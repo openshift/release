@@ -1,8 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
@@ -10,7 +13,7 @@ finalize() {
   if [ "${JOB_TYPE}" == "presubmit" ]; then
     JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
   fi
-  URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
+  URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
   cat >>${REPORT} <<EOF
 <html>
 <head>
@@ -96,14 +99,21 @@ trap 'finalize' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
-if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
+EXCLUDE_CNCF_CONFORMANCE=false
+
+if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
+  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-bootc"
+elif [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
   SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
+  if [ "${JOB_TYPE}" == "presubmit" ]; then
+    EXCLUDE_CNCF_CONFORMANCE=true
+  fi
 fi
 
 # Run in background to allow trapping signals before the command ends. If running in foreground
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
 # and get abruptly killed, which prevents gathering logs.
-ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} EXCLUDE_CNCF_CONFORMANCE=${EXCLUDE_CNCF_CONFORMANCE} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
 # Run wait -n since we only have one background command. Should this change, please update the exit
 # status handling.
 wait -n

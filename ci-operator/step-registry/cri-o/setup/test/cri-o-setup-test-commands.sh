@@ -10,19 +10,29 @@ ${SHARED_DIR}/login_script.sh
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
-timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
-    REPO_DIR="/home/deadbeef/cri-o"
-    cd "\${REPO_DIR}/contrib/test/ci"
+timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
+    SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
+    cd "\${SOURCE_DIR}/contrib/test/ci"
     ansible-playbook setup-main.yml --connection=local -vvv
+    sudo rm -rf "\${SOURCE_DIR}"
 EOF
 
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
-gcloud compute images create crio-setup-${currentDate} --source-disk-zone=${ZONE} --source-disk="${instance_name//[$'\t\r\n']}" --family="crio-setup"
+disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
+
+gcloud compute images create crio-setup-${currentDate} \
+    --source-disk="${disk_name}" \
+    --family="crio-setup" \
+    --source-disk-zone=${ZONE} \
+    --project="openshift-node-devel"
 # Delete images older than 2 weeks
-images=$(gcloud compute images list --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
+images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
-  echo "$images" | xargs -I '{}' gcloud compute images delete '{}'
+    echo "The following images will be deleted:"
+    echo "$images"
+    echo "$images" | xargs -I '{}' gcloud compute images delete '{}' --project="openshift-node-devel" || true
 else
-  echo "No images found that were created more than 2 weeks ago."
+    echo "No images found that were created more than 2 weeks ago."
 fi
+gcloud compute instances delete ${instance_name} --zone=${ZONE}

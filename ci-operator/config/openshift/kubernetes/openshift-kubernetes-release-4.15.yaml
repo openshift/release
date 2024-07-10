@@ -11,10 +11,14 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  cloud-provider-aws-rpms:
+    name: "4.15"
+    namespace: ocp
+    tag: cloud-provider-aws-rpms
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -89,7 +93,7 @@ images:
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
-    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-hyperkube
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
     # See also https://issues.redhat.com/browse/ART-4352
     FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
     COPY --from=build /*.rpm /
@@ -117,18 +121,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: pod
 promotion:
-  additional_images:
-    artifacts: artifacts
-  disabled: true
-  excluded_images:
-  - machine-os-content
-  - rhel-coreos
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - machine-os-content
+    - rhel-coreos
+    name: "4.15"
+    namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-aws-rpms /go/src/k8s.io/cloud-provider-aws/_output/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -140,6 +144,9 @@ raw_steps:
         paths:
         - destination_dir: .
           source_path: /go/src/k8s.io/kubernetes/_output/local/releases/Dockerfile
+      cloud-provider-aws-rpms:
+        as:
+        - cloud-provider-aws-rpms
       oc-rpms:
         as:
         - oc-rpms
@@ -346,7 +353,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
@@ -362,10 +369,25 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-multitenant
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
   cluster: build05

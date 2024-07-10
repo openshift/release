@@ -8,9 +8,9 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${REGION:-$LEASED_RESOURCE}
+KMS_KEY_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 # get user arn
-# arn:aws:iam::301721915996:user/qe-jenkins
 user_arn=$(aws sts get-caller-identity --output json | jq -r .Arn)
 KMS_KEY_POLICY=$(echo -e '
 {
@@ -61,8 +61,6 @@ KMS_KEY_POLICY=$(echo -e '
         }
     ]
 }')
-echo "KMS Key Policy Template:"
-echo $KMS_KEY_POLICY | jq
 
 ACCOUNT_ROLES_ARNS_FILE="${SHARED_DIR}/account-roles-arns"
 for i in $(cat "$ACCOUNT_ROLES_ARNS_FILE"); do
@@ -79,15 +77,13 @@ if [[ -e "${OPERATOR_ROLES_ARNS_FILE}" ]]; then
 fi
 
 ts=$(date +%m%d%H%M%S)
-alias_name="${NAMESPACE}-${ts}"
+alias_name="${KMS_KEY_PREFIX}-${ts}"
 echo "Creating KMS key: $alias_name"
 key_output=${ARTIFACT_DIR}/key_output.json
 
 aws --region $REGION kms create-key --description "Prow CI $alias_name" \
   --output json \
   --policy "$(echo $KMS_KEY_POLICY | jq -c)" > "${key_output}" || exit 1
-
-cat $key_output
 key_arn=$(cat "${key_output}" | jq -r '.KeyMetadata.Arn')
 key_id=$(cat "${key_output}" | jq -r '.KeyMetadata.KeyId')
 
@@ -96,7 +92,7 @@ if [[ "${key_arn}" == "" ]] || [[ "${key_arn}" == "null" ]] || [[ "${key_id}" ==
   exit 1
 fi
 
-echo "Created key $key_arn"
+echo "Created key successfully"
 echo $key_arn > ${SHARED_DIR}/aws_kms_key_arn
 echo $key_id > ${SHARED_DIR}/aws_kms_key_id
 

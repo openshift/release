@@ -34,18 +34,13 @@ export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 declare vsphere_portgroup
 if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
-  if [[ "${LEASED_RESOURCE}" == *"segment"* ]]; then
-    # notes: jcallen: to keep backward compatiability with existing vsphere env(s)
-    vsphere_portgroup="${LEASED_RESOURCE}"
-  else
-    # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
-    # into: primary router hostname, datacenter and vlan id
-    vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
+  # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
+  # into: primary router hostname, datacenter and vlan id
+  vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
 
-    # notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
-    vsphere_portgroup="ci-vlan-${vlanid}"
-    export LEASED_RESOURCE="${vsphere_portgroup}"
-  fi
+  # notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
+  vsphere_portgroup="ci-vlan-${vlanid}"
+  export LEASED_RESOURCE="${vsphere_portgroup}"
 fi
 
 make run-ci-e2e-byoh-test

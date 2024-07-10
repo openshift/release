@@ -32,12 +32,15 @@ logger = logging.getLogger()
 
 
 def generate_app_ci_content(config, git_clone_dir):
+    namespaces = []
     for private in (False, True):
         for arch in config.arches:
             context = Context(config, arch, private)
+            namespaces.append(context.is_namespace)
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_imagestream_namespace_rbac(gendoc)
+                content.add_release_payload_modifier_rbac(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
@@ -46,9 +49,13 @@ def generate_app_ci_content(config, git_clone_dir):
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('serviceaccount.yaml'), context=config) as gendoc:
         content.add_osd_rc_service_account_resources(gendoc)
+        content.add_release_payload_modifier_service_account(gendoc)
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
+
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('ibm_managed_control_plane_testing.yaml'), context=config) as gendoc:
+        content.add_ibm_managed_control_plane_testing(gendoc)
 
     with genlib.GenDoc(config.paths.path_rc_rpms.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
@@ -115,6 +122,9 @@ def generate_app_ci_content(config, git_clone_dir):
 
     # Release Payload Controller
     content.add_release_payload_controller_resources(config, context)
+
+    # Release Reimport Controller
+    content.add_release_reimport_controller_resources(config, context, namespaces)
 
 
 def run(git_clone_dir, bump=False):

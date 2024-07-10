@@ -7,12 +7,16 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
 binary_build_commands: make
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/release-controller/Dockerfile
-  from: os
+  from: tools
   inputs:
     bin:
       paths:
@@ -20,7 +24,7 @@ images:
         source_path: /go/src/github.com/openshift/release-controller/release-controller
   to: release-controller
 - dockerfile_path: images/release-controller-api/Dockerfile
-  from: os
+  from: tools
   inputs:
     bin:
       paths:
@@ -35,9 +39,18 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/release-controller/release-payload-controller
   to: release-payload-controller
+- dockerfile_path: images/release-reimport-controller/Dockerfile
+  from: tools
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-reimport-controller
+  to: release-reimport-controller
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     requests:

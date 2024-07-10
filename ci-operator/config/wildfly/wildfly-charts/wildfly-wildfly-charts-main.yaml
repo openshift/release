@@ -1,0 +1,38 @@
+build_root:
+  project_image:
+    dockerfile_path: .github/workflows/openshift-ci/Containerfile
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: wildfly-wildfly-charts-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: wildfly-charts-build
+      commands: |
+        ls -la .github/workflows/openshift-ci/
+        /bin/bash .github/workflows/openshift-ci/e2e-test.sh
+      credentials:
+      - mount_path: /var/run/registry-quay-io-pull-secret
+        name: registry-quay-io-pull-secret
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: wildfly
+  repo: wildfly-charts

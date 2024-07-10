@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -126,8 +126,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: ovirt-installer
 promotion:
-  name: 4.8-priv
-  namespace: ocp-private
+  to:
+  - name: 4.8-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -230,11 +231,11 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-shared-vpc
+- as: e2e-gcp-byo-vpc
   optional: true
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-sharednetwork
+    workflow: openshift-e2e-gcp-byo-vpc
 - as: e2e-azure
   optional: true
   steps:
@@ -262,7 +263,7 @@ tests:
 - as: e2e-gcp-upi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-upi
 - as: e2e-gcp-upi-xpn
   optional: true
@@ -289,7 +290,7 @@ tests:
 - as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
   cluster: build05
@@ -352,7 +353,7 @@ tests:
   optional: true
   run_if_changed: (^(data/.*|pkg.*)/vsphere)|(^vendor/github.com/vmware/)
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upi
   steps:

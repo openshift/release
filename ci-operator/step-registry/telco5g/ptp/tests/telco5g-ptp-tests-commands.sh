@@ -64,8 +64,22 @@ spec:
           rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
           export PATH=$PATH:/usr/local/go/bin
           go version
-          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
-          podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
+          # set +x here to hide pass from log
+          set +xe
+
+          echo "podman login with serviceaccount"
+
+          # Used for 4.16 and newer releases.
+          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
+          pass=`echo ${pass:1:-1} | base64 -d`
+          podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
+          # Used for 4.15 and older releases.
+          if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
+            pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+            podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+          fi
 
           set -x
 
@@ -193,19 +207,31 @@ fi
 
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
+# always use the latest test code
 export TEST_BRANCH="master"
-export PTP_UNDER_TEST_BRANCH="master"
+
+export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+export IMG_VERSION="release-${T5CI_VERSION}"
+
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-temp_dir=$(mktemp -d -t cnf-XXXXX)
+# Set go version
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
+  source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
+fi
 
+temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
 # deploy ptp
 echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 
 # build ptp operator and create catalog
-export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:latest
+export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:${T5CI_VERSION}
 build_images
 
 # deploy ptp-operator
@@ -224,7 +250,7 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}}}' --type=merge
+oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 
 # wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
@@ -265,7 +291,7 @@ soaktest:
       duration: 5
       failure_threshold: 3
       custom_params:
-        prometheus_rate_time_window: "60s"
+        prometheus_rate_time_window: "70s"
         node:
           cpu_threshold_mcores: 100
         pod:

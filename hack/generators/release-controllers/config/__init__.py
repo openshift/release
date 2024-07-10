@@ -34,6 +34,8 @@ class RCPaths:
 
         # Release Payload Controller Resources
         self.path_rpc_resources = self.path_base.joinpath('clusters/app.ci/release-payload-controller')
+        # Release Reimport Controller Resources
+        self.path_reimport_resources = self.path_base.joinpath('clusters/app.ci/release-reimport-controller')
 
 
 class Config:
@@ -42,7 +44,7 @@ class Config:
         self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
         self.rc_release_domain = 'svc.ci.openshift.org'
         self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
+        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi', 'multi-2')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
         self.scos_releases = self._get_scos_releases()

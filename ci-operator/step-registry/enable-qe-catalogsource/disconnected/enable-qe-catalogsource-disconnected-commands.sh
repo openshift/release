@@ -170,12 +170,23 @@ function mirror_optional_images () {
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
-    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
+    run_command "oc adm catalog mirror --manifests-only --insecure=true --continue-on-error=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
     if [[ $ret -eq 0 ]]; then
-        echo "mirror optional operators' images successfully"
+        echo "get manifests successfully"
+        # There are some images with the registry.redhat.io prefix, but they are not store there in fact, such as unreleased images, as follows,
+        # error: unable to retrieve source image registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator manifest sha256:2801ca51e913273d7db6728f05cb50f18b5c0062f95e92609645b592512aed21: manifest unknown: manifest unknown
+        # so, replace registry.redhat.io with brew.registry.redhat.io.
+        run_command "sed -i 's/^registry.redhat.io/brew.registry.redhat.io/g' /tmp/olm_mirror/mapping.txt"
+        run_command "oc image mirror --insecure=true --skip-missing=true --continue-on-error=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" -f /tmp/olm_mirror/mapping.txt" || ret=$?
+        if [[ $ret -eq 0 ]]; then
+            echo "mirror optional operator images succeed!"
+        else
+            run_command "ls -l /tmp/olm_mirror/"
+            run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+            run_command "cat /tmp/olm_mirror/mapping.txt"
+        fi
     else
-        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
-        run_command "cat /tmp/olm_mirror/mapping.txt"
+        echo "fail to get optional operators' manifests!"
         return 1
     fi
     set_proxy
@@ -266,12 +277,42 @@ EOF
 
 function create_catalog_sources()
 {    
-    echo "create QE catalogsource: qe-app-registry"
-    cat <<EOF | oc create -f -
+    echo "create QE catalogsource: $CATALOGSOURCE_NAME"
+    # get cluster Major.Minor version
+    kube_major=$(oc version -o json |jq -r '.serverVersion.major')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
+
+    # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
+    # details: https://issues.redhat.com/browse/OCPBUGS-31427
+    if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
+        echo "the index image as the initContainer cache image)" 
+        cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: qe-app-registry
+  name: $CATALOGSOURCE_NAME
+  namespace: openshift-marketplace
+spec:
+  displayName: Production Operators
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: ${mirror_index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+    else
+        echo "the index image as the server image" 
+        cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
 spec:
   displayName: Production Operators
@@ -282,13 +323,15 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+    fi
+
     COUNTER=0
     while [ $COUNTER -lt 600 ]
     do
         sleep 20
         COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        STATUS=`oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o=jsonpath="{.status.connectionState.lastObservedState}"`
         if [[ $STATUS = "READY" ]]; then
             echo "create the QE CatalogSource successfully"
             break
@@ -301,9 +344,9 @@ EOF
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
         run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
+        run_command "oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o yaml"
+        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o yaml"
+        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${mirror_index_image}"
 
@@ -369,6 +412,21 @@ EOF
     marketplace=1
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+function check_olm_capability(){
+    # check if OLM capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManager"
+        # check if OLM capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
+              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
@@ -414,6 +472,7 @@ else
 fi 
 
 create_settled_icsp
+check_olm_capability
 check_marketplace
 # No need to disable the default OperatorHub when marketplace disabled as default.
 if [ $marketplace -eq 0 ]; then

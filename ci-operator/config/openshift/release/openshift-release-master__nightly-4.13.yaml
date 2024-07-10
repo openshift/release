@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -99,10 +99,6 @@ releases:
     release:
       channel: candidate
       version: 4.13.0-rc.5
-  oldest-supported-z-rollback:
-    release:
-      channel: candidate
-      version: 4.13.0
 resources:
   '*':
     requests:
@@ -110,7 +106,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ovn-assisted
-  cron: 0 0 * * 1
+  cron: 48 0 * * 0
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -171,18 +167,6 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-sno
-- as: e2e-metal-ovn-single-node-hostname-change
-  interval: 168h
-  steps:
-    cluster_profile: packet-sno
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - ref: baremetalds-sno-hostname
-    - ref: baremetalds-sno-conf
-    - ref: baremetalds-sno-test
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
@@ -247,7 +231,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-sdn-serial-virtualmedia-bond
+- as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
   steps:
@@ -255,7 +239,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-serial-virtualmedia-bond
+    workflow: baremetalds-e2e-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -309,7 +293,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-ovn-proxy
-  cron: 0 0 */2 * *
+  cron: 27 17 * * 6
   steps:
     cluster_profile: aws
     observers:
@@ -317,17 +301,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-sdn
-  interval: 144h
+  cron: 3 23 * * 0
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
-  interval: 146h
+  cron: 17 21 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -348,9 +332,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 148h
+  cron: 36 1 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -359,7 +343,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-externallb-ovn
-  interval: 150h
+  cron: 30 12 * * 6
   steps:
     cluster_profile: vsphere-2
     observers:
@@ -367,9 +351,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
-  interval: 152h
+  cron: 45 3 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -378,9 +362,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
-  interval: 154h
+  cron: 55 15 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -388,7 +372,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  interval: 156h
+  cron: 57 0 * * 0
   steps:
     cluster_profile: vsphere-8-vpn
     env:
@@ -399,7 +383,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
-  interval: 158h
+  cron: 55 9 * * 0
   steps:
     cluster_profile: vsphere-8-vpn
     env:
@@ -410,9 +394,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-ovn-csi
-  interval: 160h
+  cron: 9 9 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -420,26 +404,26 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-zones
-  interval: 162h
+- as: e2e-vsphere-ovn-zones
+  cron: 15 10 * * 6
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-upi-zones
-  interval: 164h
+- as: e2e-vsphere-ovn-upi-zones
+  cron: 19 5 * * 6
   steps:
     cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-etcd-scaling
-  interval: 166h
+  cron: 11 13 * * 0
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-workers-rhel8
-  cron: '@daily'
+  cron: 27 8 * * 6
   steps:
     cluster_profile: aws
     env:
@@ -449,7 +433,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt-sdn
-  cron: 0 2,8 * * *
+  cron: 14 21 * * 0
   steps:
     cluster_profile: ovirt
     observers:
@@ -457,7 +441,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-ovn
-  cron: 0 18 * * *
+  cron: 15 2 * * 6
   steps:
     cluster_profile: ovirt
     env:
@@ -475,7 +459,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-ovirt-csi
 - as: e2e-gcp-libvirt-cert-rotation
-  cron: '@daily'
+  cron: 19 4 * * 0
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     observers:
@@ -519,7 +503,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
-  interval: 3h
+  cron: 18 16 * * 6
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
@@ -529,7 +513,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-sdn-upgrade
-  interval: 3h
+  cron: 46 13 * * 6
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
@@ -604,7 +588,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp-sdn
 - as: console-aws
-  interval: 24h
+  cron: 53 3 * * 6
   steps:
     cluster_profile: aws-2
     env:
@@ -636,28 +620,13 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-realtime
 - as: e2e-gcp-ovn-xpn
-  interval: 8h
+  cron: 53 11 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
-- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
-  interval: 48h
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_SKIPS: sysctl allowlist update should start a pod with custom sysctl only
-        when the sysctl is added to whitelist
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
-    workflow: openshift-upgrade-aws
-  timeout: 6h0m0s
 - as: credentials-request-freeze
-  interval: 48h
+  cron: 45 6 * * 6
   steps:
     dependencies:
       OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
@@ -850,7 +819,7 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
+  cron: 9 22 * * 6
   steps:
     cluster_profile: aws-2
     env:
@@ -869,7 +838,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-telco5g
   cluster: build05
-  cron: 09 05 */1 * 1-5
+  cron: 35 10 * * 0
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -881,9 +850,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-origin
+  timeout: 6h0m0s
 - as: e2e-telco5g-cnftests
   cluster: build05
-  cron: 03 14 */1 * 1-5
+  cron: 00 08 * * 6,0
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -897,7 +867,7 @@ tests:
     workflow: telco5g-cnf
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
-  cron: 15 03 */1 * 1-5
+  cron: 00 08 * * 6,0
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -911,7 +881,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 00 03 */1 * 1-5
+  cron: 0 18 * * 6
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -987,7 +957,7 @@ tests:
     workflow: openshift-e2e-azurestack-upi
 - as: e2e-nutanix-ovn
   cluster: build01
-  interval: 24h
+  cron: 40 22 * * 6
   steps:
     cluster_profile: nutanix
     observers:
@@ -1003,7 +973,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-sdn-serial
 - as: e2e-aws-ovn-etcd-scaling
-  interval: 24h
+  cron: 38 7 * * 6
   steps:
     cluster_profile: aws
     observers:
@@ -1011,7 +981,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
-  interval: 24h
+  cron: 17 17 * * 6
   steps:
     cluster_profile: gcp
     observers:
@@ -1019,7 +989,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
 - as: e2e-azure-ovn-etcd-scaling
-  interval: 24h
+  cron: 50 17 * * 6
   steps:
     cluster_profile: azure4
     observers:
@@ -1027,12 +997,23 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-aws-ovn-cpu-partitioning
-  interval: 6h
+  cron: 9 1 * * 6
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
+- as: fips-payload-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      MAJOR_MINOR: "4.13"
+    test:
+    - ref: fips-check-node-scan
+    - ref: fips-check-art-fips
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

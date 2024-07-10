@@ -1,8 +1,13 @@
-build_root:
-  image_stream_tag:
+base_images:
+  e2e-test-runner:
     name: redhat-appstudio
     namespace: ci
     tag: e2e-test-runner
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 images:
 - dockerfile_path: Dockerfile
   to: redhat-appstudio-jvm-build-service-image
@@ -17,7 +22,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -30,11 +35,13 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-west-2
+    owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    version: "4.14"
+  skip_if_only_changed: ^docs/|^\.github/|^java-components/adhoc-analyser-tool/|^java-components/cli/|^java-components/management-console/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       CI_JBS_CACHE_IMAGE: redhat-appstudio-jvm-build-service-cache-image
@@ -47,19 +54,21 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-west-2
+    owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    version: "4.14"
+  skip_if_only_changed: ^docs/|^\.github/|^java-components/adhoc-analyser-tool/|^java-components/cli/|^java-components/management-console/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: jvm-build-service-e2e-in-repo-e2e
       cli: latest
       commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export GITHUB_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
         git config --global user.name "redhat-appstudio-qe-bot"
         git config --global user.email redhat-appstudio-qe-bot@redhat.com
         mkdir -p ${HOME}/creds
@@ -77,8 +86,8 @@ tests:
         export JVM_DELETE_TASKRUN_PODS="1"
         make openshift-e2e
       credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
+      - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+        name: konflux-ci-secrets-new
         namespace: test-credentials
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
@@ -93,19 +102,25 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: jvm-build-service-in-repo-apicurio-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   optional: true
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m6i.4xlarge
     test:
     - as: jvm-build-service-in-repo-apicurio-e2e
       cli: latest
       commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export GITHUB_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
         git config --global user.name "redhat-appstudio-qe-bot"
         git config --global user.email redhat-appstudio-qe-bot@redhat.com
         mkdir -p ${HOME}/creds
@@ -123,8 +138,8 @@ tests:
         /bin/bash deploy/openshift-ci.sh
         make openshift-e2e-periodic
       credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
+      - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+        name: konflux-ci-secrets-new
         namespace: test-credentials
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
@@ -138,21 +153,27 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: jvm-build-service-in-repo-quickstarts-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   optional: true
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m6i.4xlarge
     test:
     - as: jvm-build-service-in-repo-quickstarts-e2e
       cli: latest
       commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export GITHUB_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
         git config --global user.name "redhat-appstudio-qe-bot"
         git config --global user.email redhat-appstudio-qe-bot@redhat.com
         mkdir -p ${HOME}/creds
@@ -170,8 +191,8 @@ tests:
         /bin/bash deploy/openshift-ci.sh
         make openshift-e2e-quickstarts
       credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
+      - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+        name: konflux-ci-secrets-new
         namespace: test-credentials
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
@@ -185,21 +206,27 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: jvm-build-service-in-repo-wildfly-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   optional: true
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m6i.4xlarge
     test:
     - as: jvm-build-service-in-repo-wildfly-e2e
       cli: latest
       commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export GITHUB_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
         git config --global user.name "redhat-appstudio-qe-bot"
         git config --global user.email redhat-appstudio-qe-bot@redhat.com
         mkdir -p ${HOME}/creds
@@ -217,8 +244,8 @@ tests:
         /bin/bash deploy/openshift-ci.sh
         make openshift-e2e-wildfly
       credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
+      - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+        name: konflux-ci-secrets-new
         namespace: test-credentials
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
@@ -232,21 +259,27 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: jvm-build-service-in-repo-jbs-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   optional: true
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m6i.4xlarge
     test:
     - as: jvm-build-service-in-repo-jbs-e2e
       cli: latest
       commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export GITHUB_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
         git config --global user.name "redhat-appstudio-qe-bot"
         git config --global user.email redhat-appstudio-qe-bot@redhat.com
         mkdir -p ${HOME}/creds
@@ -264,8 +297,8 @@ tests:
         /bin/bash deploy/openshift-ci.sh
         make openshift-e2e-jbs
       credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
+      - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+        name: konflux-ci-secrets-new
         namespace: test-credentials
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
@@ -279,7 +312,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

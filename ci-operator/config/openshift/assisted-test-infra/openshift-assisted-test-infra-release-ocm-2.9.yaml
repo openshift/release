@@ -27,6 +27,10 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -45,8 +49,9 @@ images:
       - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.9
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.9
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -84,7 +89,8 @@ tests:
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-unbinding-single-node
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-unbinding-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -115,7 +121,7 @@ tests:
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: 43 22 */1 * 1-5
+  cron: 00 00 */1 * 0
   steps:
     cluster_profile: packet-assisted
     env:
@@ -131,7 +137,8 @@ tests:
         WORKER_DISK=40000000000
       TEST_SUITE: full
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -145,7 +152,8 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv4
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv4
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -159,7 +167,8 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv6
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv6
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -173,7 +182,8 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-vsphere-assisted-kube-api
+- always_run: false
+  as: e2e-vsphere-assisted-kube-api
   optional: true
   steps:
     cluster_profile: vsphere-2
@@ -189,32 +199,8 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-vsphere-assisted-kube-api-periodic
-  cron: 00 00 */1 * 0-5
-  steps:
-    cluster_profile: vsphere-2
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.9
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_WORKERS=0
-        IPv4=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- as: e2e-metal-assisted-ipxe
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.9
-        IPXE_BOOT=true
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-reclaim-single-node
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -228,7 +214,8 @@ tests:
         MAKEFILE_TARGET=test
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-reclaim
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim
   optional: true
   steps:
     cluster_profile: packet-assisted

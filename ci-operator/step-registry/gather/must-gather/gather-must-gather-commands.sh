@@ -9,6 +9,7 @@ function createInstallJunit() {
   EXIT_CODE_INFRA=4
   EXIT_CODE_BOOTSTRAP=5
   EXIT_CODE_CLUSTER=6
+  EXIT_CODE_OPERATORS=7
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}'`
@@ -21,12 +22,13 @@ function createInstallJunit() {
       set -o errexit
 
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-      <testsuite name="cluster install" tests="$((PREVIOUS_INFRA_FAILURE+6))" failures="$PREVIOUS_INFRA_FAILURE">
+      <testsuite name="cluster install" tests="$((PREVIOUS_INFRA_FAILURE+7))" failures="$PREVIOUS_INFRA_FAILURE">
         <testcase name="install should succeed: other"/>
         <testcase name="install should succeed: configuration"/>
         <testcase name="install should succeed: infrastructure"/>
         <testcase name="install should succeed: cluster bootstrap"/>
         <testcase name="install should succeed: cluster creation"/>
+        <testcase name="install should succeed: cluster operator stability"/>
         <testcase name="install should succeed: overall"/>
 EOF
 
@@ -102,6 +104,23 @@ EOF
         </testcase>
       </testsuite>
 EOF
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_OPERATORS" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="7" failures="2">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure"/>
+        <testcase name="install should succeed: cluster bootstrap"/>
+        <testcase name="install should succeed: cluster creation"/>
+        <testcase name="install should succeed: cluster operator stability">
+          <failure message="">openshift cluster install failed with cluster operator stability failure</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+      </testsuite>
+EOF
     else
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="2" failures="2">
@@ -148,6 +167,8 @@ function installCamgi() {
     popd
 }
 
+createInstallJunit
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in calling must-gather."
@@ -174,8 +195,6 @@ then
 else
 	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
 fi
-
-createInstallJunit
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 

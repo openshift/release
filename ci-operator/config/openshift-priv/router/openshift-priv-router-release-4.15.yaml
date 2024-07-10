@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -16,8 +16,10 @@ build_root:
 canonical_go_repository: github.com/openshift/router
 images:
 - dockerfile_path: images/router/base/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -30,9 +32,9 @@ images:
   from: haproxy-router-base
   to: f5-router
 promotion:
-  disabled: true
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -59,7 +61,7 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
@@ -158,6 +160,28 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: openshift-qe-ingress-perf
+  timeout: 5h0m0s
+- always_run: false
+  as: perfscale-aws-fips-ingress-perf
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      FIPS_ENABLED: "true"
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf

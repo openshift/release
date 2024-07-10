@@ -7,7 +7,7 @@ OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
-export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="8Gi"}
 export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
@@ -16,8 +16,13 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Build tag
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -26,7 +31,7 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
       echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
@@ -34,6 +39,8 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 # Copy base operator code to home directory
 cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
@@ -51,12 +58,12 @@ if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
 else
   export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
 fi
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
   cd ${BASE_DIR}
-  git clone https://github.com/openstack-k8s-operators/install_yamls.git
+  git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
 fi
 
 cd ${BASE_DIR}/install_yamls
@@ -189,6 +196,9 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+    - op: replace
+      path: /spec/glance/template/glanceAPIs/default/type
+      value: split
 $(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
   cat <<IRONIC_EOF
     - op: add
@@ -256,7 +266,7 @@ oc exec -it  pod/${DBSERVICE_CONTAINER} -- mysql -uroot -p${MARIADB_PASSWD} -e "
 
 # Post tests for keystone-operator
 # Check to confirm you can issue a token.
-openstack token issue
+openstack --insecure token issue
 
 # Dump keystone catalog endpoints
-openstack endpoint list
+openstack --insecure endpoint list

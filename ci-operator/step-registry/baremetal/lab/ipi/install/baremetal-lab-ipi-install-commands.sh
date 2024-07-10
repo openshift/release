@@ -10,7 +10,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ -z "${PROVISIONING_HOST}" ] && { echo "\$PROVISIONING_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
@@ -19,6 +18,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 export TF_LOG=DEBUG
 
 function oinst() {
@@ -26,19 +32,18 @@ function oinst() {
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
-function prepare_bmc() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-}
-
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
@@ -59,13 +64,13 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
 # for the provisioning host).
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
   --command=openshift-baremetal-install --to=/tmp
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
+# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install
@@ -94,13 +99,17 @@ compute:
 platform:
   baremetal:
     libvirtURI: >-
-      qemu+ssh://root@${PROVISIONING_HOST}/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
+      qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
     apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
     ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
+    externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
     hosts: []
 "
+
+# Copy provisioning-host-ssh-port-${architecture} to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
 # shellcheck disable=SC2154
@@ -149,14 +158,27 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
-  echo "Power off ${bmc_address//.*/} (${name}) and prepare host bmc conf for installation..."
-  prepare_bmc "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+  echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
+done
+
+echo "[INFO] Looking for patches to the install-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  echo "[INFO] Applying patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
 done
 
 mkdir -p "${INSTALL_DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"

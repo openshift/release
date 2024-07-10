@@ -13,85 +13,36 @@ fi
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare dns_server
-declare vsphere_portgroup
 declare vlanid
 declare primaryrouterhostname
+# # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - setting up static IP assignments"
 
 STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
+echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
-  cat >>"${STATIC_IPS}" <<EOF
-    hosts:
-    - role: bootstrap
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.5/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.6/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.7/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.8/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.9/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.10/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - 192.168.${third_octet}.11/24
-        gateway: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-EOF
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
-else
+echo "$(date -u --rfc-3339=seconds) - ${vlanid} ${primaryrouterhostname} "
 
-  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
+fi
 
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-  cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
 
-  cat >>"${STATIC_IPS}" <<EOF
+cat >>"${STATIC_IPS}" <<EOF
     hosts:
 EOF
 
@@ -128,7 +79,6 @@ EOF
         - ${dns_server}
 EOF
   done
-fi
 
 echo "$(date -u --rfc-3339=seconds) - set up static IP assignments"
 cat "${STATIC_IPS}"

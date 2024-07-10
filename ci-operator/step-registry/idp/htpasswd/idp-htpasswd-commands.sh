@@ -4,6 +4,25 @@ set -e
 set -u
 set -o pipefail
 
+# Check if any IDP is already configured
+function check_idp () {
+    # Check if runtime_env exists and then check if $USERS is not empty
+    if [ -f "${SHARED_DIR}/runtime_env" ]; then
+        source "${SHARED_DIR}/runtime_env"
+    else
+        echo "runtime_env does not exist, continuing checking..."
+        USERS=""
+    fi
+
+    # Fetch the detailed identityProviders configuration if any
+    current_idp_config=$(oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{" "}{.type}{"\n"}{end}')
+
+    if [ -n "$current_idp_config" ] && [ "$current_idp_config" != "null" ] && [ -n "$USERS" ]; then
+        echo -e "Skipping addition of new htpasswd IDP because already configured IDP as below:\n$current_idp_config"
+        exit 0
+    fi
+}
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
@@ -64,7 +83,7 @@ function set_users () {
 
     # store users in a shared file
     if [ -f "${SHARED_DIR}/runtime_env" ] ; then
-    source "${SHARED_DIR}/runtime_env"
+        source "${SHARED_DIR}/runtime_env"
     fi
     runtime_env=${SHARED_DIR}/runtime_env
     users=${users::-1}
@@ -84,4 +103,5 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
 fi
 
 set_proxy
+check_idp
 set_users

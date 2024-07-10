@@ -16,6 +16,9 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "Deleting cluster: ${CLUSTER_ID}"
 
+echo "Fetching installation logs of the cluster ${CLUSTER_ID}..."
+ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log" || echo "error: Unable to pull installation log."
+
 ocm delete "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
 echo "Waiting for cluster deletion..."
 while ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" ; do

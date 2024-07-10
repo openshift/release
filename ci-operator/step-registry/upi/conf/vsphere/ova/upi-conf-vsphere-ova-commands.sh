@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 HOME=/tmp
@@ -23,7 +28,11 @@ source "${SHARED_DIR}/govc.sh"
 
 declare vsphere_cluster
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 DATACENTERS=("$GOVC_DATACENTER")
 DATASTORES=("$GOVC_DATASTORE")
@@ -47,6 +56,7 @@ echo "$(date -u --rfc-3339=seconds) - govc version: ${govc_version}"
 echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
 
 vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
 for i in "${!DATACENTERS[@]}"; do
     DATACENTER=$(echo -n ${DATACENTERS[$i]} | tr -d '\n')
     export GOVC_DATACENTER=$DATACENTER
@@ -118,6 +128,9 @@ EOF
     hw_versions=(15 17 18 19)
     if [[ ${vsphere_version} -eq 8 ]]; then
         hw_versions=(20)
+      if [[ ${vsphere_minor_version} -ge 2 ]]; then
+        hw_versions=(20 21)
+      fi
     fi
 
     for hw_version in "${hw_versions[@]}"; do

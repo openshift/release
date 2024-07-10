@@ -11,6 +11,11 @@ BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 which openshift-install
 openshift-install version
 
+function get_arch() {
+  ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+  echo "${ARCH}"
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -27,6 +32,13 @@ function populate_artifact_dir() {
 	s/UserData:.*,/UserData: REDACTED,/;
 	' "${dir}/terraform.txt"
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output/" 2>/dev/null
+  fi
 }
 
 function prepare_next_steps() {
@@ -98,6 +110,64 @@ function wait_router_lb_provision() {
     return 0
 }
 
+function patch_public_ip_for_edge_node() {
+  set -x
+  local dir=${1}
+  
+  pushd "${dir}/openshift"
+
+  # For wavelength zone & byo vpc only
+  if [[ "${EDGE_ZONE_TYPES:-}"  == 'wavelength-zone' ]] && [[ -e ${SHARED_DIR}/edge_zone_subnet_id ]]; then
+
+    if [ ! -f /tmp/yq ]; then
+      curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+      -o /tmp/yq && chmod +x /tmp/yq
+    fi
+    
+    PATCH=$(mktemp)
+    cat <<EOF > ${PATCH}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          publicIp: true
+EOF
+
+    SUBNET_ID=$(head -n 1 ${SHARED_DIR}/edge_zone_subnet_id)
+
+    echo "wavelength zone: patching publi ip: ${PATCH}"
+
+    for MACHINESET in $(grep -lr "machine.openshift.io/cluster-api-machine-role: edge" .)
+    do
+      echo -e "\tpatching: ${MACHINESET}"
+      sed -i "s/subnet-.*/${SUBNET_ID}/g" ${MACHINESET}
+      /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+    done
+  fi
+  popd
+  set +x
+}
+
+# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
+function enable_efa_pg_instance_config() {
+  local dir=${1}
+
+  PATCH="${SHARED_DIR}/machineset0-efa-pg.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          networkInterfaceType: EFA
+          instanceType: c5n.9xlarge
+          placementGroupName: pgcluster
+EOF
+  yq-go m -x -i "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" "${PATCH}"
+  echo 'Patched efa pg into 99_openshift-cluster-api_worker-machineset-0.yaml'
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -141,7 +211,11 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
@@ -161,30 +235,38 @@ if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
-if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
-  if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
+if [ "${ENABLE_AWS_EDGE_ZONE}" == "yes" ]; then
+  if [[ -f "${SHARED_DIR}/manifest_edge_node_machineset.yaml" ]]; then
     # Phase 0, inject manifests
     
     # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
     echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
-    localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+    edge_node_machineset="${SHARED_DIR}/manifest_edge_node_machineset.yaml"
     infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
     ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
-    sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
-    sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
-    cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+    sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${edge_node_machineset}
+    sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${edge_node_machineset}
+    cp "${edge_node_machineset}" "${ARTIFACT_DIR}/"
   else
     # Phase 1 & 2, use install-config
-    if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "yes" ]]; then
-      echo 'LOCALZONE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from localzone machineset'
-      for local_zone_machineset in $(grep -lr 'cluster-api-machine-type: edge' ${dir});
+    if [[ "${EDGE_NODE_WORKER_SCHEDULABLE}" == "yes" ]]; then
+      echo 'EDGE_NODE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from edge node machineset'
+      for edge_node_machineset in $(grep -lr 'cluster-api-machine-type: edge' ${dir});
       do
-        echo "Removing spec.template.spec.taints from $(basename ${local_zone_machineset})"
-        yq-go d "${local_zone_machineset}" spec.template.spec.taints
+        echo "Removing spec.template.spec.taints from $(basename ${edge_node_machineset})"
+        yq-go d "${edge_node_machineset}" spec.template.spec.taints
       done
     fi
   fi
+
+  if [[ "${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP:-}"  == 'yes' ]]; then
+    patch_public_ip_for_edge_node ${dir}
+  fi
   
+fi
+
+if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
+  enable_efa_pg_instance_config ${dir}
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"

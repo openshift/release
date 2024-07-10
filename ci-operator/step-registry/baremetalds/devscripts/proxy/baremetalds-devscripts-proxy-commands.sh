@@ -13,6 +13,19 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+set -x
+# CENTOS STREAM 8 IS END OF LIFE
+# FIXME:Update to CentOS Stream 9
+# Temporary workaround here https://forums.centos.org/viewtopic.php?t=78708&start=30
+cat /etc/os-release
+source /etc/os-release
+if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
+    sudo sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+    sudo sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+    sudo dnf clean all
+fi
+set +x
+
 sudo dnf install -y podman firewalld
 
 # The default "10:30:100" results in connections being rejected
@@ -23,7 +36,7 @@ sudo systemctl restart sshd
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
-acl cluster dstdomain .metalkube.org .ocpci.eng.rdu2.redhat.com
+acl cluster dstdomain .metalkube.org .ocpci.eng.rdu2.redhat.com .okd.on.massopen.cloud .p1.openshiftapps.com sso.redhat.com
 http_access allow cluster
 http_access deny all
 http_port 8213
@@ -50,12 +63,20 @@ sudo podman run -d --rm \
      quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
+CIRFILE=$SHARED_DIR/cir
+PROXYPORT=8213
+if [ -f $CIRFILE ] ; then
+    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
+fi
+
+
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${IP}:8213/
-export HTTPS_PROXY=http://${IP}:8213/
+export PROXYPORT=${PROXYPORT}
+export HTTP_PROXY=http://${IP}:${PROXYPORT}/
+export HTTPS_PROXY=http://${IP}:${PROXYPORT}/
 export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
-export http_proxy=http://${IP}:8213/
-export https_proxy=http://${IP}:8213/
+export http_proxy=http://${IP}:${PROXYPORT}/
+export https_proxy=http://${IP}:${PROXYPORT}/
 export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF

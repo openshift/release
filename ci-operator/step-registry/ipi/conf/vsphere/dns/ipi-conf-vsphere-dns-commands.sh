@@ -16,22 +16,32 @@ export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
+
+which python || true
+whereis python || true
+
 if ! command -v aws &> /dev/null
 then
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
-    export PATH="${HOME}/.local/bin:${PATH}"
-    if command -v pip3 &> /dev/null
+    export PATH="${HOME}/.local/bin:${PATH}" 
+  
+    if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
     then
+      easy_install --user 'pip<21'
+      pip install --user awscli
+    elif [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 3 ]
+    then
+      python -m ensurepip
+      if command -v pip3 &> /dev/null
+      then        
         pip3 install --user awscli
-    else
-        if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-        then
-          easy_install --user 'pip<21'
-          pip install --user awscli
-        else
-          echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
-          exit 1
-        fi
+      elif command -v pip &> /dev/null
+      then
+        pip install --user awscli
+      fi
+    else    
+      echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+      exit 1
     fi
 fi
 
@@ -47,18 +57,17 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+RECORD_TYPE="A"
+
 if [ "${JOB_NAME_SAFE}" = "launch" ]; then
   # setup DNS records for clusterbot to point to the IBM VIP
-  api_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.20"}]'
-  apps_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "169.48.190.20"}]'
+  api_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "vsphere-clusterbot-2284482-dal12.clb.appdomain.cloud"}]'
+  apps_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "vsphere-clusterbot-2284482-dal12.clb.appdomain.cloud"}]'
+  RECORD_TYPE="CNAME"
 else
   # Configure DNS direct to respective VIP
-  api_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
-  apps_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
+  api_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+  apps_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
 fi
 
 # api-int record is needed just for Windows nodes
@@ -71,7 +80,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "Action": "UPSERT",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $api_dns_target
       }
     },{
@@ -86,7 +95,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "Action": "UPSERT",
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $apps_dns_target
       }
 }]}

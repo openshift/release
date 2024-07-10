@@ -32,7 +32,7 @@ function eval_instance_capacity() {
   # During our initial adoption of m6a, AWS has report insufficient capacity at peak hours. For cost effectiveness
   # and to ensure AWS eventual adds m6a capacity due to these errors, we want to continue to use them. However,
   # if left unchecked, these peak hour errors can derail a statistically significant number of jobs.
-  # To mitigate the capacity issues, search.ci.openshift.org can tell us if previous jobs have failed to provision
+  # To mitigate the capacity issues, search.dptools.openshift.org can tell us if previous jobs have failed to provision
   # the desired instance type - in this region - in the last x minutes.
   # If we find such an error, use the fallback instance type.
 
@@ -46,7 +46,7 @@ function eval_instance_capacity() {
   local LOOK_BACK_PERIOD="30m"
   local TARGET_TYPE="${DESIRED_TYPE}"
   for retry in {1..30}; do
-    if err_count=$(curl -L -s "https://search.ci.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
+    if err_count=$(curl -L -s "https://search.dptools.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
       if [[ "${err_count}" == "0" ]]; then
         break  # Use DESIRED_TYPE
       else
@@ -134,14 +134,16 @@ fi
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
-workers=${COMPUTE_NODE_REPLICAS:-3}
+worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
-    workers=0
+    worker_replicas=0
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  workers=0
+  worker_replicas=0
 fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
 
 # Generate working availability zones from the region
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
@@ -194,7 +196,8 @@ fi
 
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
-echo "Using compute node replicas: ${workers}"
+echo "Using compute node replicas: ${worker_replicas}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
@@ -207,13 +210,14 @@ platform:
 controlPlane:
   architecture: ${architecture}
   name: master
+  replicas: ${master_replicas}
   platform:
     aws:
       type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
 - architecture: ${architecture}
   name: worker
-  replicas: ${workers}
+  replicas: ${worker_replicas}
   platform:
     aws:
       type: ${COMPUTE_NODE_TYPE}
@@ -322,8 +326,16 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  local_zone=$(< "${SHARED_DIR}"/local-zone-name.txt)
-  local_zones_str="[ $local_zone ]"
+  edge_zones=""
+  while IFS= read -r line; do
+    if [[ -z "${edge_zones}" ]]; then
+      edge_zones="$line";
+    else
+      edge_zones+=",$line";
+    fi
+  done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
+
+  edge_zones_str="[ $edge_zones ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:
@@ -331,7 +343,7 @@ compute:
   name: edge
   platform:
     aws:
-      zones: ${local_zones_str}
+      zones: ${edge_zones_str}
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
 fi

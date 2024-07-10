@@ -15,14 +15,37 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare vsphere_datacenter
 declare vsphere_url
 declare vsphere_portgroup
+declare vsphere_extra_portgroup_1
+declare vsphere_extra_portgroup_2
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+declare -a vips
+mapfile -t vips < "${SHARED_DIR}"/vips.txt
+
+# if loadbalancer is UserManaged, it's mean using external LB,
+# then keepalived and haproxy will not deployed, but coredns still keep
+if [[ ${LB_TYPE} == "UserManaged" ]]; then
+    APIVIPS_DEF="apiVIPs:
+      - ${vips[0]}"
+    INGRESSVIPS_DEF="ingressVIPs:
+      - ${vips[1]}"
+    LB_TYPE_DEF="loadBalancer:
+      type: UserManaged"
+else
+    APIVIPS_DEF=""
+    INGRESSVIPS_DEF=""
+    LB_TYPE_DEF=""
+fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
+if [[ -z "${vsphere_extra_portgroup_1}" ]] || [[ -z "${vsphere_extra_portgroup_2}" ]]; then
+   echo "The required extra leases is 2 at leaset, exit"
+   exit 1
+fi	
 cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 controlPlane:
@@ -45,8 +68,9 @@ compute:
        - "us-east-3"
 platform:
   vsphere:
-    apiVIP:
-    ingressVIP:
+    ${LB_TYPE_DEF}
+    ${APIVIPS_DEF}
+    ${INGRESSVIPS_DEF}
     vCenter: "${vsphere_url}"
     username: "${GOVC_USERNAME}"
     password: ${GOVC_PASSWORD}
@@ -69,7 +93,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
-        - ocp-ci-seg-20
+        - ${vsphere_extra_portgroup_1}
         datastore: mdcnc-ds-shared
     - name: us-east-3
       region: us-east
@@ -77,7 +101,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
-        - ocp-ci-seg-21
+        - ${vsphere_extra_portgroup_2}
         datastore: mdcnc-ds-shared
     - name: us-west-1
       region: us-west

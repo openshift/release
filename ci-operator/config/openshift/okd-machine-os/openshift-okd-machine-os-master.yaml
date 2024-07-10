@@ -1,6 +1,6 @@
 base_images:
-  origin_4.15_artifacts:
-    name: "4.15"
+  origin_4.16_artifacts:
+    name: "4.17"
     namespace: origin
     tag: artifacts
 build_root:
@@ -13,9 +13,9 @@ images:
   to: layering-build
 - dockerfile_path: Dockerfile.rpms
   inputs:
-    origin_4.15_artifacts:
+    origin_4.16_artifacts:
       as:
-      - registry.ci.openshift.org/origin/4.15:artifacts
+      - registry.ci.openshift.org/origin/4.16:artifacts
   to: okd-rpms
 - dockerfile_path: Dockerfile.generated
   inputs:
@@ -24,26 +24,21 @@ images:
       - destination_dir: .
         source_path: /tmp/Dockerfile.generated
   to: fedora-coreos
-- dockerfile_literal: FROM fedora-coreos
-  inputs:
-    fedora-coreos:
-      as:
-      - fedora-coreos
-  to: machine-os-content
 promotion:
-  excluded_images:
-  - layering-build
-  name: "4.15"
-  namespace: origin
+  to:
+  - excluded_images:
+    - layering-build
+    name: "4.17"
+    namespace: origin
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.17"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.17"
       namespace: origin
 resources:
   '*':
@@ -63,7 +58,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-ovirt
   optional: true

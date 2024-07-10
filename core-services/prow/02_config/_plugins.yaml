@@ -196,6 +196,24 @@ bugzilla:
       - 4.17.0
       target_release: 4.16.0
       validate_by_default: true
+    openshift-4.17:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.18.0
+      target_release: 4.17.0
+      validate_by_default: true
+    openshift-4.18:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.19.0
+      target_release: 4.18.0
+      validate_by_default: true
     release-3.11:
       add_external_link: true
       allowed_groups:
@@ -320,6 +338,24 @@ bugzilla:
       - 4.17.0
       target_release: 4.16.0
       validate_by_default: true
+    release-4.17:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.18.0
+      target_release: 4.17.0
+      validate_by_default: true
+    release-4.18:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.19.0
+      target_release: 4.18.0
+      validate_by_default: true
 cat: {}
 cherry_pick_unapproved:
   branchregexp: ^release-.*$
@@ -336,8 +372,7 @@ config_updater:
       - build04
       - build05
       - build09
-      - multi01
-      - vsphere
+      - build10
       - vsphere02
       namespaces:
       - ci
@@ -350,26 +385,12 @@ config_updater:
       - build04
       - build05
       - build09
-      - multi01
-      - vsphere
+      - build10
       - vsphere02
       namespaces:
       - ocp
-    build_farm_ocp_aarch64:
-      clusters:
-      - arm01
   gzip: false
   maps:
-    ci-operator/config/**/*-kepler-operator*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/templates/master-sidecar-3.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-master-sidecar-3
     ci-operator/templates/master-sidecar-4.4.yaml:
       cluster_groups:
       - build_farm_ci
@@ -390,62 +411,10 @@ config_updater:
       cluster_groups:
       - build_farm_ci
       name: prow-job-cluster-launch-installer-openstack-upi-e2e
-    ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml:
+    cluster/test-deploy/gcp-3/*:
       cluster_groups:
       - build_farm_ci
-      name: prow-job-cluster-launch-installer-src
-    ci-operator/templates/openshift/installer/cluster-launch-installer-upi-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-upi-e2e
-    ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-ansible.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-e2e-openshift-ansible
-    ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-e2e
-    ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-scaleup-e2e-40
-    cluster/test-deploy/aws-4.0/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-aws-centos-40
-    cluster/test-deploy/aws-atomic/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-aws-atomic
-    cluster/test-deploy/aws-centos/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-aws-centos
-    cluster/test-deploy/aws-gluster/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-aws-gluster
-    cluster/test-deploy/gcp-4.0/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-40
-    cluster/test-deploy/gcp-crio/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-crio
-    cluster/test-deploy/gcp-ha-static/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-ha-static
-    cluster/test-deploy/gcp-ha/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-ha
-    cluster/test-deploy/gcp-logging/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-logging
+      name: cluster-profile-gcp-3
     cluster/test-deploy/gcp-openshift-gce-devel-ci-2/*:
       cluster_groups:
       - build_farm_ci
@@ -586,7 +555,6 @@ config_updater:
     core-services/release-controller/_repos/*:
       cluster_groups:
       - build_farm_ocp
-      - build_farm_ocp_aarch64
       name: base-repos
     core-services/retester/_config.yaml:
       clusters:
@@ -594,18 +562,24 @@ config_updater:
         - ci
       name: retester-config
 dco:
+  stolostron/cert-policy-controller:
+    trusted_apps:
+    - red-hat-konflux
   stolostron/config-policy-controller:
     trusted_apps:
-    - red-hat-trusted-app-pipeline
+    - red-hat-konflux
   stolostron/governance-policy-addon-controller:
     trusted_apps:
-    - red-hat-trusted-app-pipeline
+    - red-hat-konflux
   stolostron/governance-policy-framework-addon:
     trusted_apps:
-    - red-hat-trusted-app-pipeline
+    - red-hat-konflux
   stolostron/governance-policy-propagator:
     trusted_apps:
-    - red-hat-trusted-app-pipeline
+    - red-hat-konflux
+  stolostron/iam-policy-controller:
+    trusted_apps:
+    - red-hat-konflux
 golint: {}
 goose:
   key_path: /etc/unsplash-api/api-key
@@ -635,8 +609,10 @@ label:
   - px-approved
   - docs-approved
   - qe-approved
+  - no-qe
   - downstream-change-needed
   - rebase/manual
+  - cluster-config-api-changed
   restricted_labels:
     '*':
     - allowed_teams:
@@ -665,18 +641,23 @@ label:
       label: bugzilla/valid-bug
     - allowed_teams:
       - openshift-release-oversight
+      - openshift-staff-engineers
       label: approved
 override:
   allow_top_level_owners: true
   allowed_github_teams:
     openshift:
     - openshift-release-oversight
+    - openshift-staff-engineers
 owners:
   filenames:
     openshift-kni/scheduler-plugins:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/aws-load-balancer-controller:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/cloud-provider-openstack:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/cluster-api-provider-openstack:
@@ -704,6 +685,21 @@ owners:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/operator-framework-rukpak:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero-plugin-for-aws:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero-plugin-for-csi:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero-plugin-for-gcp:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero-plugin-for-microsoft-azure:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
   labels_denylist:

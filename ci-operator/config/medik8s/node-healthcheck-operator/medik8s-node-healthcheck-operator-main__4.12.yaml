@@ -2,7 +2,7 @@ base_images:
   base:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -17,7 +17,7 @@ images:
 operator:
   bundles:
   - as: my-bundle
-    dockerfile_path: bundle.Dockerfile
+    dockerfile_path: bundle.ci.Dockerfile
     skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
@@ -45,8 +45,9 @@ tests:
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: medik8s-aws
     env:
+      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
       INSTALL_NAMESPACE: nhc-install
     test:
     - as: e2e-install

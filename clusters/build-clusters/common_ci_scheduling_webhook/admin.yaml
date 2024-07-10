@@ -1,0 +1,72 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-scheduling-webhook
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-builds
+handler: runc
+overhead:
+  podFixed:
+    # Reserve an CPU and memory for each build on crio as overhead for the runtime
+    memory: "500Mi"
+    cpu: "1"
+scheduling:
+  nodeSelector:
+    ci-workload: builds
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-builds-worker
+      operator: Exists
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-tests
+handler: runc
+overhead:
+  podFixed:
+    # Reserve a CPU and memory for each build on crio as overhead for the runtime
+    memory: "600Mi"
+    cpu: "300m"
+scheduling:
+  nodeSelector:
+    ci-workload: tests
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-tests-worker
+      operator: Exists
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-longtests
+handler: runc
+overhead:
+  podFixed:
+    # Reserve a CPU and memory for each build on crio as overhead for the runtime
+    memory: "600Mi"
+    cpu: "300m"
+scheduling:
+  nodeSelector:
+    ci-workload: longtests
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-longtests-worker
+      operator: Exists
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-prowjobs
+handler: runc
+scheduling:
+  nodeSelector:
+    ci-workload: prowjobs
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-prowjobs-worker
+      operator: Exists

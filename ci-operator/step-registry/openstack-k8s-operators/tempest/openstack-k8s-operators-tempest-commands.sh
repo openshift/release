@@ -15,6 +15,10 @@ mkdir -p ~/.config/openstack
 cat > ~/.config/openstack/clouds.yaml << EOF
 $(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
+
+# Disable TLS CA verification for now
+yq -i ".clouds.default.verify = False" ~/.config/openstack/clouds.yaml
+
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
 KEYSTONE_PASSWD_SELECT=$(oc get keystoneapi keystone -o json | jq -r .spec.passwordSelectors.admin)
@@ -84,26 +88,32 @@ if [ "$TEMPEST_CONCURRENCY" ]; then
 fi
 
 if [ "$TEMPEST_REGEX" ]; then
-    tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}"
+    tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}" | sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g'
 else
-    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
-    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_allowed.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_skipped.yml
 
-    tempest-skip list-allowed --file tempest_allow.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
-    tempest-skip list-skipped --file tempest_skip.yml --job ${BASE_OP} -f value > skip.txt
+    tempest-skip list-allowed --file list_allowed.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
+    tempest-skip list-skipped --file list_skipped.yml --job ${BASE_OP} -f value > skip.txt
     if [ -f allow.txt ] && [ -f skip.txt ]; then
         TEMPEST_ARGS+=( --exclude-list skip.txt --include-list allow.txt)
         cp allow.txt skip.txt ${ARTIFACT_DIR}
     else
         TEMPEST_ARGS+=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
     fi
-    tempest run "${TEMPEST_ARGS[@]}"
+    tempest run "${TEMPEST_ARGS[@]}" | sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g'
 fi
 EXIT_CODE=$?
 set -e
 
 # Generate subunit
 stestr last --subunit > testrepository.subunit || true
+
+# Remove sensitive keys
+files=("testrepository.subunit" "tempest.log")
+for file in "${files[@]}"; do
+    sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g' -i $file
+done
 
 # Generate html
 subunit2html testrepository.subunit stestr_results.html || true

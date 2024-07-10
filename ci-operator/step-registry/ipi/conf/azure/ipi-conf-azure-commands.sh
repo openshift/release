@@ -46,8 +46,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${REGION}"
 
-workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+workers=${COMPUTE_NODE_REPLICAS:-3}
+if [ "${COMPUTE_NODE_REPLICAS}" -le 0 ] || [ "${SIZE_VARIANT}" = "compact" ]; then
   workers=0
 fi
 master_type=null
@@ -66,7 +66,9 @@ if [ -n "${master_type_prefix}" ]; then
     master_type=${master_type_prefix}ps_v5
   fi
 fi
-
+if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
+    master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
+fi
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 

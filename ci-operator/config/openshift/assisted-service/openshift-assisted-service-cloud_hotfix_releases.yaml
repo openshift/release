@@ -1,48 +1,44 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.10
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.10
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.10
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.10
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.10
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra
   cli:
-    name: "4.11"
+    name: "4.16"
     namespace: ocp
     tag: cli
-  coreos_centos_stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ci-images/Dockerfile.base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
@@ -58,11 +54,10 @@ images:
       - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
 - dockerfile_path: Dockerfile.assisted-service
-  from: coreos_centos_stream8
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
@@ -72,7 +67,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -117,7 +112,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.15"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
@@ -175,22 +170,6 @@ tests:
         IPv6=yes
         IPv4=yes
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-9
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.9
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-10
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.10
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-11
   steps:
     cluster_profile: packet-assisted
@@ -216,6 +195,26 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.14
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.15
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite
   steps:
     cluster_profile: packet-assisted
@@ -223,8 +222,6 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         STATIC_IPS=true
-        TEST_FUNC=test_networking
-      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -234,7 +231,8 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=17408
         MASTER_CPU=8
         WORKER_MEMORY=9216
@@ -248,9 +246,11 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
-        MASTER_MEMORY=18000
+        MASTER_MEMORY=25600
+        NUM_MASTERS=3
+        NUM_WORKERS=0
         MASTER_CPU=9
+        MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -260,7 +260,8 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 zz_generated_metadata:

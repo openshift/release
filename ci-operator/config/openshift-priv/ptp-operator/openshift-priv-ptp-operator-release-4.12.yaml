@@ -3,6 +3,10 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
+  linuxptp-daemon:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: ptp
   ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
@@ -22,11 +26,17 @@ operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-ptp-operator:4.10
+  - pullspec: quay.io/openshift/origin-ptp-operator:4.12
     with: pipeline:ptp-operator
+  - pullspec: quay.io/openshift/origin-ptp:4.12
+    with: pipeline:linuxptp-daemon
 promotion:
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: ptp-4.12
+    namespace: origin
+  - name: 4.12-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -70,6 +80,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: ptp-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

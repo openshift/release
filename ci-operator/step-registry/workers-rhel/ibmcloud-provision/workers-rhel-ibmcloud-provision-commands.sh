@@ -4,14 +4,22 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
 # IBM Cloud CLI login
 function ibmcloud_login {
   export IBMCLOUD_CLI=ibmcloud
   export IBMCLOUD_HOME=/output
   region="${LEASED_RESOURCE}"
   export region
+  "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  "${IBMCLOUD_CLI}" plugin list
 }
 
 ibmcloud_login
@@ -21,6 +29,9 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 
+infra_id=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+cluster_rg=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.ibmcloud.resourceGroupName}')
+
 # Get existing vnet info
 VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
 if [[ ! -f "${VPC_CONFIG}" ]]; then
@@ -28,11 +39,10 @@ if [[ ! -f "${VPC_CONFIG}" ]]; then
 fi
 echo "Reading variables from ${VPC_CONFIG}..."
 vpcName=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.vpcName')
-resource_group=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.resourceGroupName')
-infra_id=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
-echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpcName}"
 
-${IBMCLOUD_CLI} target -g ${resource_group}
+echo "Using region: ${region}; resource_group: ${cluster_rg}; vpc: ${vpcName}"
+
+${IBMCLOUD_CLI} target -g ${cluster_rg}
 
 workdir=`mktemp -d`
 
@@ -43,7 +53,9 @@ ${IBMCLOUD_CLI} is keys --all-resource-groups
 rhelSSHKey="$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-sshkey-name)"
 
 #use the same sgs created by installer, shared with the default rhcos nodes
+run_command "${IBMCLOUD_CLI} is sgs -q"
 rhel_worker_sgs="${infra_id}-sg-cluster-wide,${infra_id}-sg-openshift-net"
+echo "use the worker sgs: $rhel_worker_sgs"
 computeSubnetLength=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.computeSubnets' -l)
 
 # Start to provision rhel instances from template in existing VPC and NSG
@@ -53,20 +65,21 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   idx=$(((count-1) % $computeSubnetLength))
   
   subnet=$(yq-go r "${VPC_CONFIG}" "platform.ibmcloud.computeSubnets[${idx}]")
-  zone=$(ibmcloud is subnet ${subnet} --output JSON | jq -r '.zone.name')
+  zone=$(${IBMCLOUD_CLI} is subnet ${subnet} --output JSON | jq -r '.zone.name')
   volume="${infra_id}-vol-$count"
   vmName=${infra_id}-rhel-${count}
-  echo "computeSubnet ${subnet} zone ${zone} volume $volume vmName $vmName"
+
+  echo "computeSubnet: ${subnet}; zone: ${zone}; volume: $volume; vmName: $vmName"
 
   volumeJson=$(jq -n \
     --arg vn "$volume" \
     --argjson size ${RHEL_VM_DISK_SIZE} \
     '{"name": $vn, "volume": {"capacity": $size, "profile": {"name": "general-purpose"}}}')
-  cmd="${IBMCLOUD_CLI} is instance-create $vmName ${vpcName} ${zone} ${RHEL_VM_SIZE} ${subnet} --image ${RHEL_IMAGE} --keys ${rhelSSHKey} --sgs ${rhel_worker_sgs} --boot-volume '${volumeJson}'"
+  cmd="${IBMCLOUD_CLI} is instance-create $vmName ${vpcName} ${zone} ${RHEL_VM_SIZE} ${subnet} --image ${RHEL_IMAGE} --keys ${rhelSSHKey} --pnac-vni-sgs ${rhel_worker_sgs} --boot-volume '${volumeJson}'"
 
-  echo "Creating RHEL VM: ${cmd}"
-  eval "${cmd}"
-  sleep 60
+  echo "Creating RHEL VM..."
+  run_command "${cmd}"
+  sleep 120
 
   insFile="${workdir}/${vmName}.json"
   echo "create instance ${vmName}, recored in ${insFile} ..."
@@ -76,7 +89,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   rhel_node_ip="$(jq -r '.network_interfaces[0].primary_ip.address' ${insFile})"
   echo "Ip address is ${rhel_node_ip}"
   
-  if [ "x${rhel_node_ip}" == "x" ]; then
+  if [[ -z "${rhel_node_ip}" ]]; then
     echo "Unable to get ip of rhel instance ${infra_id}-rhel-${count}!"
     exit 1
   fi

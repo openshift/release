@@ -1,26 +1,29 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-control-plane-machine-set-operator
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.17-priv
+    namespace: ocp-private
 releases:
   arm64-latest:
     candidate:
@@ -30,20 +33,20 @@ releases:
       version: "4.13"
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: lint
   commands: make lint
@@ -59,10 +62,6 @@ tests:
     from: src
 - as: generate
   commands: make verify-generate
-  container:
-    from: src
-- as: crds-sync
-  commands: make verify-crds-sync
   container:
     from: src
 - as: vendor
@@ -130,6 +129,21 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-azure-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
@@ -144,13 +158,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-gcp-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
 - as: e2e-vsphere-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -164,9 +191,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-multizone-2
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -228,7 +253,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-nutanix-ovn
   cluster: build01

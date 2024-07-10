@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: webhook-server
+  namespace: crt-admission-webhooks
+spec:
+  selector:
+    matchLabels:
+      server: "true"
+  template:
+    metadata:
+      name: server
+      labels:
+        server: "true"
+    spec:
+      serviceAccountName: crt-admission-webhook-server
+      containers:
+      - name: server
+        image: crt-admission-webhook-server:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - "/usr/bin/crt-admission-webhook-server"
+        - "--secure-port=8443"
+        - "--audit-log-path=-"
+        - "--tls-cert-file=/var/serving-cert/tls.crt"
+        - "--tls-private-key-file=/var/serving-cert/tls.key"
+        - "--v=8"
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - mountPath: /var/serving-cert
+          name: serving-cert
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - name: serving-cert
+        secret:
+          defaultMode: 420
+          secretName: crt-admission-webhook-server-serving-cert

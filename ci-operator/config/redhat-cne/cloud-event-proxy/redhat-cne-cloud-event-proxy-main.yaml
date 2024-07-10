@@ -1,37 +1,45 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cloud-event-proxy
+- dockerfile_path: examples/consumer.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: cloud-event-consumer
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.17"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -44,7 +52,16 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname redhat-cne-cloud-event-proxy-main
+        ci-job-type e2e-aws
+        ci-repo-name cloud-event-proxy
+        ci-org-name redhat-cne
     test:
     - as: functests
       cli: latest
@@ -56,16 +73,25 @@ tests:
         fi
         popd
         export CNE_IMG=${IMAGE_CLOUD_EVENT_PROXY}
+        export CONSUMER_IMG=${IMAGE_CLOUD_EVENT_CONSUMER}
         hack/deploy_test.sh deploy
         make functests
       dependencies:
       - env: IMAGE_CLOUD_EVENT_PROXY
         name: pipeline:cloud-event-proxy
+      - env: IMAGE_CLOUD_EVENT_CONSUMER
+        name: pipeline:cloud-event-consumer
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cloud-event-proxy
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: redhat-cne

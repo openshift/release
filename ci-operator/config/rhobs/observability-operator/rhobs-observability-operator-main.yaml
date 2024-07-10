@@ -1,17 +1,17 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.14"
+    name: "4.15"
     namespace: origin
     tag: operator-sdk
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - context_dir: .
   dockerfile_path: build/Dockerfile
@@ -27,12 +27,18 @@ operator:
   substitutions:
   - pullspec: observability-operator:.*
     with: pipeline:observability-operator
+promotion:
+  to:
+  - excluded_images:
+    - observability-operator
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -43,10 +49,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-coo
     product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
+    timeout: 3h0m0s
+    version: "4.15"
   steps:
     test:
     - as: install

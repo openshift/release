@@ -1,0 +1,86 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-test
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: operator-test
+      cli: latest
+      commands: /bin/bash build/scripts/oc-tests/oc-test-operator.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upgrade-stable-to-next
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: upgrade-stable-to-next
+      cli: latest
+      commands: /bin/bash build/scripts/oc-tests/oc-test-upgrade-from-stable-to-next.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: devworkspace-happy-path
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: /bin/bash build/scripts/oc-tests/oc-test-happy-path.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: che-behind-proxy
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: che-behind-proxy
+      cli: latest
+      commands: /bin/bash build/scripts/oc-tests/oc-test-operator.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-proxy
+zz_generated_metadata:
+  branch: main
+  org: eclipse-che
+  repo: che-operator
+  variant: v14

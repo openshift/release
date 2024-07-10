@@ -11,10 +11,7 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
-LOKI_SSO_CLIENT_ID="$(cat /var/run/loki-secret/client-id)"
-export LOKI_SSO_CLIENT_ID
-LOKI_SSO_CLIENT_SECRET="$(cat /var/run/loki-secret/client-secret)"
-export LOKI_SSO_CLIENT_SECRET
+echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
@@ -26,6 +23,14 @@ export LOKI_SSO_CLIENT_SECRET
 if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
     export CLUSTER_TYPE="aws"
     echo "Overriding 'hypershift' cluster type to be 'aws'"
+fi
+
+# OpenShift clusters intalled with platform type External is handled as 'None'
+# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
+# integrated by OpenShift (like AWS).
+STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
+    export CLUSTER_TYPE="external"
 fi
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -131,6 +136,7 @@ azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
     # shellcheck disable=SC1090
@@ -174,6 +180,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
+external) export TEST_PROVIDER='' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -182,8 +189,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig

@@ -164,7 +164,7 @@ launch_vm
 loop=10
 while [ ${loop} -gt 0 ]; do
    get_vm_ip
-   if [ "${BASTION_VM_IP}" == "" ]; then
+   if [ "${BASTION_VM_IP}" == "" ] || [ "${BASTION_VM_IP}" == "null" ]; then
       echo "$(date -u --rfc-3339=seconds) - bastion host IP is not ready yet"
       loop=$((loop - 1))
       sleep 60
@@ -172,7 +172,7 @@ while [ ${loop} -gt 0 ]; do
       break
    fi
 done
-if [ "${BASTION_VM_IP}" == "" ]; then
+if [ "${BASTION_VM_IP}" == "" ] || [ "${BASTION_VM_IP}" == "null" ]; then
    echo "$(date -u --rfc-3339=seconds) - Failed to get host IP"
    exit 1
 fi

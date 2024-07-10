@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -10,42 +6,45 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.59.0
   hypershift-operator:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: hypershift-operator
-  hypershift-tests:
-    name: "4.15"
+  ocp_4.17_base-rhel9:
+    name: "4.17"
     namespace: ocp
-    tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-network-operator
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.17"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -61,29 +60,32 @@ tests:
   commands: hack/verify-style.sh
   container:
     from: src
-- as: e2e-gcp-sdn
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
-  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-ovn
-- as: e2e-aws-sdn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-ipsec-upgrade
   optional: true
   steps:
     cluster_profile: aws
-    workflow: openshift-upgrade-aws-sdn
-- as: e2e-aws-sdn-multi
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-sdn-multi
+    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
 - as: e2e-ovn-step-registry
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
@@ -99,6 +101,13 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-ipsec-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-ipsec-serial
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   steps:
@@ -122,19 +131,19 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      WINDOWS_SERVER_VERSION: "2019"
+      CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - as: e2e-vsphere-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for pod-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for node-Service\|
@@ -145,7 +154,7 @@ tests:
 - as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     workflow: openshift-e2e-vsphere-ovn-dualstack
@@ -154,7 +163,8 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
-- as: e2e-azure-ovn-dualstack
+- always_run: false
+  as: e2e-azure-ovn-dualstack
   optional: true
   steps:
     cluster_profile: azure4
@@ -165,26 +175,45 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
-- as: e2e-vsphere-ovn-windows
-  steps:
-    cluster_profile: vsphere-2
-    test:
-    - ref: windows-e2e-operator-test-with-custom-vxlan-port
-    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: e2e-openstack-sdn
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: openstack-vexxhost
+    cluster_profile: gcp
     env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-aws-ovn-techpreview-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-vsphere-ovn-windows
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: e2e-openstack-ovn
   optional: true
   steps:
@@ -195,64 +224,25 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-aws-ovn-network-migration
-  steps:
-    cluster_profile: aws
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-network-migration-rollback
-  steps:
-    cluster_profile: aws
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-rollback
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-network-reverse-migration
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration-rollback
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
   cron: 0 3 * * 0,2,4,6
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cidr-expansion
+- as: e2e-aws-ovn-subnet-configs
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: ovn-subnet-configs
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-hypershift-ovn
+- as: e2e-aws-ovn-hypershift-conformance
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-conformance
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -265,7 +255,7 @@ tests:
 - as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
@@ -289,20 +279,7 @@ tests:
     - chain: baremetalds-ipi-test
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 5h0m0s
-- as: e2e-network-mtu-migration-sdn-ipv4
-  optional: true
-  steps:
-    cluster_profile: gcp
-    env:
-      MTU_DECREASE: "400"
-      MTU_INCREASE: "200"
-    test:
-    - chain: network-mtu-migration-decrease
-    - chain: network-mtu-migration-increase
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-gcp-sdn
-  timeout: 5h0m0s
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
     cluster_profile: aws
@@ -367,7 +344,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni
@@ -385,6 +362,13 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cluster-network-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

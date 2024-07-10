@@ -1,18 +1,14 @@
 ref:
   as: rosa-cluster-provision
-  from_image:
-    namespace: ci
-    name: rosa-aws-cli
-    tag: latest
+  from: rosa-aws-cli
   grace_period: 10m
   commands: rosa-cluster-provision-commands.sh
   resources:
     requests:
       cpu: 100m
       memory: 300Mi
-  timeout: 2h0m0s
   env:
-  - name: ROSA_LOGIN_ENV
+  - name: OCM_LOGIN_ENV
     default: "staging"
     documentation: The environment for rosa login. The supported values are [production, staging, integration].
   - name: CLUSTER_NAME
@@ -96,20 +92,45 @@ ref:
   - name: DISABLE_SCP_CHECKS
     default: "false"
     documentation: Indicates if cloud permission checks are disabled when attempting installation of the cluster.
+  - name: ADDITIONAL_SECURITY_GROUP
+    default: "false"
+    documentation: Indicates if there are additional security groups are enabled for the cluster creation
   - name: FIPS
     default: "false"
     documentation: Create cluster that uses FIPS Validated / Modules in Process cryptographic libraries.
   - name: CLUSTER_TAGS
     default: ""
     documentation: Apply user defined tags to all resources created by ROSA in AWS. Tags are comma separated example - 'foo:bar,bar:baz', The default value is "prowci:${CLUSTER_NAME}".
-  - name: ENABLE_SECTOR
-    default: "false"
-    documentation: Enable the sector to specify the provision shard to provision the hosted control planes (HyperShift) cluster.
+  - name: CLUSTER_SECTOR
+    default: ""
+    documentation: Sector groups a set of service clusters for HCP. The supported values are [canary, main].
+  - name: ENABLE_SHARED_VPC
+    default: "no"
+    documentation: Create a Shared VPC cluster.
+  - name: AVAILABLE_UPGRADE
+    default: "no"
+    documentation: Set to 'yes' to pick up the openshift version that could be upgraded.
   - name: DRY_RUN
     default: "false"
     documentation: If DRY_RUN=true, just simulate creating the cluster.
   - name: CLUSTER_TIMEOUT
     default: "7200"
     documentation: Set to number of seconds for the cluster to timeout if it's not ready.
+  - name: NO_CNI
+    default: "false"
+    documentation: Set to 'true' if you want to deploy a cluster without CNI.
+  - name: CONFIGURE_CLUSTER_AUTOSCALER
+    default: "false"
+    documentation: Set to 'true' to enable cluster autoscaler,it is valid when the enable_autoscaling is true. 
+  - name: LONG_CLUSTER_NAME_ENABLED
+    default: "false"
+    documentation: Feature card XCMSTRAT-214, Set to 'true' to enable long name of length ( > 15 && <= 54 ) chars for cluster creation.
+  - name: SPECIFY_DOMAIN_PREFIX
+    default: "false"
+    documentation: Feature card XCMSTRAT-214, Set to 'true' to use a custome domain_prefix of length ( <= 15 ) chars for cluster creation. 
+  - name: ENABLE_BILLING_ACCOUNT
+    default: "no"
+    documentation: Enable the use of the billing account for billing subscriptions purchased via the AWS marketplace.
+
   documentation: |-
     Using rosa cli to create a rosa cluster with the provided cluster profile. The cluster profile should include the offline token ocm-token to login and .awscred to init the rosa environment.

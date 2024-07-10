@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-hypershift-ovn-kubevirt
     decorate: true
     decoration_config:
@@ -94,7 +94,96 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
+    context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit
+    optional: true
+    path_alias: github.com/openshift/cluster-network-operator
+    rerun_command: /test e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit-cluster-profile
+        - --target=e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     decoration_config:
@@ -183,7 +272,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-network-migration
     decorate: true
     decoration_config:
@@ -271,7 +360,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
@@ -360,8 +449,8 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
-    context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+    cluster: build03
+    context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -373,10 +462,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+    name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-aws-ovn-shared-to-local-gateway-mode-migration
     optional: true
     path_alias: github.com/openshift/cluster-network-operator
-    rerun_command: /test e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+    rerun_command: /test e2e-aws-ovn-shared-to-local-gateway-mode-migration
     spec:
       containers:
       - args:
@@ -386,8 +475,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic-cluster-profile
-        - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+        - --secret-dir=/usr/local/e2e-aws-ovn-shared-to-local-gateway-mode-migration-cluster-profile
+        - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration
         command:
         - ci-operator
         image: ci-operator:latest
@@ -403,7 +492,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-shared-to-local-gateway-mode-migration-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -443,13 +532,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-to-local-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     decoration_config:
@@ -538,7 +627,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     decoration_config:
@@ -626,7 +715,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-sdn-multi
     decorate: true
     decoration_config:
@@ -714,7 +803,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-sdn-network-migration-rollback
     decorate: true
     decoration_config:
@@ -802,7 +891,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-sdn-network-reverse-migration
     decorate: true
     decoration_config:
@@ -890,7 +979,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-sdn-upgrade
     decorate: true
     decoration_config:
@@ -979,7 +1068,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1064,100 +1153,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: build04
-    context: ci/prow/e2e-azure-ovn-dualstack
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-azure-ovn-dualstack
-    optional: true
-    path_alias: github.com/openshift/cluster-network-operator
-    rerun_command: /test e2e-azure-ovn-dualstack
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-azure-ovn-dualstack-cluster-profile
-        - --target=e2e-azure-ovn-dualstack
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-ovn-dualstack-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure4
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-ovn-dualstack,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-manual-oidc
     decorate: true
     decoration_config:
@@ -1352,7 +1352,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-gcp-ovn-upgrade
-    optional: true
     path_alias: github.com/openshift/cluster-network-operator
     rerun_command: /test e2e-gcp-ovn-upgrade
     spec:
@@ -1523,7 +1522,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-hypershift-ovn
     decorate: true
     decoration_config:
@@ -2069,7 +2068,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -2158,7 +2157,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     decoration_config:
@@ -2247,7 +2246,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-openstack-sdn
     decorate: true
     decoration_config:
@@ -2336,7 +2335,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
@@ -2425,7 +2424,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-ovn-ipsec-step-registry
     decorate: true
     decoration_config:
@@ -2514,7 +2513,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -2613,7 +2612,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-vsphere-ovn
@@ -2702,7 +2701,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-vsphere-ovn-dualstack
@@ -2791,7 +2790,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-vsphere-ovn-dualstack-primaryv6
@@ -2880,10 +2879,11 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-e2e-vsphere-ovn-windows
+    optional: true
     path_alias: github.com/openshift/cluster-network-operator
     rerun_command: /test e2e-vsphere-ovn-windows
     spec:
@@ -2958,7 +2958,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3021,7 +3021,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -3084,7 +3084,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
     decorate: true
     decoration_config:
@@ -3174,7 +3174,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
     decorate: true
     decoration_config:
@@ -3264,7 +3264,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
     decorate: true
     decoration_config:
@@ -3354,7 +3354,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build01
+    cluster: build03
     context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
@@ -3444,7 +3444,78 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
+    context: ci/prow/security
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-network-operator-release-4.14-security
+    optional: true
+    path_alias: github.com/openshift/cluster-network-operator
+    rerun_command: /test security
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3507,7 +3578,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     decoration_config:

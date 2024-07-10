@@ -4,6 +4,20 @@ chain:
   - as: run-e2e-local
     cli: latest
     commands: |-
+
+        if [ "$SKIP_E2E_LOCAL" == "true" ]; then
+            echo "Skipping e2e local"
+            exit 0
+        fi
+
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+        
         # compile the e2e tests
         make e2e
       
@@ -12,13 +26,16 @@ chain:
           STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
         fi
 
+        export EVENTUALLY_VERBOSE="false"
+
         # run the test
-        bin/test-e2e \
+        hack/ci-test-e2e.sh \
                   --test.v \
                   --test.timeout=0 \
-                  --test.run='^TestCreateCluster$|TestNodePool' \
+                  --test.run='^TestCreateCluster$|TestNodePool|TestAutoscaling' \
                   --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.kubevirt-node-memory="10Gi" \
+                  --e2e.kubevirt-node-cores="4" \
                   --e2e.platform="KubeVirt" \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
@@ -41,11 +58,13 @@ chain:
         name: KUBECONFIG
       - default: ""
         name: ETCD_STORAGE_CLASS
+      - default: "false"
+        name: SKIP_E2E_LOCAL
     from: test-bin
     grace_period: 30m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 1h0m0s
+    timeout: 1h30m0s
 

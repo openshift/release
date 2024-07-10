@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Deprovisioning cluster ..."
+if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
+  echo "Skipping: ${SHARED_DIR}/metadata.json not found."
+  exit
+fi
+
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
@@ -26,23 +32,30 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
+elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
 fi
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
 if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+    IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+  else
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  fi
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
     # all vcenter certificates are in the file below
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
-fi
-
-echo "Deprovisioning cluster ..."
-if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
-  echo "Skipping: ${SHARED_DIR}/metadata.json not found."
-  exit
+    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
 fi
 
 echo ${SHARED_DIR}/metadata.json

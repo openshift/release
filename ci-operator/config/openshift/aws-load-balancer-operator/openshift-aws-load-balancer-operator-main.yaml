@@ -1,17 +1,16 @@
 base_images:
-  base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.9
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: aws-load-balancer-operator
 operator:
   bundles:
@@ -24,12 +23,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -75,6 +74,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-aws-load-balancer-operator-bundle
     env:
+      CHANNEL_GROUP: stable
       EVAL_CONFIG_ENVVARS: "yes"
       OO_CHANNEL: stable-v1
       OO_CONFIG_ENVVARS: ROLEARN=$(cat ${SHARED_DIR}/operator-role-arn)

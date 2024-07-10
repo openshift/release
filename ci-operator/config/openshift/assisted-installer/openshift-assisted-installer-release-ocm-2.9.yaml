@@ -23,6 +23,10 @@ base_images:
     name: stream8
     namespace: coreos
     tag: "8"
+  coreos-centos-stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -32,8 +36,7 @@ base_images:
     namespace: openshift
     tag: golang-1.19
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted-installer-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted-installer
   from: coreos-centos-stream8
@@ -49,9 +52,13 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-controller
+- dockerfile_path: Dockerfile.assisted-installer-build
+  from: coreos-centos-stream9
+  to: assisted-installer-build
 promotion:
-  name: ocm-2.9
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.9
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -63,19 +70,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
-- as: publish-multi-arch-images
-  postsubmit: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DOCKERFILE_IMAGE_PAIRS: |
-        Dockerfile.assisted-installer , quay.io/edge-infrastructure/assisted-installer-multi:ocm-2.9 |
-        Dockerfile.assisted-installer-controller , quay.io/edge-infrastructure/assisted-installer-controller-multi:ocm-2.9
-    workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
@@ -118,33 +113,41 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: format-check
   commands: make format-check
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/gocache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -157,6 +160,8 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 zz_generated_metadata:
   branch: release-ocm-2.9

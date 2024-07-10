@@ -7,8 +7,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-gcp-413
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -21,88 +22,90 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-gcp-control-plane-24nodes-periodic
-  cron: 29 5 */1 * 1-5
+- as: control-plane-etcd-fips-24nodes
+  cron: 0 8 23 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-control-plane
-- as: perfscale-gcp-data-path-6nodes-periodic
-  cron: 0 9 * * 3
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
+- as: data-path-etcd-fips-9nodes
+  cron: 0 6 22 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "6"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: n1-standard-8
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: n1-standard-16
+      SET_ENV_BY_PLATFORM: custom
     test:
     - ref: openshift-qe-perfscale-gcp-data-path-fw
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
 - always_run: false
-  as: perfscale-gcp-router-perf-5nodes-periodic
+  as: node-density-heavy-etcd-fips-24nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "5"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: workers-scale
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-router-perf
-- as: perfscale-gcp-node-density-cni-24nodes-periodic
-  cron: 0 12 * * 1
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-node-density-cni
-- as: perfscale-gcp-node-density-heavy-24nodes-periodic
-  cron: 0 12 * * 1
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-node-density-heavy
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
 - always_run: false
-  as: perfscale-gcp-network-policy-5nodes-periodic
+  as: control-plane-24nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "5"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: workers-scale
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-network-policy
-  timeout: 8h0m0s
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: data-path-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: node-density-heavy-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: node-density-cni-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-qe

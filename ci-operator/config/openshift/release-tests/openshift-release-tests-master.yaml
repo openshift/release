@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_literal: |
     FROM src
@@ -23,12 +23,21 @@ images:
 - dockerfile_path: Dockerfile
   from: oar-python3
   to: oar
+- dockerfile_path: prow/Dockerfile
+  to: jobctl-python3
 - dockerfile_path: prow/Dockerfile.k8sgpt
   from: root
   to: k8sgpt
 promotion:
-  namespace: ci
-  tag: master
+  to:
+  - namespace: ci
+    tag: master
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -48,6 +57,11 @@ tests:
   steps:
     test:
     - ref: api-job
+- as: qe-release-gate-test
+  cron: 15 * * * *
+  steps:
+    test:
+    - ref: release-qe-tests
 zz_generated_metadata:
   branch: master
   org: openshift

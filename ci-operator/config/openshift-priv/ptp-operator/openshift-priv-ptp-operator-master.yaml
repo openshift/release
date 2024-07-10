@@ -1,41 +1,53 @@
 base_images:
-  base:
-    name: 4.15-priv
+  linuxptp-daemon:
+    name: 4.17-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: ptp
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ptp-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
+- dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: ptp-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-ptp-operator:4.10
+  - pullspec: quay.io/openshift/origin-ptp-operator:4.17
     with: pipeline:ptp-operator
+  - pullspec: quay.io/openshift/origin-ptp:4.17
+    with: pipeline:linuxptp-daemon
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: ptp-4.17
+    namespace: origin
+  - name: 4.17-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
@@ -74,6 +86,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: ptp-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv

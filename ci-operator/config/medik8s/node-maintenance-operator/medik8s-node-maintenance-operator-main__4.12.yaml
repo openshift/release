@@ -5,19 +5,18 @@ base_images:
     tag: base
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: node-maintenance-operator
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/node-maintenance-operator:latest
+  - pullspec: quay.io/medik8s/node-maintenance-operator:.*
     with: pipeline:node-maintenance-operator
 releases:
   latest:
@@ -31,24 +30,61 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: medik8s-aws
     env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: nmo-install
-      OO_PACKAGE: node-maintenance-operator
-      OO_TARGET_NAMESPACES: '!all'
+      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
+      OPERATOR_NAMESPACE: nmo-install
     test:
-    - as: e2e
-      commands: export OPERATOR_NS="nmo-install" && make cluster-functest
+    - as: e2e-install-operator-last-version
+      cli: latest
+      commands: |
+        oc create namespace "$OPERATOR_NAMESPACE"
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/node-maintenance-operator-bundle:v0.17.0 make bundle-run
+      env:
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    - as: e2e-upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make cluster-functest
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s

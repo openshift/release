@@ -16,16 +16,17 @@ PATH=$PATH:/tmp/go/bin
 #  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
-     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN CYPRESS_SSO_URL CYPRESS_PASSWORD
 
-QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
-QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
+QONTRACT_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_password)
+QONTRACT_USERNAME=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_username)
 QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
-export CYPRESS_USERNAME=user1
-export CYPRESS_PASSWORD=user1
+KEYCLOAK_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password)
+CYPRESS_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password_2)
+export CYPRESS_USERNAME=e2e-hac-test
 export CYPRESS_PERIODIC_RUN=true
-CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
+CYPRESS_GH_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
+HAC_SA_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 
@@ -52,6 +53,16 @@ EOF
 	  exit 1
   fi
 
+# Register test user
+KEYCLOAK_URL='https://'$(oc get route keycloak -n dev-sso -o json | jq -r .spec.host)'/auth/'
+REGISTRATION_URL='https://'$(oc get route registration-service -n toolchain-host-operator -o json | jq -r .spec.host)'/'
+ENCODED_USERNAME=`echo -n ${CYPRESS_USERNAME} | base64 -w 0`
+ENCODED_PASSWORD=`echo -n ${CYPRESS_PASSWORD} | base64 -w 0`
+KEYCLOAK_USERNAME=user1
+
+curl -o keycloak.py https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/keycloak.py
+python3 keycloak.py $KEYCLOAK_URL $KEYCLOAK_USERNAME $KEYCLOAK_PASSWORD $ENCODED_USERNAME $ENCODED_PASSWORD $REGISTRATION_URL --no-verify
+
 # Install HAC in ephemeral cluster
 REF=main
 if [ -n "$PULL_PULL_SHA" ] && [ "$REPO_NAME" = "infra-deployments" ]; then
@@ -62,13 +73,14 @@ curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/h
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
-oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
+oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.crc-eph.r9lp.p1.openshiftapps.com:6443
 echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
-CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
+CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/preview/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+CYPRESS_SSO_URL="$(oc get feenv env-$HAC_NAMESPACE --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.sso}")"
 
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
@@ -94,12 +106,14 @@ metadata:
     namespace: toolchain-host-operator
     labels:
         toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-        toolchain.dev.openshift.com/user-email: user1@user.us
+        toolchain.dev.openshift.com/state: approved
 spec:
+    identityClaims:
+        email: user1@user.us
+        sub: user1
+        preferredUsername: user1
     username: user1
     userid: user1
-    approved: true
 EOF
 sleep 5
 oc get UserSignup -n toolchain-host-operator

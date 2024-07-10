@@ -62,12 +62,13 @@ operator:
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
 promotion:
-  excluded_images:
-  - ubi8-minimal-entitled
-  - ubi9-minimal-entitled
-  namespace: edge-infrastructure
-  tag: release-1.1
-  tag_by_commit: true
+  to:
+  - excluded_images:
+    - ubi8-minimal-entitled
+    - ubi9-minimal-entitled
+    namespace: edge-infrastructure
+    tag: release-1.1
+    tag_by_commit: true
 releases:
   latest:
     release:
@@ -180,6 +181,12 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kmm
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-1.1
   org: rh-ecosystem-edge

@@ -1,74 +1,57 @@
 base_images:
-  base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
   cli:
     name: "4.16"
     namespace: ocp
     tag: cli
-  hypershift-operator-initial:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
-    tag: hypershift-operator
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  openshift_release_golang-1.20:
+    tag: rhel-9-golang-1.21-openshift-4.16
+  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: rhel-9-release-golang-1.21-openshift-4.16
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
-    openshift_release_golang-1.20:
+- inputs:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift
 promotion:
-  additional_images:
-    hypershift-tests: test-bin
-  name: "4.16"
-  namespace: ocp
+  to:
+  - additional_images:
+      hypershift-tests: test-bin
+    name: "4.16"
+    namespace: ocp
 releases:
-  hosted-ocp-4-12-latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.12"
-  hosted-ocp-4-12-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.12"
-  hosted-ocp-4-13-latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
-  hosted-ocp-4-13-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.13"
   initial:
     candidate:
       product: ocp
       stream: ci
-      version: "4.14"
+      version: "4.16"
   latest:
     integration:
       include_built_images: true
@@ -99,39 +82,47 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- as: e2e-azure
+  optional: true
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-e2e-nested
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
-    workflow: hypershift-kubevirt-e2e
-- as: e2e-aws-4-12
+    workflow: hypershift-kubevirt-e2e-aws
+- as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
-      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
-    workflow: hypershift-aws-e2e-nested
-- as: e2e-aws-4-13
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:hosted-ocp-4-13-latest
-      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-13-previous
-    workflow: hypershift-aws-e2e-nested
+    cluster_profile: azure4
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D16as_v5
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: managed-csi
+      KUBEVIRT_CSI_INFRA: managed-csi
+      ODF_BACKEND_STORAGE_CLASS: managed-csi
+    workflow: hypershift-kubevirt-e2e-azure
 - as: e2e-aws-metrics
   optional: true
   steps:
@@ -142,6 +133,20 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-kubevirt-metal-ovn-conformance
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
+    workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-azure-ovn-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-azure-conformance
 - as: e2e-ibmcloud-iks
   optional: true
   run_if_changed: ^api/

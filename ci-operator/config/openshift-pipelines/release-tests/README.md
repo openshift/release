@@ -5,9 +5,9 @@
 - [General Information](#general-information)
 - [Purpose](#purpose)
 - [Process](#process)
-  - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning--firewatch-ipi-aws)
+  - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning-firewatch-ipi-aws)
   - [Test Setup, Execution, and Reporting Results - `openshift-pipelines-interop-aws`](#test-setup-execution-and-reporting-results---openshift-pipelines-interop-aws)
-- [Prerequisite(s)](#prerequisite--s-)
+- [Prerequisite(s)](#prerequisites)
   - [Environment Variables](#environment-variables)
   - [Custom Images](#custom-images)
 
@@ -32,7 +32,8 @@ The [`firewatch-ipi-aws`](../../../step-registry/firewatch/ipi/aws/README.md) wo
 
 Following the test cluster being provisioned, the following steps are executed in this order:
 
-1. [`openshift-pipelines-install-and-tests`](../../../step-registry/openshift-pipelines/install-and-tests/README.md)
+1. [`openshift-pipelines-install`](../../../step-registry/openshift-pipelines/install/README.md)
+2. [`openshift-pipelines-tests`](../../../step-registry/openshift-pipelines/tests/README.md)
 
 ## Prerequisite(s)
 

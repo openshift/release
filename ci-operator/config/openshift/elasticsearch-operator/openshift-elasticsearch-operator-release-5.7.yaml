@@ -24,7 +24,7 @@ base_images:
     namespace: ocp
     tag: kube-rbac-proxy
   log-file-metric-exporter:
-    name: 5.y
+    name: "5.7"
     namespace: logging
     tag: log-file-metric-exporter
   logging-curator5:
@@ -51,10 +51,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: oauth-proxy
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.21-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -63,9 +63,9 @@ build_root:
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: elasticsearch-operator
 - dockerfile_path: Dockerfile.src
   from: src
@@ -93,8 +93,9 @@ operator:
   - pullspec: quay.io/openshift-logging/curator5
     with: pipeline:logging-curator5
 promotion:
-  name: "5.7"
-  namespace: logging
+  to:
+  - name: "5.7"
+    namespace: logging
 releases:
   latest:
     release:
@@ -120,7 +121,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-5.7
       OO_INSTALL_NAMESPACE: openshift-operators-redhat
       OO_PACKAGE: elasticsearch-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -140,7 +141,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-5.7
       OO_INSTALL_NAMESPACE: openshift-operators-redhat
       OO_PACKAGE: elasticsearch-operator
       OO_TARGET_NAMESPACES: '!all'

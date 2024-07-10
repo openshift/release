@@ -39,14 +39,14 @@ function createHeterogeneousJunit() {
     if (( FRC == 0 )); then
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="1">
+<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="OCP-00001:${subteam}_leader:Adding secondary arch nodes to multi-arch cluster should succeed"/>
 </testsuite>
 EOF
     else
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="1">
+<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="OCP-00001:${subteam}_leader:Adding secondary arch nodes to multi-arch cluster should succeed">
     <failure message="">add secondary architecture nodes failed or cluster operators abnormal after the new nodes joined the cluster</failure>
   </testcase>
@@ -199,7 +199,7 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.opensh
   | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
   | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
   | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
-  | del(.metadata.generation)
+  | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
 EOF
 )")
 

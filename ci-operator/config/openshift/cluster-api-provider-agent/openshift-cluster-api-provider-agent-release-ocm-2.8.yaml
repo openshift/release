@@ -50,8 +50,9 @@ images:
   from: base
   to: cluster-api-provider-agent
 promotion:
-  name: ocm-2.8
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.8
+    namespace: edge-infrastructure
 releases:
   latest:
     integration:
@@ -97,6 +98,17 @@ tests:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-ai-operator-ztp-capi
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 00 00 */1 * 0
   steps:
     cluster_profile: packet-assisted
     dependencies:

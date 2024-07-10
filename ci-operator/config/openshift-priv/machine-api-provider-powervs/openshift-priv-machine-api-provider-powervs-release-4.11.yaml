@@ -20,8 +20,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: powervs-machine-controllers
 promotion:
-  name: 4.11-priv
-  namespace: ocp-private
+  to:
+  - name: 4.11-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -64,6 +65,12 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: machine-api-provider-powervs
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

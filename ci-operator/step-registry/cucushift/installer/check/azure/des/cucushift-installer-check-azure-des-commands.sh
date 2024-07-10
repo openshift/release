@@ -4,21 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-# A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
-ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP Version: $ocp_version"
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
@@ -61,23 +46,61 @@ if [[ -z "${CLUSTER_RESOURCE_GROUP}" ]]; then
     CLUSTER_RESOURCE_GROUP="${INFRA_ID}-rg"
 fi
 DES_RESOURCE_GROUP=$(< "${SHARED_DIR}/resourcegroup")
-DES_NAME=$(< "${SHARED_DIR}/azure_des")
+AZURE_DES_FILE="${SHARED_DIR}/azure_des.json"
+
+if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
+    DES_DEFAULT=$(cat ${AZURE_DES_FILE} | jq -r '.default')
+    DES_CONTROL_PLANE=${DES_DEFAULT}
+    DES_COMPUTE=${DES_DEFAULT}
+fi
+
+if [[ "${ENABLE_DES_CONTROL_PLANE}" == "true" ]]; then
+    DES_CONTROL_PLANE=$(cat ${AZURE_DES_FILE} | jq -r '.master')
+fi
+
+if [[ "${ENABLE_DES_COMPUTE}" == "true" ]]; then
+    DES_COMPUTE=$(cat ${AZURE_DES_FILE} | jq -r '.worker')
+fi
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 critical_check_result=0
 
 #Get des id
-des_id=$(az disk-encryption-set show -n "${DES_NAME}" -g "${DES_RESOURCE_GROUP}" --query '[id]' -otsv)
+expected_master_des_id=$(az disk-encryption-set show -n "${DES_CONTROL_PLANE}" -g "${DES_RESOURCE_GROUP}" --query '[id]' -otsv)
+expected_worker_des_id=${expected_master_des_id}
+if [[ "${DES_CONTROL_PLANE}" != "${DES_COMPUTE}" ]]; then
+    expected_worker_des_id=$(az disk-encryption-set show -n "${DES_COMPUTE}" -g "${DES_RESOURCE_GROUP}" --query '[id]' -otsv)
+fi
 
-#check that node os disk is encrypted
-nodes_list=$(oc get nodes --no-headers | awk '{print $1}')
-for node in ${nodes_list}; do
-    echo "--- check node ${node} ---"
-    node_des_id=$(az vm show --name "${node}" -g "${CLUSTER_RESOURCE_GROUP}" --query 'storageProfile.osDisk.managedDisk.diskEncryptionSet.id' -otsv)
-    if [[ "${node_des_id}" == "${des_id}" ]]; then
-        echo "INFO: os disk for node ${node} is encrypted"
+#check that master node os disk is encrypted
+echo "Expected des on master node: ${DES_CONTROL_PLANE}"
+master_nodes_list=$(oc get nodes --no-headers | grep "master" | awk '{print $1}')
+for master_node in ${master_nodes_list}; do
+    echo "--- check master node ${master_node} ---"
+    master_node_des_id=$(az vm show --name "${master_node}" -g "${CLUSTER_RESOURCE_GROUP}" --query 'storageProfile.osDisk.managedDisk.diskEncryptionSet.id' -otsv)
+    if [[ "${master_node_des_id}" == "${expected_master_des_id}" ]]; then
+        echo "INFO: os disk for node ${master_node} is encrypted"
     else
-        echo "ERROR: Get unexpected des id on os disk for node ${node}! expected value: ${des_id}, real value: ${node_des_id}"
+        echo "ERROR: Get unexpected des id on os disk for node ${master_node}! expected value: ${expected_master_des_id}, real value: ${master_node_des_id}"
         critical_check_result=1 
+    fi
+done
+
+#check that worker node os disk is encrypted
+echo "Expected des on master node: ${DES_COMPUTE}"
+worker_nodes_list=$(oc get nodes --no-headers | grep "worker" | awk '{print $1}')
+for worker_node in ${worker_nodes_list}; do
+    echo "--- check worker node ${worker_node} ---"
+    worker_node_des_id=$(az vm show --name "${worker_node}" -g "${CLUSTER_RESOURCE_GROUP}" --query 'storageProfile.osDisk.managedDisk.diskEncryptionSet.id' -otsv)
+    if [[ "${worker_node_des_id}" == "${expected_worker_des_id}" ]]; then
+        echo "INFO: os disk for node ${worker_node} is encrypted"
+    else
+        echo "ERROR: Get unexpected des id on os disk for node ${worker_node}! expected value: ${expected_worker_des_id}, real value: ${worker_node_des_id}"
+        critical_check_result=1
     fi
 done
 
@@ -86,11 +109,13 @@ echo "--- check des setting in default sc ---"
 if (( ocp_minor_version < 13 )) || [[ "${ENABLE_DES_DEFAULT_MACHINE}" != "true" ]]; then
     echo "DES setting in default sc is only available on 4.13+ and requires ENABLE_DES_DEFAULT_MACHINE set to true, no need to check on current cluster, skip."
 else
+    echo "Expected des in default sc: ${DES_DEFAULT}"
+    expected_default_des_id=$(az disk-encryption-set show -n "${DES_DEFAULT}" -g "${DES_RESOURCE_GROUP}" --query '[id]' -otsv)
     sc_des_id=$(oc get sc managed-csi -ojson | jq -r '.parameters.diskEncryptionSetID')
-    if [[ "${des_id}" == "${sc_des_id}" ]]; then
+    if [[ "${expected_default_des_id}" == "${sc_des_id}" ]]; then
         echo "default sc contains expected des setting!"
     else
-        echo "ERROR: Fail to check des setting in default sc! expected des id: ${des_id}, sc des id: ${sc_des_id}"
+        echo "ERROR: Fail to check des setting in default sc! expected des id: ${expected_default_des_id}, sc des id: ${sc_des_id}"
         critical_check_result=1
     fi
 fi

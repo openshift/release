@@ -1,16 +1,16 @@
 #!/bin/bash
 
 set -o nounset
-# set -o errexit
+set -o errexit
 set -o pipefail
 
 # Set cluster variables
-CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
-CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
+# CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 
 # Exports
-export CLUSTER_NAME CLUSTER_DOMAIN
+# export CLUSTER_NAME CLUSTER_DOMAIN
 export PATH="${BIN_FOLDER}:${PATH}"
 
 # Unset the following environment variables to avoid issues with oc command
@@ -40,7 +40,7 @@ FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
 
-if [[ ${DIFF_TIME} -le 600 ]]; then
+if [[ ${DIFF_TIME} -le 720 ]]; then
     echo ""
     echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
     echo "  😴 😴 😴"

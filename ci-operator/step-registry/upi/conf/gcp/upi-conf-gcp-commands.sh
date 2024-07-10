@@ -76,6 +76,10 @@ fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 ### Create manifests
 echo "Creating manifests..."
 openshift-install --dir="${dir}" create manifests &

@@ -1,0 +1,107 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: hack/Dockerfile.upgrade.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-upgrade-ci
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: e2e-deploy
+  steps:
+    cluster_profile: azure-virtualization
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+    test:
+    - as: test
+      cli: latest
+      commands: make deploy_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v1.1.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.16"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+- as: e2e-upgrade
+  steps:
+    cluster_profile: azure-virtualization
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+    test:
+    - as: test
+      commands: make upgrade_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v1.1.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.16"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src-upgrade-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: openshift-cnv
+  repo: cnv-ci
+  variant: "4.16"

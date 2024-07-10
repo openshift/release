@@ -23,8 +23,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: machine-api-operator
 promotion:
-  name: "4.10"
-  namespace: ocp
+  to:
+  - name: "4.10"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -148,7 +149,7 @@ tests:
       RUN_UPGRADE_TEST: "true"
       TEST_SUITE: ""
       TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
@@ -181,25 +182,25 @@ tests:
 - as: e2e-vsphere-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-libvirt
   optional: true
   skip_if_only_changed: ^docs/
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-libvirt
 - as: e2e-vsphere
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - as: e2e-test
       commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
@@ -213,7 +214,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
 - as: e2e-aws-disruptive
   optional: true

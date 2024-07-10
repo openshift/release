@@ -26,33 +26,43 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+declare vsphere_url
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare vsphere_datacenter
+declare vsphere_datastore
+declare dns_server
+declare vsphere_cluster
 
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-  gateway="192.168.${third_octet}.1"
-  rendezvous_ip_address="192.168.${third_octet}.4"
-else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-  cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
-  machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
-
-  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-  rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
-
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
+cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
+machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
 
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
@@ -81,26 +91,54 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-# Load array created in setup-vips:
-# 0: API
-# 1: Ingress
-declare -a vips
-mapfile -t vips <"${SHARED_DIR}"/vips.txt
+
+echo "Installing from initial release $RELEASE_IMAGE_LATEST"
+oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
+  --command=openshift-install --to=/tmp
+
+version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
+# Add vSphere credentials if the version is 4.15 or more
+if [[ "${version}" -ge "415" ]]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
+platform:
+  vsphere:
+    failureDomains:
+    - name: test-failure-baseDomain
+      region: changeme-region
+      server: ${vsphere_url}
+      topology:
+        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
+        datacenter: ${vsphere_datacenter}
+        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+        networks:
+        - ${vsphere_portgroup}
+        resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources
+        folder: /${vsphere_datacenter}/vm/${cluster_name}
+      zone: changeme-zone
+    vcenters:
+    - datacenters:
+      - ${vsphere_datacenter}
+      server: ${vsphere_url}
+      password: ${GOVC_PASSWORD}
+      user: ${GOVC_USERNAME}
+"
+fi
 
 if [ "${MASTERS}" -eq 1 ]; then
+  yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 platform:
   none: {}
 "
-else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
-platform:
-  vsphere:
-    apiVIPs:
-    - ${vips[0]}
-    ingressVIPs:
-    - ${vips[1]}
-"
+fi
+
+if [[ ${IP_FAMILIES} == "IPv4" ]]; then
+  yq e --inplace 'del(.networking)' "${SHARED_DIR}"/install-config.yaml
+  cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
+networking:
+  machineNetwork:
+  - cidr: ${machine_cidr}
+EOF
 fi
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
@@ -111,9 +149,6 @@ controlPlane:
 compute:
 - name: worker
   replicas: ${WORKERS}
-networking:
-  machineNetwork:
-  - cidr: ${machine_cidr}
 EOF
 
 # Create cluster-domain.txt
@@ -129,13 +164,6 @@ echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_vers
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >>"${SHARED_DIR}"/vsphere_context.sh
-declare vsphere_url
-declare GOVC_USERNAME
-declare GOVC_PASSWORD
-declare vsphere_datacenter
-declare vsphere_datastore
-declare dns_server
-declare vsphere_cluster
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
@@ -158,14 +186,36 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/hostnames.txt
 
 for ((i = 0; i < total_host; i++)); do
-  ipaddress=""
-  if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-    ipaddress=192.168.${third_octet}.$((i + 4))
-    cidr=25
-  else
-    ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-  fi
+  ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+  ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
 
+  ipv4="
+        ipv4:
+          enabled: true
+          address:
+            - ip: ${ipaddress}
+              prefix-length: ${cidr}
+          dhcp: false"
+  ipv6="
+        ipv6:
+          enabled: true
+          address:
+            - ip: "${ipv6_address%%::*}::"$((i + 6))
+              prefix-length: ${cidr_ipv6}
+          dhcp: false"
+  route_ipv4="
+          - destination: 0.0.0.0/0
+            next-hop-address: ${gateway}
+            next-hop-interface: ens32
+            table-id: 254"
+  route_ipv6="
+          - destination: ::/0
+            next-hop-address: ${gateway_ipv6}
+            next-hop-interface: ens32
+            table-id: 254"
+  # Single-stack override conditions
+  if [[ ${IP_FAMILIES} == "IPv4" ]]; then ipv6=""; route_ipv6=""; fi
+  if [[ ${IP_FAMILIES} == "IPv6" ]]; then ipv4=""; route_ipv4=""; fi
   echo " - hostname: ${hostnames[$i]}
    role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
@@ -176,23 +226,13 @@ for ((i = 0; i < total_host; i++)); do
       - name: ens32
         type: ethernet
         state: up
-        mac-address: ${mac_addresses[$i]}
-        ipv4:
-          enabled: true
-          address:
-            - ip: ${ipaddress}
-              prefix-length: ${cidr}
-          dhcp: false
+        mac-address: ${mac_addresses[$i]}${ipv4}${ipv6}
     dns-resolver:
      config:
       server:
        - ${dns_server}
     routes:
-     config:
-       - destination: 0.0.0.0/0
-         next-hop-address: ${gateway}
-         next-hop-interface: ens32
-         table-id: 254"
+     config:${route_ipv4}${route_ipv6}"
 done >>"${SHARED_DIR}/agent-config.yaml.patch"
 
 agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"
@@ -209,17 +249,16 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
-  --command=openshift-install --to=/tmp
-
+echo "Creating agent image..."
 dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
-cp -t "${dir}" \
-  "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Creating agent image..."
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 
 if ! wait $!; then
@@ -228,8 +267,6 @@ if ! wait $!; then
 fi
 
 curl -s -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o ${HOME}/glx.tar.gz && tar -C ${HOME} -xvf ${HOME}/glx.tar.gz govc && rm -f ${HOME}/glx.tar.gz
-
-source "${SHARED_DIR}/govc.sh"
 
 echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)

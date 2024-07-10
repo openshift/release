@@ -81,6 +81,11 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+if test -f "${SHARED_DIR}/cluster-id"
+then
+    CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
+    export CLUSTER_ID
+fi
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
@@ -134,10 +139,13 @@ vsphere)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    error_code=0
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    if [ "W${error_code}W" == "W0W" ]; then
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090
@@ -148,7 +156,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -169,8 +177,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir -p gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -241,8 +249,16 @@ function run {
         echo "add FILTERS_ADDITIONAL into test_filters"
         test_filters="${TEST_FILTERS};${FILTERS_ADDITIONAL}"
     fi
+    echo "------handle test filter start------"
     echo "${test_filters}"
     handle_filters "${test_filters}"
+    echo "------handle test filter done------"
+
+    echo "------handle module filter start------"
+    echo "MODULE_FILTERS: \"${MODULE_FILTERS:-}\""
+    handle_module_filter "${MODULE_FILTERS}"
+    echo "------handle module filter done------"
+
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -284,18 +300,36 @@ function run {
     fi
 
     # summarize test results
-    echo "Summarizing test result..."
-    mapfile -t test_suite_failures < <(grep -r -E 'testsuite.*failures="[1-9][0-9]*"' "${ARTIFACT_DIR}" | grep -o -E 'failures="[0-9]+"' | sed -E 's/failures="([0-9]+)"/\1/')
-    failures=0
-    for (( i=0; i<${#test_suite_failures[@]}; ++i ))
-    do
-        let failures+=${test_suite_failures[$i]}
-    done
-    if [ $((failures)) == 0 ]; then
-        echo "All tests have passed"
-    else
-        echo "${failures} failures in openshift-extended-logging-test" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
+    echo "Summarizing test results..."
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]+' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
+    done < /tmp/zzz-tmp.log
+
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
+    cat > "${TEST_RESULT_FILE}" <<- EOF
+openshift-extended-logging-test:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
+EOF
+
+    if [ ${results[failures]} != 0 ] ; then
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
+        for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
+            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        done
     fi
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
@@ -391,6 +425,52 @@ function handle_or_filter {
         check_case_selected "${ret}"
     fi
 }
+
+function handle_module_filter {
+    local module_filter="$1"
+    declare -a module_filter_keys
+    declare -a module_filter_values
+    valid_and_get_module_filter "$module_filter"
+
+
+    for i in "${!module_filter_keys[@]}"; do
+
+        module_key="${module_filter_keys[$i]}"
+        filter_value="${module_filter_values[$i]}"
+        echo "moudle: $module_key"
+        echo "filter: $filter_value"
+        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+
+        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
+
+        handle_filters "${filter_value}"
+
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+
+    done
+}
+
+function valid_and_get_module_filter {
+    local module_filter_tmp="$1"
+
+    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    for pair in "${pairs[@]}"; do
+        IFS=':' read -ra kv <<< "$pair"
+        if [[ ${#kv[@]} -ne 2 ]]; then
+            echo "moudle filter format is not correct"
+            exit 1
+        fi
+
+        module_key="${kv[0]}"
+        filter_value="${kv[1]}"
+        module_filter_keys+=("$module_key")
+        module_filter_values+=("$filter_value")
+    done
+}
+
 function handle_result {
     resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
     echo $resultfile
@@ -419,6 +499,15 @@ function handle_result {
     fi
     cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${newresultfile}
+
+    for file in "${ARTIFACT_DIR}/junit/"*.xml;
+    do
+       if [ -e "$file" ]; then
+           new_file="${file%.xml}-junit.xml"
+           mv "$file" "$new_file"
+           echo "renamed $file to $new_file"
+       fi
+    done
 }
 function check_case_selected {
     found_ok=$1

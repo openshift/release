@@ -17,6 +17,7 @@ function run_analysis() {
   echo "********** Starting testcase analysis for: ${analysis} "
   echo
   set -x
+  export KUBECONFIG=/var/run/kubeconfig/kubeconfig
   job-run-aggregator analyze-test-case \
     --google-service-account-credential-file "${GOOGLE_SA_CREDENTIAL_FILE}" \
     --payload-tag="${PAYLOAD_TAG}" \
@@ -24,6 +25,7 @@ function run_analysis() {
     --job-start-time="${JOB_START_TIME}" \
     --working-dir="${artifacts}" \
     --timeout=4h30m \
+    --query-source=cluster \
     $parameters \
     --test-group="${TEST_GROUP}" > "${artifacts}/${analysis}.log" 2>&1  &
   set +x

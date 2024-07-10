@@ -7,14 +7,13 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
 
-ls -la /root/kraken
-python3.9 -m virtualenv ./chaos
-source ./chaos/bin/activate
-pip3.9 install -r /root/kraken/requirements.txt
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
+ES_PASSWORD=$(cat "/secret/es/password")
+ES_USERNAME=$(cat "/secret/es/username")
+
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ELASTIC_INDEX=krkn_chaos_ci
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -27,8 +26,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-chmod +x ./prow/cpu-hog/prow_run.sh
-./prow/cpu-hog/prow_run.sh
+./cpu-hog/prow_run.sh
 rc=$?
 echo "Finished running memory hog scenario"
 echo "Return code: $rc"

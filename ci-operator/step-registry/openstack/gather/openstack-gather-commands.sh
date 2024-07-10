@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 set -o nounset
-set -x
 
 cd /tmp || exit
 

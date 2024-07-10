@@ -122,16 +122,48 @@ EOF
 function create_catalog_sources()
 {
     # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    kube_major=$(oc version -o json |jq -r '.serverVersion.major')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
-    echo "create QE catalogsource: qe-app-registry"
-    cat <<EOF | oc create -f -
+    echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
+    echo "Use $index_image in catalogsource/$CATALOGSOURCE_NAME"
+    # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
+    # details: https://issues.redhat.com/browse/OCPBUGS-31427
+    if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
+        echo "the index image as the initContainer cache image)" 
+        cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: qe-app-registry
+  name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
+spec:
+  displayName: Production Operators
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: ${index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+    else
+        echo "the index image as the server image" 
+        cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOGSOURCE_NAME
+  namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}
@@ -141,6 +173,8 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+    fi
+
     set +e 
     COUNTER=0
     while [ $COUNTER -lt 600 ]
@@ -148,7 +182,7 @@ EOF
         sleep 20
         COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        STATUS=`oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o=jsonpath="{.status.connectionState.lastObservedState}"`
         if [[ $STATUS = "READY" ]]; then
             echo "create the QE CatalogSource successfully"
             break
@@ -162,9 +196,9 @@ EOF
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
         
         run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
+        run_command "oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o yaml"
+        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o yaml"
+        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
         
@@ -208,14 +242,30 @@ EOF
 
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+function check_olm_capability(){
+    # check if OLM capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManager"
+        # check if OLM capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
+              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
 update_global_auth
 sleep 5
 create_icsp_connected
+check_olm_capability
 check_marketplace
 create_catalog_sources
 
 #support hypershift config guest cluster's icsp
-oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_iscp.yaml
+oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml

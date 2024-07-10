@@ -1,0 +1,29 @@
+workflow:
+  as: hypershift-kubevirt-e2e-azure
+  documentation: |-
+    Sets up all the mgmt/infra cluster prerequisites necessary for hypershift kubevirt guest clusters on Azure infra.
+    Then runs basic hypershift e2e tests.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      COMPUTE_NODE_TYPE: Standard_D16as_v5
+      COMPUTE_NODE_REPLICAS: "3"
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16as_v5
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_VOLUME_SIZE: "500"
+      ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: hypershift-kubevirt-install-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    test:
+    - chain: hypershift-kubevirt-run-e2e-local
+    - chain: hypershift-kubevirt-run-e2e-external
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: ipi-azure-post

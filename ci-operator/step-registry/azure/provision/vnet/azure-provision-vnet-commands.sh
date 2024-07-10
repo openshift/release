@@ -92,6 +92,17 @@ if [ X"$ret" != X"0" ]; then
     exit 1
 fi
 
+# Assigne proper permissions to resource group where vnet will be created
+if [[ -n "${AZURE_PERMISSION_FOR_VNET_RG}" ]]; then
+    cluster_sp_id=${AZURE_AUTH_CLIENT_ID}
+    if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
+        cluster_sp_id=$(< "${SHARED_DIR}/azure_sp_id")
+    fi
+    resource_group_id=$(az group show -g "${RESOURCE_GROUP}" --query id -otsv)
+    echo "Assigin role '${AZURE_PERMISSION_FOR_VNET_RG}' to resource group ${RESOURCE_GROUP}"
+    run_command "az role assignment create --assignee ${cluster_sp_id} --role '${AZURE_PERMISSION_FOR_VNET_RG}' --scope ${resource_group_id} -o jsonc"
+fi
+
 VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # create vnet
@@ -117,6 +128,29 @@ clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'worker-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges 80 443" || exit 3
 #Add port 22 to debug easily and to gather bootstrap log
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'ssh-allow' --priority 1001 --access Allow --source-port-ranges '*' --destination-port-ranges 22" || exit 3
+
+if [[ "${AZURE_CUSTOM_NSG}" == "yes" ]]; then
+    controlPlaneSubnet_addressPrefix=$(cat "${vnet_info_file}" | jq -r '.[].subnets[] | select(.name == "'"${controlPlaneSubnet}"'") | .addressPrefix')
+    computeSubnet_addressPrefix=$(cat "${vnet_info_file}" | jq -r '.[].subnets[] | select(.name == "'"${computeSubnet}"'") | .addressPrefix')
+
+    echo "Disable default network security rule AllowInBoundVnet from VirtualNetwork to VirtualNetwork"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'DenyVnetInbound' --priority 1100 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound"
+
+    echo "Create network security rules on specific ports from nodes to nodes"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundTCP' --priority 1010 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-port-ranges 1936 9000-9999 10250-10259 30000-32767 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundUDP' --priority 1011 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-port-ranges 4789 6081 9000-9999 500 4500 30000-32767 --direction Inbound --protocol Udp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowCidr22623InboundTCP' --priority 1012 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-port-ranges 22623 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowetcdInboundTCP' --priority 1013 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-port-ranges 2379-2380 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowInboundICMP' --priority 1014 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound --protocol Icmp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowInboundESP' --priority 1015 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound --protocol Esp"
+fi
+
+if [[ ! -z "${AZURE_VNET_TAGS}" ]]; then
+  echo "Adding custom tags ${AZURE_VNET_TAGS} on vnet ${vnet_name}"
+  vnet_id=$(az network vnet list -g ${RESOURCE_GROUP} --query "[].id" -otsv)
+  az tag update --resource-id "${vnet_id}" --operation merge --tags ${AZURE_VNET_TAGS}
+  echo "az tag list --resource-id ${vnet_id}" > ${SHARED_DIR}/list_azure_existing_vnet_tags.sh
+fi
 
 if [ X"${RESTRICTED_NETWORK}" == X"yes" ]; then
     echo "Remove outbound internet access from the Network Security groups used for master and worker subnets"

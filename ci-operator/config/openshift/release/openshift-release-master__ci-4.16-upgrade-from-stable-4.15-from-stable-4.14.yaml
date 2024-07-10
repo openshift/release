@@ -1,0 +1,48 @@
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: "4.14"
+  intermediate:
+    release:
+      channel: candidate
+      version: "4.15"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sdn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_UPGRADE_OPTIONS: ""
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: set-releases-release
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-upgrade-aws-sdn
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.16-upgrade-from-stable-4.15-from-stable-4.14

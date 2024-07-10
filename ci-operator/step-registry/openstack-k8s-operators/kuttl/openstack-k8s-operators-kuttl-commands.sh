@@ -6,7 +6,7 @@ META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
 # Export Ceph options for tests that call 'make ceph'
 export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
-export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="8Gi"}
 export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
@@ -15,8 +15,14 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
+
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Build tag
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -25,13 +31,15 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
       echo "Failing since this step supports only ${ORG} changes."
       exit 1
     fi
     BASE_OP=${EXTRA_REF_REPO}
 fi
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 # custom per project ENV variables
 # shellcheck source=/dev/null
@@ -52,7 +60,7 @@ if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
 fi
 
 
-export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${PR_SHA}
+export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
 export ${SERVICE_NAME^^}_KUTTL_CONF=/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml
 if [ -d  /go/src/github.com/${ORG}/${BASE_OP}/tests ]; then
     export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/tests/kuttl/tests
@@ -66,13 +74,17 @@ fi
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
+# Use built META_OPERATOR index image
+# This is required by dataplane kuttl tests which installs openstack-operator
+export OPENSTACK_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-index:${BUILD_TAG}
+
 # Use built META_OPERATOR bundle image
-export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${PR_SHA}
+export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${BUILD_TAG}
 
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then
     cd ${HOME}
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
 
   cd ${HOME}/install_yamls

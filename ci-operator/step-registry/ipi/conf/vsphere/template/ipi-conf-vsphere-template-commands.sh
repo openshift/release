@@ -6,15 +6,11 @@ set -o pipefail
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare vsphere_datacenter
-declare vsphere_datastore
-declare vsphere_url
-declare vsphere_cluster
-declare vsphere_portgroup
-# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
-
+CONFIG="${SHARED_DIR}/install-config.yaml"
+PATCH="${SHARED_DIR}/template.yaml.patch"
 
 if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
   installer_bin=$(which openshift-install)
@@ -24,9 +20,13 @@ if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
 
   # select a hardware version for testing
   vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+  vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
   hw_versions=(15 17 18 19)
   if [[ ${vsphere_version} -eq 8 ]]; then
     hw_versions=(20)
+    if [[ ${vsphere_minor_version} -ge 2 ]]; then
+      hw_versions=(20 21)
+    fi
   fi
   hw_available_versions=${#hw_versions[@]}
   selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
@@ -38,17 +38,12 @@ else
   vm_template="${RHCOS_VM_TEMPLATE}"
 fi
 
-cat >> "${SHARED_DIR}"/enable_template_content.txt << EOF
+cat > "${PATCH}" << EOF
+platform:
+  vsphere:
     failureDomains:
-    - name: generated-failure-domain
-      region: generated-region
-      server: "${vsphere_url}"
-      topology:
-        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
-        datacenter: ${vsphere_datacenter}
-        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+    - topology:
         template: /${vsphere_datacenter}/vm/${vm_template}
-        networks:
-        - ${vsphere_portgroup}
-      zone: generated-zone
 EOF
+yq-go m -x -i "${CONFIG}" "${PATCH}"
+

@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-private-sshkey-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-sshkey
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-private
+  - ref: cucushift-installer-check-sshkey
+  env:
+  - name: PUBLISH
+    default:  "Internal"
+  - name: SSH_KEY_TYPE_LIST
+    default: "ed25519 ecdsa rsa"
+    documentation: Specify the ssh key types to be generated for core user
+  documentation: |-
+    Create an IPI private cluster on AZURE for QE e2e tests.
+    Configure different type of ssh key for core user.

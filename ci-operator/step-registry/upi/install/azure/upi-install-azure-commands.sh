@@ -2,7 +2,7 @@
 set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"; cp -t "${SHARED_DIR}" "${ARTIFACT_DIR}/installer/metadata.json" "${ARTIFACT_DIR}/installer/auth/kubeconfig"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -58,7 +58,15 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+  echo "Setting AZURE credential with minimal permissions to install UPI"
+  AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
+fi
 export AZURE_AUTH_LOCATION
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 pushd ${ARTIFACT_DIR}/installer
 
@@ -163,13 +171,15 @@ else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
 fi
 
+# change to use --account-key instead of --auth-mode login to avoid issue
+# https://github.com/MicrosoftDocs/azure-docs/issues/53299
 echo "Copying VHD image from ${VHD_URL}"
-az storage container create --name vhd --account-name $ACCOUNT_NAME --auth-mode login
+az storage container create --name vhd --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY
 
 status="false"
 while [ "$status" == "false" ]
 do
-  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --auth-mode login -o tsv --query exists)
+  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --account-key $ACCOUNT_KEY -o tsv --query exists)
 done
 
 az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
@@ -180,9 +190,11 @@ do
 done
 
 status="pending"
-while [ "$status" == "pending" ]
+cmd_result=1
+while [[ ${cmd_result} -eq 1 ]] || [[ "$status" == "pending" ]]
 do
-  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status)
+  cmd_result=0
+  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1
 done
 if [[ "$status" != "success" ]]; then
   echo "Error copying VHD image ${VHD_URL}"
@@ -190,7 +202,7 @@ if [[ "$status" != "success" ]]; then
 fi
 
 echo "Uploading bootstrap.ign"
-az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob
+az storage container create --name files --account-name $ACCOUNT_NAME
 az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "${ARTIFACT_DIR}/installer/bootstrap.ign" -n "bootstrap.ign"
 
 echo "Creating private DNS zone"
@@ -253,7 +265,9 @@ echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
 az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${BASE_DOMAIN} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
 
 echo "Deploying 04_bootstrap"
-BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
+BOOTSTRAP_URL_EXPIRY=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
+BOOTSTRAP_URL=$(az storage blob generate-sas -c 'files' -n 'bootstrap.ign' --https-only --full-uri --permissions r --expiry ${BOOTSTRAP_URL_EXPIRY} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} -o tsv)
+#BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
 IGNITION_VERSION=$(jq -r .ignition.version ${ARTIFACT_DIR}/installer/bootstrap.ign)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "${IGNITION_VERSION}" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
 # shellcheck disable=SC2046
@@ -352,6 +366,4 @@ wait "$!"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 # Password for the cluster gets leaked in the installer logs and hence removing them.
 sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
-cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"
-cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
 touch /tmp/install-complete

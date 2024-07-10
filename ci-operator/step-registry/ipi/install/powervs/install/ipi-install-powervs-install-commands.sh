@@ -10,6 +10,7 @@ function populate_artifact_dir() {
     echo "Copying log bundle..."
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   fi
+
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -21,6 +22,7 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
+
   case "${CLUSTER_TYPE}" in
     powervs*)
       # We don't want debugging in this section
@@ -30,13 +32,19 @@ function populate_artifact_dir() {
       unset IBMCLOUD_TRACE
 
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select (.name|test("'${CLUSTER_NAME}'")) | [.name, .id, .networkPorts[].ip, .networkPorts[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
       >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
       ;;
   esac
+
+  if [ -d "${dir}/.clusterapi_output" ]
+  then
+    echo "Copying CAPI output to artifact dir"
+    cp -r "${dir}/.clusterapi_output/" "${ARTIFACT_DIR}/clusterapi_output/"
+  fi
 }
 
 function prepare_next_steps() {
@@ -220,95 +228,47 @@ function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
-  export HOME=/tmp
+  export HOME=/output
 
-  if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.20.0/IBM_Cloud_CLI_2.20.0_amd64.tar.gz
-    tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
-
-    if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
-      exit 1
-    fi
-
-    PATH=${PATH}:/tmp/Bluemix_CLI/bin
-
-    hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
-    echo "Checking ibmcloud version..."
-    if ! ibmcloud --version; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
-      exit 1
-    fi
-
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
-      ibmcloud plugin install ${I}
-    done
-    ibmcloud plugin list
-
-    for PLUGIN in cis pi; do
-      if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
-        echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
-        ls -la ${HOME}/.bluemix/
-        ls -la ${HOME}/.bluemix/plugins/
-        exit 1
-      fi
-    done
+  hash ibmcloud || exit 1
+  echo "Checking ibmcloud version..."
+  if ! ibmcloud --version; then
+    echo "Error: ibmcloud is not working?"
+    exit 1
   fi
 
-  if [ ! -f /tmp/jq ]; then
+  #
+  # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
+  #
+  for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
+    #
+    # NOTE: If a plugin is already installed then don't do another install. If not, then install it.
+    # 
+    yes N | ibmcloud plugin install ${I}
+  done
+  ibmcloud plugin list
 
-    for I in $(seq 1 10)
-    do
-      curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
-
-      hash file 2>/dev/null && file /tmp/jq
-      echo "Checking jq version..."
-      if /tmp/jq --version; then
-        break
-      else
-        echo "Error: /tmp/jq is not working?"
-        /bin/rm /tmp/jq
-        sleep 30s
-      fi
-    done
-
-    if [ ! -f /tmp/jq ]; then
-      echo "Error: Could not successfully download jq!"
+  for PLUGIN in cis pi; do
+    if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
+      echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
+      ls -la ${HOME}/.bluemix/
+      ls -la ${HOME}/.bluemix/plugins/
       exit 1
     fi
-
-    #PATH=${PATH}:/tmp/:/tmp/jq
-    PATH=${PATH}:/tmp
+  done
+  echo "Installing yq-v4"
+  # Install yq manually if its not found in installer image
+  cmd_yq="$(which yq-v4 2>/dev/null || true)"
+  mkdir -p /tmp/bin
+  if [ ! -x "${cmd_yq}" ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
   fi
-
-  if [ ! -f /tmp/yq ] || [ ! -f /bin/yq-go ]; then
-
-    uname -m
-    ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
-    echo "ARCH=${ARCH}"
-    if [ -z "${ARCH}" ]; then
-      echo "Error: ARCH is empty!"
-      exit 1
-    fi
-
-    for I in $(seq 1 10)
-    do
-      curl -L "https://github.com/mikefarah/yq/releases/download/v4.25.3/yq_linux_${ARCH}" -o /tmp/yq && chmod +x /tmp/yq
-
-      hash file 2>/dev/null && file /tmp/yq
-      echo "Checking yq version..."
-      if /tmp/yq --version; then
-        break
-      else
-        echo "Error: /tmp/yq is not working?"
-        /bin/rm /tmp/yq
-        sleep 30s
-      fi
-    done
-  fi
-
-  PATH=${PATH}:$(pwd)/bin
+  PATH=${PATH}:/tmp/bin
   export PATH
+
+  hash jq || exit 1
+  hash yq-v4 || exit 1
 }
 
 function init_ibmcloud() {
@@ -333,7 +293,30 @@ function init_ibmcloud() {
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
 
-  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  echo "BASE_DOMAIN = ${BASE_DOMAIN}"
+  (
+  set -xeuo pipefail;
+  INSTANCES=$(mktemp);
+  DOMAINS=$(mktemp);
+  trap '/bin/rm "${INSTANCES}" "${DOMAINS}"' EXIT;
+  ibmcloud cis instances --output json > ${INSTANCES};
+  while read INSTANCE;
+  do
+    ibmcloud cis instance "${INSTANCE}" --output json | jq -r '.crn' > /tmp/cis_instance;
+    ibmcloud cis instance-set ${INSTANCE};
+    ibmcloud cis domains --output json > ${DOMAINS};
+    while read DOMAIN;
+    do
+      echo "DOMAIN=${DOMAIN}";
+      if [ "${DOMAIN}" == "${BASE_DOMAIN}" ]
+      then
+        exit 0;
+      fi;
+    done < <(jq -r '.[] | .name' ${DOMAINS});
+  done < <(jq -r '.[] | .name' ${INSTANCES});
+  true > /tmp/cis_instance;
+  )
+  CIS_INSTANCE_CRN=$(cat /tmp/cis_instance)
   if [ -z "${CIS_INSTANCE_CRN}" ]; then
     echo "Error: CIS_INSTANCE_CRN is empty!"
     exit 1
@@ -345,14 +328,18 @@ function init_ibmcloud() {
     exit 1
   fi
 
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  # BUG, this:
+  #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
+  # does not always return a match!  This also is likely to fail:
+  #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
     exit 1
   fi
   export SERVICE_INSTANCE_CRN
 
-  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
+  ibmcloud pi workspace target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
   if [ -z "${CLOUD_INSTANCE_ID}" ]; then
@@ -390,7 +377,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi job list --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -411,14 +398,14 @@ function delete_network() {
   (
     while read UUID
     do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
+      echo ibmcloud pi subnet delete ${UUID}
+      ibmcloud pi subnet delete ${UUID}
     done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
+  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
 
   for (( TRIES=0; TRIES<20; TRIES++ ))
   do
-    LINES=$(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
+    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
     echo "LINES=${LINES}"
     if (( LINES == 0 ))
     then
@@ -432,50 +419,11 @@ function delete_network() {
 
 function destroy_resources() {
   #
-  # TODO: Remove after infra bugs are fixed
-  # TO confirm resources are cleared properly
-  #
-
-  #
-  # Clean up DHCP networks via curl.
-  # At the moment, this is the only api and 4.11 version of destroy cluster
-  # only cleans up DHCP networks in use by VMs, which is not always the case.
-  #
-  [ -z "${CLOUD_INSTANCE_ID}" ] && exit 1
-  echo "CLOUD_INSTANCE_ID=${CLOUD_INSTANCE_ID}"
-  set +x
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT="$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")"
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  for i in {1..3}; do
-    while read UUID
-    do
-      echo ${UUID}
-      GET_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "GET_RESULT=${GET_RESULT}"
-      if [ "${GET_RESULT}" == "{}" ]
-      then
-        continue
-      fi
-      if [ "$(echo "${GET_RESULT}" | jq -r '.error')" == "dhcp server not found" ]
-      then
-        continue
-      fi
-      DELETE_RESULT=$(curl --silent --location --request DELETE "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "DELETE_RESULT=${DELETE_RESULT}"
-      sleep 2m
-    done < <(echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id')
-  done
-
-  #
   # Create a fake cluster metadata file
   #
   mkdir /tmp/ocp-test
   cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
   #
@@ -495,22 +443,6 @@ EOF
       break
     fi
   done
-
-  #
-  # Clean up leftover networks from a previous OpenShift cluster
-  #
-  if ! delete_network "rdr-multiarch-${POWERVS_ZONE}"
-  then
-      DESTROY_SUCCEEDED=false
-  fi
-
-  #
-  # Clean up the public-192_168_XXX_XX-XX-VLAN_XXXX network
-  #
-  if ! delete_network "public-192_168"
-  then
-      DESTROY_SUCCEEDED=false
-  fi
 
   if ! ${DESTROY_SUCCEEDED}
   then
@@ -544,27 +476,22 @@ function dump_resources() {
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
-  echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
+# "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
+(
+  echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -z "${CLOUD_UUID}" ]
+  ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
+
+  GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  if [ -z "${GATEWAY_ID}" ]
   then
-    echo "Error: Could not find a Cloud Connection with the name ${INFRA_ID}"
-  else
-    ibmcloud pi connection ${CLOUD_UUID}
+    echo "Error: GATEWAY_ID is empty"
+    exit
   fi
 
-  echo "8<--------8<--------8<--------8<-------- Direct Link 8<--------8<--------8<--------8<--------"
-
-  DL_UUID=$(ibmcloud dl gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
-  if [ -z "${DL_UUID}" ]
-  then
-    echo "Error: Could not find a Direct Link with the name ${INFRA_ID}"
-  else
-    ibmcloud dl gateway ${DL_UUID}
-  fi
+  ibmcloud tg connections ${GATEWAY_ID}
+)
 
 # "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
@@ -707,11 +634,38 @@ function dump_resources() {
     oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
   )
 
+  echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -n openshift-machine-api
+    echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc get machineset.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machineset.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc logs -l k8s-app=controller -c machine-controller -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s logs -l k8s-app=controller -c machine-controller -n openshift-machine-api
+  )
+
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
-  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+  ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
-  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+  ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+ 
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+  (
+    if [ -d "${dir}/.clusterapi_output" ]; then
+      yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+
+      echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+      for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
+      do
+	echo ${FILE}
+        yq-v4 eval .status.conditions ${FILE}
+	echo
+      done
+    fi
+  )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
@@ -754,11 +708,11 @@ IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_REGION=$(yq eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_ZONE=$(yq eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
-VPCREGION=$(yq eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
-CLUSTER_NAME=$(yq eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
+VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
+CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -932,6 +886,21 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
+
+# If we need to try again, then does the CAPI cluster status yaml file exist?
+if [ ${ret} -gt 0 ]; then
+  SFILE="/tmp/installer/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests*yaml"
+  ls -l ${SFILE} || true
+  if [ -f ${SFILE} ]; then
+    # How many statuses are False?
+    SLINES=$(yq-v4 eval .status.conditions ${SFILE} -o json | jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
+    echo "Skip? SLINES=${SLINES}"
+    if [ ${SLINES} -gt 0 ]; then
+      echo "Skipping wait-for install-complete since detected CAPI problem"
+      ret=0
+    fi
+  fi
+fi
 
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"

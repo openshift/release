@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -29,6 +28,11 @@ EOF
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not create host config for additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+    continue
+  fi
   ADAPTED_YAML="
   hostname: ${name}
   role: ${name%%-[0-9]*}
@@ -50,22 +54,23 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         enabled: ${ipv6_enabled}
 "
 
-  # split the ipi_disabled_ifaces semi-comma separated list into an array
-  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
-  for iface in "${ipi_disabled_ifaces[@]}"; do
-    # Take care of the indentation when adding the disabled interfaces to the above yaml
-    ADAPTED_YAML+="
-    - name: ${iface}
-      type: ethernet
-      state: up
-      ipv4:
-        enabled: false
-        dhcp: false
-      ipv6:
-        enabled: false
-        dhcp: false
-    "
-  done
+# Workaround: Comment out this code until OCPBUGS-34849 is fixed
+#  # split the ipi_disabled_ifaces semi-comma separated list into an array
+#  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
+#  for iface in "${ipi_disabled_ifaces[@]}"; do
+#    # Take care of the indentation when adding the disabled interfaces to the above yaml
+#    ADAPTED_YAML+="
+#    - name: ${iface}
+#      type: ethernet
+#      state: up
+#      ipv4:
+#        enabled: false
+#        dhcp: false
+#      ipv6:
+#        enabled: false
+#        dhcp: false
+#    "
+#  done
   # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"

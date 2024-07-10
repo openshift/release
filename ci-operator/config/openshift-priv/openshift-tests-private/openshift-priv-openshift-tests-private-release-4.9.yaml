@@ -3,7 +3,7 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: cli
-binary_build_commands: make all
+binary_build_commands: make go-mod-tidy;make all
 build_root:
   image_stream_tag:
     name: release
@@ -11,8 +11,9 @@ build_root:
     tag: golang-1.16
 canonical_go_repository: github.com/openshift/openshift-tests-private
 promotion:
-  name: 4.9-priv
-  namespace: ocp-private
+  to:
+  - name: 4.9-priv
+    namespace: ocp-private
 releases:
   latest:
     candidate:
@@ -59,6 +60,22 @@ tests:
     - as: pr-test
       cli: latest
       commands: make pr-test
+      from: bin
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: "2"
+          memory: 600Mi
+    workflow: ipi-aws
+- as: sanity
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: periodic-e2e-test
+      cli: latest
+      commands: make nightly-test
       from: bin
       resources:
         limits:

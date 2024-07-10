@@ -2,13 +2,16 @@ ref:
   as: redhat-chaos-pod-scenarios-etcd-disruption
   from_image:
     namespace: chaos
-    name: krkn
+    name: prow-scripts
     tag: latest
   commands: redhat-chaos-pod-scenarios-etcd-disruption-commands.sh
   credentials:
   - namespace: test-credentials
     name: cluster-secrets-aws-chaos
     mount_path: /secret/telemetry
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/es
   env:
   - name: TARGET_NAMESPACE
     default: "openshift-etcd"
@@ -20,12 +23,12 @@ ref:
     default: "3"
   - name: KILL_TIMEOUT
     default: "180"
-  - name: WAIT_TIMEOUT
+  - name: EXPECTED_RECOVERY_TIME
     default: "90"
   - name: ENABLE_ALERTS
     default: "True"
   - name: ALERTS_PATH
-    default: "/root/kraken/config/alerts"
+    default: "/home/krkn/kraken/config/alerts_openshift.yaml"
   - name: CHECK_CRITICAL_ALERTS
     default: "True"
   - name: WAIT_DURATION
@@ -36,8 +39,10 @@ ref:
     default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
   - name: TELEMETRY_USERNAME
     default: "redhat-chaos"
+  - name: TELEMETRY_GROUP
+    default: "prow"
   - name: TELEMETRY_RUN_TAG
-    default: "prow-etcd-pod-disruption"
+    default: "etcd-pod-disruption"
   - name: TELEMETRY_PROMETHEUS_BACKUP
     default: "True"
   - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
@@ -54,6 +59,8 @@ ref:
     default: "True"
   - name: TELEMTRY_CLI_PATH
     default: "/usr/local/bin/oc"
+  - name: TELEMETRY_EVENTS_BACKUP
+    default: "True"
   resources:
     requests:
       cpu: 100m

@@ -45,6 +45,9 @@ echo "$(date -u --rfc-3339=seconds) - Subnet Name: ${subnet_name}"
 
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
+echo "Nutanix API_VIP = ${API_VIP}"
+echo "Nutanix INGRESS_VIP = ${INGRESS_VIP}"
+
 # Create variables file
 cat >> "${SHARED_DIR}"/platform-conf.sh << EOF
 export PLATFORM=nutanix
@@ -55,8 +58,8 @@ export NUTANIX_ENDPOINT='${NUTANIX_HOST}'
 export NUTANIX_PORT="${NUTANIX_PORT}"
 export NUTANIX_CLUSTER_NAME="${pe_name}"
 export NUTANIX_SUBNET_NAME="${subnet_name}"
-export API_VIP="${API_VIP}"
-export INGRESS_VIP="${INGRESS_VIP}"
+export API_VIPS="[{\"ip\": \"${API_VIP}\"}]"
+export INGRESS_VIPS="[{\"ip\": \"${INGRESS_VIP}\"}]"
 export BASE_DOMAIN="${base_domain}"
 export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF

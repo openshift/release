@@ -48,13 +48,13 @@ images:
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
 promotion:
-  disabled: true
-  excluded_images:
-  - kubernetes-nmstate-handler
-  - kubernetes-nmstate-operator
-  - src-with-oc-and-kubectl
-  name: "4.15"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - kubernetes-nmstate-handler
+    - kubernetes-nmstate-operator
+    - src-with-oc-and-kubectl
+    name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -82,6 +82,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 - as: unit
   commands: make test/unit
   container:
@@ -126,6 +134,36 @@ tests:
       HANDLER_NAMESPACE: openshift-nmstate
       OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator
+- as: e2e-handler-sdn-ipv4-nightly-periodic
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OpenShiftSDN"
+        MIRROR_IMAGES=false
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
+    workflow: kubernetes-nmstate-e2e-handler
+- as: e2e-handler-ovn-ipv4-nightly-periodic
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
+    workflow: kubernetes-nmstate-e2e-handler
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

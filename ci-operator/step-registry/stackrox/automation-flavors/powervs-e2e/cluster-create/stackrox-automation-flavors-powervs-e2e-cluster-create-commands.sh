@@ -25,6 +25,6 @@ cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
 # acquire a ocp cluster
-ssh $SSH_ARGS root@cluster.pool.synergyonpower.com "$SSH_CMD" > $KUBECONFIG_FILE
+ssh $SSH_ARGS root@163.68.64.118 "$SSH_CMD" > $KUBECONFIG_FILE
 
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes

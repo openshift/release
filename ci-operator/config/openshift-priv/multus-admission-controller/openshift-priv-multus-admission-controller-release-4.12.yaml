@@ -19,8 +19,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: multus-admission-controller
 promotion:
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - name: 4.12-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -41,6 +42,13 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: multus-admission-controller
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

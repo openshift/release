@@ -1,0 +1,119 @@
+build_root:
+  project_image:
+    dockerfile_path: ci-builder/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: tekton-tasks-operator-container
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: unittests
+      commands: make unittest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: win10-pipeline-example-test
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win10-pipeline-example-test
+      commands: export TARGET=windows10 && ./scripts/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows11 && ./scripts/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k22-pipeline-example-test
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows2k22 && ./scripts/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-functests
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        ./scripts/e2e-functests.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.5
+  org: kubevirt
+  repo: tekton-tasks-operator

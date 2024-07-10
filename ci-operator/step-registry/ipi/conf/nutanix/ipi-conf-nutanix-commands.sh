@@ -57,6 +57,15 @@ controlPlane:
   replicas: 3"
 fi
 
+# if loadbalancer is UserManaged, it's mean using external LB,
+# then keepalived and haproxy will not deployed, but coredns still keep
+if [[ ${LB_TYPE} == "UserManaged" ]]; then
+    LB_TYPE_DEF="loadBalancer:
+      type: UserManaged"
+else
+    LB_TYPE_DEF=""
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Adding platform data to install-config.yaml"
 
 # Populate install-config with Nutanix specifics
@@ -67,6 +76,7 @@ platform:
   nutanix:${RHCOS_PATCH}
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
+    ${LB_TYPE_DEF}
     prismCentral:
       endpoint:
         address: ${NUTANIX_HOST}
@@ -90,3 +100,16 @@ networking:
   - 172.30.0.0/16
 $MACHINE_POOL_OVERRIDES
 EOF
+
+if [ "${RT_ENABLED}" = "true" ]; then
+	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+fi

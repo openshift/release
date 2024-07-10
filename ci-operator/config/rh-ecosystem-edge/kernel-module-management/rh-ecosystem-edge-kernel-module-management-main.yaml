@@ -2,13 +2,13 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.14
+    tag: rhel-9-golang-1.21-openshift-4.16
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.54.2
   operator-sdk:
-    name: "4.14"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make manager
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 images:
 - build_args:
   - name: TARGET
@@ -32,23 +32,36 @@ images:
   inputs:
     ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.4
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.webhook
+  to: kernel-module-management-webhook-server
 - dockerfile_path: Dockerfile.worker
   to: kernel-module-management-worker
 - dockerfile_literal: |
-    FROM ubi9-minimal
+    FROM ubi9-minimal:9.4
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-14-rhel9.ocp.svc > /etc/yum.repos.d/base-4-14-rhel9.repo
+    RUN curl http://base-4-16-rhel94.ocp.svc > /etc/yum.repos.d/base-4-16-rhel94.repo
   to: ubi9-minimal-entitled
 - dockerfile_literal: |
     FROM src
-    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
-      chmod +x /usr/bin/yq
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && \
+      chmod +x /usr/local/bin/yq
+    RUN wget https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1/operator-sdk_linux_amd64 -O /usr/local/bin/operator-sdk && \
+      chmod +x /usr/local/bin/operator-sdk
   from: src
-  to: e2e-hub-yq
+  to: e2e-hub-tools
+- dockerfile_literal: |
+    FROM src
+    RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz && \
+      tar -xvzf grpcurl_1.8.9_linux_x86_64.tar.gz -C /tmp/ && \
+      chmod +x /tmp/grpcurl && \
+      mv /tmp/grpcurl /usr/local/bin/ && \
+      rm grpcurl_1.8.9_linux_x86_64.tar.gz
+  from: src
+  to: src-grpcurl
 operator:
   bundles:
   - as: operator-bundle
@@ -64,20 +77,24 @@ operator:
     with: pipeline:kernel-module-management-operator-hub
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-webhook-server:latest
+    with: pipeline:kernel-module-management-webhook-server
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
     with: pipeline:kernel-module-management-worker
 promotion:
-  excluded_images:
-  - ubi9-minimal-entitled
-  - e2e-hub-yq
-  namespace: edge-infrastructure
-  tag: latest
-  tag_by_commit: true
+  to:
+  - excluded_images:
+    - e2e-hub-tools
+    - ubi9-minimal-entitled
+    - src-grpcurl
+    namespace: edge-infrastructure
+    tag: latest
+    tag_by_commit: true
 releases:
   latest:
     release:
       channel: fast
-      version: "4.13"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -157,7 +174,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.15"
   steps:
     test:
     - as: install
@@ -165,7 +182,7 @@ tests:
       commands: |
         oc create namespace openshift-kmm
         operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
@@ -192,7 +209,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.15"
   steps:
     test:
     - as: run-test
@@ -202,16 +219,51 @@ tests:
         oc project default
         ./ci/prow/e2e-hub-spoke-incluster-build
       dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
       - env: IMG
         name: kernel-module-management-operator
       - env: HUB_IMG
         name: kernel-module-management-operator-hub
-      from: e2e-hub-yq
+      - env: WEBHOOK_IMG
+        name: kernel-module-management-webhook-server
+      from: e2e-hub-tools
       resources:
         requests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  optional: true
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: ./ci/prow/operator-upgrade
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: src-grpcurl
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kmm
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

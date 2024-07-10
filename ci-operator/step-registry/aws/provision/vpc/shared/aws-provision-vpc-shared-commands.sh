@@ -62,6 +62,17 @@ Parameters:
     Default: 12
     Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
     Type: Number
+  DhcpOptionSet:
+    Default: "no"
+    AllowedValues:
+    - "yes"
+    - "no"
+    Description: "Create a dhcpOptionSet with a custom DNS name"
+    Type: String
+  AllowedAvailabilityZoneList:
+    ConstraintDescription: "Select AZs from this list, e.g. 'us-east-2c,us-east-2a'"
+    Type: CommaDelimitedList
+    Default: ""
   ResourceSharePrincipals:
     ConstraintDescription: ResourceSharePrincipals
     Default: ""
@@ -91,6 +102,8 @@ Metadata:
 Conditions:
   DoAz3: !Equals [3, !Ref AvailabilityZoneCount]
   DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
+  DoDhcp: !Equals ["yes", !Ref DhcpOptionSet]
+  AzRestriction: !Not [ !Equals [!Join ['', !Ref AllowedAvailabilityZoneList], ''] ]
   ShareSubnets: !Not [ !Equals ['', !Ref ResourceSharePrincipals] ]
 
 Resources:
@@ -108,27 +121,36 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 0
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [0, !Ref AllowedAvailabilityZoneList ],
+              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   PublicSubnet2:
     Type: "AWS::EC2::Subnet"
     Condition: DoAz2
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 1
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [1, !Ref AllowedAvailabilityZoneList ],
+              !Select [1, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   PublicSubnet3:
     Type: "AWS::EC2::Subnet"
     Condition: DoAz3
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 2
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [2, !Ref AllowedAvailabilityZoneList ],
+              !Select [2, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   InternetGateway:
     Type: "AWS::EC2::InternetGateway"
   GatewayToInternet:
@@ -169,9 +191,12 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 0
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [0, !Ref AllowedAvailabilityZoneList ],
+              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   PrivateRouteTable:
     Type: "AWS::EC2::RouteTable"
     Properties:
@@ -209,9 +234,12 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 1
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [1, !Ref AllowedAvailabilityZoneList ],
+              !Select [1, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   PrivateRouteTable2:
     Type: "AWS::EC2::RouteTable"
     Condition: DoAz2
@@ -254,9 +282,12 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
-      AvailabilityZone: !Select
-      - 2
-      - Fn::GetAZs: !Ref "AWS::Region"
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [2, !Ref AllowedAvailabilityZoneList ],
+              !Select [2, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
   PrivateRouteTable3:
     Type: "AWS::EC2::RouteTable"
     Condition: DoAz3
@@ -316,6 +347,19 @@ Resources:
         - !Ref 'AWS::Region'
         - .s3
       VpcId: !Ref VPC
+  DhcpOptions:
+    Type: AWS::EC2::DHCPOptions
+    Condition: DoDhcp
+    Properties:
+        DomainName: example.com
+        DomainNameServers:
+          - AmazonProvidedDNS
+  VPCDHCPOptionsAssociation:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Condition: DoDhcp
+    Properties:
+      VpcId: !Ref VPC
+      DhcpOptionsId: !Ref DhcpOptions
   ResourceShareSubnets:
     Type: "AWS::RAM::ResourceShare"
     Condition: ShareSubnets
@@ -376,6 +420,38 @@ Outputs:
         ",",
         [!Ref PrivateSubnet, !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
       ]
+  PublicRouteTableId:
+    Description: Public Route table ID
+    Value: !Ref PublicRouteTable
+  PrivateRouteTableIds:
+    Description: Private Route table IDs
+    Value:
+      !Join [
+        ",",
+        [
+          !If [
+              "AzRestriction",
+              !Join ["=", [!Select [0, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable]],
+              !Join ["=", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable]]
+          ],
+          !If [DoAz2,
+                !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [1, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable2]],
+                  !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]]
+                ],
+               !Ref "AWS::NoValue"
+          ],
+          !If [DoAz3,
+               !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [2, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable3]],
+                  !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]]
+                ],
+               !Ref "AWS::NoValue"
+          ]
+        ]
+      ]
 EOF
 
 MAX_ZONES_COUNT=$(aws --region "${REGION}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
@@ -400,6 +476,19 @@ vpc_params="${ARTIFACT_DIR}/vpc_params.json"
 aws_add_param_to_json "AvailabilityZoneCount" ${ZONES_COUNT} "$vpc_params"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
+fi
+
+if [[ -n "${VPC_CIDR}" ]]; then
+     aws_add_param_to_json "VpcCidr" ${VPC_CIDR} "$vpc_params"
+fi
+
+if [[ ${ZONES_LIST} != "" ]]; then
+  zones_list_count=$(echo "$ZONES_LIST" | awk -F',' '{ print NF }')
+  if [[ "${zones_list_count}" != "${ZONES_COUNT}" ]]; then
+    echo "ERROR: ${zones_list_count} zones in the list [${ZONES_LIST}], the zone count in the list should be the same as ZONES_COUNT: ${ZONES_COUNT}, exit now"
+    exit 1
+  fi
+  aws_add_param_to_json "AllowedAvailabilityZoneList" "${ZONES_LIST}" "$vpc_params"
 fi
 
 aws --region "${REGION}" cloudformation create-stack \
@@ -452,12 +541,16 @@ AvailabilityZones=$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids $
 echo "$AvailabilityZones" > "${SHARED_DIR}/availability_zones"
 echo "AvailabilityZones: ${AvailabilityZones}"
 
-# output: ['subnet-045024152d76c74fc','subnet-0107825ef27dfefa4','subnet-08b8f4f03e7f5172f','subnet-010adebbf0bf628c9','subnet-03b660891d311091f','subnet-08242f9ab76d449ef']
-# subnets="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' | sed "s/\"/'/g")"
-# echo "Subnets : ${subnets}"
+# ***********************
+# Route table ids are generally used by Local Zone and Wavelength Zone
+# ***********************
 
-cp "${SHARED_DIR}/vpc_stack_name" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/vpc_id" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/subnet_ids" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/public_subnet_ids" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/private_subnet_ids" "${ARTIFACT_DIR}/"
+# PublicRouteTableId
+PublicRouteTableId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicRouteTableId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+echo "$PublicRouteTableId" > "${SHARED_DIR}/public_route_table_id"
+echo "PublicRouteTableId: ${PublicRouteTableId}"
+
+# PrivateRouteTableId
+PrivateRouteTableId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateRouteTableIds") | .OutputValue | split(",")[0] | split("=")[1]' "${SHARED_DIR}/vpc_stack_output")
+echo "$PrivateRouteTableId" > "${SHARED_DIR}/private_route_table_id"
+echo "PrivateRouteTableId: ${PrivateRouteTableId}"

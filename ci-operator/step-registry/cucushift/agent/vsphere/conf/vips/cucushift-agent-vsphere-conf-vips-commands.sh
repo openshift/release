@@ -10,33 +10,38 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 declare vlanid
 declare primaryrouterhostname
-declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-  echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
-  if [ "${MASTERS}" -eq 1 ]; then
-    echo "192.168.${third_octet}.4" >>"${SHARED_DIR}"/vips.txt
-    echo "192.168.${third_octet}.4" >>"${SHARED_DIR}"/vips.txt
-  else
-    echo "192.168.${third_octet}.2" >>"${SHARED_DIR}"/vips.txt
-    echo "192.168.${third_octet}.3" >>"${SHARED_DIR}"/vips.txt
-  fi
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
+fi
+if [ "${MASTERS}" -eq 1 ]; then
+  jq -r --argjson N 4 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
+  jq -r --argjson N 4 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
 else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
   jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
   jq -r --argjson N 3 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
-  jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
-
 fi
+jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
 
 echo "Reserved the following IP addresses..."
 cat "${SHARED_DIR}"/vips.txt
+
+declare -a vips
+mapfile -t vips <"${SHARED_DIR}"/vips.txt
+/tmp/yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
+platform:
+  vsphere:
+    apiVIP: ${vips[0]}
+    ingressVIP: ${vips[1]}
+"

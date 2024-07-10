@@ -11,11 +11,6 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
-LOKI_SSO_CLIENT_ID="$(cat /var/run/loki-secret/client-id)"
-export LOKI_SSO_CLIENT_ID
-LOKI_SSO_CLIENT_SECRET="$(cat /var/run/loki-secret/client-secret)"
-export LOKI_SSO_CLIENT_SECRET
-
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -182,8 +177,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig

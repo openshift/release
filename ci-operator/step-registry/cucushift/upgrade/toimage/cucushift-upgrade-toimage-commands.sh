@@ -6,22 +6,37 @@ set -o pipefail
 
 trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "Describing abnormal nodes...\n"
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            echo -e "\n# oc adm upgrade status\n"
+            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true 
+        fi
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        echo -e "\n# Describing abnormal mcp...\n"
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -42,12 +57,28 @@ EOF
 }
 
 function extract_ccoctl(){
-    echo -e "Extracting ccoctl\n"
-    local retry=5 
-    tmp_ccoctl="/tmp/upgtool"
+    local payload_image image_arch cco_image
+    local retry=5
+    local tmp_ccoctl="/tmp/upgtool"
     mkdir -p ${tmp_ccoctl}
     export PATH=/tmp:${PATH}
-    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+
+    echo -e "Extracting ccoctl\n"
+    payload_image="${TARGET}"
+    set -x
+    image_arch=$(oc adm release info ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o jsonpath='{.config.architecture}')
+    if [[ "${image_arch}" == "arm64" ]]; then
+        echo "The target payload is arm64 arch, trying to find out a matched version of payload image on amd64"
+        if [[ -n ${RELEASE_IMAGE_TARGET:-} ]]; then
+            payload_image=${RELEASE_IMAGE_TARGET}
+            echo "Getting target release image from RELEASE_IMAGE_TARGET: ${payload_image}"
+        elif env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc get istag "release:target" -n ${NAMESPACE} &>/dev/null; then
+            payload_image=$(env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc -n ${NAMESPACE} get istag "release:target" -o jsonpath='{.tag.from.name}')
+            echo "Getting target release image from build farm imagestream: ${payload_image}"
+        fi
+    fi
+    set +x
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
     while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
     do
         echo >&2 "Failed to extract ccoctl binary, retry..."
@@ -61,9 +92,12 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
+    local platform preCredsDir tobeCredsDir tmp_ret
+
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
@@ -78,7 +112,9 @@ function update_cloud_credentials_oidc(){
 
     # TODO: add gcp and azure
     # Update iam role with ccoctl based on tobeCredsDir
-    if ! diff -r "${preCredsDir}" "${tobeCredsDir}" &> /dev/null; then
+    tmp_ret=0
+    diff -r "${preCredsDir}" "${tobeCredsDir}" || tmp_ret=1
+    if [[ ${tmp_ret} != 0 ]]; then
         toManifests="/tmp/to-manifests"
         mkdir "${toManifests}"
         case "${platform}" in
@@ -106,15 +142,26 @@ function update_cloud_credentials_oidc(){
     fi
 }
 
-# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
+# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local cco_mode; cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')"
-    if [[ ${cco_mode} != "Manual" ]]; then
-        echo "CCO annotation change is not required in non-manual mode" && return
+    local platform; platform="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')"
+    if [[ ${cco_mode} == "Manual" ]]; then
+        echo "CCO annotation change is required in Manual mode"
+    elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
+        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+            echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
+        else
+            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            return 0
+        fi
+    else
+        echo "CCO annotation change is not required in ${cco_mode} mode"
+        return 0
     fi
 
     echo "Require CCO annotation change"
@@ -140,343 +187,33 @@ function cco_annotation(){
     fi
 }
 
-# Update RHEL repo before upgrade
-function rhel_repo(){
-    echo "Updating RHEL node repo"
-    # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-    # to be able to SSH.
-    if ! whoami &> /dev/null; then
-        if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        else
-            echo "/etc/passwd is not writeable, and user matching this uid is not found."
-            exit 1
-        fi
-    fi
-    SOURCE_REPO_VERSION=$(echo "${SOURCE_VERSION}" | cut -d'.' -f1,2)
-    TARGET_REPO_VERSION=$(echo "${TARGET_VERSION}" | cut -d'.' -f1,2)
-    export SOURCE_REPO_VERSION
-    export TARGET_REPO_VERSION
-
-    cat > /tmp/repo.yaml <<-'EOF'
----
-- name: Update repo Playbook
-  hosts: workers
-  any_errors_fatal: true
-  gather_facts: false
-  vars:
-    source_repo_version: "{{ lookup('env', 'SOURCE_REPO_VERSION') }}"
-    target_repo_version: "{{ lookup('env', 'TARGET_REPO_VERSION') }}"
-    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
-    major_platform_version: "{{ platform_version[:1] }}"
-  tasks:
-  - name: Wait for host connection to ensure SSH has started
-    wait_for_connection:
-      timeout: 600
-  - name: Replace source release version with target release version in the files
-    replace:
-      path: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
-      regexp: "{{ source_repo_version }}"
-      replace: "{{ target_repo_version }}"
-  - name: Clean up yum cache
-    command: yum clean all
-EOF
-
-    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
-    openshift_ansible_branch='master'
-    if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
-        openshift_ansible_branch="release-${version_info}"
-        minor_version="${version_info##*.}"
-        if [[ -n "$minor_version" ]] && [[ $minor_version -le 10 ]] ; then
-            source /opt/python-env/ansible2.9/bin/activate
-        else
-            source /opt/python-env/ansible-core/bin/activate
-        fi
-        ansible --version
-    else
-        echo "WARNING: version_info is $version_info"
-    fi
-    echo -e "Using openshift-ansible branch $openshift_ansible_branch\n"
-    cd /usr/share/ansible/openshift-ansible
-    git stash || true
-    git checkout "$openshift_ansible_branch"
-    git pull || true
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
-}
-
-# Upgrade RHEL node
-function rhel_upgrade(){
-    echo "Upgrading RHEL nodes"
-    echo "Validating parsed Ansible inventory"
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    echo -e "\nRunning RHEL worker upgrade"
-    sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
-
-    echo "Check K8s version on the RHEL node"
-    master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    exp_version=$(oc get node ${master_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-    act_version=$(oc get node ${rhel_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-
-    echo -e "Expected K8s version is: ${exp_version}\nActual K8s version is: ${act_version}"
-    if [[ ${exp_version} == "${act_version}" ]]; then
-        echo "RHEL worker has correct K8s version"
-    else
-        echo "RHEL worker has incorrect K8s version" && exit 1
-    fi
-    echo -e "oc get node -owide\n$(oc get node -owide)"
-    echo "RHEL worker upgrade complete"
-}
-
-# Extract oc binary which is supposed to be identical with target release
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    which oc
-    oc version --client
-    return 0
-}
-
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
     eval "${CMD}"
 }
 
-function run_command_oc() {
-    local try=0 max=40 ret_val
-
-    if [[ "$#" -lt 1 ]]; then
-        return 0
-    fi
-
-    while (( try < max )); do
-        if ret_val=$(oc "$@" 2>&1); then
-            break
-        fi
-        (( try += 1 ))
-        sleep 3
-    done
-
-    if (( try == max )); then
-        echo >&2 "Run:[oc $*]"
-        echo >&2 "Get:[$ret_val]"
-        return 255
-    fi
-
-    echo "${ret_val}"
-}
-
-function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc unavailable_operator degraded_operator skip_operator
-
-    skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
-    echo "Make sure every operator do not report empty column"
-    tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
-    input="${tmp_clusteroperator}"
-    ${OC} get clusteroperator >"${tmp_clusteroperator}"
-    column=$(head -n 1 "${tmp_clusteroperator}" | awk '{print NF}')
-    last_column_name=$(head -n 1 "${tmp_clusteroperator}" | awk '{print $NF}')
-    if [[ ${last_column_name} == "MESSAGE" ]]; then
-        (( column -= 1 ))
-        tmp_clusteroperator_1=$(mktemp /tmp/health_check-script.XXXXXX)
-        awk -v end=${column} '{for(i=1;i<=end;i++) printf $i"\t"; print ""}' "${tmp_clusteroperator}" > "${tmp_clusteroperator_1}"
-        input="${tmp_clusteroperator_1}"
-    fi
-
-    while IFS= read -r line
-    do
-        rc=$(echo "${line}" | awk '{print NF}')
-        if (( rc != column )); then
-            echo >&2 "The following line have empty column"
-            echo >&2 "${line}"
-            (( tmp_ret += 1 ))
-        fi
-    done < "${input}"
-    rm -f "${tmp_clusteroperator}"
-
-    echo "Make sure every operator reports correct version"
-    if incorrect_version=$(${OC} get clusteroperator --no-headers | grep -v ${skip_operator} | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
-        echo >&2 "Incorrect CO Version: ${incorrect_version}"
-        (( tmp_ret += 1 ))
-    fi
-
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
-    echo "Make sure every operator's AVAILABLE column is True"
-    if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
-        echo >&2 "Some operator's AVAILABLE is False"
-        echo >&2 "$unavailable_operator"
-        (( tmp_ret += 1 ))
-    fi
-    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Available")].status}'| grep -iv "True"; then
-        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
-        (( tmp_ret += 1 ))
-    fi
-
-    # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
-    #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
-    if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then
-        echo >&2 "Some operator's DEGRADED is True"
-        echo >&2 "$degraded_operator"
-        (( tmp_ret += 1 ))
-    fi
-    #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Degraded")].status}'| grep -iv 'False'; then
-        echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
-        (( tmp_ret += 1 ))
-    fi
-
-    return $tmp_ret
-}
-
-function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
-    while (( try < max_retries && continous_successful_check < passed_criteria )); do
-        echo "Checking #${try}"
-        if check_clusteroperators; then
-            echo "Passed #${continous_successful_check}"
-            (( continous_successful_check += 1 ))
-        else
-            echo "cluster operators are not ready yet, wait and retry..."
-            continous_successful_check=0
-        fi
-        sleep 60
-        (( try += 1 ))
-    done
-    if (( continous_successful_check != passed_criteria )); then
-        echo >&2 "Some cluster operator does not get ready or not stable"
-        echo "Debug: current CO output is:"
-        oc get co
-        return 1
-    else
-        echo "All cluster operators status check PASSED"
-        return 0
-    fi
-}
-
-function check_latest_machineconfig_applied() {
-    local role="$1" cmd latest_machineconfig
-
-    cmd="oc get machineconfig"
-    echo "Command: $cmd"
-    eval "$cmd"
-
-    echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get mcp/$role -o jsonpath='{.spec.configuration.name}')
-    if [[ ${latest_machineconfig} == "" ]]; then
-        echo >&2 "Did not found ${role} render machineconfig"
-        return 1
-    else
-        echo "latest ${role} machineconfig: ${latest_machineconfig}"
-    fi
-
-    for NODE in $(oc get -l node-role.kubernetes.io/$role -o jsonpath='{.items[*].metadata.name}' nodes); do
-        node_state=$(oc get node $NODE -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io\/state}')
-        cur_config=$(oc get node $NODE -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io\/currentConfig}')
-        if [[ "${node_state}" == "Done" && "${cur_config}" == "${latest_machineconfig}" ]];then
-            echo "latest machineconfig - ${latest_machineconfig} is already applied to ${NODE}"
-            continue
-        else
-            echo "${NODE}'s status: ${node_state}, ${NODE}'s config: ${cur_config}"
-            echo "latest machineconfig - ${latest_machineconfig} is not applied to ${NODE}"
-            return 1
-        fi
-    done
-}
-
-function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=30
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l) 
-    local max_retries; max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
-
-    local mcp_try=0 mcp_status=''
-    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
-    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
-    do
-        sleep ${interval}
-        echo "Checking MCP #${try}"
-        mcp_status=$(oc get mcp/$role -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}')
-        if [[ X"$mcp_status" != X"True" ]]; then
-            mcp_try=0
-        fi
-        (( mcp_try += 1 ))
-        (( try += 1 ))
-    done
-    echo "MCP ${role} status is ${mcp_status}"
-    if [[ X"$mcp_status" != X"True" ]]; then
-        echo "Timeout waiting for mcp updated"
-        return 1
-    fi
-
-    if ! check_latest_machineconfig_applied "${role}"; then
-        echo >&2 "Timeout waiting for all $role machineconfigs are applied"
-        return 1
-    else
-        echo "All ${role} machineconfigs check PASSED"
-        return 0
-    fi
-}
-
-function check_node() {
-    local node_number ready_number
-    node_number=$(${OC} get node |grep -vc STATUS)
-    ready_number=$(${OC} get node |grep -v STATUS | awk '$2 == "Ready"' | wc -l)
-    if (( node_number == ready_number )); then
-        echo "All nodes status check PASSED"
-        return 0
-    else
-        if (( ready_number == 0 )); then
-            echo >&2 "No any ready node"
-        else
-            echo >&2 "We found failed node"
-            oc get node |grep -v STATUS | awk '$2 != "Ready"'
-        fi
-        return 1
-    fi
-}
-
-function check_pod() {
-    echo "Show all pods status for reference/debug"
-    oc get pods --all-namespaces
-}
-
-function health_check() {
-    #1. Make sure all machines are applied with latest machineconfig
-    echo "Step #1: Make sure all machines are applied with latest machineconfig"
-    wait_machineconfig_applied "master"
-    wait_machineconfig_applied "worker"
-
-    #2. Check all cluster operators get stable and ready
-    echo "Step #2: check all cluster operators get stable and ready"
-    wait_clusteroperators_continous_success
-
-    #3. Make sure every machine is in 'Ready' status
-    echo "Step #3: Make sure every machine is in 'Ready' status"
-    check_node
-
-    #4. All pods are in status running or complete
-    echo "Step #4: check all pods are in status running or complete"
-    check_pod
-}
-
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    try=0
+    max_retries=3
+    response=0
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        (( try += 1 ))
+        sleep 60
+    done
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -491,6 +228,7 @@ function admin_ack() {
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
+    echo -e "All admin acks:\n${out}"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required: ${out}" && return
     fi
@@ -506,12 +244,11 @@ function admin_ack() {
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
-            break
         fi
     done
     echo "Admin-acks patch gets started"
 
-    echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
+    echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
@@ -528,31 +265,124 @@ function admin_ack() {
     fi
 }
 
+# Check if the cluster hit the image validation error, which caused by image signature
+function error_check_invalid_image() {
+    local try=0 max_retries=5 tmp_log cmd expected_msg
+    tmp_log=$(mktemp)
+    while (( try < max_retries )); do
+        echo "Trying #${try}"
+        cmd="oc adm upgrade"
+        expected_msg="failure=The update cannot be verified:"
+        run_command "${cmd} 2>&1 | tee ${tmp_log}"
+        if grep -q "${expected_msg}" "${tmp_log}"; then
+            echo "Found the expected validation error message"
+            break
+        fi
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( ${try} >= ${max_retries} )); then
+        echo >&2 "Timed out catching image invalid error message..." && return 1
+    fi
+
+}
+
+function clear_upgrade() {
+    local cmd tmp_log expected_msg
+    tmp_log=$(mktemp)
+    cmd="oc adm upgrade --clear"
+    expected_msg="Cancelled requested upgrade to"
+    run_command "${cmd} 2>&1 | tee ${tmp_log}"
+    if grep -q "${expected_msg}" "${tmp_log}"; then
+        echo "Last upgrade is cleaned."
+    else
+        echo "Clear the last upgrade fail!"
+        return 1
+    fi
+}
+
 # Upgrade the cluster to target release
 function upgrade() {
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
+    local log_file history_len cluster_src_ver
+    if check_ota_case_enabled "OCP-21588"; then
+        log_file=$(mktemp)
+        echo "Testing --allow-explicit-upgrade option"
+        run_command "oc adm upgrade --to-image=${TARGET} --force=${FORCE_UPDATE} 2>&1 | tee ${log_file}" || true
+        if grep -q 'specify --allow-explicit-upgrade to continue' "${log_file}"; then
+            echo "--allow-explicit-upgrade prompt message is shown"
+        else
+            echo "--allow-explicit-upgrade prompt message is NOT shown!"
+            exit 1
+        fi
+        history_len=$(oc get clusterversion -o json | jq '.items[0].status.history | length')
+        if [[ "${history_len}" != 1 ]]; then
+            echo "seem like there are more than 1 hisotry in CVO, sounds some unexpected update happened!"
+            exit 1
+        fi
+    fi
+    if check_ota_case_enabled "OCP-24663"; then
+        cluster_src_ver=$(oc version -o json | jq -r '.openshiftVersion')
+        if [[ -z "${cluster_src_ver}" ]]; then
+            echo "Did not get cluster version at this moment"
+            exit 1
+        else
+            echo "Current cluster is on ${cluster_src_ver}"
+        fi
+        echo "Negative Testing: upgrade to an unsigned image without --force option"
+        admin_ack
+        cco_annotation
+        run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
+        error_check_invalid_image
+        clear_upgrade
+        check_upgrade_status "${cluster_src_ver}"
+    fi
+    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
+    if [[ -n "${1:-}" ]]; then
+        cluster_version="$1"
+    else
+        cluster_version="${TARGET_VERSION}"
+    fi
+    echo "Starting the upgrade checking on $(date "+%F %T")"
+    # print once to log (including full messages)
+    oc adm upgrade || true
+    # log oc adm upgrade (excluding garbage messages)
+    stat_cmd="oc adm upgrade | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    # if available (version 4.16+) log "upgrade status" instead
+    if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    fi
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        (( wait_upgrade -= 5 ))
-        if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
-            continue
+        sleep ${interval}m
+        wait_upgrade=$(( wait_upgrade - interval ))
+        # if output is different from previous (ignoring irrelevant time/percentage difference), write to log
+        if stat="$(eval "${stat_cmd}")" && [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+            echo -e "=== Upgrade Status $(date "+%T") ===\n${stat}\n\n\n\n"
+            oldstat=${stat}
         fi
-        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
+        if ! out="$(oc get clusterversion --no-headers || false)"; then
+            echo "Error occurred when getting clusterversion"
+            continue 
+        fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
-        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed\n\n"
+        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            return 0
+        fi
+        if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
+            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
             return 0
         fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo -e "Upgrade timeout, exiting\n" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
 }
 
@@ -568,8 +398,27 @@ function check_history() {
     fi
 }
 
+# check if any of cases is enabled via ENABLE_OTA_TEST
+function check_ota_case_enabled() {
+    local case_id
+    local cases_array=("$@")
+    for case_id in "${cases_array[@]}"; do
+        # shellcheck disable=SC2076
+        if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
+            echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            return 0
+        fi
+    done
+    return 1
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
+
+#support HyperShift upgrade
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
 fi
 
 # Setup proxy if it's present in the shared dir
@@ -578,62 +427,46 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
-# If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
-# upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
-export TARGET_RELEASES=("${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}")
-if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
-    release_string="$(< "${SHARED_DIR}/upgrade-edge")"
-    # shellcheck disable=SC2207
-    TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
+run_command "oc get machineconfigpools"
+run_command "oc get machineconfig"
+
+export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+export TARGET_VERSION
+export TARGET_MINOR_VERSION
+echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
+
+SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+export SOURCE_VERSION
+export SOURCE_MINOR_VERSION
+echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
+
+export FORCE_UPDATE="false"
+if ! check_signed; then
+    echo "You're updating to an unsigned images, you must override the verification using --force flag"
+    FORCE_UPDATE="true"
+    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
+        echo "The case need to run against a signed target image!"
+        exit 1
+    fi
+else
+    echo "You're updating to a signed images, so run the upgrade command without --force flag"
 fi
-echo "Upgrade targets are ${TARGET_RELEASES[*]}"
+if [[ "${FORCE_UPDATE}" == "false" ]]; then
+    admin_ack
+    cco_annotation
+fi
+if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+    update_cloud_credentials_oidc
+fi
+upgrade
+check_upgrade_status
 
-export OC="run_command_oc"
-
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
-export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
-
-for target in "${TARGET_RELEASES[@]}"
-do
-    export TARGET="${target}"
-    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
-    extract_oc
-
-    SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
-    SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
-    export SOURCE_VERSION
-    export SOURCE_MINOR_VERSION
-    echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
-
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION
-    export TARGET_MINOR_VERSION
-    echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
-
-    export FORCE_UPDATE="false"
-    if ! check_signed; then
-        echo "You're updating to an unsigned images, you must override the verification using --force flag"
-        FORCE_UPDATE="true"
-    fi
-    if [[ "${FORCE_UPDATE}" == "false" ]]; then
-        admin_ack
-        cco_annotation
-    fi
-    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
-        update_cloud_credentials_oidc
-    fi
-    upgrade
-    check_upgrade_status
+if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
     check_history
-
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo -e "oc get node -owide\n$(oc get node -owide)"
-        rhel_repo
-        rhel_upgrade
-    fi
-    health_check
-done
-
+fi

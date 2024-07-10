@@ -1,0 +1,43 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: etcd-defragger
+  namespace: ci
+---
+apiVersion: authorization.openshift.io/v1
+kind: ClusterRole
+metadata:
+  name: etcd-defragger-admin
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams/layers
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: etcd-defragger-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: etcd-defragger-admin
+subjects:
+- kind: ServiceAccount
+  name: etcd-defragger
+  namespace: ci

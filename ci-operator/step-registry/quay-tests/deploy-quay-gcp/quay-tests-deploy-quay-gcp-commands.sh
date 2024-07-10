@@ -6,15 +6,15 @@ set -o pipefail
 
 
 #Create AWS S3 Storage Bucket
-QUAY_OPERATOR_CHANNEL=stable-3.7
+QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_GCP_STORAGE_ID="quaygcpci$RANDOM"
 GCP_ACCESS_KEY=$(cat /var/run/quay-qe-gcp-secret/access_key)
 GCP_SECRET_KEY=$(cat /var/run/quay-qe-gcp-secret/secret_key)
 
 #Copy GCP auth.json from mounted secret to current directory
+mkdir -p QUAY_GCP && cd QUAY_GCP
 cp /var/run/quay-qe-gcp-secret/auth.json . 
-
-echo "quay new gcp storage bucket is $QUAY_GCP_STORAGE_ID"
 
 cat >> variables.tf << EOF
 variable "gcp_storage_bucket" {
@@ -40,7 +40,12 @@ EOF
 
 export TF_VAR_gcp_storage_bucket="${QUAY_GCP_STORAGE_ID}"
 terraform init
-terraform apply -auto-approve
+terraform apply -auto-approve || true
+
+#Share Terraform Var and Terraform Directory
+echo "${QUAY_GCP_STORAGE_ID}" > ${SHARED_DIR}/QUAY_GCP_STORAGE_ID
+tar -cvzf terraform.tgz --exclude=".terraform" *
+cp terraform.tgz ${SHARED_DIR}
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
@@ -72,7 +77,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )

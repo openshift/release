@@ -7,6 +7,7 @@ set -o pipefail
 
 #Create Azure Storage Account and Storage Container
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
 QUAY_AZURE_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
 QUAY_AZURE_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
@@ -14,8 +15,8 @@ QUAY_AZURE_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
 QUAY_AZURE_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
 QUAY_AZURE_STORAGE_ID="quayazure$RANDOM"
 
-echo "quay azure storage ID is $QUAY_AZURE_STORAGE_ID"
 
+mkdir -p QUAY_AZURE && cd QUAY_AZURE
 cat >> variables.tf << EOF
 variable "resource_group" {
     default = "quayazure"
@@ -109,7 +110,12 @@ export TF_VAR_resource_group="${QUAY_AZURE_STORAGE_ID}"
 export TF_VAR_storage_account="${QUAY_AZURE_STORAGE_ID}"
 export TF_VAR_storage_container="${QUAY_AZURE_STORAGE_ID}"
 terraform init
-terraform apply -auto-approve
+terraform apply -auto-approve || true
+
+#Share Terraform Var and Terraform Directory
+echo "${QUAY_AZURE_STORAGE_ID}" > ${SHARED_DIR}/QUAY_AZURE_STORAGE_ID
+tar -cvzf terraform.tgz --exclude=".terraform" *
+cp terraform.tgz ${SHARED_DIR}
 
 AZURE_ACCOUNT_KEY=$(terraform output primary_access_key)
 SAS_TOKEN=$(terraform output sas_url_query_string)
@@ -144,7 +150,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )

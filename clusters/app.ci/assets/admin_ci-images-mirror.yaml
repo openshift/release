@@ -77,7 +77,7 @@ spec:
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -94,7 +94,7 @@ spec:
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -108,10 +108,12 @@ spec:
         - --leader-election-namespace=ci
         - --release-repo-git-sync-path=/var/repo/release
         - --registry-config=/etc/push/.dockerconfigjson
-        - --quayIOCIImagesDistributorOptions.additional-image-stream-namespace=ci
+        - --config=/var/repo/release/core-services/image-mirroring/_config.yaml
         ports:
         - name: http
           containerPort: 8090
+        - name: metrics
+          containerPort: 8080
         volumeMounts:
         - name: release
           mountPath: /var/repo
@@ -129,3 +131,20 @@ spec:
       - name: push-credentials
         secret:
           secretName: registry-push-credentials-ci-images-mirror
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: ci-images-mirror
+  name: ci-images-mirror
+  namespace: ci
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: ci-images-mirror
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s

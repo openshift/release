@@ -36,6 +36,12 @@ cat > gather_logs.yaml <<-EOF
 
     - name: Gather logs and debug information from primary host
       block:
+      - name: Copy terraform log
+        ansible.builtin.copy:
+          remote_src: true
+          src: /home/assisted/build/terraform/
+          dest: "{{ LOGS_DIR }}"
+
       - name: Copy junit report files
         ansible.builtin.copy:
           remote_src: true

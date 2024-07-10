@@ -9,7 +9,6 @@ AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred"
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 CLUSTER_DATA_DIR="/tmp/clusters-data"
-DATA_FILENAME="cluster_data.yaml"
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 
 export AWS_ACCESS_KEY_ID
@@ -22,29 +21,11 @@ tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --ocm-token=$OCM_TOKEN \
-            --s3-bucket-name=$S3_BUCKET_NAME "
+            --destroy-clusters-from-install-data-directory-using-s3-bucket \
+            --clusters-install-data-directory $CLUSTER_DATA_DIR"
 
-CLUSTER_DATA_FILES=$(find $CLUSTER_DATA_DIR -name $DATA_FILENAME)
-if [ -z "${CLUSTER_DATA_FILES}" ] ; then
-  echo "No ${DATA_FILENAME} files found under ${CLUSTER_DATA_DIR}"
-  exit 1
-fi
-
-NUM_CLUSTERS=0
-CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
-for data_file in $CLUSTER_DATA_FILES; do
-  CLUSTER_DATA_CMD+="$(dirname "${data_file}"),"
-  NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
-done
-
-RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
-
-if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
-fi
-
-if [[ -n "${S3_BUCKET_PATH}" ]]; then
-    RUN_COMMAND+=" --s3-bucket-path=${S3_BUCKET_PATH} "
 fi
 
 if [[ -n "${PULL_SECRET_NAME}" ]]; then

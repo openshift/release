@@ -4,6 +4,42 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function info {
+  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
+}
+
+function gather_recert_logs {
+  info "Adding systemd recert.service log to ${ARTIFACT_DIR}/recert.log ..."
+  ssh -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}" "sudo journalctl -u recert.service" > "${ARTIFACT_DIR}/recert.log"
+
+  info "Adding recert_summary_clean.yaml to ${ARTIFACT_DIR}/ssh-bastion/gather/ ..."
+  scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/"
+}
+
+if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+  info "Found bastion host, setting up the respective env vars and the container's SSH configuration..."
+
+  SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+  INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+
+  KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+  SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${INGRESS_HOST}")
+
+  export SINGLE_NODE_IP INGRESS_HOST KUBE_SSH_KEY_PATH SSH_OPTS
+
+  mkdir -p ~/.ssh
+  cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
+  chmod 0600 ~/.ssh/id_rsa
+  if ! whoami &> /dev/null; then
+      if [[ -w /etc/passwd ]]; then
+          echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+      fi
+  fi
+
+  info "Ready to gather recert logs on EXIT and TERM..."
+  trap gather_recert_logs EXIT TERM
+fi
+
 # Echo a script to be run as our systemd unit to a file so we can base64 encode it.
 recert_script=$(cat << EOF
 #!/usr/bin/env bash
@@ -19,60 +55,6 @@ function wait_for_api {
     sleep 5
   done
   echo "API is available"
-}
-
-function start_containers {
-  systemctl start crio
-  systemctl start kubelet
-}
-
-function stop_containers {
-  systemctl stop kubelet
-  crictl ps -q | xargs crictl stop || true
-  systemctl stop crio
-}
-
-function recert {
-  local release_image="${RELEASE_IMAGE:-quay.io/openshift-release-dev/ocp-release:4.13.6-x86_64}"
-  local etcd_image="\$(oc adm release extract --from="\${release_image}" --file=image-references | jq '.spec.tags[] | select(.name == "etcd").from.name' -r)"
-  local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
-
-  podman run --authfile=/var/lib/kubelet/config.json \
-      --name recert_etcd \
-      --detach \
-      --rm \
-      --network=host \
-      --privileged \
-      --entrypoint etcd \
-      -v /var/lib/etcd:/store \
-      "\${etcd_image}" \
-      --name editor \
-      --data-dir /store \
-
-  sleep 10 # TODO: wait for etcd
-
-  podman run -it --network=host --privileged \
-      -v /tmp/certs:/certs  \
-      -v /tmp/keys:/keys \
-      -v /etc/kubernetes:/kubernetes \
-      -v /var/lib/kubelet:/kubelet \
-      -v /etc/machine-config-daemon:/machine-config-daemon \
-      \${recert_image} \
-      --etcd-endpoint localhost:2379 \
-      --static-dir /kubernetes \
-      --static-dir /kubelet \
-      --static-dir /machine-config-daemon \
-      --use-cert /certs/admin-kubeconfig-client-ca.crt \
-      --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key" \
-      --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key" \
-      --use-key "kube-apiserver-service-network-signer /keys/service-network-serving-signer.key" \
-      --use-key "\${ROUTER_CA_CN} /keys/router-ca.key" \
-
-  podman kill recert_etcd
-
-  # workaround until https://github.com/omertuc/recert/blob/4d41d451ba57fbc9fd75781684906360696f384a/README.md?plain=1#L24 is resolved
-  rm -rf "/etc/machine-config-daemon/currentconfig"
-  touch "/run/machine-config-daemon-force"
 }
 
 function fetch_crts_keys {
@@ -94,13 +76,94 @@ function fetch_crts_keys {
   oc get secret -n openshift-ingress-operator router-ca -ojsonpath='{.data.tls\.key}' | base64 -d > "/tmp/keys/router-ca.key"
 }
 
+function fetch_etcd_image {
+  ETCD_IMAGE="\$(oc get pods -l 'app=etcd' -n openshift-etcd -ojsonpath='{.items[0].spec.containers[?(@.name=="etcd")].image}')"
+}
+
+function stop_containers {
+  echo "Stopping kubelet.service..."
+  systemctl stop kubelet.service
+
+  echo "Stopping all containers..."
+  until crictl ps -q | xargs --no-run-if-empty --max-args 1 --max-procs 10 crictl stop --timeout 5 &> /dev/null
+  do
+    sleep 2
+  done
+
+  echo "Stopping crio.service..."
+  systemctl stop crio.service
+}
+
+function delete_ovn_certs {
+  rm -rf /var/lib/ovn-ic/etc/ovnkube-node-certs
+  rm -rf /etc/cni/multus/certs
+}
+
+function wait_for_recert_etcd {
+  echo "Waiting for recert etcd to be available..."
+  until curl -s http://localhost:2379/health |jq -e '.health == "true"' &> /dev/null
+  do
+    echo "Waiting for recert etcd to be available..."
+    sleep 2
+  done
+}
+
+function recert {
+  local etcd_image="\${ETCD_IMAGE}"
+  local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
+
+  podman run --authfile=/var/lib/kubelet/config.json \
+      --name recert_etcd \
+      --detach \
+      --rm \
+      --network=host \
+      --privileged \
+      --entrypoint etcd \
+      -v /var/lib/etcd:/store \
+      "\${etcd_image}" \
+      --name editor \
+      --data-dir /store \
+
+  wait_for_recert_etcd
+
+  podman run -it --network=host --privileged \
+      -v /tmp/certs:/certs  \
+      -v /tmp/keys:/keys \
+      -v /etc/kubernetes:/kubernetes \
+      -v /var/lib/kubelet:/kubelet \
+      -v /etc/machine-config-daemon:/machine-config-daemon \
+      \${recert_image} \
+      --etcd-endpoint localhost:2379 \
+      --static-dir /kubernetes \
+      --static-dir /kubelet \
+      --static-dir /machine-config-daemon \
+      --use-cert /certs/admin-kubeconfig-client-ca.crt \
+      --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key" \
+      --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key" \
+      --use-key "kube-apiserver-service-network-signer /keys/service-network-serving-signer.key" \
+      --use-key "\${ROUTER_CA_CN} /keys/router-ca.key" \
+      --summary-file-clean /kubernetes/recert_summary_clean.yaml \
+
+  podman kill recert_etcd
+}
+
 function delete_crts_keys {
   rm -rf /tmp/certs /tmp/keys
 }
 
+function start_containers {
+  echo "Starting crio.service..."
+  systemctl start crio.service
+
+  echo "Starting kubelet.service..."
+  systemctl start kubelet.service
+}
+
 wait_for_api
 fetch_crts_keys
+fetch_etcd_image
 stop_containers
+delete_ovn_certs
 
 recert
 
@@ -150,15 +213,32 @@ spec:
         name: recert.service
 EOF
 )
-echo "Created \"${machineconfig}\" MachineConfig"
+info "Created \"${machineconfig}\" MachineConfig"
 
-echo "Waiting for master MachineConfigPool to have condition=updating..."
+info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 2m
 
-echo "Waiting for master MachineConfigPool to have condition=updated..."
+# Make sure the ssh-bastion is there, otherwise skip waiting for recert completion logging
+if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+  info "Waiting for recert to be completed..."
+  while true; do
+    if ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then
+      info "Recert completed successfully"
+      break
+    elif ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.failed; then
+      info "Recert failed"
+      exit 1
+    else
+      info "Waiting for recert to be completed..."
+      sleep 5
+    fi
+  done
+fi
+
+info "Waiting for master MachineConfigPool to have condition=updated..."
 until oc wait --for=condition=updated machineconfigpools master --timeout=5m &> /dev/null
 do
-  echo "Waiting for master MachineConfigPool to have condition=updated..."
+  info "Waiting for master MachineConfigPool to have condition=updated..."
   sleep 5s
 done
 

@@ -7,6 +7,13 @@ set -o pipefail
 # shellcheck disable=SC1091
 source "$SHARED_DIR/main.env"
 
+# Set go version
+if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+    source $HOME/golang-1.19
+else
+    source $HOME/golang-1.20
+fi
+
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
 export CNF_BRANCH="${CNF_BRANCH:-master}"
@@ -23,7 +30,7 @@ SSH_PKEY=~/key
 cp "$SSH_PKEY_PATH" "$SSH_PKEY"
 chmod 600 "$SSH_PKEY"
 
-if [[ "$T5CI_VERSION" == "4.15" ]]; then
+if [[ "$T5CI_VERSION" == "4.17" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
@@ -35,7 +42,7 @@ cd "$cnf_dir" || exit 1
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
-if [[ "$T5CI_VERSION" == "4.15" ]]; then
+if [[ "$T5CI_VERSION" != "4.11" ]] && [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules

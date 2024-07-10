@@ -4,6 +4,40 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-ginkgo-result.xml" <<- EOF
+<testsuite name="openshift-extended-test" tests="1" errors="1">
+  <testcase name="Overall status of openshift-extended test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
+function save_oidc_tokens {
+    echo "Saving oidc tokens back to SHARED_DIR"
+    cp "$token_cache_dir"/* "$SHARED_DIR"/oc-oidc-token
+    ls "$token_cache_dir" > "$SHARED_DIR"/oc-oidc-token-filename
+}
+
+function exit_trap {
+    echo "Exit trap triggered"
+    date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
+    warn_0_case_executed
+    if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+        save_oidc_tokens
+    fi
+}
+
+trap 'exit_trap' EXIT
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
@@ -22,8 +56,6 @@ fi
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # prepare for the future usage on the kubeconfig generation of different workflow
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
@@ -46,7 +78,18 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-#setup bastion
+# restore external oidc cache dir for oc
+if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+    echo "Restoring external OIDC cache dir for oc"
+    export KUBECACHEDIR
+    KUBECACHEDIR="/tmp/output/oc-oidc"
+    token_cache_dir="$KUBECACHEDIR/oc"
+    mkdir -p "$token_cache_dir"
+    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    oc whoami
+fi
+
+# setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
     QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
@@ -92,8 +135,13 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+if test -f "${SHARED_DIR}/cluster-id"
+then
+    CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
+    export CLUSTER_ID
+fi
 
-# configure enviroment for different cluster
+# configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 gcp)
@@ -162,7 +210,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -183,8 +231,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir -p gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -194,13 +242,40 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
+
+function remove_kubeadmin_user() {
+    if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
+        ret_delete_admin=0
+
+        ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+        ## it means you only see hosted cluster in testing
+        if test -f "${SHARED_DIR}/nested_kubeconfig" && diff -q "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/kubeconfig" >/dev/null; then
+            return
+        fi
+
+        echo "KUBEADMIN_REMOVED is set to 'true' and it is not hosted cluster. Deleting kubeadmin secret..."
+        oc --kubeconfig="${SHARED_DIR}/kubeconfig" delete secrets kubeadmin -n kube-system || ret_delete_admin=$?
+        if [ "W${ret_delete_admin}W" != "W0W" ]; then
+            echo "fail to delete kubeadmin-password in mgmt clusger or non-hypershift cluster"
+            if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+                echo "do not force success exit"
+                exit 1
+            fi
+            echo "force success exit"
+            exit 0
+        fi
+        echo "Kubeadmin secret deleted successfully for mgmt cluster or non-hypershift cluster."
+
+    else
+        echo '$KUBEADMIN_REMOVED not set to "true". Skipping deletion.'
+    fi
+}
 
 # execute the cases
 function run {
@@ -252,9 +327,9 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
-        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
+        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~VMonly&;~ProdrunOnly&"
     fi
     echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
     echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
@@ -263,8 +338,16 @@ function run {
         echo "add FILTERS_ADDITIONAL into test_filters"
         test_filters="${hardcoded_filters};${TEST_FILTERS};${FILTERS_ADDITIONAL}"
     fi
+    echo "------handle test filter start------"
     echo "${test_filters}"
     handle_filters "${test_filters}"
+    echo "------handle test filter done------"
+
+    echo "------handle module filter start------"
+    echo "MODULE_FILTERS: \"${MODULE_FILTERS:-}\""
+    handle_module_filter "${MODULE_FILTERS}"
+    echo "------handle module filter done------"
+
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -284,6 +367,7 @@ function run {
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
+    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
@@ -305,18 +389,37 @@ function run {
         echo "fail"
     fi
     # summarize test results
-    echo "Summarizing test result..."
-    mapfile -t test_suite_failures < <(grep -r -E 'testsuite.*failures="[1-9][0-9]*"' "${ARTIFACT_DIR}" | grep -o -E 'failures="[0-9]+"' | sed -E 's/failures="([0-9]+)"/\1/')
-    failures=0
-    for (( i=0; i<${#test_suite_failures[@]}; ++i ))
-    do
-        let failures+=${test_suite_failures[$i]}
-    done
-    if [ $((failures)) == 0 ]; then
-        echo "All tests have passed"
-    else
-        echo "${failures} failures in openshift-extended-test" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
+    echo "Summarizing test results..."
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]+' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
+    done < /tmp/zzz-tmp.log
+
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
+    cat > "${TEST_RESULT_FILE}" <<- EOF
+openshift-extended-test:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
+EOF
+
+    if [ ${results[failures]} != 0 ] ; then
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
+        for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
+            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        done
     fi
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
@@ -411,6 +514,52 @@ function handle_or_filter {
         check_case_selected "${ret}"
     fi
 }
+
+function handle_module_filter {
+    local module_filter="$1"
+    declare -a module_filter_keys
+    declare -a module_filter_values
+    valid_and_get_module_filter "$module_filter"
+
+
+    for i in "${!module_filter_keys[@]}"; do
+
+        module_key="${module_filter_keys[$i]}"
+        filter_value="${module_filter_values[$i]}"
+        echo "moudle: $module_key"
+        echo "filter: $filter_value"
+        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+
+        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
+
+        handle_filters "${filter_value}"
+
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+
+    done
+}
+
+function valid_and_get_module_filter {
+    local module_filter_tmp="$1"
+
+    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    for pair in "${pairs[@]}"; do
+        IFS=':' read -ra kv <<< "$pair"
+        if [[ ${#kv[@]} -ne 2 ]]; then
+            echo "moudle filter format is not correct"
+            exit 1
+        fi
+
+        module_key="${kv[0]}"
+        filter_value="${kv[1]}"
+        module_filter_keys+=("$module_key")
+        module_filter_values+=("$filter_value")
+    done
+}
+
 function handle_result {
     resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
     echo $resultfile

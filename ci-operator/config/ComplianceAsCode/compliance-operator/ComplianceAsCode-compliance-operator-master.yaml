@@ -3,15 +3,23 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   openshift_release_rhel-8-release-golang-1.20-openshift-4.14:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.20-openshift-4.14
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.12
+    tag: rhel-8-release-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: Dockerfile.ci
   from: base
@@ -25,20 +33,21 @@ images:
 - dockerfile_path: images/openscap/Dockerfile
   to: testopenscap
 promotion:
-  excluded_images:
-  - testcontent
-  - testopenscap
-  name: "4.12"
-  namespace: ComplianceAsCode
+  to:
+  - excluded_images:
+    - testcontent
+    - testopenscap
+    name: "4.15"
+    namespace: ComplianceAsCode
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -64,7 +73,9 @@ tests:
 - as: e2e-aws-parallel
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
@@ -84,7 +95,9 @@ tests:
 - as: e2e-aws-serial
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
@@ -101,6 +114,28 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-rosa
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: 4.15.8
+      REGION: us-east-2
+    test:
+    - as: test-ocp4-pci-dss-node
+      cli: latest
+      commands: make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode

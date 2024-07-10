@@ -153,7 +153,7 @@ case "$IAAS_PLATFORM" in
 	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
 	;;
   vsphere)
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template" -n openshift-machine-api)
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
     ;;
   gcp)
 	# we need the value after family/

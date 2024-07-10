@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_4.15_installer:
     name: "4.15"
     namespace: ocp
@@ -18,16 +18,18 @@ images:
   - name: DIRECT_DOWNLOAD
     value: "true"
   dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_installer:
       as:
       - registry.ci.openshift.org/ocp/4.15:installer
   to: machine-os-images
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -61,7 +63,7 @@ tests:
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

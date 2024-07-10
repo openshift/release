@@ -5,6 +5,14 @@ ref:
     name: ocp-qe-perfscale-ci
     tag: latest
   env:
+  - name: E2E_VERSION
+    default: "v2.1.8"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
   - name: CHURN
     default: "true"
     documentation: |-
@@ -13,6 +21,10 @@ ref:
     default: "--churn-duration=20m"
     documentation: |-
       Default is Churn Duration for 20 minutes
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
   - name: GC
     default: "true"
     documentation: |-
@@ -21,11 +33,19 @@ ref:
     default: "9"
     documentation: |-
       The number of iterations per worker nodes to create
+  - name: USE_HORREUM_WEBHOOK
+    default: "false"
+    documentation: |-
+      Trigger to call horreum webhook
   commands: openshift-qe-cluster-density-v2-commands.sh
+  timeout: 6h
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
     mount_path: /secret
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
   resources:
     requests:
       cpu: 100m

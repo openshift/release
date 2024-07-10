@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.3-0.20210827222652-7b3a8699fa04
+    controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
   name: pullrequestpayloadqualificationruns.ci.openshift.io
 spec:
@@ -39,6 +39,10 @@ spec:
             description: Spec is considered immutable and should be entirely created
               by the requestor
             properties:
+              initial:
+                description: InitialPayloadBase specifies the base payload pullspec
+                  for the "initial" release payload
+                type: string
               jobs:
                 description: Jobs specifies the jobs to be executed. Immutable.
                 properties:
@@ -115,51 +119,43 @@ spec:
                 - releaseControllerConfig
                 - releaseJobSpec
                 type: object
-              pullRequest:
-                description: PullRequest specifies the code to be tested. Immutable
-                  and required.
+              payload:
+                description: PayloadOverrides specifies overrides to the base payload.
                 properties:
-                  baseRef:
-                    description: BaseRef identifies the target branch for the PR
+                  base:
+                    description: BasePullSpec specifies the base payload pullspec
+                      for the "latest" release payload (alternate from the default
+                      of the 4.x CI payload) to layer changes on top of.
                     type: string
-                  baseSHA:
-                    description: BaseSHA identifies the HEAD of BaseRef at the time
-                    type: string
-                  org:
-                    description: Org is something like "openshift" in github.com/openshift/kubernetes
-                    type: string
-                  pr:
-                    description: PullRequest identifies a pull request in a repository
-                    properties:
-                      author:
-                        type: string
-                      number:
-                        type: integer
-                      sha:
-                        type: string
-                      title:
-                        type: string
-                    required:
-                    - author
-                    - number
-                    - sha
-                    - title
-                    type: object
-                  repo:
-                    description: Repo is something like "kubernetes" in github.com/openshift/kubernetes
-                    type: string
-                required:
-                - baseRef
-                - baseSHA
-                - org
-                - pr
-                - repo
+                  tags:
+                    description: ImageTagOverrides allow specific image tags to be
+                      overridden
+                    items:
+                      description: ImageTagOverride describes a specific image name
+                        that should be overridden with the provided tag
+                      properties:
+                        name:
+                          description: Name is the name of the image like "machine-os-content"
+                          type: string
+                        tag:
+                          description: Tag is the tag to override the image with like
+                            "4.16-art-latest-2024-02-05-071231"
+                          type: string
+                      required:
+                      - name
+                      - tag
+                      type: object
+                    type: array
                 type: object
               pullRequests:
+                description: PullRequests specifies the code to be tested. Immutable
+                  and required.
                 items:
-                  description: PullRequests specify the code to be tested.
-                    Multiple can be passed, but they must be from distinct repos.
-                    Immutable and required.
+                  description: PullRequestUnderTest describes the state of the repo
+                    that will be under test This is a combination of the PR revision
+                    and base ref revision. Tested code is the specific revision of
+                    the PR merged into the base branch with a specific branch as a
+                    HEAD
                   properties:
                     baseRef:
                       description: BaseRef identifies the target branch for the PR
@@ -171,7 +167,8 @@ spec:
                       description: Org is something like "openshift" in github.com/openshift/kubernetes
                       type: string
                     pr:
-                      description: PullRequest identifies a pull request in a repository
+                      description: PullRequest identifies a pull request, omit to
+                        only utilize the repo at the BaseRef and BaseSHA
                       properties:
                         author:
                           type: string
@@ -194,13 +191,12 @@ spec:
                   - baseRef
                   - baseSHA
                   - org
-                  - pr
                   - repo
                   type: object
                 type: array
             required:
             - jobs
-            - pullRequest
+            - pullRequests
             type: object
           status:
             description: PullRequestPayloadTestStatus provides runtime data, such
@@ -212,13 +208,12 @@ spec:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
                     use as an array at the field path .status.conditions.  For example,
-                    type FooStatus struct{     // Represents the observations of a
-                    foo's current state.     // Known .status.conditions.type are:
-                    \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type
-                    \    // +patchStrategy=merge     // +listType=map     // +listMapKey=type
-                    \    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`
-                    \n     // other fields }"
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
                   properties:
                     lastTransitionTime:
                       description: lastTransitionTime is the last time the condition
@@ -341,6 +336,7 @@ spec:
                         state:
                           description: ProwJobState specifies whether the job is running
                           enum:
+                          - scheduling
                           - triggered
                           - pending
                           - success
@@ -363,9 +359,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

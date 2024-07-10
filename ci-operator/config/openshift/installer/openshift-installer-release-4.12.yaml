@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -47,10 +47,6 @@ base_images:
     name: "4.12"
     namespace: origin
     tag: cli
-  rhel-7:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
 build_root:
   from_repository: true
 images:
@@ -81,8 +77,8 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
     ocp_4.10_cli:
       as:
@@ -122,8 +118,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: ovirt-installer
 promotion:
-  name: "4.12"
-  namespace: ocp
+  to:
+  - name: "4.12"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -262,12 +259,12 @@ tests:
         identity\|\[StatefulSetBasic\] should adopt matching orphans and release non-matching
         pods\|PVC Protection
     workflow: openshift-e2e-alibabacloud
-- as: e2e-gcp-ovn-shared-vpc
+- as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: gcp
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-sharednetwork
+    workflow: openshift-e2e-gcp-byo-vpc
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
@@ -326,7 +323,7 @@ tests:
 - as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi-sdn
   cluster: build05
@@ -372,7 +369,7 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-sdn-virtualmedia
+- as: e2e-metal-ipi-ovn-virtualmedia
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
@@ -431,7 +428,7 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
@@ -441,7 +438,7 @@ tests:
 - as: e2e-vsphere-zones
   optional: true
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-crc
   optional: true
@@ -551,7 +548,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_DEPLOY_MCE=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-compact-ipv4
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

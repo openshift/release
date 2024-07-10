@@ -15,6 +15,7 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -48,7 +49,7 @@ fi
 
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
-${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
+${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno "
@@ -79,7 +80,7 @@ EOF
 
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
-echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
@@ -106,7 +107,7 @@ if $BASTION_ENV; then
 # Run on upstream lab with bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q centos@${BASTION_IP}"'
+${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
 
 else
@@ -143,7 +144,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Run deployment
     shell: >-
         ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
-        --host-ip ${HYPERV_IP} --registry
+        --host-ip ${HYPERV_IP} --registry --reset-bmc
         -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
@@ -158,6 +159,14 @@ cat << EOF > ~/ocp-install.yml
     register: job_result
     until: job_result.finished
     retries: 90
+    delay: 60
+    ignore_errors: true
+
+  - name: Run oc command to check if cluster is ready
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
+    register: oc_status
+    until: "'False' in oc_status.stdout"
+    retries: 60
     delay: 60
     ignore_errors: true
 
@@ -181,7 +190,7 @@ cat << EOF > ~/ocp-install.yml
     set_fact:
       deploy_failed: true
     when:
-      - (job_result.failed | bool) or (sno_deploy.failed | bool)
+      - (sno_deploy.failed | bool) or (oc_status.failed | bool)
 
   - name: Show last logs from cloud init if failed
     shell: tail -100 /tmp/${CLUSTER_NAME}_sno_ag.log
@@ -191,7 +200,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Fail if deployment did not finish
     fail:
       msg: Installation not finished yet
-    when: job_result.failed | bool
+    when: oc_status.failed | bool
 
   - name: Fail if deployment failed
     fail:
@@ -226,6 +235,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      oc --kubeconfig=${WORK_DIR}/auth/kubeconfig set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -237,12 +250,23 @@ cat << EOF > ~/fetch-information.yml
 
   - name: Get cluster version
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    ignore_errors: true
 
   - name: Get bmh objects
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get bmh -A
+    ignore_errors: true
 
   - name: Get nodes
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get node
+    ignore_errors: true
+
+  - name: Get MCP
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get mcp
+    ignore_errors: true
+
+  - name: Get operators
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get co
+    ignore_errors: true
 EOF
 
 cat << EOF > ~/check-cluster.yml
@@ -253,13 +277,30 @@ cat << EOF > ~/check-cluster.yml
   tasks:
 
   - name: Check if cluster is available
-    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: ready_check
+
+  - name: Check for errors in cluster deployment
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    register: error_check
 
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: "'True' not in ready_check.stdout"
+    when: "'False' not in ready_check.stdout"
+
+EOF
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Delete deployment plan
+    debug:
+      msg: "Doing nothing currently"
 
 EOF
 

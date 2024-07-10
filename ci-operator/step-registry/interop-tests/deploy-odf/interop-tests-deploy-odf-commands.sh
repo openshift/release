@@ -11,9 +11,27 @@ ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
 
-readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-${ODF_VERSION_MAJOR_MINOR}"
+readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 readonly ODF_CATALOG_NAME=odf-catalogsource
 
+readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
+readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
+readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
+
+
+if [[ ! -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+  echo "ERROR: ODF Quay credentials file not found"
+  sleep 7200
+fi
+
+echo "🐶 Get pull secret from cluster"
+oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
+
+echo "🍯 Merge pull secret with ODF Quay credentials"
+jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
+
+echo "🌊 Update pull secret in cluster"
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
 
 function monitor_progress() {
   local status=''
@@ -124,6 +142,9 @@ echo "⏳ Wait for CatalogSource to be ready"
 sleep 30
 oc wait catalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace \
   --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout='5m'
+
+echo "🏷 Set label on ODF CatalogSource (required for ocs-ci tests)"
+oc label CatalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace ocs-operator-internal=true
 
 echo "Subscribe to the operator"
 SUB=$(

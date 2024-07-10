@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: base
   base-machine:
@@ -8,47 +8,51 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: cli
+  cloud-provider-aws-rpms:
+    name: "4.17"
+    namespace: ocp
+    tag: cloud-provider-aws-rpms
+  cloud-provider-azure-rpms:
+    name: "4.17"
+    namespace: ocp
+    tag: cloud-provider-azure-rpms
+  cloud-provider-gcp-rpms:
+    name: "4.17"
+    namespace: ocp
+    tag: cloud-provider-gcp-rpms
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  machine-os-content-base:
-    name: "4.15"
-    namespace: ocp
-    tag: machine-os-content
   oc-rpms:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: oc-rpms
-  ocp_4.15_base-rhel9:
-    name: "4.15"
+  ocp_4.17_base-rhel9:
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_4.15_tools:
-    name: "4.15"
+  ocp_4.17_tools:
+    name: "4.17"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.17
   rhel-coreos-base:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: rhel-coreos
   tools:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -58,38 +62,35 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   inputs:
-    ocp_4.15_tools:
+    ocp_4.17_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.15:tools
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.17:tools
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: kubernetes-tests
-- context_dir: openshift-hack/images/os/
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - centos:stream9
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-  to: machine-os-content
 - dockerfile_literal: |
-    # This uses the new rhel-coreos base image
-    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    # We want to test the PR using the code from it. Now, this repo ships RPMs
+    # which are normally part of RHCOS. We need to make sure that RHCOS itself
+    # is updated with the freshly built RPMs from the PR run. To do this, we do a
+    # multi-stage build: the first stage downloads the RPMs that were just built
+    # (the `base-machine-with-rpms` contains the RPMs), and the second stage
+    # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
+    # bootable container).
+    # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
-    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-hyperkube
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
     # See also https://issues.redhat.com/browse/ART-4352
     FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
     COPY --from=build /*.rpm /
@@ -106,28 +107,44 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: pod
+- dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: installer-kube-apiserver-artifacts
 promotion:
-  additional_images:
-    artifacts: artifacts
-  excluded_images:
-  - machine-os-content
-  - rhel-coreos
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - rhel-coreos
+    name: "4.17"
+    namespace: ocp
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - rhel-coreos
+    - hyperkube
+    - kubernetes-tests
+    - pod
+    - installer-kube-apiserver-artifacts
+    name: scos-4.17
+    namespace: origin
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-aws-rpms /go/src/k8s.io/cloud-provider-aws/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-azure-rpms /go/src/github.com/kubernetes-sigs/cloud-provider-azure/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-gcp-rpms /go/src/k8s.io/cloud-provider-gcp/_output/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -139,6 +156,15 @@ raw_steps:
         paths:
         - destination_dir: .
           source_path: /go/src/k8s.io/kubernetes/_output/local/releases/Dockerfile
+      cloud-provider-aws-rpms:
+        as:
+        - cloud-provider-aws-rpms
+      cloud-provider-azure-rpms:
+        as:
+        - cloud-provider-azure-rpms
+      cloud-provider-gcp-rpms:
+        as:
+        - cloud-provider-gcp-rpms
       oc-rpms:
         as:
         - oc-rpms
@@ -164,12 +190,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -239,7 +265,8 @@ tests:
     memory_backed_volume:
       size: 6Gi
 - as: verify
-  commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
+  commands: |
+    KUBE_VERIFY_GIT_BRANCH="${PULL_BASE_REF:-master}" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
   container:
     from: src
 - as: verify-commits
@@ -345,7 +372,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
@@ -374,21 +401,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-multitenant
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-metal-ipi
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
@@ -458,6 +470,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-ovn-runc
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-runc
 - as: e2e-aws-crun-wasm
   steps:
     cluster_profile: aws

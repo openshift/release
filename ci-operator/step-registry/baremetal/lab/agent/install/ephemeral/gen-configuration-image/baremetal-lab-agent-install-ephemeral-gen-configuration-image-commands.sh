@@ -4,7 +4,6 @@ set -o errtrace
 set -o errexit
 set -o pipefail
 set -o nounset
-set -x
 
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR

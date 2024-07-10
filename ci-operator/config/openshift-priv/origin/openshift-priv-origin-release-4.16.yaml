@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -15,14 +11,14 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: hypershift-operator
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   tools:
     name: 4.16-priv
     namespace: ocp-private
@@ -35,23 +31,23 @@ images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: hello-openshift
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -86,16 +82,19 @@ tests:
     from: src
     memory_backed_volume:
       size: 4Gi
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: e2e-aws
   optional: true
   steps:
@@ -105,13 +104,14 @@ tests:
       TELEMETRY_ENABLED: "false"
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-fips-serial
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -131,8 +131,21 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-azure-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
 - as: e2e-agnostic-ovn-cmd
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:
@@ -186,16 +199,19 @@ tests:
       TEST_SUITE: openshift/image-registry
     workflow: openshift-e2e-aws-image-registry
 - as: e2e-gcp-ovn-upgrade
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-upgrade-gcp
 - as: e2e-gcp-ovn-rt-upgrade
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-upgrade-gcp-ovn-rt
 - as: e2e-gcp-csi
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi
@@ -211,14 +227,26 @@ tests:
       TEST_UPGRADE_OPTIONS: abort-at=100
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-ovn-ipsec-serial
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn-ipsec-serial
+  timeout: 6h0m0s
 - as: e2e-aws-csi
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -234,6 +262,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-aws-ovn-fips
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -252,16 +281,18 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi-sdn
   cluster: build05
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
-  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -271,6 +302,20 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   optional: true
@@ -282,15 +327,18 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -298,6 +346,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-serial
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -306,6 +355,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-upgrade
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -314,6 +364,7 @@ tests:
     workflow: openshift-upgrade-aws-single-node
 - as: e2e-openstack-ovn
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -332,6 +383,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-cgroupsv2
   optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
@@ -344,6 +396,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: e2e-aws-ovn-etcd-scaling
   optional: true
   steps:
@@ -362,8 +415,15 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
+- as: e2e-vsphere-ovn-dualstack-primaryv6
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      IP_FAMILIES: DualStackIPv6Primary
+    workflow: openshift-e2e-vsphere-ovn-dualstack
 - as: e2e-aws-etcd-recovery
   optional: true
   steps:
@@ -386,6 +446,7 @@ tests:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-gcp
 - as: e2e-aws-ovn-kubevirt
   optional: true
@@ -400,8 +461,20 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       HYPERSHIFT_NODE_COUNT: "2"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.13
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
+- always_run: false
+  as: e2e-aws-ovn-upi
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-edge-zones
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

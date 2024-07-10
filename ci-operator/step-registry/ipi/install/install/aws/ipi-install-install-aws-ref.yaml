@@ -12,16 +12,31 @@ ref:
   - name: OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
     default: ""
     documentation: "Keep bootstrap resources after install. Warning: this should only be used for debugging purposes, and poses a risk to cluster stability."
+  - name: FIPS_ENABLED
+    default: "false"
+    documentation: "Indicates a FIPS-enabled cluster, to disable FIPS host checks in the installer."
   - name: ADD_INGRESS_RECORDS_MANUALLY
     default: "no"
     documentation: "Allow create cluster fail with exit code zero, and then execute wait-for install complete in next step"
-  - name: ENABLE_AWS_LOCALZONE
+  - name: ENABLE_AWS_EDGE_ZONE
     default: "no"
     documentation: "Enable worker nodes in Local Zone or not"
-  - name: LOCALZONE_WORKER_SCHEDULABLE
+  - name: EDGE_ZONE_TYPES
+    default: "local-zone"
+    documentation: |-
+      EDGE_ZONE_TYPES is a comma sepparated AWS Zone types to create the network infrastructure resources required by edge compute
+      pool (worker nodes in Local or Wavelength zones), creating a file SHARED_DIR/edge-zone-names.txt with
+      AWS Zone names with new line as delimitator.
+      Example of valid values:
+      - local-zone
+      - wavelength-zone
+      - local-zone,wavelength-zone
+  - name: EDGE_NODE_WORKER_SCHEDULABLE
     default: "no"
     documentation: |-
       If worker nodes in Local Zone are schedulable.
+  - name: EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP
+    default: "no"
   - name: OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY
     default: ""
     documentation: "Whether to use public only subnets. Implies no NAT gateways. Requires a VPC to be configured prior to install"
@@ -34,6 +49,9 @@ ref:
   - name: TF_LOG_PROVIDER
     default: "INFO"
     documentation: "Specifies the logging level for terraform provider libraries."
+  - name: ENABLE_AWS_EFA_PG_INSTANCE
+    default: "false"
+    documentation:  "Set to 'true' to opt in c5n.9xlarge instance type and AWS EFA Network Interface Type in an pre-existing placement group named 'pgcluster' for one worker node.  Explicitly set to 'false' to opt out.  Leave unset for the default, which may change."
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
