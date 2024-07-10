@@ -10,8 +10,6 @@ ssh_host_ip="$host@$instance_ip"
 TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
 target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
 
-echo "Using Host $instance_ip"
-
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -21,25 +19,19 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 cat <<EOF > ${SHARED_DIR}/gather_target_lca.sh
 #!/bin/bash
-set -euo pipefail
+set -xeuo pipefail
 
 # Setup directories for data
 cd ${remote_workdir}
 gather_dir=./must-gather-lca-${TARGET_VM_NAME}
-gather_dir_extra=./must-gather-lca-${TARGET_VM_NAME}/extra
-mkdir -p \$gather_dir_extra
 
 export KUBECONFIG=${target_kubeconfig}
 
 # Inspect the namespace
-oc adm inspect ns/openshift-lifecycle-agent --dest-dir=\$gather_dir
+oc adm must-gather --image=${LCA_PULL_REF} --dest-dir=\$gather_dir
 
-# Get installation service logs and recert summary files
-node="\$(oc get nodes -oname)"
-
-oc debug \$node -qn openshift-cluster-node-tuning-operator -- chroot /host/ bash -c 'journalctl -u installation-configuration.service' > \$gather_dir_extra/installation-configuration.service.log
-
-tar cvaf must-gather-lca-${TARGET_VM_NAME}.tar.gz \$gather_dir
+echo "compressing must gather contents..."
+sudo tar cvaf must-gather-lca-${TARGET_VM_NAME}.tar.gz \$gather_dir
 EOF
 
 chmod +x ${SHARED_DIR}/gather_target_lca.sh
