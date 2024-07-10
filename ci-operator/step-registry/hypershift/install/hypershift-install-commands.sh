@@ -65,7 +65,7 @@ else
   --managed-service ARO-HCP \
   --external-dns-provider=azure \
   --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
-  --external-dns-domain-filter=service.hypershift.azure.devcluster.openshift.com \
+  --external-dns-domain-filter=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
   --platform-monitoring=All \
   --enable-ci-debug-output \
   --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
