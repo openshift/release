@@ -12,6 +12,9 @@ echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 FOLDER="/$vsphere_datacenter/vm/$vsphere_datacenter"
 SUB_FOLDER="$FOLDER/${NAMESPACE}-${UNIQUE_HASH}"
 
