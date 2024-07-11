@@ -14,7 +14,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 [ -z "${PULL_NUMBER:-}" ] && \
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
     test -f /var/builds/${NAMESPACE}/preserve && \
-  exit 0
+  { echo "The cluster is expected to persist. Skipping deprovisioning..."; exit 0 }
 
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
