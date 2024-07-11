@@ -13,7 +13,6 @@ cp $KUBECONFIG /app/.kube/config
 export KUBECONFIG=/app/.kube/config
 
 echo "Execute tests"
-sleep 7200
 operator-suite/container/scripts/run-test.sh --make-envvar OLM=true --image-tag $TEST_IMAGE_TAG || true
 
 echo "Renaming xmls to junit_*.xml"
