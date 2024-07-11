@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-if [ "$RUN_ORION" = false ]; then
+if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
@@ -43,8 +43,9 @@ if [ ${HUNTER_ANALYZE} == "true" ]; then
 fi
 if [ ${JUNIT} == true ]; then
   export EXTRA_FLAGS+=" --lookback 5d"
-  export EXTRA_FLAGS+=" --output-format"
+  export EXTRA_FLAGS+=" --output-format junit"
   export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+  export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
