@@ -5,8 +5,14 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 
 check_result=0
@@ -34,11 +40,11 @@ function check_rhcos() {
 	else
             check_result=1
 	    echo "ERROR: folder ${fd_folder}  not found"
-	fi    
+	fi
 
     done
 
-    return ${check_result}    
+    return ${check_result}
 }
 
 check_rhcos || check_result=1
