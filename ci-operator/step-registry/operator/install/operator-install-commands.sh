@@ -56,7 +56,7 @@ for operator_value in $operator_configs; do
     operator_value=$(extract_operator_config "$operator_value")
     if [ "${operator_value}" ]; then
         name=$(echo $operator_value | sed -E 's/.*name=([^;]+);.*/\1/')
-        version=$(oc get csv -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
+        version=$(oc get csv -o yaml | grep -B1 "name: $name" | grep "version:" | awk '{print $2}')
         echo "$name-v$version" >> "${SHARED_DIR}/operator-versions"
     fi
 done
