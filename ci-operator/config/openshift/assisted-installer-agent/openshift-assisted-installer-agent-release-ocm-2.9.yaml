@@ -27,6 +27,10 @@ base_images:
     name: stream8
     namespace: coreos
     tag: "8"
+  coreos-centos-stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -36,8 +40,7 @@ base_images:
     namespace: openshift
     tag: golang-1.19
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
   from: coreos-centos-stream8
@@ -46,6 +49,9 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-agent
+- dockerfile_path: Dockerfile.assisted_installer_agent-build
+  from: coreos-centos-stream9
+  to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
     COPY . .
@@ -90,28 +96,37 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret

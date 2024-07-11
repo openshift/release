@@ -9,6 +9,10 @@ chain:
       documentation: |-
         Specifies the Azure location of the cluster. If intentionally left as an empty string, 
         it defaults to that of the management cluster.
+    - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+      default: "false"
+      documentation: |-
+        If true, create hosted cluster infrastructure in the resource group specified in "${SHARED_DIR}/resourcegroup".
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
@@ -21,12 +25,18 @@ chain:
       fi
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
 
+      RESOURCE_GROUP_NAME=""
+      if [[ $HYPERSHIFT_CUSTOM_RESOURCE_GROUP == "true" ]]; then
+        RESOURCE_GROUP_NAME="$(cat "${SHARED_DIR}/resourcegroup")"
+      fi
+
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster azure \
         --azure-creds=${AZURE_CREDS} \
         --name ${CLUSTER_NAME} \
         --location ${HC_LOCATION} \
+        --resource-group-name=${RESOURCE_GROUP_NAME} \
         --cluster-grace-period 40m
 
       echo "$(date) Finished deleting cluster"
@@ -36,7 +46,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 15m0s
+    timeout: 25m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       name: hypershift-ci-jobs-azurecreds

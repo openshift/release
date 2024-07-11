@@ -15,19 +15,19 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-echo "== Parameters:"
-echo "OO_BUNDLE:            $OO_BUNDLE"
-echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
-echo "OO_INSTALL_MODE:      $OO_INSTALL_MODE"
-echo "OO_SECURITY_CONTEXT:  $OO_SECURITY_CONTEXT"
+echo "[$(date --utc +%FT%T.%3NZ)] == Parameters:"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_BUNDLE:            $OO_BUNDLE"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_MODE:      $OO_INSTALL_MODE"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_SECURITY_CONTEXT:  $OO_SECURITY_CONTEXT"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
 elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
     NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
 else
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
 fi
 
 if [[ -n "${NS_NAMESTANZA:-}" ]]; then
@@ -42,7 +42,7 @@ EOF
 fi
 
 if [[ "${OO_INSTALL_NAMESPACE}" =~ ^openshift- ]]; then
-    echo "Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
+    echo "[$(date --utc +%FT%T.%3NZ)] Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
     oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=true
 fi
 
@@ -54,3 +54,6 @@ fi
   cd /tmp
   operator-sdk run bundle "${OO_BUNDLE}" -n "${OO_INSTALL_NAMESPACE}" --verbose ${INSTALL_MODE_ARG} --timeout="${OO_INSTALL_TIMEOUT_MINUTES}m" --security-context-config="${OO_SECURITY_CONTEXT}"
 )
+
+echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution Successfully !"
+
