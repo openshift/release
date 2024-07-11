@@ -59,7 +59,7 @@ function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
   rsync -avP \
     -e "ssh $(echo "${SSHOPTS[@]}")" \
     "${SHARED_HUB_CLUSTER_PROFILE}" \
-    "root@${AUX_HOST}":/var/telco-qe-preserved/
+    "root@${AUX_HOST}":/var/builds/telco-qe-preserved/
   set +x
   echo
 }
