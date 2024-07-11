@@ -52,14 +52,29 @@ function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
   
   echo "************ telcov10n Create a symbolic link to the shared artifacts folder that would be used during Spoke deployments ************"
 
-  ln -s /var/builds/${NAMESPACE}/${SHARED_HUB_CLUSTER_PROFILE} ${SHARED_HUB_CLUSTER_PROFILE}
-
   echo
   set -x
-  rsync -avP \
-    -e "ssh $(echo "${SSHOPTS[@]}")" \
-    "${SHARED_HUB_CLUSTER_PROFILE}" \
-    "root@${AUX_HOST}":/var/builds/telco-qe-preserved/
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
+    "${NAMESPACE}" "${SHARED_HUB_CLUSTER_PROFILE}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+telco_qe_preserved_dir=/var/builds/telco-qe-preserved
+
+# For the very first time...
+mkdir -pv ${telco_qe_preserved_dir}
+
+set -x
+if [[ -e ${telco_qe_preserved_dir}/${2} && ! -h ${telco_qe_preserved_dir}/${2} ]]; then
+  echo "Unexpected wrong condition found!!! The ${telco_qe_preserved_dir}/${2} file already exists and is not a symbolic link."
+  exit 1
+else
+  cd ${telco_qe_preserved_dir}
+  ln -s /var/builds/${1}/${2} ${2}
+fi
+EOF
+
   set +x
   echo
 }
