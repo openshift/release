@@ -47,6 +47,9 @@ oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\
 sleep 10
 oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
+echo "Begin troubleshooting"
+sleep 10800
+
 # Execute OpenTelemetry e2e tests
 chainsaw test \
 --report-name "junit_otel_e2e" \
