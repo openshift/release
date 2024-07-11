@@ -28,6 +28,18 @@ workflow:
         requests:
           cpu: 2000m
           memory: 4000Mi
+    - as: ocp-statecheck
+      commands: |
+        echo "Checking cluster state"
+        set -x
+        oc get nodes -o wide
+        pgrep -af crun || \
+          pgrep -af runc || true
+      from: ocp-4
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
     test:
     - ref: stackrox-stackrox-e2e-test
     post:
