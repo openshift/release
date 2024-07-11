@@ -35,22 +35,19 @@ declare primaryrouterhostname
 declare vsphere_portgroup
 
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
-# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
-
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+  SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 fi
 
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json."
   exit 1
 fi
 
