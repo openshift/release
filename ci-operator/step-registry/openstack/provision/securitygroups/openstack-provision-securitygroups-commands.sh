@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -21,10 +20,9 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
 if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
-	mkdir -p "${SHARED_DIR}/securitygroups"
 	sg_name='additional_workers'
 	sg_id="$(openstack security group create "$sg_name" --description "${CLUSTER_NAME}: additional security group for the compute nodes" -f value -c id)"
-	printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups/${sg_name}"
+	printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups"
 	(
 		IFS=','
 		for service in $ADDITIONAL_SECURITY_GROUP_RULES; do

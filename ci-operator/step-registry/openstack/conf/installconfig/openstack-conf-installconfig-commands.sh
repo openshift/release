@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
@@ -197,14 +196,11 @@ EOF
 	" "$INSTALL_CONFIG"
 fi
 
-# Add additional security groups, in case they exist, to the compute nodes
-
-if [[ -d "${SHARED_DIR}/securitygroups" ]]; then
-	for sg_id in "${SHARED_DIR}"/securitygroups/*; do
-		yq --yaml-output --in-place ".
-			| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"$sg_id")\" ]
-		" "$INSTALL_CONFIG"
-	done
+# Add an additional security group, in case it exists, to the compute nodes
+if test -f "${SHARED_DIR}/securitygroups"; then
+	yq --yaml-output --in-place ".
+		| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"${SHARED_DIR}"/securitygroups)\" ]
+	" "$INSTALL_CONFIG"
 fi
 
 # Regenerate install-config.yaml to fill in unset values with default values.
