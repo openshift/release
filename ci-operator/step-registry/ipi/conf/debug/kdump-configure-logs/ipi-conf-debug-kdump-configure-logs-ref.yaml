@@ -11,6 +11,15 @@ ref:
     default: "worker"
     documentation: |-
       The node role to configure kdump logs on.
+  - name: ARCH
+    default: amd64
+    documentation: |-
+      This parameter is a safety net to protect deployments from setting arch-specific arguments.
+  - name: BUTANE_RELEASE
+    default: "4.15.0"
+    documentation: |-
+      You can read up on upgrading butane here (https://coreos.github.io/butane/upgrading-openshift/).
+      In general it's safe to stick to 4.15.0 unless this is upgraded to use a feature from a newer release.
   - name: KDUMP_COMMANDLINE_REMOVE
     default: "hugepages hugepagesz slub_debug quiet log_buf_len swiotlb"
     documentation: |-
@@ -20,9 +29,14 @@ ref:
     documentation: |-
       List of kargs to append in crashkernel.
   - name: KDUMP_KEXEC_ARGS
-    default: "-s"
+    default: "--dt-no-old-root -s"
     documentation: |-
       Args used when kdump kexecs into the crash kernel.
+
+      The --dt-no-old-root argument is used for arm64 and ppc64le clusters. If it's present
+      on amd64 and s390x, it will be filtered out based on the ARCH input parameter.
+      Otherwise, an error would be thrown into /var/log/kdump.log and stdout would just
+      print a usage statement in the kdump service log.
   - name: KDUMP_IMG
     default: "vmlinuz"
     documentation: |-
