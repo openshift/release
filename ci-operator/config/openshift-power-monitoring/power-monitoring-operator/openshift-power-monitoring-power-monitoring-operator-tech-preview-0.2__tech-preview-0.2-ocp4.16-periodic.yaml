@@ -35,15 +35,14 @@ operator:
     with: pipeline:power-monitoring-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.16"
 resources:
   '*':
     requests:
       cpu: 200m
-      memory: 400Mi
+      memory: 200Mi
 tests:
 - as: power-monitoring-operator-e2e-aws
   cluster_claim:
@@ -55,7 +54,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.16"
-  postsubmit: true
+  cron: 0 4 * * 1,3,5
   steps:
     test:
     - as: install
@@ -73,7 +72,7 @@ tests:
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: generic-claim
 - as: power-monitoring-operator-e2e-gcp
-  postsubmit: true
+  cron: 0 4 * * 1,3,5
   steps:
     cluster_profile: gcp-qe
     test:
@@ -91,8 +90,42 @@ tests:
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: power-monitoring-operator-e2e-bm
+  cluster: build05
+  cron: 30 4 * * 1,3,5
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export HOME=/tmp/home
+        export XDG_RUNTIME_DIR=/tmp/home/containers
+        mkdir -p $XDG_RUNTIME_DIR
+        OLD_KUBECONFIG=${KUBECONFIG}
+        unset KUBECONFIG
+        oc registry login
+        echo "exporting the KUBECONFIG"
+        export KUBECONFIG="${OLD_KUBECONFIG}"
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=15m
+      dependencies:
+      - env: OO_BUNDLE
+        name: power-monitoring-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
-  branch: v1alpha1
+  branch: tech-preview-0.2
   org: openshift-power-monitoring
   repo: power-monitoring-operator
-  variant: post-submit
+  variant: tech-preview-0.2-ocp4.16-periodic
