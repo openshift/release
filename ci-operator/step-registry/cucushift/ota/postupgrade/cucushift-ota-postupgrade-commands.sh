@@ -71,6 +71,7 @@ function verify_output(){
         echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
     fi
     echo "passed verifying ${message}"
+    return 0
 }
 
 # Define the checkpoints/steps needed for the specific case
