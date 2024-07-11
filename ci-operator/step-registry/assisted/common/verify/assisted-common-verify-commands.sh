@@ -11,6 +11,21 @@ if [ "${TEST_SUITE:-full}" == "none" ]; then
     exit 0
 fi
 
+function get_test_list() {
+    podman run --network host --rm -i \
+        -e KUBECONFIG=tmp/kubeconfig -v ${KUBECONFIG}:tmp/kubeconfig \
+        ${OPENSHIFT_TESTS_IMAGE} openshift-tests run "openshift/conformance/parallel" --dry-run | \
+        grep -Ff ${SHARED_DIR}/test-list
+}
+
+function run_tests() {
+    podman run --network host --rm -i -v ${ARTIFACT_DIR}:${ARTIFACT_DIR} \
+        openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
+        --junit-dir ${ARTIFACT_DIR}/reports -f -
+}
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 case "${CLUSTER_TYPE}" in
     vsphere)
         # shellcheck disable=SC1090
@@ -36,6 +51,5 @@ esac
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 mkdir -p ${ARTIFACT_DIR}/reports
 
-openshift-tests run "openshift/conformance/parallel" --dry-run | \
-    grep -Ff ${SHARED_DIR}/test-list | \
-    openshift-tests run -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/reports -f -
+get_test_list | run_tests
+
