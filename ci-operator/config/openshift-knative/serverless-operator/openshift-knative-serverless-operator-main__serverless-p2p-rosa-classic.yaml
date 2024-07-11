@@ -127,36 +127,33 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: serverless-p2p-rosa
+- as: 417-rc-iib
   cron: 0 6 11 2 *
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-managed-cspi-qe
     env:
+      CHANNEL_GROUP: nightly
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
           [
-            {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-            {"step": "rosa-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-            {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-            {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-            {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-            {"step": "mesh-e2e", "failure_type": "test_failure", "classification": "mesh-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
-            {"step": "ui-e2e", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
-            {"step": "mesh-e2e", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
-            {"step": "ui-e2e", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+            {"step": "mesh-e2e-tests", "failure_type": "test_failure", "classification": "mesh-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
+            {"step": "ui-e2e-tests", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
+            {"step": "mesh-e2e-tests", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
+            {"step": "ui-e2e-tests", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
           ],
-          "success_rules":
-          [
-            {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
-          ]
+          "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp-p2p","rosa-classic-lp","serverless-p2p"]'
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","rosa-classic-p2p","serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-1165
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
+      FIREWATCH_FAIL_WITH_POD_FAILURES: "true"
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
       OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.16"
+      OPENSHIFT_VERSION: "4.17"
       OPERATOR1_CONFIG: name=jaeger-product;namespace=openshift-operators
       OPERATOR2_CONFIG: name=kiali-ossm;namespace=openshift-operators
       OPERATOR3_CONFIG: name=servicemeshoperator;namespace=openshift-operators
@@ -191,6 +188,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     - as: ui-e2e-tests
+      best_effort: true
       cli: latest
       commands: SKIP_MESH_AUTH_POLICY_GENERATION=true SKIP_OPERATOR_SUBSCRIPTION=true
         make ui-e2e
@@ -220,4 +218,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: serverless-ocp4.16-p2p-iib
+  variant: serverless-p2p-rosa-classic
