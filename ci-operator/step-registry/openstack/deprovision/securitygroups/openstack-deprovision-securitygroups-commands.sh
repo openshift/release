@@ -19,5 +19,5 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 if test -f "${SHARED_DIR}/securitygroups"; then
 	echo "Deleting security group $(<"${SHARED_DIR}/securitygroups")..."
-	openstack security group delete $(<"${SHARED_DIR}/securitygroups")
+	openstack security group delete "$(<"${SHARED_DIR}/securitygroups")"
 fi
