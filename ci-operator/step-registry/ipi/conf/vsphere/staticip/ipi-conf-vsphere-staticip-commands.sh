@@ -26,10 +26,13 @@ STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
+# subnets.json is no longer available in vault
 SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
     SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 fi
+
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
 
 echo "$(date -u --rfc-3339=seconds) - ${vlanid} ${primaryrouterhostname} "
 

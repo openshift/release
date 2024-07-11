@@ -63,10 +63,6 @@ function eval_instance_capacity() {
   set -o errexit
 }
 
-
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
-
 CONTROL_PLANE_INSTANCE_SIZE="xlarge"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="8xlarge"
@@ -91,7 +87,9 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
-  architecture="arm64"
+  CONTROL_ARCH="arm64"
+  COMPUTE_ARCH="arm64"
+
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     COMPUTE_NODE_TYPE="m6g.xlarge"
   fi
@@ -100,7 +98,7 @@ elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; t
     CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 else
-  # AMD 64
+  # AMD 64 or Multiarch Compute
 
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
@@ -113,20 +111,34 @@ else
   # Do not change auto-types unless it is coordinated with the cloud
   # financial operations team. Savings plans may be in place to
   # decrease the cost of certain instance families.
-  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-    else
-      CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+  if [[ "${CONTROL_ARCH}" == "amd64" ]]; then
+    if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+      else
+        CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+      fi
     fi
+  elif [[ "${CONTROL_ARCH}" == "arm64" ]]; then
+    CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
+  else
+    echo "${CONTROL_ARCH} is not a valid control plane architecture..."
+    exit 1
   fi
 
-  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-    else
-      COMPUTE_NODE_TYPE="m6i.xlarge"
+  if [[ "${COMPUTE_ARCH}" == "amd64" ]]; then
+    if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+      else
+        COMPUTE_NODE_TYPE="m6i.xlarge"
+      fi
     fi
+  elif [[ "${COMPUTE_ARCH}" == "arm64" ]]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
+  else
+    echo "${COMPUTE_ARCH} is not a valid compute plane architecture..."
+    exit 1
   fi
 
 fi
@@ -208,14 +220,14 @@ platform:
     userTags:
       expirationDate: ${expiration_date}
 controlPlane:
-  architecture: ${architecture}
+  architecture: ${CONTROL_ARCH}
   name: master
   replicas: ${master_replicas}
   platform:
     aws:
       type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
-- architecture: ${architecture}
+- architecture: ${COMPUTE_ARCH}
   name: worker
   replicas: ${worker_replicas}
   platform:
@@ -339,7 +351,7 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:
-- architecture: ${architecture}
+- architecture: ${COMPUTE_ARCH}
   name: edge
   platform:
     aws:
