@@ -1,9 +1,11 @@
 #!/bin/bash
-
-set -e
+# Setup mirror registry credential and ICSP when proxy registry is used.
+# Enable openshift qe catalogsource when OLM and marketplace is avaiable
+# mirror operator images into local mirror registry when cluster type is c2s or sc2s
+# The script exit 1 if fail to create mirror registry credential or ICSP.
+# The script exit 0 if fail to mirror images. this allows the other test can be executed continuously
+# The script exit 0 if fail to create catalogsource. this allows  the other test can be executed continuously
 set -u
-set -o pipefail
-
 # use it as a bool
 marketplace=0
 mirror=0
@@ -90,12 +92,14 @@ function set_cluster_auth () {
         if [[ $ret -eq 0 ]]; then
             check_mcp_status
             echo "set the mirror registry auth successfully."
+	    return 0
         else
             echo "!!! fail to set the mirror registry auth"
             return 1
         fi
     else
-        echo "!!! fail to extract the auth of the cluster"
+        echo "Can not extract Auth of the cluster"
+        echo "!!! fail to set the mirror registry auth"
         return 1
     fi
 }
@@ -142,7 +146,7 @@ function mirror_optional_images () {
     skopeo login quay.io/openshift-qe-optional-operators -u ${optional_auth_user} -p ${optional_auth_password}
 
     echo "skopeo copy docker://${origin_index_image} oci://${work_dir}oci-local-catalog --remove-signatures"
-    skopeo copy --all docker://${origin_index_image} "oci://${work_dir}/oci-local-catalog" --remove-signatures --src-tls-verify=false || { echo "Error! skopeo copy catalog failed, abort !"; exit 1; }
+    skopeo copy --all docker://${origin_index_image} "oci://${work_dir}/oci-local-catalog" --remove-signatures --src-tls-verify=false || { echo "Error! skopeo copy catalog failed, abort !"; return 1; }
 
     echo "create ImageSetConfiguration"
     cat <<EOF >${work_dir}/imageset-config.yaml
@@ -294,6 +298,7 @@ EOF
 
     if [ $? == 0 ]; then
         echo "create the ICSP/IDMS successfully" 
+	return 0
     else
         echo "!!! fail to create the ICSP/IDMS"
         return 1
@@ -431,7 +436,12 @@ metadata:
     pod-security.kubernetes.io/warn: baseline
   name: openshift-marketplace
 EOF
-    marketplace=1
+    if [[ $? -eq 0 ]]; then
+        marketplace=1
+        return 0
+    else
+        return 1
+    fi
 }
 
 # from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
@@ -444,9 +454,10 @@ function check_olm_capability(){
         enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
           if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
               echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
-              exit 0
+              return 0
           fi
     fi
+    return 0
 }
 
 #################### Main #######################################
@@ -492,8 +503,19 @@ mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operator
 echo "origin_index_image: ${origin_index_image}"
 echo "mirror_index_image: ${mirror_index_image}"
 
-check_marketplace
-check_olm_capability
+if [ $mirror -eq 0 ]; then
+    echo "Set mirror registry credential when the cluster isn't c2s or SC2S"
+    set_cluster_auth || exit 1
+fi
+#Create ICSP for mirror registry. The ICSP are used for the following ci-opertor steps too. Abort the job if ICSP can not be created
+create_settled_icsp  || exit 1
+
+#skip the mirror or catalogsource when OLM is not enabled.
+check_olm_capability || exit 0
+
+#skip if marketplace doesn't exit
+check_marketplace || exit 0
+
 # No need to disable the default OperatorHub when marketplace disabled as default.
 if [ $marketplace -eq 0 ]; then
     disable_default_catalogsource
@@ -502,10 +524,5 @@ fi
 if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
-else
-    echo "set_cluster_auth as the cluster isn't c2s or SC2S"
-    set_cluster_auth
 fi 
-
-create_settled_icsp
 create_catalog_sources
