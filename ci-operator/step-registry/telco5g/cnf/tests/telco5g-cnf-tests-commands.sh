@@ -94,6 +94,11 @@ if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
 # TESTNAME
 sriov "SCTP integration Test Connectivity"
 
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
 EOF
 
 fi
@@ -116,6 +121,10 @@ if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
 # tests that require machineconfigs
 # TESTNAME
 sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
 
 EOF
 fi
