@@ -16,7 +16,11 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 installer_dir=/tmp/installer
@@ -56,6 +60,8 @@ export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 function gather_console_and_bootstrap() {
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/govc.sh"
+    unset SSL_CERT_FILE
+    unset GOVC_TLS_CA_CERTS
     # list all the virtual machines in the folder/rp
     clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
     GATHER_BOOTSTRAP_ARGS=()
@@ -197,9 +203,14 @@ then
   wait "$!"
 else
   echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
-  pwsh -f powercli/upi.ps1 &
+  NO_COLOR=true pwsh -f powercli/upi.ps1 &
   wait "$!"
 fi
+
+echo "$(date -u --rfc-3339=seconds) - removing ignition..."
+rm "${SHARED_DIR}/bootstrap.ign" \
+    "${SHARED_DIR}/worker.ign" \
+    "${SHARED_DIR}/master.ign"
 
 # The terraform state could be larger than the maximum 1mb
 # in a secret

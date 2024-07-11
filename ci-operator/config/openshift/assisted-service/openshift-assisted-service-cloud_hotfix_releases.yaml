@@ -31,6 +31,26 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.20
+  tests:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
+  tests-4.12:
+    name: "4.12"
+    namespace: ocp
+    tag: tests
+  tests-4.13:
+    name: "4.13"
+    namespace: ocp
+    tag: tests
+  tests-4.14:
+    name: "4.14"
+    namespace: ocp
+    tag: tests
+  tests-4.15:
+    name: "4.15"
+    namespace: ocp
+    tag: tests
 build_root:
   from_repository: true
 images:
@@ -170,17 +190,11 @@ tests:
         IPv6=yes
         IPv4=yes
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-11
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.11
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
@@ -190,6 +204,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.13
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
@@ -200,6 +216,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
@@ -210,6 +228,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
@@ -227,6 +247,8 @@ tests:
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
@@ -256,6 +278,8 @@ tests:
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
