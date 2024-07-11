@@ -6,6 +6,10 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+function show_multiclusterhub_generated_objects {
+  oc -n ${MCH_NAMESPACE} get configmaps,secrets,all
+}
+
 # create image pull secret for MCH
 oc create secret generic ${IMAGE_PULL_SECRET} -n ${MCH_NAMESPACE} --from-file=.dockerconfigjson=$CLUSTER_PROFILE_DIR/pull-secret --type=kubernetes.io/dockerconfigjson
 
@@ -35,6 +39,9 @@ for try in $(seq "${RETRIES}"); do
       echo "Error MCH failed to reach Running status in alloted time."
       exit 1
     fi
+    echo
+    show_multiclusterhub_generated_objects
+    echo
     echo "Try ${try}/${RETRIES}: MCH is not running yet. Checking again in 30 seconds"
     sleep 30
   fi
