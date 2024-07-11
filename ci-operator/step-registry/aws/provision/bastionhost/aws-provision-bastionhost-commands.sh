@@ -285,8 +285,6 @@ aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name 
 wait "$!"
 echo "Waited for stack"
 
-echo "$stack_name" > "${SHARED_DIR}/bastion_host_stack_name"
-
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `BastionInstanceId`].OutputValue' --output text)"
 echo "Instance ${INSTANCE_ID}"

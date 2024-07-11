@@ -219,6 +219,7 @@ platform:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
+      clusterName: ${NAMESPACE}-${UNIQUE_HASH}
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
@@ -242,6 +243,16 @@ do
   printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
   yq-go write -i "${CONFIG}" "platform.aws.userTags.${TAG}" "${VALUE}"
 done
+
+if [[ "${PROPAGATE_USER_TAGS:-}" == "yes" ]]; then
+  patch_propagate_user_tags="${SHARED_DIR}/install-config-propagate_user_tags.yaml.patch"
+  cat > "${patch_propagate_user_tags}" << EOF
+platform:
+  aws:
+    propagateUserTags: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_propagate_user_tags}"
+fi
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret

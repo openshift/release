@@ -37,7 +37,21 @@ echo "EDGE_ZONE_TYPES: ${EDGE_ZONE_TYPES}"
 echo "EDGE_NODE_WORKER_SCHEDULABLE: ${EDGE_NODE_WORKER_SCHEDULABLE}"
 echo "EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP: ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP}"
 
+# get availability zones of configuration
+VALID_AVAILABILITY_ZONES=$(tr '\n' ' ' < ${SHARED_DIR}/edge-zone-names.txt )
+echo "Valid availability zones: ${VALID_AVAILABILITY_ZONES}"
+
 ret=0
+
+# check edge node count
+echo "Checking edge machine count"
+edge_machine_count=$(echo $MACHINES | wc -w)
+if [[ "${edge_machine_count}" != "${EDGE_NODE_WORKER_NUMBER}" ]]; then
+  echo "FAIL: edge machine count: ${edge_machine_count}, expect ${EDGE_NODE_WORKER_NUMBER}"
+  ret=$((ret+1))
+else
+  echo "PASS: edge machine count"
+fi
 
 for machineset in $MACHINESETS;
 do
@@ -71,6 +85,7 @@ do
   instance_id=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
   external_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
   internal_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
+  az=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.spec.providerSpec.value.placement.availabilityZone')
 
   machine_info="instance_id:[${instance_id}], external_dns:[${external_dns}], internal_dns:[${internal_dns}]"
 
@@ -82,6 +97,16 @@ do
   echo "MACHINE: ${machine}: ${machine_info}"
   
   # Checking
+
+  # availability zone
+  if [[ $VALID_AVAILABILITY_ZONES == *"${az}"* ]];
+  then
+    echo "PASS: machine AZ: ${machine} ${az}"
+  else
+    echo "FAIL: machine AZ: ${machine} ${az}"
+    ret=$((ret+1))
+  fi
+
   if [[ ${EDGE_ZONE_TYPES} == "wavelength-zone" ]]; then
     # wavelength-zone
     if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]] && [[ ${external_dns} == ec2* ]] && [[ "${carrier_ip}" != "" ]] && [[ "${carrier_ip}" != "null" ]]; then
