@@ -75,7 +75,7 @@ function check_pod_status {
             echo "Pod $pod in namespace $namespace has status $status, which is not valid."
             return 1
         fi
-    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix" | grep -v "debug-")
+    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix")
     echo "All pods are in the expected state."
     return 0
 }
