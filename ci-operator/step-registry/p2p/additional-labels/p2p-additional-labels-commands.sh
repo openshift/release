@@ -6,7 +6,7 @@ set -o pipefail
 
 # Login to cluster
 eval "$(cat "${SHARED_DIR}/api.login")"
-
+sleep 7200
 # Populate operator version labels
 if [ -f "${SHARED_DIR}/operator-versions" ]; then
     cat "${SHARED_DIR}/operator-versions" >> "${SHARED_DIR}/firewatch-additional-labels"
