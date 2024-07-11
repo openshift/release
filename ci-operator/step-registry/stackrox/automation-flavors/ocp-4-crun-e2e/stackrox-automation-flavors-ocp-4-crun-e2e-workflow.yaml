@@ -31,10 +31,14 @@ workflow:
     - as: ocp-statecheck
       commands: |
         echo "Checking cluster state"
+        set +e
         set -x
+        ps -ef | grep "crun\|runc"
         oc get nodes -o wide
         pgrep -af crun || \
           pgrep -af runc || true
+        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'tr \\0 " " < /proc/"$(pgrep kubelet)"/cmdline'
+        oc get nodes -o json
       from: ocp-4
       resources:
         requests:
