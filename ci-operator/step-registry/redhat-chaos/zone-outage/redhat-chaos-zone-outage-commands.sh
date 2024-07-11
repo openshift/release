@@ -33,6 +33,13 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION=us-west-2
 
+NODE_NAME=$(oc get nodes --no-headers | head -n 1 | awk '{print $1}')
+
+VPC_ID=$(aws ec2 describe-instances --filter Name=private-dns-name,Values=$NODE_NAME  --query 'Reservations[*].Instances[*].NetworkInterfaces[*].VpcId' --output text)
+export VPC_ID
+SUBNET_ID=$(aws ec2 describe-subnets --filter Name=vpc-id,Values=$VPC_ID --query 'Subnets[*].SubnetId' --max-items 2) 
+export SUBNET_ID
+
 ./zone-outages/prow_run.sh
 rc=$?
 echo "Finished running zone outages"
