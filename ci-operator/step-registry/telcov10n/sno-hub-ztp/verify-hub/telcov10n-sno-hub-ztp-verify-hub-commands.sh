@@ -31,7 +31,7 @@ function get_hub_cluster_profile_artifacts {
   set -x
   rsync -avP \
     -e "ssh $(echo "${SSHOPTS[@]}")" \
-    "root@${AUX_HOST}":/var/telco-qe-preserved/${SHARED_HUB_CLUSTER_PROFILE}/ \
+    "root@${AUX_HOST}":/var/builds/telco-qe-preserved/${SHARED_HUB_CLUSTER_PROFILE}/ \
     ${HOME}/${SHARED_HUB_CLUSTER_PROFILE}
   set +x
   echo
