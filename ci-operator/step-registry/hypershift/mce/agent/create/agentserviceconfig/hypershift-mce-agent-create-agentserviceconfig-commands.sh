@@ -146,6 +146,7 @@ function mirror_rhcos() {
 }
 
 set -xeo pipefail
+oc get InfraEnv -A
 
 cd /root/dev-scripts
 source common.sh
@@ -187,6 +188,7 @@ timeout 15m oc rollout status -n openshift-machine-api deployment/metal3
 oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/cluster-baremetal-operator=metal3-state --for=condition=Ready
 
 echo "Configuration of Assisted Installer operator passed successfully!"
+oc get InfraEnv -A
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
