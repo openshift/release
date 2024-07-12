@@ -179,7 +179,7 @@ def _add_origin_resources(gendoc):
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
                                     "--ref=master",
-                                    "--period=30",
+                                    "--period=30s",
                                     "--root=/tmp/git-sync",
                                     "--max-failures=3"
                                 ],
