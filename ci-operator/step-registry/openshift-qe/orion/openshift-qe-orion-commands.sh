@@ -42,7 +42,7 @@ if [ ${HUNTER_ANALYZE} == "true" ]; then
  export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 if [ ${JUNIT} == true ]; then
-  export EXTRA_FLAGS+=" --lookback 5d"
+  export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
   export EXTRA_FLAGS+=" --output-format junit"
   export EXTRA_FLAGS+=" --save-output-path=junit.xml"
   export EXTRA_FLAGS+=" --hunter-analyze"
