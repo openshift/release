@@ -33,7 +33,7 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 
-NODE_NAME=$(oc get nodes --no-headers | head -n 1 | awk '{print $1}')
+NODE_NAME=$(set +o pipefail; oc get nodes --no-headers | head -n 1 | awk '{print $1}')
 rc=$?
 echo "Node name return code: $rc"
 
