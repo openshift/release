@@ -93,7 +93,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     copy-mac-from: ${baremetal_iface}
     ipv4:
       enabled: true
-      dhcp: true
+      dhcp: false
+      address:
+      - ip: "${ip}"
+        prefix-length: 22
     ipv6:
       enabled: false
       dhcp: false"
