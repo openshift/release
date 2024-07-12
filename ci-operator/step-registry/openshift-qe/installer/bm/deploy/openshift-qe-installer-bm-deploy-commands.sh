@@ -55,7 +55,7 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "./clean-resources.sh"
 
 # Setup Bastion
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml"
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v"
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-deploy-$(date +%s)"

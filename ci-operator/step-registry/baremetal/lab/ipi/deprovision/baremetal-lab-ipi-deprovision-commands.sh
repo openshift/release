@@ -6,7 +6,7 @@ set -o nounset
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 echo "[INFO] Look for a bootstrap VM in the provisioning host and destroy it..."
-LIBVIRT_DEFAULT_URI="qemu+ssh://root@${AUX_HOST}:$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1"
+LIBVIRT_DEFAULT_URI="qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1"
 export LIBVIRT_DEFAULT_URI
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 

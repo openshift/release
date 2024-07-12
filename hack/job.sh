@@ -22,6 +22,7 @@ $CONTAINER_ENGINE run \
     --config-path core-services/prow/02_config/_config.yaml \
     --job-config-path ci-operator/jobs/ \
     ${BASE_REF:+"--base-ref" "${BASE_REF}"} \
+    ${PULL_NUMBER:+"--pull-number" "${PULL_NUMBER}"} \
     ${arg:-} \
     --job "${1}" |
     oc --context app.ci --namespace ci --as system:admin apply -f -

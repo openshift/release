@@ -191,7 +191,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',
                      '-tls-key=/etc/tls/private/tls.key'],
-            'image': 'quay.io/openshift/origin-oauth-proxy:4.9',
+            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
             'imagePullPolicy': 'IfNotPresent',
             'name': 'oauth-proxy',
             'ports': [{
@@ -275,7 +275,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build02,build03,build04,build05')
+        extra_rc_args.append('--cluster-group=build01,build02,build03,build05')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({

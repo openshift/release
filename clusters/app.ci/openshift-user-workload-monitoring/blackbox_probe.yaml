@@ -23,7 +23,6 @@ spec:
       - https://registry.ci.openshift.org
       - https://steps.ci.openshift.org
       - https://slack.ci.openshift.org
-      - https://prow.ci.openshift.org
       - https://bugs.ci.openshift.org
       - https://amd64.ocp.releases.ci.openshift.org
       - https://arm64.ocp.releases.ci.openshift.org
@@ -46,7 +45,6 @@ spec:
       - https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-4.0/repodata/repomd.xml
       - https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-origin-v4.1/repodata/repomd.xml
       - https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-origin-v4.2/repodata/repomd.xml
-      - https://vault.ci.openshift.org/v1/sys/health
       - https://hook-apps-ci.apps.ci.l2s4.p1.openshiftapps.com
       - https://pr-payload-tests.ci.openshift.org/readyz
       - https://selfservice.vault.ci.openshift.org/ping
@@ -56,3 +54,20 @@ spec:
       - https://quayio-pull-through-cache-us-west-1-ci.apps.ci.l2s4.p1.openshiftapps.com
       - https://quayio-pull-through-cache-us-west-2-ci.apps.ci.l2s4.p1.openshiftapps.com
       - https://quay-proxy.ci.openshift.org/healthz
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: blackbox-lenient
+  namespace: ci
+spec:
+  jobName: blackbox-lenient
+  module: http_2xx
+  prober:
+    url: blackbox-prober.ci.svc
+    path: /probe
+  targets:
+    staticConfig:
+      static:
+      - https://prow.ci.openshift.org
+      - https://vault.ci.openshift.org/v1/sys/health
