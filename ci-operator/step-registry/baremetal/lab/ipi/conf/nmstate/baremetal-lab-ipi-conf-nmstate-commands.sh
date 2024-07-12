@@ -95,7 +95,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       enabled: true
       dhcp: false
       address:
-      - ip: "${ip}"
+      - ip: ${ip}
         prefix-length: 22
     ipv6:
       enabled: false
