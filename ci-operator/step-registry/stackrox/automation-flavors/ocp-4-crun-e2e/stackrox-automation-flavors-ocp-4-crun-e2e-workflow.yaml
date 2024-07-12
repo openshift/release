@@ -28,31 +28,9 @@ workflow:
         requests:
           cpu: 2000m
           memory: 4000Mi
-    - as: ocp-statecheck
-      commands: |
-        echo "Checking cluster state"
-        set +e
-        set -x
-        oc get nodes -o wide
-        oc debug node/anynode -- bash -c 'tr \\0 " " < /proc/"$(pgrep kubelet)"/cmdline'
-        oc get nodes -o json
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'pgrep -af crun'
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'ps -ef | grep "crun\|runc"'
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'chroot /host ; cat /host/etc/crio/crio.conf'
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'chroot /host ; cat /host/etc/crio/crio.conf.d/*'
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'chroot /host ; journalctl -t crio; grep -ra crun /var/log'
-        oc debug "node/$(oc get nodes --no-headers | head -1 | cut -d\  -f1)" -- bash -c 'chroot /host ; systemctl status crio.service'
-        oc debug node/anynode -- bash -c 'chroot /host ; systemctl status crio.service'
-        oc adm node-logs --role=master -u crio
-      from: ocp-4
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
     test:
     - ref: stackrox-stackrox-e2e-test
     post:
-    - ref: gather-extra
     - as: ocp-4-destroy
       commands: |
         /usr/bin/openshift-ci.sh destroy openshift-4
