@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "CLUSTER_PROFILE_DIR:${CLUSTER_PROFILE_DIR}"
-ls -latr "${CLUSTER_PROFILE_DIR}"
-
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
