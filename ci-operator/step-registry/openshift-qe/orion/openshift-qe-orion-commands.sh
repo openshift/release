@@ -40,6 +40,6 @@ if [ ${HUNTER_ANALYZE} == "true" ]; then
  export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 
-orion --config $CONFIG $EXTRA_FLAGS
+orion cmd --config $CONFIG $EXTRA_FLAGS
 
 cat *.csv
