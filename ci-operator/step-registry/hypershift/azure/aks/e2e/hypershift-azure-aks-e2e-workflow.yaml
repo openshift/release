@@ -1,9 +1,8 @@
 workflow:
-  as: hypershift-azure-e2e-nested
+  as: hypershift-azure-aks-e2e
   documentation: |-
-    The HyperShift azure e2e workflow executes tests against a new ephemeral
-    HyperShift cluster. Administrative access to the control plane is provided
-    via the `KUBECONFIG` environment variable.
+    The HyperShift azure aks e2e workflow executes tests against a new ephemeral
+    AKS cluster.
 
     Note that tests will execute once the control plane is ready, regardless of
     whether nodes have been requested, have joined, or are available.
@@ -22,14 +21,22 @@ workflow:
     Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
   steps:
     post:
-    - chain: hypershift-destroy-nested-management-cluster
+    - chain: hypershift-dump
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     test:
     - ref: hypershift-azure-run-e2e
     pre:
-    - ref: ipi-install-rbac
-    - chain: hypershift-setup-nested-management-cluster
+    - chain: cucushift-installer-rehearse-azure-aks-provision
     - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
     env:
+      AKS_NODE_COUNT: "5"
       CLOUD_PROVIDER: "Azure"
-      HYPERSHIFT_NODE_COUNT: "3"
-      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "service.hypershift.azure.devcluster.openshift.com"
+      AKS: "true"
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_AZURE_LOCATION: "eastus"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "aks-e2e.hypershift.azure.devcluster.openshift.com"
+      AKS_CLUSTER_AUTOSCALER_MIN_NODES: "3"
+      AKS_CLUSTER_AUTOSCALER_MAX_NODES: "6"
+      ENABLE_CLUSTER_AUTOSCALER: "true"
+      USE_LATEST_K8S_VERSION: "true"
