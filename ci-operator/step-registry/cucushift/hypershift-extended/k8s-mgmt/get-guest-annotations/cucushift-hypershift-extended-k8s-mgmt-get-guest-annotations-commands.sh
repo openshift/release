@@ -8,13 +8,13 @@ REDHAT_MARKETPLACE_INDEX_REPO="registry.redhat.io/redhat/redhat-marketplace-inde
 REDHAT_OPERATOR_INDEX_REPO="registry.redhat.io/redhat/redhat-operator-index"
 
 echo "Retrieving hash for the multi-arch index images"
-CERTIFIED_OPERATOR_INDEX_HASH="$(oc image info "$CERTIFIED_OPERATOR_INDEX_REPO:v${HYPERSHIFT_HC_VERSION}" \
+CERTIFIED_OPERATOR_INDEX_HASH="$(oc image info "$CERTIFIED_OPERATOR_INDEX_REPO:v${HYPERSHIFT_CATALOG_IMAGE_VERSION}" \
     -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os linux/amd64 -o json | jq -r .listDigest)"
-COMMUNITY_OPERATOR_INDEX_HASH="$(oc image info "$COMMUNITY_OPERATOR_INDEX_REPO:v${HYPERSHIFT_HC_VERSION}" \
+COMMUNITY_OPERATOR_INDEX_HASH="$(oc image info "$COMMUNITY_OPERATOR_INDEX_REPO:v${HYPERSHIFT_CATALOG_IMAGE_VERSION}" \
     -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os linux/amd64 -o json | jq -r .listDigest)"
-REDHAT_MARKETPLACE_INDEX_HASH="$(oc image info "$REDHAT_MARKETPLACE_INDEX_REPO:v${HYPERSHIFT_HC_VERSION}" \
+REDHAT_MARKETPLACE_INDEX_HASH="$(oc image info "$REDHAT_MARKETPLACE_INDEX_REPO:v${HYPERSHIFT_CATALOG_IMAGE_VERSION}" \
     -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os linux/amd64 -o json | jq -r .listDigest)"
-REDHAT_OPERATOR_INDEX_HASH="$(oc image info "$REDHAT_OPERATOR_INDEX_REPO:v${HYPERSHIFT_HC_VERSION}" \
+REDHAT_OPERATOR_INDEX_HASH="$(oc image info "$REDHAT_OPERATOR_INDEX_REPO:v${HYPERSHIFT_CATALOG_IMAGE_VERSION}" \
     -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os linux/amd64 -o json | jq -r .listDigest)"
 
 echo "Writing hosted cluster annotations to \$SHARED_DIR"

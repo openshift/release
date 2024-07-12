@@ -6,7 +6,7 @@ set -o pipefail
 
 RG_NAME="${NAMESPACE}-${UNIQUE_HASH}-rg"
 
-REGION="${LEASED_RESOURCE}"
+REGION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
 echo "Azure region: ${REGION}"
 
 # az should already be there
@@ -15,6 +15,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+  AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
