@@ -334,7 +334,7 @@ def _add_osd_rc_deployment(gendoc):
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
                                 "--ref=master",
-                                "--period=30",
+                                "--period=30s",
                                 "--root=/tmp/git-sync",
                                 "--max-failures=3"
                             ],
