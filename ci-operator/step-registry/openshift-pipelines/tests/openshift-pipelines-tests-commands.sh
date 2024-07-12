@@ -29,7 +29,7 @@ else #login for ROSA & Hypershift platforms
   echo $(cat "${SHARED_DIR}/api.login")
 fi
 
-sleep 18000 && echo "Waiting"
+sleep 36000 && echo "Waiting"
 
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
