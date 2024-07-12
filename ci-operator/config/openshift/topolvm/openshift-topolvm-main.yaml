@@ -8,11 +8,36 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile
   from: ubi_minimal
   to: topolvm
+- dockerfile_literal: |-
+    FROM ubi_minimal
+
+    COPY --from=root:current /usr/lib/golang /usr/local/go
+    ENV PATH=$PATH:/usr/local/go/bin
+
+    ENV GOPATH=/tmp/go
+    ENV GOTOOLCHAIN=auto
+    ENV GOTOOLDIR=/tmp/gotools
+
+    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+    RUN mkdir /.local && chmod 777 /.local
+    RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
+
+    ENV SNYK_DIR=/tmp/snyk
+    RUN mkdir -p ${SNYK_DIR}
+    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
+    RUN chmod +x ${SNYK_DIR}/snyk
+    ENV PATH=$PATH:${SNYK_DIR}
+  from: ubi_minimal
+  inputs:
+    root:
+      as:
+      - root:current
+  to: topolvm-snyk
 promotion:
   to:
   - namespace: lvms
@@ -35,6 +60,26 @@ tests:
   steps:
     cluster_profile: aws
     workflow: lvms-topolvm-conformance
+- as: snyk-code
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) snyk code test --project-name=lvms --severity-threshold="medium" --org="81de31f3-6dff-46ff-af37-664e272a9fe3" --report
+  container:
+    clone: true
+    from: topolvm-snyk
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
+- as: snyk-deps
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) snyk test --project-name=lvms --severity-threshold="medium" --org="81de31f3-6dff-46ff-af37-664e272a9fe3" --report
+  container:
+    clone: true
+    from: topolvm-snyk
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
 zz_generated_metadata:
   branch: main
   org: openshift
