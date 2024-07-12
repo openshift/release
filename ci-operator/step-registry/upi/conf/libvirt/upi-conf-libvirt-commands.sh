@@ -43,6 +43,9 @@ CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 
 # Default UPI installation
 echo "Create the install-config.yaml file..."
+echo "${BASE_DOMAIN}"
+exit 1
+
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
