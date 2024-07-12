@@ -2,11 +2,7 @@
 
 set -o nounset
 
-error_handler() {
-  echo "Error: ($1) occurred on $2"
-}
-
-trap 'error_handler $? $LINENO' ERR
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 echo "Invoking installation of UPI based PowerVS cluster"
@@ -179,8 +175,6 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   cd automation/ || true
   ../terraform output -raw -no-color bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
   ../terraform output -raw -no-color bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
@@ -197,7 +191,6 @@ function create_upi_powervs_cluster() {
   echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
   echo "Done copying the kubeconfig"
-  exit 0
 }
 
 function ic() {
@@ -628,11 +621,8 @@ case "$CLUSTER_TYPE" in
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
-  exit 0
 ;;
 *)
   echo "Creating UPI based PowerVS cluster using ${CLUSTER_TYPE} is not implemented yet..."
   exit 4
 esac
-
-exit 0
