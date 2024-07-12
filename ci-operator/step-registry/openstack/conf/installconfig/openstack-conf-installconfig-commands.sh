@@ -196,6 +196,13 @@ EOF
 	" "$INSTALL_CONFIG"
 fi
 
+# Add an additional security group, in case it exists, to the compute nodes
+if test -f "${SHARED_DIR}/securitygroups"; then
+	yq --yaml-output --in-place ".
+		| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"${SHARED_DIR}"/securitygroups)\" ]
+	" "$INSTALL_CONFIG"
+fi
+
 # Regenerate install-config.yaml to fill in unset values with default values.
 # Note that this triggers some validation against the OpenStack infrastructure.
 (
