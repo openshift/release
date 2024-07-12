@@ -26,6 +26,11 @@ if [ "${ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --cert-rotation-scale=20m"
 fi
 
+AZURE_EXTERNAL_DNS_DOMAIN="service.hypershift.azure.devcluster.openshift.com"
+if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
+  AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
@@ -43,29 +48,31 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   ${EXTRA_ARGS}
 fi
 
-if [ "${CLOUD_PROVIDER}" == "Azure" ] && [ "${AKS}" == "true" ]; then
-  oc delete secret/azure-config-file --namespace "default" --ignore-not-found=true
-  oc create secret generic azure-config-file --namespace "default" --from-file etc/hypershift-aks-e2e-dns-credentials/credentials.json
+if [ "${AKS}" == "true" ]; then
+  oc delete secret azure-config-file --namespace "default" --ignore-not-found=true
+  oc create secret generic azure-config-file --namespace "default" --from-file=etc/hypershift-aks-e2e-dns-credentials/credentials.json
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
   oc apply -f https://raw.githubusercontent.com/openshift/api/master/route/v1/zz_generated.crd-manifests/routes-Default.crd.yaml
+fi
+
+if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --enable-conversion-webhook=false \
-    --external-dns-provider=azure \
-    --external-dns-credentials=etc/hypershift-aks-e2e-dns-credentials/credentials.json \
-    --external-dns-domain-filter=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
-    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-    --managed-service=ARO-HCP \
-    ${EXTRA_ARGS}
-else
-  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --platform-monitoring=All \
-  --enable-ci-debug-output \
-  --managed-service ARO-HCP \
+  --enable-conversion-webhook=false \
+  --managed-service=ARO-HCP \
   --external-dns-provider=azure \
   --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
-  --external-dns-domain-filter=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
+  --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
+  --platform-monitoring=All \
+  --enable-ci-debug-output \
+  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+  --wait-until-available \
+  ${EXTRA_ARGS}
+fi
+
+if [ "${CLOUD_PROVIDER}" != "Azure" ] && [ "${CLOUD_PROVIDER}" != "AWS" ]; then
+  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --platform-monitoring=All \
   --enable-ci-debug-output \
   --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
