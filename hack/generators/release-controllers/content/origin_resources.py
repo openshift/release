@@ -152,7 +152,7 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--branch=master",
+                                    "--ref=master",
                                     "--root=/tmp/git-sync",
                                     "--one-time=true",
                                     "--depth=1"
@@ -178,10 +178,10 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--branch=master",
-                                    "--wait=30",
+                                    "--ref=master",
+                                    "--period=30",
                                     "--root=/tmp/git-sync",
-                                    "--max-sync-failures=3"
+                                    "--max-failures=3"
                                 ],
                                 "env": [
                                     {
