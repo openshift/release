@@ -49,7 +49,7 @@ if [ ${JUNIT} == true ]; then
 fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
-  export CONFIG="examples/trt-external-payload-${ORION_CONFIG}.yaml"
+  export CONFIG="${ORION_CONFIG}"
 fi
 
 orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
