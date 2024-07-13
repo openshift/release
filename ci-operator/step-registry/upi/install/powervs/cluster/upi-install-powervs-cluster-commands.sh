@@ -99,7 +99,7 @@ function create_upi_tf_varfile(){
   export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-publickey
   export CLUSTER_DOMAIN="${BASE_DOMAIN}"
   export IBMCLOUD_CIS_CRN="${IBMCLOUD_CIS_CRN}"
-  COREOS_URL=$(/tmp/openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location')
+  COREOS_URL=$(openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location')
   COREOS_FILE=$(echo "${COREOS_URL}" | sed 's|/| |g' | awk '{print $NF}')
   COREOS_NAME=$(echo "${COREOS_FILE}" | tr '.' '-' | sed 's|-0-powervs-ppc64le-ova-gz|-0-ppc64le-powervs.ova.gz|g')
 
@@ -197,24 +197,11 @@ function ic() {
   HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
 }
 
-function setup_jq() {
-  if [ -z "$(command -v jq)" ]
-  then
-    echo "jq is not installed, proceed to installing jq"
-    curl -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux64" -o /tmp/jq && chmod +x /tmp/jq
-  fi
-}
-
 function setup_openshift_installer() {
-  OCP_STREAM="ocp"
-  ocp_target_version="candidate-4.15"
-  echo "proceed to re-installing openshift-install"
-  curl -L "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${ocp_target_version}/amd64/openshift-install-linux.tar.gz" -o "${IBMCLOUD_HOME_FOLDER}"/openshift-install.tar.gz
-  tar -xf "${IBMCLOUD_HOME_FOLDER}"/openshift-install.tar.gz -C "${IBMCLOUD_HOME_FOLDER}"
-  cp "${IBMCLOUD_HOME_FOLDER}"/openshift-install /tmp/
-  OCP_VERSION="$(/tmp/openshift-install version | head -n 1 | awk '{print $2}')"
-  export OCP_VERSION
-  export OCP_STREAM
+  # https://github.com/openshift/installer/blob/master/images/installer/Dockerfile.upi.ci
+  export OCP_STREAM="ocp"
+  export OCP_VERSION="$(openshift-install version | head -n 1 | awk '{print $2}')"
+  echo "OCP_VERSION: ${OCP_VERSION}"
 }
 
 function fix_user_permissions() {
@@ -587,7 +574,6 @@ case "$CLUSTER_TYPE" in
   # Saving the OCP VERSION so we can use in a subsequent deprovision
   echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
 
-  setup_jq
   setup_ibmcloud_cli
 
   IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
