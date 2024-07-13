@@ -51,12 +51,3 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
 fi
 
 ${RUN_COMMAND}
-
-for operator_value in $operator_configs; do
-    operator_value=$(extract_operator_config "$operator_value")
-    if [ "${operator_config}" ]; then
-        name=$(echo $operator_config | sed -E 's/.*name=([^;]+);.*/\1/')
-        version=$(oc get csv -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
-        echo "$name-v$version" >> "${SHARED_DIR}/operator-versions"
-    fi
-done
