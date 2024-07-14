@@ -104,7 +104,11 @@ function verify_output(){
 }
 
 function switch_channel() {
-    local SOURCE_VERSION SOURCE_XY_VERSION
+    local SOURCE_VERSION SOURCE_XY_VERSION ret
+    if [[ "$(oc get clusterversion version -o jsonpath='{.spec.channel}')" == *"candidate"* ]]; then
+        echo "skip switching channel, already on candidate"
+        return 0
+    fi
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
         echo >&2 "Failed to run oc get clusterversion version, received \"${SOURCE_VERSION}\", exiting" && return 1
     fi
@@ -114,7 +118,7 @@ function switch_channel() {
     fi
     echo "Switch upgrade channel to candidate-""${SOURCE_XY_VERSION}""..."
     oc adm upgrade channel "candidate-""${SOURCE_XY_VERSION}"
-    ret=$(oc get clusterversion version -o jsonpath='{.spec.channel}')
+    ret="$(oc get clusterversion version -o jsonpath='{.spec.channel}')"
     if [[ "${ret}" != "candidate-${SOURCE_XY_VERSION}" ]]; then
         echo >&2 "Failed to switch channel, received ""${ret}"", exiting" && return 1
     fi
@@ -404,18 +408,16 @@ function pre-OCP-56083(){
 }
 
 function verify_nonhetero(){
-    echo "checking cvo image pre-transition is non-hetero"
     # return not required for single command, its the return by default
     verify_output \
-    "cvo image is non-hetero" \
+    "cvo image pre-transition is non-hetero" \
     "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
     "application/vnd.docker.distribution.manifest.v2+json"
 }
 
 function verify_retrieved_updates(){
-    echo "checking RetrievedUpdates condition is True"
     verify_output \
-    "RetrievedUpdates status=true" \
+    "RetrievedUpdates condition is True" \
     "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"RetrievedUpdates\")].status}'" \
     "True"
 }
@@ -433,7 +435,7 @@ function pre-OCP-60396(){
 
     # --to-image <some pullspec> --to-multi-arch - error
     verify_output \
-    "proper error trying to image with to multi arch" \
+    "proper error trying --to-image with to multi arch" \
     "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
     "--to-multi-arch may not be used with --to or --to-image" 1 \
     || return 1
@@ -441,21 +443,21 @@ function pre-OCP-60396(){
 
     # --to <some version> --to-multi-arch -error
     verify_output \
-    "proper error trying to image with to multi arch" \
+    "proper error trying --to with to multi arch" \
     "oc adm upgrade --to 4.10.0 --to-multi-arch" \
     "--to-multi-arch may not be used with --to or --to-image" 1 \
     || return 1
 
     # verify not progressing.
     verify_output \
-    "Cluster progressing=false" \
+    "Cluster Progressing is False" \
     "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
     "False"  \
     || return 1
 
     # create Invalid=True by applying invalid .spec.desiredUpdate
     verify_output \
-    "patching cvo for invalid=true" \
+    "patching cvo for Invalid=True" \
     "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"desiredUpdate\":{\"force\":true} }}'" \
     "clusterversion.config.openshift.io/version patched"  \
     || return 1
@@ -465,7 +467,7 @@ function pre-OCP-60396(){
 
     # check cvo invalid=true 
     verify_output \
-    "check cvo invalid=true" \
+    "check cvo Invalid is True" \
     "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Invalid\")].status}'" \
     "True"  \
     || return 1
@@ -479,7 +481,7 @@ function pre-OCP-60396(){
 
     # verify not progressing.
     verify_output \
-    "Cluster progressing=false" \
+    "Cluster Progressing is False" \
     "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
     "False" \
     || return 1
