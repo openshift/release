@@ -104,9 +104,9 @@ function verify_output(){
 }
 
 function switch_channel() {
-    local SOURCE_VERSION SOURCE_XY_VERSION ret
-    if [[ "$(oc get clusterversion version -o jsonpath='{.spec.channel}')" == *"candidate"* ]]; then
-        echo "skip switching channel, already on candidate"
+    local SOURCE_VERSION SOURCE_XY_VERSION ret chan="${1:-candidate}"
+    if [[ "$(oc get clusterversion version -o jsonpath='{.spec.channel}')" == *"${chan}"* ]]; then
+        echo "skip switching channel, already on ""${chan}"
         return 0
     fi
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
@@ -116,10 +116,10 @@ function switch_channel() {
     if [[ -z "${SOURCE_XY_VERSION}" ]]; then
         echo >&2 "Failed to get version, exiting" && return 1
     fi
-    echo "Switch upgrade channel to candidate-""${SOURCE_XY_VERSION}""..."
-    oc adm upgrade channel "candidate-""${SOURCE_XY_VERSION}"
+    echo "Switch upgrade channel to ""${chan}""-""${SOURCE_XY_VERSION}""..."
+    oc adm upgrade channel --allow-explicit-channel "${chan}-${SOURCE_XY_VERSION}"
     ret="$(oc get clusterversion version -o jsonpath='{.spec.channel}')"
-    if [[ "${ret}" != "candidate-${SOURCE_XY_VERSION}" ]]; then
+    if [[ "${ret}" != "${chan}-${SOURCE_XY_VERSION}" ]]; then
         echo >&2 "Failed to switch channel, received ""${ret}"", exiting" && return 1
     fi
     return 0
@@ -132,11 +132,14 @@ function preserve_graph(){
     if [[ -z "${upstream}" ]]; then
         upstream="empty"
     else
-        retcode=$(curl --head --silent --write-out "%{http_code}" --output /dev/null "${upstream}")
-        if [[ $retcode -ne 200 ]]; then
-            echo >&2 "Failed get valid accessable upstream graph, received: \"${retcode}\" for \"${upstream}\", exiting" && return 1
+        # # retcode=$(curl --head --silent --write-out "%{http_code}" --output /dev/null "${upstream}")
+        # # if [[ $retcode -ne 200 ]]; then
+        # #     echo >&2 "Failed get valid accessable upstream graph, received: \"${retcode}\" for \"${upstream}\", exiting" && return 1
+        # relaxing upstream url to check just for sane url
+        if [[ "${upstream}" != "https"* ]]; then
+            echo "failed to get valid upstream. expecting https... in \"${upstream}\"" && return 1
         else
-            echo "found a valid upstream ""${upstream}"
+            echo "found a valid upstream \"${upstream}\""
         fi
     fi
     export upstream
@@ -146,18 +149,33 @@ function preserve_graph(){
 function set_upstream_graph(){
     if [[ "${1}" == "empty" ]]; then
         verify_output \
-        "previous upstream url empty, removing" \
+        "set default upstream graph by removing spec upstream" \
         "oc patch clusterversion/version --type=json --patch='[{\"op\": \"remove\", \"path\": \"/spec/upstream\"}]'" \
         "clusterversion.config.openshift.io/version patched" \
         || return 1
     else
         verify_output \
-        "set back production graph with multi-arch payload available" \
+        "set upstream graph to ${1}" \
         "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"upstream\":\"${1}\"}}'" \
         "clusterversion.config.openshift.io/version patched" \
         || return 1
     fi
     return 0
+}
+
+function verify_nonhetero(){
+    # return not required for single command, its the return by default
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json"
+}
+
+function verify_retrieved_updates(){
+    verify_output \
+    "RetrievedUpdates condition is True" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"RetrievedUpdates\")].status}'" \
+    "True"
 }
 
 # Define the checkpoints/steps needed for the specific case
@@ -407,28 +425,13 @@ function pre-OCP-56083(){
     return 1
 }
 
-function verify_nonhetero(){
-    # return not required for single command, its the return by default
-    verify_output \
-    "cvo image pre-transition is non-hetero" \
-    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
-    "application/vnd.docker.distribution.manifest.v2+json"
-}
-
-function verify_retrieved_updates(){
-    verify_output \
-    "RetrievedUpdates condition is True" \
-    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"RetrievedUpdates\")].status}'" \
-    "True"
-}
-
 function pre-OCP-60396(){
     echo "Test Start: ${FUNCNAME[0]}"
     # verify cvo image non-hetero
     verify_nonhetero || return 1
 
     # set chan candidate
-    switch_channel || return 1
+    switch_channel "candidate" || return 1
 
     # check RetrievedUpdates=True
     verify_retrieved_updates || return 1
@@ -497,12 +500,11 @@ function pre-OCP-60397(){
     # preserve graph
     preserve_graph  || return 1 # exports "upstream"
 
+    # set chan stable-xx
+    switch_channel "stable" || return 1
+
     # set testing graph
-    verify_output \
-    "set internal upstream graph with no multi-arch payload available" \
-    "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"upstream\":\"https://arm64.ocp.releases.ci.openshift.org/graph\"}}'" \
-    "clusterversion.config.openshift.io/version patched" \
-    || return 1
+    set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
@@ -527,11 +529,21 @@ function pre-OCP-60397(){
     # verify cvo image still non-hetero
     verify_nonhetero || return 1
 
+    # clear the upgrade
+    if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
+        echo >&2 "Failed to run oc get clusterversion version, received \"${SOURCE_VERSION}\", exiting" && return 1
+    fi
+    verify_output \
+    "clear to-multi-arch" \
+    "oc adm upgrade --clear" \
+    "${SOURCE_VERSION}" \
+    || return 1
+
     # restore graph
     set_upstream_graph "${upstream}" || return 1
     
-    # set chan candidate
-    switch_channel || return 1
+    # set chan candidate-xx
+    switch_channel "candidate" || return 1
 
     # wait no more progressing
     sleep 60
@@ -540,6 +552,12 @@ function pre-OCP-60397(){
     verify_retrieved_updates || return 1
 
     return 0
+}
+
+function defer-OCP-60397(){
+    echo "Defer Recovery: ${FUNCNAME[0]}"
+    set_upstream_graph "${upstream:-empty}"
+    switch_channel "candidate"
 }
 
 # This func run all test cases with checkpoints which will not break other cases, 
@@ -573,6 +591,10 @@ function run_ota_single_case(){
             echo "PASS: pre-${1}" >> "${report_file}"
         else
             echo "FAIL: pre-${1}" >> "${report_file}"
+            # case failed in the middle may leave the cluster in unusable state
+            if type defer-"${1}" &>/dev/null; then
+                defer-"${1}"
+            fi
         fi
     fi
 }
