@@ -4,7 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
@@ -56,6 +55,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+   set -e
    cd jetlag
    if [[ -n '$JETLAG_PR' ]]; then
      git checkout main
@@ -71,6 +71,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+   set -e
    cd jetlag
    git branch
    source bootstrap.sh
