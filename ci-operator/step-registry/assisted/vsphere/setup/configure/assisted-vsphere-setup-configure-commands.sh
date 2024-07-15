@@ -17,7 +17,13 @@ source "${SHARED_DIR}/govc.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+# subnets.json is no longer available in vault
+#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
+SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+
 
 if ! jq -e --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"

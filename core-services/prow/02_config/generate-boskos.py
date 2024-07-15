@@ -253,7 +253,6 @@ CONFIG = {
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
-    'vsphere-8-vpn-quota-slice':{},
     'vsphere-multi-vcenter-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -339,6 +338,13 @@ CONFIG = {
     },
     'aws-perfscale-quota-slice': {
         'us-west-2': 10,
+    },
+    'aws-stackrox-quota-slice': {
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
@@ -451,9 +457,6 @@ for i in [871,991,1165,1154,1148,1140]:
 
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
-for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274]:
-    CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
 for i in range(0,100):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
