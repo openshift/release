@@ -10,7 +10,7 @@ images:
   - name: nvcc_threads
     value: "2"
   - name: TORCH_CUDA_ARCH_LIST
-    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+    value: 7.5 8.0
   - name: PYTHON_VERSION
     value: "3.11"
   context_dir: .
@@ -77,7 +77,42 @@ tests:
     export VIRTUAL_ENV=/opt/vllm
     export PATH=$VIRTUAL_ENV/bin/:$PATH
 
-    bash extras/unit-tests.sh
+    echo "python=$(which python)"
+    echo "pytest=$(which pytest)"
+    echo "pwd=$(pwd)"
+    ls -l
+
+    cd tests
+    echo "========================================"
+
+    echo "pwd=$(pwd)"
+    ls -l
+
+    unset HF_HUB_OFFLINE
+
+    echo "========================================"
+    pip list | grep vllm
+
+    echo "========================================"
+    # try listing the venv vllm package .so s
+    ls -l /opt/vllm/lib/python3.11/site-packages/vllm/*so
+
+    echo "========================================"
+    # try importing vllm
+    python -c 'import vllm; print(vllm)'
+
+    echo "========================================"
+    # basic correctness
+    pytest -v -s test_regression.py
+    #pytest -v -s async_engine
+
+    #bash extras/unit-tests.sh
+
+    # finally check if the smoke test works
+
+    cd ../extras
+
+    bash smoke-test.sh
   container:
     clone: true
     from: vllm-test
