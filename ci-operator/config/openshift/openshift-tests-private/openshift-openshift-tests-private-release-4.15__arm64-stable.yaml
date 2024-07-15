@@ -111,6 +111,27 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-ovn-ipsec-to-multiarch-f28
+  cron: 11 0 3 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-60397
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-proxy-sts-f14
   cron: 44 6 13,27 * *
   steps:
@@ -153,6 +174,26 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-to-multiarch-f28
+  cron: 6 0 5 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-60397
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-usertags-f14
   cron: 41 8 16,30 * *
   steps:
@@ -260,6 +301,25 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+- as: gcp-ipi-to-multiarch-f28
+  cron: 19 16 20 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      ENABLE_OTA_TEST: OCP-60397
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
