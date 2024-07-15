@@ -100,6 +100,7 @@ trap archive-results SIGINT SIGTERM ERR EXIT
 
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   # Set default storage class to ocs-storagecluster-ceph-rbd
+  export JUNIT_REPORT_ABS_PATH="/alabama/cspi/report.xml" &&\
   oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
   oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
