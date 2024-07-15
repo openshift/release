@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Suppress shellcheck warning for 14+ instances of '. <(echo "$bmhost"'
+# 'var is referenced but not assigned.' as a consequence of using '. <'
+# shellcheck disable=SC1090
+# shellcheck disable=SC2154
+
 set -o nounset
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -33,7 +38,6 @@ NODE_STARTUP="Node startup"
 NODE_BOOTED_IMAGE="Node booted image"
 NODE_REBOOTED="Node rebooted"
 NODE_BOOTED_DISK="Node booted disk"
-NODE_REBASE_DISK="Node rebased"
 NODE_INSTALLING="Node is installing"
 NODE_REBOOTING="Node is rebooting"
 
@@ -52,9 +56,6 @@ IS_PXE_JOB=false
 
 FSM_FILE_PREFIX="/tmp/fsm_"
 
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-
-
 function writeFSMFile(){
   local host="${1}"
   local message="${2}"
@@ -65,7 +66,7 @@ function writeFSMFile(){
 function handleUnreachableNode(){
   local bmhost="${1}"
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ $(grep -P "(?=.*?$host)(?=.*?$EXIT_CODE_UNREACHABLE)" "${ARTIFACT_DIR}/node-status.txt") != 0 ]; then
+  if [ "$(grep -P "(?=.*?$host)(?=.*?$EXIT_CODE_UNREACHABLE)" "${ARTIFACT_DIR}/node-status.txt")" != 0 ]; then
     echo "Host has already been rebooted once, exiting"
     writeFSMFile $host "${NODE_IS_UNRECOVERABLE}"
   else
@@ -102,13 +103,13 @@ function handleNode(){
   local TRAP_EXIT_CODE="${2}"
   echo "handling node after event $TRAP_EXIT_CODE"
   case $TRAP_EXIT_CODE in
-    $EXIT_CODE_UNREACHABLE)
+    "$EXIT_CODE_UNREACHABLE")
       handleUnreachableNode $bmhost
       ;;
-    $EXIT_CODE_WRONG_VERSION)
+    "$EXIT_CODE_WRONG_VERSION")
       handleWrongVersionBooted $bmhost
       ;;
-    $EXIT_CODE_COREOS_NOT_FOUND)
+    "$EXIT_CODE_COREOS_NOT_FOUND")
       handleOSNotFound $bmhost
       ;;
     *)
@@ -250,7 +251,6 @@ function isNodeReachable(){
 
 function isNodeAlive(){
   local bmhost="${1}"
-  # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Starting isNodeAlive for ${host}"
   for i in $(seq 1 $MAX_RETRY); do
@@ -386,7 +386,7 @@ function ipmiRecord(){
       echo "$vendor SoL recording on ${bmc_address}"
       case $vendor in
         "dell")
-        ssh "${SSHOPTS[@]}" -tt -q "root@${AUX_HOST}" "ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" -z 8196 sol activate usesolkeepalive" >> "${ARTIFACT_DIR}/${name}_${ip}_ipmi.txt" &
+        ssh "${SSHOPTS[@]}" -tt -q "root@${AUX_HOST}" "ipmitool -I lanplus -H $bmc_address -U $bmc_user -P $bmc_pass -z 8196 sol activate usesolkeepalive" >> "${ARTIFACT_DIR}/${name}_${ip}_ipmi.txt" &
         ;;
         "hpe")
         ssh "${SSHOPTS[@]}" -tt -q "root@${AUX_HOST}" "hpecmd $host vsp" >> "${ARTIFACT_DIR}/${name}_${ip}_ipmi.txt" &
@@ -427,7 +427,6 @@ function initFSM(){
 }
 
 INSTALL_SUCCESS=false
-INSTALL_FAILURE=false
 
 function postInstall(){
   for bmhost in $(yq e -o=j -I=0 '.[]' "${HOSTS_FILE}"); do
@@ -462,7 +461,7 @@ function waitForInstallFailure(){
     sleep 30
   done
   printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${INSTALL_FAILURE_FILE}"
-  INSTALL_FAILURE=true
+  # INSTALL_SUCCESS default value is false
   postInstall
 }
 
@@ -486,7 +485,7 @@ function monitorFSM(){
         echo "filename is $FSM_FILE with status: $status"
         case $status in
           # state defined by function: isNodeAlive
-          $NODE_IS_REACHABLE)
+          "$NODE_IS_REACHABLE")
             echo "Node ${host} alive, waiting for services to come up..."
             # connections may not work even if SSH check passed
             sleep 60
@@ -494,49 +493,49 @@ function monitorFSM(){
             checkBootedImage "boot" "${bmhost}"
             ;;
           # state defined by function: checkBootedImage boot
-          $NODE_BOOTED_IMAGE)
+          "$NODE_BOOTED_IMAGE")
             # If the correct image was booted, start recording journalctl logs and leverage SSH connection trap to detect reboot
             journalRecord "${bmhost}" &
             ;;
           # state defined by function: journalRecord
-          $NODE_INSTALLING)
+          "$NODE_INSTALLING")
             echo "Node $host is installing"
             ;;
           # state defined by function: handleReboot
-          $NODE_REBOOTING)
+          "$NODE_REBOOTING")
             echo "Node $host is rebooting"
             ;;
           # state defined by function: handleReboot
-          $NODE_REBOOTED)
+          "$NODE_REBOOTED")
             # When the journalctl trap detects the first reboot, check if host booted correctly from disk
             echo "node $host up again, checking booted image"
             checkBootedImage "disk" "${bmhost}"
             ;;
           # state defined by function: checkBootedImage disk
-          $NODE_BOOTED_DISK)
+          "$NODE_BOOTED_DISK")
             journalRecord "${bmhost}" &
             ;;
           # state defined by function: waitForInstall
-          $INSTALL_COMPLETE)
+          "$INSTALL_COMPLETE")
             echo "Node $host completed the install, exiting"
             createInstallJunit
             INSTALL_COMPLETED=true
             break
             ;;
           # state defined by function: isNodeAlive
-          $EXIT_CODE_UNREACHABLE)
+          "$EXIT_CODE_UNREACHABLE")
             handleNode "${bmhost}" "${EXIT_CODE_UNREACHABLE}"
             ;;
           # state defined by function: checkBootedImage boot
-          $EXIT_CODE_WRONG_VERSION)
+          "$EXIT_CODE_WRONG_VERSION")
             handleNode "${bmhost}" "${EXIT_CODE_WRONG_VERSION}"
             ;;
           # state defined by function: checkBootedImage disk
-          $EXIT_CODE_COREOS_NOT_FOUND)
+          "$EXIT_CODE_COREOS_NOT_FOUND")
             handleNode "${bmhost}" "${EXIT_CODE_COREOS_NOT_FOUND}"
             ;;
           # state defined by function: initFSM
-          $NODE_STARTUP)
+          "$NODE_STARTUP")
             echo "Node $host is starting up"
             ;;
         esac
