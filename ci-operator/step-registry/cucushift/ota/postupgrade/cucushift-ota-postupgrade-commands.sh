@@ -62,6 +62,18 @@ function check_tp_operator_notfound(){
     fi
 }
 
+function verify_output(){
+    local out message="${1}" cmd="${2}" expected="${3}"
+    if ! out=$(eval "${cmd}" 2>&1); then
+        echo >&2 "Failed to execute \"${cmd}\" while verifying ${message}, received \"${out}\", exiting" && return 1
+    fi
+    if ! [[ "${out}" == *"${expected}"* ]]; then
+        echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
+    fi
+    echo "passed verifying ${message}"
+    return 0
+}
+
 # Define the checkpoints/steps needed for the specific case
 function post-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -246,6 +258,22 @@ function post-OCP-56083(){
     fi
     echo "Test Failed: OCP-56083"
     return 1
+}
+
+function post-OCP-60396(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
+}
+
+function post-OCP-60397(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
 }
 
 # This func run all test cases with with checkpoints which will not break other cases,
