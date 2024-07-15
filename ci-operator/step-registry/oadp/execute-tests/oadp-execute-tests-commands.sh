@@ -60,10 +60,6 @@ cd $OADP_GIT_DIR
 go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
 go mod tidy
 
-# Run OADP tests with the focus
-export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
-export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
-/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 
 # Run OADP Kubevirt tests if configured
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
@@ -74,6 +70,11 @@ if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
   /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 fi
+
+# Run OADP tests with the focus
+export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
+export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
+/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 
 # Copy logs into artifact directory if they exist
 if [ -d "${LOGS_FOLDER}" ]; then
