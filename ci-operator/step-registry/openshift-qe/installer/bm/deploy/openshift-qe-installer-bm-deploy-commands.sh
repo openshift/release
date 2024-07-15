@@ -57,7 +57,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd jetlag
-   if [[ -n $JETLAG_PR ]]; then
+   if [[ -n '$JETLAG_PR' ]]; then
      git checkout main
      git branch -D dev
      git fetch origin pull/$JETLAG_PR/head:dev
