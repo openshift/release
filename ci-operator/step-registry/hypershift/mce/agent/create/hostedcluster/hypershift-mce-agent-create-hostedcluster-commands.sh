@@ -39,13 +39,27 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
-IP_STACK_COMMAND=""
-if [[ "${IP_STACK}" == "v4v6" ]]; then
-  IP_STACK_COMMAND="--default-dual"
+case "${IP_STACK}" in
+  "v4v6")
+    # --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112
+    EXTRA_ARGS+="--default-dual"
+    ;;
+  "v6")
+    EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
+    ;;
+esac
+
+if [[ "$DISCONNECTED" == "true" ]]; then
+  source "${SHARED_DIR}/packet-conf.sh"
+  # disconnected requires the additional trust bundle containing the local registry certificate
+  scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
+  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
+  EXTRA_ARGS+=" --olm-disable-default-sources "
+  RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 fi
 
 /tmp/${HYPERSHIFT_NAME} --version
-/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} ${IP_STACK_COMMAND} \
+/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="${CLUSTER_NAMESPACE}" \
