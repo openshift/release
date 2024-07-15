@@ -1,20 +1,22 @@
 presubmits:
-  opendatahub-io/odh-model-controller:
+  openshift-qe/ocpqe-security-tools:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.11\.1$
-    - ^release-0\.11\.1-
+    - ^main$
+    - ^main-
     cluster: build03
-    context: ci/prow/images
+    context: ci/prow/dast-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: dast
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-odh-model-controller-release-0.11.1-images
-    rerun_command: /test images
+    name: pull-ci-openshift-qe-ocpqe-security-tools-main-dast-images
+    rerun_command: /test dast-images
     spec:
       containers:
       - args:
@@ -22,6 +24,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=dast
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,23 +57,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )dast-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-0\.11\.1$
-    - ^release-0\.11\.1-
+    - ^main$
+    - ^main-
     cluster: build03
-    context: ci/prow/pr-image-mirror
+    context: ci/prow/dast-security-test
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 1h0m0s
     labels:
+      ci-operator.openshift.io/variant: dast
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-odh-model-controller-release-0.11.1-pr-image-mirror
-    rerun_command: /test pr-image-mirror
-    skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+    name: pull-ci-openshift-qe-ocpqe-security-tools-main-dast-security-test
+    rerun_command: /test dast-security-test
     spec:
       containers:
       - args:
@@ -78,7 +83,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=pr-image-mirror
+        - --target=security-test
+        - --variant=dast
         command:
         - ci-operator
         image: ci-operator:latest
@@ -117,60 +123,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-0\.11\.1$
-    - ^release-0\.11\.1-
-    cluster: build03
-    context: ci/prow/unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-odh-model-controller-release-0.11.1-unit
-    rerun_command: /test unit
-    skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )(dast-security-test|remaining-required),?($|\s.*)
