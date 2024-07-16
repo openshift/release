@@ -8,11 +8,9 @@ workflow:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - ref: wait
     - chain: hypershift-mce-agent-destroy
     - chain: baremetalds-ipi-post
-    test:
-    - ref: hypershift-mce-agent-info
-    - chain: hypershift-conformance
     pre:
     - chain: baremetalds-ipi-pre
     - ref: enable-qe-catalogsource-baremetalds-proxy-server
@@ -20,11 +18,14 @@ workflow:
     - ref: hypershift-mce-install
     - chain: hypershift-mce-agent-lvm
     - chain: hypershift-mce-agent-metal3-create
+    - chain: hypershift-mce-agent-oadp
     env:
       AGENT_NAMESPACE: hypershift-agents
       DISCONNECTED: "true"
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      OADP_OPERATOR_SUB_SOURCE: qe-app-registry
+      OADP_OPERATOR_SUB_CHANNEL: stable-1.3
       MCE_QE_CATALOG: "true"
       IP_STACK: v6
       PACKET_OS: rocky_9
