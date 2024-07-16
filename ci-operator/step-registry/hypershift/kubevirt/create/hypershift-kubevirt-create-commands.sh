@@ -130,6 +130,7 @@ then
 
 fi
 
+oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   oc apply -f - <<EOF
