@@ -44,13 +44,13 @@ elif [ "$platform" = "Azure" ]; then
     export CLOUD_TYPE="azure"
     export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     # jq is not available in the ci image...
-    AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
+    export AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
 
-    AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
+    export AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
 
-    AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
+    export AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
     
-    AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
+    export AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
 
 elif [ "$platform" = "IBMCloud" ]; then
 # https://github.com/openshift/release/blob/3afc9cb376776ca27fbb1a4927281e84295f4810/ci-operator/step-registry/openshift-extended/upgrade/pre/openshift-extended-upgrade-pre-commands.sh#L158
