@@ -1,0 +1,76 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: max_jobs
+    value: "8"
+  - name: nvcc_threads
+    value: "2"
+  - name: TORCH_CUDA_ARCH_LIST
+    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: PYTHON_VERSION
+    value: "3.11"
+  context_dir: .
+  dockerfile_path: Dockerfile.ubi
+  to: vllm-build-ibm-dev-cuda
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  smoke-test:
+    limits:
+      cpu: "4"
+      memory: 24Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "4"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
+  vllm-build-ibm-dev-main-cuda:
+    limits:
+      cpu: "16"
+      memory: 24Gi
+    requests:
+      cpu: "16"
+      memory: 24Gi
+tests:
+- always_run: true
+  as: smoke-test
+  cluster: build05
+  commands: |
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
+
+    cd extras
+
+    bash smoke-test.sh
+  container:
+    clone: true
+    from: vllm-build-ibm-dev-cuda
+- as: ibm-dev-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-ibm-dev-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: fast-ibm
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: ibm-dev
+  org: opendatahub-io
+  repo: vllm
