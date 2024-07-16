@@ -40,9 +40,18 @@ function version_check() {
   oc registry login --to pull-secret
   ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 
-  if [[ "${ocp_version}" == "${minimum_version}" ]] || [[ "${ocp_version}" > "${minimum_version}" ]]; then
+  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
+  echo "[DEBUG] current OCP version: '${ocp_version}'"
+  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
+  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
+  min_x=$(echo "${minimum_version}" | cut -d. -f1)
+  min_y=$(echo "${minimum_version}" | cut -d. -f2)
+
+  if [ ${curr_x} -ge ${min_x} ] && [ ${curr_y} -ge ${min_y} ]; then
+    echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
     ret=0
   else
+    echo "[DEBUG] version_check result: ${ocp_version} < ${minimum_version}"
     ret=1
   fi
 
