@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -ignore-os-checks -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -ignore-os-checks | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
@@ -179,8 +179,6 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   cd automation/ || true
   ../terraform output -raw -no-color bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
   ../terraform output -raw -no-color bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
