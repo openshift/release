@@ -45,9 +45,20 @@ ret=0
 ./console-test-azure-external-oidc.sh || ret=$?
 
 echo "Summarizing test results..."
-[[ -e "${ARTIFACT_DIR}" ]] || exit 0
+if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+    echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+    exit 0
+else
+    echo "Artifact dir '${ARTIFACT_DIR}' exist"
+    ls -lR "${ARTIFACT_DIR}"
+    files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+    if [[ "$files" -eq 0 ]] ; then
+        echo "There are no JUnit files"
+        exit 0
+    fi
+fi
 declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null > /tmp/zzz-tmp.log
+grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null > /tmp/zzz-tmp.log || exit 0
 while read row ; do
     for ctype in "${!results[@]}" ; do
         count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
