@@ -21,20 +21,30 @@ echo "Start to test logging web cases"
 export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
 echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"
 
-run_shell="console-test-frontend.sh"
-if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
-    run_shell="console-test-managed-service.sh"
-fi
 ## determine if it is hypershift guest cluster or not
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
-    run_shell="console-test-frontend-hypershift.sh"
-fi
-
-if [[ $E2E_RUN_TAGS =~ @level0 ]]; then
-    echo "only run level0 scenarios"
-    ./${run_shell} --spec ./tests/logging/ --tags @level0 || true
+  echo "Skip logging web test as console-test-frontend-hypershift.sh can not select cases" || exit 0
+  #./console-test-frontend-hypershift.sh || true
+elif [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
+  echo "Skip logging web test as console-test-managed-service.sh can not select case" || exit 0
+  #./console-test-managed-service.sh || true
 else
-    ./${run_shell} --spec ./tests/logging/ || true
+  if [[ $E2E_RUN_TAGS == @logging ]]; then
+    echo "run all logging scenarios"
+    ./console-test-frontend.sh --tags @logging || true
+  elif [[ $E2E_RUN_TAGS =~ @level0 ]]; then
+    echo "only run logging level0 scenarios"
+    ./console-test-frontend.sh --tags @logging+@level0 || true
+  elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
+    echo "only run logging wrs scenarios"
+    ./console-test-frontend.sh --tags @logging+@wrs || true
+  elif [[ $E2E_RUN_TAGS =~ @smoke ]]; then
+    echo "only run logging smoke scenarios"
+    ./console-test-frontend.sh --tags @logging+@smoke || true
+  else
+    echo "run all logging web scenarios"
+    ./console-test-frontend.sh --spec tests/logging/* || true
+  fi
 fi
 
 # summarize test results
