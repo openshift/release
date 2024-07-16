@@ -45,6 +45,69 @@ function set_hub_cluster_kubeconfig {
   oc_hub="oc --kubeconfig ${hub_kubeconfig}"
 }
 
+##############################################################################################################
+# Test results
+##############################################################################################################
+
+function run_pytest {
+
+  junitxml_dir=${ARTIFACT_DIR}/junit/
+  mkdir -pv ${junitxml_dir}
+
+  test_name=$1
+  test_results_xml_output=${junitxml_dir}/${test_name}-test-results.xml
+
+  pytest ${PYTEST_VERBOSITY} ${tc_file} --junitxml=${test_results_xml_output}
+}
+
+function test_deployment_and_services {
+
+  echo "************ telcov10n-vhub Generate Test results ************"
+
+  tc_file="/tmp/pytest-tc.py"
+  cat << EOF >| ${tc_file}
+import os
+import time
+import requests
+import pytest
+
+@pytest.mark.parametrize("url", [
+    ("$($oc_hub whoami --show-console)", 200),
+    ("$($oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}')", 403),
+])
+def test_http_endpoint(url):
+    response = requests.get(url[0], verify=False)
+    assert response.status_code == url[1], f"Endpoint {url[0]} is not accessible. Status code: {response.status_code}"
+
+def test_cluster_version(bash):
+    oc_cmd = "oc get clusterversion version -ojsonpath='{.status.desired.version}'"
+    assert bash.run_script_inline([oc_cmd]).startswith("${OCP_HUB_VERSION}")
+
+@pytest.mark.parametrize("namespace", [
+    "openshift-local-storage",
+    "${MCH_NAMESPACE}",
+    "multicluster-engine",
+    "openshift-gitops",
+])
+def test_ztp_namespaces(bash, namespace):
+    oc_cmd = f"oc get ns {namespace} " + "-ojsonpath='{.metadata.name}'"
+    assert bash.run_script_inline([oc_cmd]) == namespace
+
+    count = 0
+    attempts = 10
+    while attempts > 0:
+      oc_cmd = f"oc -n {namespace} get po --no-headers | grep -v -E 'Running|Completed' | wc -l"
+      if bash.run_script_inline([oc_cmd]) == '0':
+        break
+      attempts -= 1
+      time.sleep(60)
+    assert attempts > 0, f"Not all PODs in {namespace} namespace are ready yet"
+
+EOF
+
+  run_pytest check_hub_installation
+}
+
 function test_hub_cluster_deployment {
 
   set -x
@@ -59,6 +122,8 @@ function test_hub_cluster_deployment {
   echo "Current namespace is ${NAMESPACE}"
   base_domain=$(cat ${HOME}/${SHARED_HUB_CLUSTER_PROFILE}/base_domain)
   echo "Current base_domain is ${base_domain}"
+
+  test_deployment_and_services
 
   echo "Exiting successfully..."
 }
