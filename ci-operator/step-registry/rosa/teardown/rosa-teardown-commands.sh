@@ -6,8 +6,8 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE}
-# export CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
@@ -25,7 +25,7 @@ fi
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+  export AWS_DEFAULT_REGION=${REGION:-$LEASED_RESOURCE}
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
