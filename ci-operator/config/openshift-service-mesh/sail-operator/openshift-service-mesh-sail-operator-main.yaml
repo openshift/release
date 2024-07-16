@@ -19,6 +19,11 @@ releases:
     release:
       channel: stable
       version: "4.16"
+  next:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -141,9 +146,10 @@ tests:
   optional: true
   steps:
     cluster_profile: ossm-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.0-ec.1-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -155,7 +161,6 @@ tests:
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
         oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -188,7 +193,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: e2e-ocp-4-16-arm
   steps:
     cluster_profile: ossm-aws
