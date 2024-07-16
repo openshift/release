@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_LABEL_FILTERS=${TEST_LABEL_FILTERS:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
