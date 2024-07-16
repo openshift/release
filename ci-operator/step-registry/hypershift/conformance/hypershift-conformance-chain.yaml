@@ -35,7 +35,7 @@ chain:
           FROM=$(oc get -n openshift ${isName} -o=jsonpath={.spec.tags[0].from.name})
           EXT_REG=${FROM%%@*}
           INT_PULL_URL=${FROM/$EXT_REG/$DEVSCRIPTS_RELEASE_IMAGE_REPO}
-          oc patch -n openshift ${isName} --type json -p "[{\"op\": \"replace\", \"path\": \"/spec/tags/0/importPolicy/insecure\", \"value\": true}, {\"op\": \"replace\", \"path\": \"/spec/tags/0/from/name\", \"value\": \"${INT_PULL_URL}\"}]"
+          oc patch -n openshift ${isName} --type json -p "[{\"op\": \"replace\", \"path\": \"/spec/tags/0/importPolicy/insecure\", \"value\": true}, {\"op\": \"replace\", \"path\": \"/spec/tags/0/from\", \"value\": {\"kind\": \"DockerImage\", \"name\": \"${INT_PULL_URL}\"} }]"
         done
 
         ### tests like "services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod *"
@@ -45,7 +45,7 @@ chain:
         FROM=$(oc --kubeconfig=${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}  get -n openshift ${isName} -o=jsonpath={.spec.tags[0].from.name})
         EXT_REG=${FROM%%@*}
         INT_PULL_URL=${FROM/$EXT_REG/$DEVSCRIPTS_RELEASE_IMAGE_REPO}
-        oc patch --kubeconfig=${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG} -n openshift ${isName} --type json -p "[{\"op\": \"replace\", \"path\": \"/spec/tags/0/importPolicy/insecure\", \"value\": true}, {\"op\": \"replace\", \"path\": \"/spec/tags/0/from/name\", \"value\": \"${INT_PULL_URL}\"}]"
+        oc patch --kubeconfig=${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG} -n openshift ${isName} --type json -p "[{\"op\": \"replace\", \"path\": \"/spec/tags/0/importPolicy/insecure\", \"value\": true}, {\"op\": \"replace\", \"path\": \"/spec/tags/0/from\", \"value\": {\"kind\": \"DockerImage\", \"name\": \"${INT_PULL_URL}\"} }]"
         ###
       }
 
