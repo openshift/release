@@ -23,6 +23,8 @@ function collect-results() {
     done
 }
 
+echo "Testing echo to test RHBQP 3.8.5 update"
+
 echo "Logging to oc:"
 sh ./oc_login.sh
 echo "Executing tests:"
