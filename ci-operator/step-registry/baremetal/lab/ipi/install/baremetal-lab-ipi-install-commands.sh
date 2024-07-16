@@ -99,7 +99,7 @@ compute:
 platform:
   baremetal:
     libvirtURI: >-
-      qemu+ssh://root@${AUX_HOST}:$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
+      qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
     apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
     ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
@@ -107,6 +107,9 @@ platform:
     externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
     hosts: []
 "
+
+# Copy provisioning-host-ssh-port-${architecture} to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
 # shellcheck disable=SC2154
@@ -172,6 +175,10 @@ mkdir -p "${INSTALL_DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"

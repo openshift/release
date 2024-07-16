@@ -15,7 +15,11 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 master_nodes=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')

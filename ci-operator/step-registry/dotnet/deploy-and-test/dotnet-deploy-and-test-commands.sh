@@ -13,6 +13,7 @@ cp $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
 export EXT_TEST=$DOTNET_VERSION
+export PATH=/cli:$PATH
 
 # Run tests
 echo "Executing .net tests..."

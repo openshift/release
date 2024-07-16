@@ -49,9 +49,18 @@ function version_check() {
   KUBECONFIG="" oc registry login --to pull-secret
   ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 
-  if [[ "${ocp_version}" == "${minimum_version}" ]] || [[ "${ocp_version}" > "${minimum_version}" ]]; then
+  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
+  echo "[DEBUG] current OCP version: '${ocp_version}'"
+  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
+  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
+  min_x=$(echo "${minimum_version}" | cut -d. -f1)
+  min_y=$(echo "${minimum_version}" | cut -d. -f2)
+
+  if [ ${curr_x} -ge ${min_x} ] && [ ${curr_y} -ge ${min_y} ]; then
+    echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
     ret=0
   else
+    echo "[DEBUG] version_check result: ${ocp_version} < ${minimum_version}"
     ret=1
   fi
 
@@ -431,8 +440,15 @@ echo "$(date -u --rfc-3339=seconds) - Adding the bootstrap instance to the load 
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
+  # https://github.com/openshift/installer/pull/8582
   gcloud compute instance-groups unmanaged add-instances "${BOOTSTRAP_INSTANCE_GROUP}" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+
+  if version_check "4.12"; then
+    gcloud compute backend-services add-backend "${INFRA_ID}-api-internal" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  else
+    gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  fi
+
 else # for workflow before internal load balancers
   gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
@@ -575,7 +591,13 @@ echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap r
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
-  gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  # https://github.com/openshift/installer/pull/8582
+  if version_check "4.12"; then
+    gcloud compute backend-services add-backend "${INFRA_ID}-api-internal" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  else
+    gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  fi
+
 else # for workflow before internal load balancers
   gcloud compute target-pools remove-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools remove-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
