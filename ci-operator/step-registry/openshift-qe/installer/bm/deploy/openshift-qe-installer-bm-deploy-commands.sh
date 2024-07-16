@@ -56,6 +56,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
+   set -o pipefail
    cd jetlag
    if [[ -n '$JETLAG_PR' ]]; then
      git checkout main
@@ -72,6 +73,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
+   set -o pipefail
    cd jetlag
    git branch
    source bootstrap.sh
