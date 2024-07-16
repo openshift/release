@@ -37,6 +37,12 @@ else
   exit 1
 fi
 
+# Configure shared vpc aws account file
+if [[ -f ${CLUSTER_PROFILE_DIR}/.awscred_shared_account ]];then
+  echo "Got awscred_shared_account and set it to env variable SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE"
+  export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+fi
+
 # Log in
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${OCM_TOKEN}" ]]; then
