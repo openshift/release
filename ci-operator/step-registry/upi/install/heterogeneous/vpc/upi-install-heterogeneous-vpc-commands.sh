@@ -14,7 +14,7 @@ echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
-OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
+OCP_CLEAN_VERSION=$(openshift-install version | head -n 1 | awk '{print $2}'| tr '.' ' ' | awk -F. '{print $1"."$2}')
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 export NAME_PREFIX="rdr-mac-${CLEAN_VERSION}"
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)

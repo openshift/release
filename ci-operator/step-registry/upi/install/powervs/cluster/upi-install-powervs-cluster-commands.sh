@@ -200,7 +200,7 @@ function ic() {
 function setup_openshift_installer() {
   # https://github.com/openshift/installer/blob/master/images/installer/Dockerfile.upi.ci
   export OCP_STREAM="ocp"
-  export OCP_VERSION="$(openshift-install version | head -n 1 | awk '{print $2}')"
+  export OCP_VERSION="$(openshift-install version | head -n 1 | awk '{print $2}'| tr '.' ' ' | awk '{print $1"."$2}')"
   echo "OCP_VERSION: ${OCP_VERSION}"
 }
 
