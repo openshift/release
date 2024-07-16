@@ -57,31 +57,6 @@ function show_multiclusterhub_related_objects {
   done
 }
 
-function troubleshooting_waiting {
-
-  if [ -n "${PULL_NUMBER:-}" ]; then
-
-    echo "Using pull request ${PULL_NUMBER}. Entering in the troubleshooting code..."
-
-    echo "######################################################################"
-    echo "# From here WIP changes"
-    echo "######################################################################"
-    echo " To quit, run the following command from POD shell: "
-    echo " $ touch ${HOME}/debug.done"
-    echo "######################################################################"
-    echo
-
-    set -x
-    while sleep 1m; do
-      date
-      test -f ${HOME}/debug.done && break
-    done
-    set +x
-
-    echo "Exiting from troubleshooting..."
-  fi
-}
-
 # create image pull secret for MCH
 oc create secret generic ${IMAGE_PULL_SECRET} -n ${MCH_NAMESPACE} --from-file=.dockerconfigjson=$CLUSTER_PROFILE_DIR/pull-secret --type=kubernetes.io/dockerconfigjson
 
@@ -115,7 +90,6 @@ EOF
   show_multiclusterhub_related_objects ;
   dump_multiclusterhub_pod_logs ;
   echo "Error MCH failed to reach Running status in alloted time." ;
-  troubleshooting_waiting ;
   exit 1 ;
 }
 

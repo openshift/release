@@ -47,16 +47,6 @@ function set_hub_cluster_kubeconfig {
 
 function test_hub_cluster_deployment {
 
-  echo "Using pull request ${PULL_NUMBER}, so this Hub cluster won't be preserved"
-
-  echo "######################################################################"
-  echo "# From here WIP changes"
-  echo "######################################################################"
-  echo " To quit, run the following command from POD shell: "
-  echo " $ touch ${HOME}/debug.done"
-  echo "######################################################################"
-  echo
-
   set -x
   diff -u ${KUBECONFIG} ${hub_kubeconfig} || \
     ( echo "Wrong KUBECONFIG file retreived!!! Exiting..." && exit 1 )
@@ -69,15 +59,6 @@ function test_hub_cluster_deployment {
   echo "Current namespace is ${NAMESPACE}"
   base_domain=$(cat ${HOME}/${SHARED_HUB_CLUSTER_PROFILE}/base_domain)
   echo "Current base_domain is ${base_domain}"
-
-  set -x
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    while sleep 1m; do
-      date
-      test -f ${HOME}/debug.done && break
-    done
-  fi
-  set +x
 
   echo "Exiting successfully..."
 }
