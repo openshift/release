@@ -30,9 +30,11 @@ if [ "$arch" == "x86_64" ]; then
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-CLUSTER_NAMESPACE=local-cluster-${CLUSTER_NAME}
+if [[ -z ${AGENT_NAMESPACE} ]] ; then
+  AGENT_NAMESPACE=local-cluster-${CLUSTER_NAME}
+fi
+oc get ns "${AGENT_NAMESPACE}" || oc create namespace "${AGENT_NAMESPACE}"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-oc create ns "${CLUSTER_NAMESPACE}"
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
@@ -62,7 +64,7 @@ fi
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
-  --agent-namespace="${CLUSTER_NAMESPACE}" \
+  --agent-namespace="${AGENT_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
