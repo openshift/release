@@ -3,6 +3,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.54.2
+  lightspeed-console-plugin:
+    name: lightspeed-console-plugin
+    namespace: ols
+    tag: latest
   lightspeed-service-api:
     name: lightspeed-service-api
     namespace: ols
@@ -33,6 +37,12 @@ operator:
     with: pipeline:lightspeed-operator
   - pullspec: quay.io/openshift-lightspeed/lightspeed-service-api:latest
     with: pipeline:lightspeed-service-api
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-operator@sha256:[a-z0-9]{64}
+    with: pipeline:lightspeed-operator
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-service@sha256:[a-z0-9]{64}
+    with: pipeline:lightspeed-service-api
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-console@sha256:[a-z0-9]{64}
+    with: pipeline:lightspeed-console-plugin
 promotion:
   to:
   - namespace: ols
@@ -80,6 +90,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
         operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
       dependencies:
@@ -108,8 +119,9 @@ tests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
 - as: security
-  optional: true
   steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main

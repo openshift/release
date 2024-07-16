@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 git clone https://github.com/open-telemetry/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
 git checkout -b downstream-release "${INTEROP_TESTS_COMMIT}"
@@ -18,7 +24,7 @@ oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 #Set parameters for running the test cases on OpenShift and remove contrib collector images from tests.
 unset NAMESPACE
 find ./tests/e2e-otel -type f -exec sed -i '/image: ghcr.io\/open-telemetry\/opentelemetry-collector-releases\/opentelemetry-collector-contrib:/d' {} \;
-oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
+#oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
