@@ -71,7 +71,7 @@ if [[ -e ${telco_qe_preserved_dir}/${2} && ! -h ${telco_qe_preserved_dir}/${2} ]
   exit 1
 else
   cd ${telco_qe_preserved_dir}
-  ln -s /var/builds/${1}/${2} ${2}
+  ln -sf /var/builds/${1}/${2} ${2}
 fi
 EOF
 
