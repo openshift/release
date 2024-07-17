@@ -31,6 +31,12 @@ if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
   AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
 fi
 
+AZURE_MANAGED_SERVICE="ARO-HCP"
+if [ "${CLOUD_PROVIDER}" == "Azure" ] && [ "${DISABLE_ARO_MANAGED_SERVICE}" == "false" ]; then
+  AZURE_MANAGED_SERVICE=""
+fi
+
+
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
@@ -60,8 +66,8 @@ fi
 if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --enable-conversion-webhook=false \
-  --managed-service=ARO-HCP \
   --external-dns-provider=azure \
+  --managed-service="${AZURE_MANAGED_SERVICE}" \
   --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
   --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
   --platform-monitoring=All \
