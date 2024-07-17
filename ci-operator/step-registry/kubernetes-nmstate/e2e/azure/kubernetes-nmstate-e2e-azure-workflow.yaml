@@ -1,0 +1,21 @@
+workflow:
+  as: kubernetes-nmstate-e2e-azure
+  steps:
+    env:
+      SKIP_IMAGE_BUILD: "true"
+      IMAGE_BUILDER: "podman"
+      HANDLER_NAMESPACE: "nmstate"
+      OPERATOR_NAMESPACE: "nmstate"
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ovn-conf
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    test:
+    - ref: kubernetes-nmstate-e2e-azure
+  documentation: |-
+    Setup an Azure cluster and run kubernetes-nmstate operator e2e tests.
