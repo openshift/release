@@ -29,7 +29,7 @@ resources:
       memory: 200Mi
 tests:
 - as: camel-k-interop-aws
-  cron: 0 6 25 12 *
+  cron: 0 6 9 7 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -38,11 +38,6 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "camel-k-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
             ],
@@ -51,17 +46,21 @@ tests:
               {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","camel-k-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OPERATORS: |
         [
             {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
         ]
+      USER_TAGS: |
+        scenario camel-k
     test:
     - ref: install-operators
     - ref: camel-k-interop-tests
     workflow: firewatch-ipi-aws
 - as: camel-k-interop-ibmcloud
-  cron: 0 6 25 12 *
+  cron: 0 6 9 7 *
   steps:
     cluster_profile: ibmcloud-cspi-qe
     env:
@@ -70,11 +69,6 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "camel-k-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
             ],
@@ -83,6 +77,7 @@ tests:
               {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","camel-k-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OPERATORS: |
