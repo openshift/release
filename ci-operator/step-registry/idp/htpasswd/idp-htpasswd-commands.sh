@@ -21,7 +21,8 @@ function check_if_hypershift_env () {
     elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
         export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
     else
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        echo "This idp-htpasswd step is being run as a day-2 operation for a HyperShift guest cluster. We need the kubeconfig of management cluster, but it does not exist!"
+        exit 1
     fi
     
     count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
@@ -142,7 +143,7 @@ EOF
 
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
-    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]] || [[ "$CLUSTER_TYPE" == "hypershift-guest" ]]; then
+    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         echo "Skip the step. The managed clusters generate the testing accounts by themselves"
         exit 0
     fi
