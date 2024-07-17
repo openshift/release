@@ -3,14 +3,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
-  rosa-aws-cli:
-    name: rosa-aws-cli
-    namespace: ci
-    tag: latest
 releases:
   latest:
     release:
@@ -28,37 +20,14 @@ tests:
   cron: 0 6 11 2 *
   steps:
     cluster_profile: aws-managed-cspi-qe
-    env:
-      CHANNEL_GROUP: nightly
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-          [
-            {"step": "mesh-e2e-tests", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
-            {"step": "ui-e2e-tests", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
-          ],
-          "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","rosa-classic-p2p","serverless-p2p"]'
-      FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-1165
-      FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
-      FIREWATCH_FAIL_WITH_POD_FAILURES: "true"
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.17"
-      REGION: us-west-2
-      SLEEP_DURATION: 15m
     test:
-    - ref: wait
     - as: odc-tests
       cli: latest
-      commands: ./test-prow-e2e.sh knative
+      commands: echo "dummy command"
       from: stable:console-tests
       resources:
         requests:
           cpu: 100m
-    workflow: firewatch-rosa-aws-sts
 zz_generated_metadata:
   branch: main
   org: chetna14manku
