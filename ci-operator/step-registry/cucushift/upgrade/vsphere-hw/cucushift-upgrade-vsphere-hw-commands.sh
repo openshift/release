@@ -9,7 +9,7 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
 fi
 
 # Setup proxy if it's present in the shared dir
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] 
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]
 then
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
@@ -61,7 +61,7 @@ for node in ${master_nodes[@]} ${worker_nodes[@]}; do
         fi
     done
 
-    if [[ "${status}" != "poweredOff" ]]; then 
+    if [[ "${status}" != "poweredOff" ]]; then
         echo >&2 "Shutdown VM failed"
         oc describe node/${node}
         exit 1
@@ -94,7 +94,7 @@ for node in ${master_nodes[@]} ${worker_nodes[@]}; do
         fi
     done
 
-    if [[ "${status}" != "poweredOn" ]]; then 
+    if [[ "${status}" != "poweredOn" ]]; then
         echo >&2 "Poweron VM failed"
         oc describe node/${node}
         exit 1
@@ -118,12 +118,12 @@ for node in ${master_nodes[@]} ${worker_nodes[@]}; do
         (( timeout -= 1))
         res=$(oc get co --no-headers| awk '{print $3$4$5}' | grep -vc 'TrueFalseFalse')
 
-        if (( res == 0 )); then 
+        if (( res == 0 )); then
             break
         fi
     done
 
-    if (( res != 0 )); then 
+    if (( res != 0 )); then
         echo >&2 "Not all co becomes Available, errors: ${res}"
         oc describe node/${node}
         exit 1

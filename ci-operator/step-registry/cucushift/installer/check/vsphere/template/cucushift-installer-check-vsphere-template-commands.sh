@@ -19,7 +19,7 @@ template_ms=${template_ms##*/}
 if [[ ${template_config} != "${template_ms}" ]]; then
     echo "ERROR: template specify in install-config is ${template_config},  not same as machineset's template ${template_ms}. please check"
     check_result=1
-else 
+else
     echo "INFO template specify in install-config is ${template_config}, same as machineset's template ${template_ms}. check successful "
 fi
 

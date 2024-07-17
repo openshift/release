@@ -38,7 +38,7 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
-function collect_sosreport_from_unprovisioned_machines {  
+function collect_sosreport_from_unprovisioned_machines {
   set +e
   echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
 
@@ -56,7 +56,7 @@ function collect_sosreport_from_unprovisioned_machines {
       echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
       ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
       echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core      
+      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
       ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
       echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
       scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
