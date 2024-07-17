@@ -34,6 +34,8 @@ hack/ci-test-e2e.sh \
         --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
         --test.run='^TestCreateCluster$' \
         --e2e.platform="OpenStack" \
+	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
         --e2e.openstack-external-network-name="${OPENSTACK_EXTERNAL_NETWORK}" \
-        --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}"
+        --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}" \
+	--e2e.openstack-node-image-name="rhcos-4.17-hcp-nodepool"
