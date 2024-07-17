@@ -49,7 +49,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 if [[ -z "${vsphere_extra_portgroup_1}" ]] || [[ -z "${vsphere_extra_portgroup_2}" ]]; then
    echo "The required extra leases is 2 at leaset, exit"
    exit 1
-fi	
+fi
 cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 controlPlane:
