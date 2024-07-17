@@ -40,7 +40,6 @@ set -euo pipefail
 
 export SEED_IMAGE="${SEED_IMAGE}"
 export SEED_VERSION="${SEED_VERSION}"
-export LCA_IMAGE="${LCA_PULL_REF}"
 export IBI_VM_NAME="${TARGET_VM_NAME}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
@@ -52,10 +51,10 @@ export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 sudo dnf -y install runc crun gcc-c++ zip
 
 echo "Starting the IBI cluster"
-make ibi-iso ibi-vm ibi-logs
+make build-openshift-install ibi-iso ibi-vm ibi-logs
 
 echo "Attaching and configuring the cluster"
-make build-openshift-install imagebasedconfig.iso ibi-attach-config.iso
+make imagebasedconfig.iso ibi-attach-config.iso
 
 echo "Rebooting the cluster"
 make ibi-reboot wait-for-ibi
