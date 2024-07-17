@@ -67,11 +67,15 @@ mkdir -pv ${telco_qe_preserved_dir}
 
 set -x
 if [[ -e ${telco_qe_preserved_dir}/${2} && ! -h ${telco_qe_preserved_dir}/${2} ]]; then
+  file ${telco_qe_preserved_dir}/${2}
+  set +x
   echo "Unexpected wrong condition found!!! The ${telco_qe_preserved_dir}/${2} file already exists and is not a symbolic link."
   exit 1
 else
-  cd ${telco_qe_preserved_dir}
-  ln -sf /var/builds/${1}/${2} ${2}
+  rm -fv ${telco_qe_preserved_dir}/${2}
+  ln -s /var/builds/${1}/${2} ${telco_qe_preserved_dir}/${2}
+  ls -l ${telco_qe_preserved_dir}/${2} | grep "/var/builds/${1}/${2}" || \
+    { set +x ; echo "Wrong generated symbolic link detected" ; exit 1 ; }
 fi
 EOF
 
