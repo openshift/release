@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -51,8 +51,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make gotest
+- as: functional
+  commands: |
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    export GOFLAGS=
+    make test GINKGO_ARGS='--no-color'
   container:
     from: src
 - as: mariadb-operator-build-deploy
@@ -62,7 +66,7 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   optional: true
   steps:
     env:
@@ -75,7 +79,7 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   steps:
     env:
       CEPH_HOSTNETWORK: "false"
@@ -86,9 +90,11 @@ tests:
     export GOFLAGS=
     export PRE_COMMIT_HOME=/tmp
     export GOLANGCI_LINT_CACHE=/tmp
+    # see tradeoff between speed and memory usage at https://tip.golang.org/doc/gc-guide#GOGC
+    export GOGC=10
     mkdir -p ../operator/ && cp -r . ../operator
     cd ../operator
-    pre-commit run -a --show-diff-on-failure
+    pre-commit run --all-files --show-diff-on-failure --verbose
   container:
     from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
