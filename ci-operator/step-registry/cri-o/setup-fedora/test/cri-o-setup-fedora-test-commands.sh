@@ -21,13 +21,13 @@ currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
 disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
 
-gcloud compute images create crio-setup-fedora-${currentDate} \
+gcloud compute images create crio-setup-fedora-test-${currentDate} \
     --source-disk="${disk_name}" \
-    --family="crio-setup-fedora" \
+    --family="crio-setup-fedora-test" \
     --source-disk-zone=${ZONE} \
     --project="openshift-node-devel"
 # Delete images older than 2 weeks
-images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup-fedora AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
+images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup-fedora-test AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
     echo "The following images will be deleted:"
     echo "$images"
