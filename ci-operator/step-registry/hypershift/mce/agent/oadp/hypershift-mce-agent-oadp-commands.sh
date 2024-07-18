@@ -71,33 +71,7 @@ spec:
   includedNamespaces:
   - local-cluster
   - local-cluster-${CLUSTER_NAME}
-  includedResources:
-  - sa
-  - role
-  - rolebinding
-  - pod
-  - pvc
-  - pv
-  - bmh
-  - configmap
-  - infraenv
-  - priorityclasses
-  - pdb
-  - agents
-  - hostedcluster
-  - nodepool
-  - secrets
-  - services
-  - deployments
-  - statefulsets
-  - hostedcontrolplane
-  - cluster
-  - agentcluster
-  - agentmachinetemplate
-  - agentmachine
-  - machinedeployment
-  - machineset
-  - machine
+  includedResources: []
   excludedResources: []
   storageLocation: dpa-sample-1
   ttl: 2h0m0s
