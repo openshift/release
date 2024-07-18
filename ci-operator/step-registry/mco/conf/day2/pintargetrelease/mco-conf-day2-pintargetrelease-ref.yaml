@@ -1,0 +1,34 @@
+ref:
+  as: mco-conf-day2-pintargetrelease
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  timeout: 1h
+  grace_period: 10m
+  commands: mco-conf-day2-pintargetrelease-commands.sh
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 350m
+      memory: 1Gi
+  env:
+  - name: MCO_CONF_DAY2_PINTARGETRELEASE
+    default: "false"
+    documentation: |-
+      This variable controls if the step is skipped or not. The step is skipped if this variable's value is "false" or empy.
+  - name: MCO_CONF_DAY2_PINTARGETRELEASE_MCPS
+    default: "worker master"
+    documentation: |-
+      Space separated list with all the pools that will pin the target image. MCP list will be used for creating PinnedImageSet.
+  - name: MCO_CONF_DAY2_PINTARGETRELEASE_REMOVE_PULLSECRET
+    default: "false"
+    documentation: |-
+      If this variable is not "false" or empty, then once the release image is pinned the pull-secret will be configure to be empty, i.e. "{}"
+  documentation: |-
+    Pins target release images in master and worker pools
+  dependencies:
+  - name: "release:target"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
