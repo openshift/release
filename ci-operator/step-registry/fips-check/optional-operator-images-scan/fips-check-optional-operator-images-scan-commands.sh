@@ -43,7 +43,7 @@ fi
 project="optional-scan-$RANDOM"
 run_command "oc new-project $project --skip-config-write"
 if [ $? == 0 ]; then
-    echo "create $project project successfully" 
+    echo "create $project project successfully"
 else
     echo "fail to create $project project."
     pass=false
@@ -81,115 +81,120 @@ timestamp_start="$(date +%s)"
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
-data_dir="/tmp/fips-check-optional-operators/"
+data_dir="/tmp/fips-check-optional-operators"
 if [ -d "${data_dir}" ]; then
     echo "delete $data_dir"
     rm -rf ${data_dir} || true
 fi
 mkdir $data_dir || true
-scan_result_file="$data_dir/scan_result.log"
+scan_result_full_log="$data_dir/scan_result.log"
 scan_result_failure_csvs="$data_dir/scan_result_failure_csvs"
 scan_result_succeed_with_warnings_csvs="$data_dir/scan_result_succeed_with_warnings_csvs"
+scan_result_succeed_csvs="$data_dir/scan_result_succeed_csvs"
+scan_result_summary="$data_dir/scan_result_summary"
 
 oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm || true
 set 644 /tmp/.dockerconfigjson || true
-scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/.dockerconfigjson ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/config.json
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-    "sudo mkdir -p /tmp/tmp/.docker || true；
+scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o LogLevel=ERROR /tmp/.dockerconfigjson ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/config.json
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o LogLevel=ERROR ${BASTION_SSH_USER}@${BASTION_IP} \
+    "sudo mkdir -p /tmp/tmp/.docker || true;
     sudo mv /tmp/config.json /tmp/tmp/.docker/config.json || true;
     sudo chown root:root /tmp/tmp/.docker/config.json || true;
     sudo chmod 600 /tmp/tmp/.docker/config.json || true;
     sudo ls -ltr /tmp/tmp/.docker/ || true"
 
 res=$(oc get packagemanifests.packages.operators.coreos.com -l catalog=qe-app-registry -n $project || true)
-if [ -z $res ]; then
-    echo "The qe-app-registy catalogsource not exits!"
+if [ -z "$res" ]; then
+    echo "The qe-app-registry catalogsource not exits!"
     exit 0
 else
     internal=true
     catalog="qe-app-registry"
-    echo "The catalog is $catalog"
+    echo "Using catalog '$catalog'"
 fi
 oc get packagemanifests.packages.operators.coreos.com -l catalog=$catalog -o json > /tmp/$catalog.json || true
 
 #Below is a full test
-package_list=$(cat /tmp/$catalog.json | jq '.items[].metadata.name' |sed 's/\"//g' || true)
-echo "The package_list is: ${package_list}" || true
+package_list=$(cat /tmp/$catalog.json | jq -r '.items[].metadata.name' || true)
+echo -e "The full package_list in catalog '$catalog' is:\n${package_list}" || true
 for package in ${package_list}; do
-    echo "Starting scan for ${package}"
+    echo "#Starting scan for package '$package'"
+    # only select csvs with annotation `"features.operators.openshift.io/fips-compliant": "true"` to perform scan
+    currentCSVs=$(cat /tmp/$catalog.json | jq -r '.items[] | select(.metadata.name=="'${package}'") | .status.channels[] | select(.currentCSVDesc.annotations["features.operators.openshift.io/fips-compliant"]=="true") | .currentCSV'| sort | uniq || true);
+    if [ -z "$currentCSVs" ]; then
+        echo "No CSV claimed to be fips-compliant in package '$package', skipping scan for it..."
+        continue
+    fi
     mkdir "${data_dir}/${package}" || true
-    skippedCSVs="compliance-operator.v0.1.32|compliance-operator.v0.1.61|file-integrity-operator.v0.1.13|file-integrity-operator.v0.1.32|file-integrity-operator.v1.0.0"
-    currentCSVs=$(cat /tmp/$catalog.json | jq '.items[] | select(.metadata.name=="'${package}'").status.channels[].currentCSV'| uniq | grep -Ev $skippedCSVs || true);
-    currentCSVs=${currentCSVs//\"/}
     for csv in ${currentCSVs}; do
-        images_test_result="${data_dir}/${package}/$csv"
-        echo "##Starting scan for csv ${csv}" >> $images_test_result
-        image_list=$(cat /tmp/$catalog.json | jq '.items[].status.channels[]|select(.currentCSV=="'$csv'")|.currentCSVDesc.relatedImages[]' || true);
-	    image_list=${image_list//,/}
-	    image_list=${image_list//\"/}
+        csv_test_result="${data_dir}/${package}/$csv"
+        echo "##Starting scan for CSV '$csv'" >> $csv_test_result
+        # retrieve related images from current CSV
+        image_list=$(cat /tmp/$catalog.json | jq -r '.items[].status.channels[]|select(.currentCSV=="'$csv'")|.currentCSVDesc.relatedImages[]' || true);
         if $internal; then
             image_list=$(echo $image_list | sed -r 's/registry.redhat.io/brew.registry.redhat.io/g' )
             image_list=$(echo $image_list | sed -r 's/registry.stage.redhat.io/brew.registry.stage.redhat.io/g')
         fi
+        # perform fips scan by using check-payload tool
         for image_url in ${image_list}; do
-            imges_test_result=$(ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-                "sudo podman run --privileged -it -v /tmp/tmp/:/root/:ro registry.ci.openshift.org/ci/check-payload scan operator --spec $image_url" || true)
-            echo "###test result for $image_url is: $imges_test_result" >> $images_test_result
+            echo "###test result for image '$image_url' is:" >> $csv_test_result
+            ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o LogLevel=ERROR ${BASTION_SSH_USER}@${BASTION_IP} \
+                "sudo podman run --rm --privileged -v /tmp/tmp/:/root/:ro registry.ci.openshift.org/ci/check-payload scan operator --spec $image_url" >> ${csv_test_result} 2>&1 || true
+
         done
-        echo "cat ${imges_test_result}" >> ${scan_result_file}
-        resFail=$(grep -E "Failure Report" ${images_test_result} || true)
-        resSuessWithWarnings=$(grep -E "Successful run with warnings" ${images_test_result} || true)
+        echo "$(cat ${csv_test_result})" >> ${scan_result_full_log}
+        # summarize scan results from csv_test_result file
+        resFail=$(grep -E "Failure Report" ${csv_test_result} || true)
+        resSuessWithWarnings=$(grep -E "Successful run with warnings" ${csv_test_result} || true)
         if [[ -n $resFail ]];then
-            echo "Fips check  for csv $csv in package $package failed!"
+            echo "##Fips check for CSV '$csv' in package '$package' failed!"
             echo "$csv" >> ${scan_result_failure_csvs}
             pass=false
         elif [[ -n $resSuessWithWarnings ]];then
-            echo "Fips check  for csv $csv in package $package succeed with warnings!"
+            echo "##Fips check for CSV '$csv' in package '$package' succeed with warnings!"
             echo "$csv" >> ${scan_result_succeed_with_warnings_csvs}
             pass=false
         else
-            echo "Fips check for csv $csv in package $package succeed!"
+            echo "##Fips check for CSV '$csv' in package '$package' succeed!"
+            echo "$csv" >> ${scan_result_succeed_csvs}
         fi
-        #delete containers and images to save disk space
-        echo "delete containers"
-        ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-            "for container in \$(sudo podman ps -q -a); do sudo podman rm \${container} || true; done"
-        echo "delete images"
-        ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-            "podman rmi $(echo ${image_list} | sed 's/\"//g') || true"
-        echo "delete containers and images done"
     done
 done
-
-# print the compelete result
-echo "The full result is: $(cat "${scan_result_file}" || true)"
-echo "The fips check returned succeeded with warnings for below csvs: $(cat "${scan_result_succeed_with_warnings_csvs}" || true)"
-echo "The csvs failed fips check are: $(cat "${scan_result_failure_csvs}" || true)"
-tar -czC "${data_dir}" -f "${ARTIFACT_DIR}/fips-check-soptional_operators-images-scan.tar.gz" . || true
-rm -rf "${data_dir}" || true
 
 # check how much time used
 time_used="$(( ($(date +%s) - $timestamp_start)/60 ))"
 echo "Tests took ${time_used} minutes"
 
+# generate scan result summary
+echo "#fips-check result summary:" > ${scan_result_summary}
+echo -e "##CSVs that failed scan:\n$(cat "${scan_result_failure_csvs}" || true)\n" >> ${scan_result_summary}
+echo -e "##CSVs that succeeded scan (with warnings):\n$(cat "${scan_result_succeed_with_warnings_csvs}" || true)\n" >> ${scan_result_summary}
+echo -e "##CSVs that succeeded scan (no warnings):\n$(cat "${scan_result_succeed_csvs}" || true)\n" >> ${scan_result_summary}
+
+# generate junit report
 echo "Generating the Junit for fips check optional operators scan"
-filename="junit_fips-check-soptional_operators-images-scan"
-testsuite="fips-check-soptional_operators-images-scan"
+filename="junit_fips-check-optional-operators-images-scan"
+testsuite="fips-check-optional-operators-images-scan"
 subteam="Security_and_Compliance"
 if $pass; then
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
-<testcase name="${subteam}:optional operators scan of fips check should succeedded or skipped"/>
+    <testcase name="${subteam}:Optional operators scan of fips check should succeed or skip"/>
 </testsuite>
 EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
-<testcase name="${subteam}:optional operators scan of fips check should succeedded or skipped">
-<failure message="">Fips optional operators scan check failed</failure>
-</testcase>
+    <testcase name="${subteam}:Optional operators scan of fips check should succeed or skip">
+        <failure message="">Some optional operators claim to be fips-compliant but failed the fips-check image scan</failure>
+        <system-out>$(cat "$scan_result_summary" || true)</system-out>
+    </testcase>
 </testsuite>
 EOF
 fi
+
+# save result artifacts and cleanup
+tar -czC "${data_dir}" -f "${ARTIFACT_DIR}/fips-check-optional-operators-images-scan.tar.gz" . || true
+rm -rf "${data_dir}" || true
