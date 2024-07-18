@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE}
 export COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
-export OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+export VERSION=${VERSION:-}
 export CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
 
