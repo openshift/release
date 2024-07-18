@@ -7,6 +7,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  console-tests:
+    name: "4.17"
+    namespace: ocp
+    tag: console-tests
   ocp-addons-operators-cli:
     name: ocp-addons-operators-cli
     namespace: ci
@@ -142,6 +146,8 @@ tests:
             {"step": "ui-e2e-tests", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
             {"step": "mesh-e2e-tests", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
             {"step": "ui-e2e-tests", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
+            {"step": "odc-tests", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
+            {"step": "odc-tests", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default","p2p-tests"]},
           ],
           "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
         }
@@ -212,6 +218,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    - as: odc-tests
+      cli: latest
+      commands: ./test-prow-e2e.sh knative
+      from: console-tests
+      resources:
+        requests:
+          cpu: 100m
     workflow: firewatch-rosa-aws-sts
   timeout: 6h0m0s
 zz_generated_metadata:
