@@ -85,6 +85,11 @@ EOF
 cat > ${workdir}/squid.conf << EOF
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwords
 auth_param basic realm proxy
+#prfsr90
+delay_pools 1
+delay_class 1 1
+delay_parameters 1  15000000/15000000 15000000/15000000 15000000/15000000
+http_port 3128
 
 acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
@@ -457,3 +462,9 @@ cp "${bastion_ignition_file}" "${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 echo "Ignition file '${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign' created"
 
 rm -rf "${workdir}"
+curl -L https://github.com/liqcui/wondershaper/archive/refs/tags/v1.tar.gz>wondershap.tar.gz
+tar xvf wondershap.tar.gz
+#git clone https://github.com/SachinNinganure/wondershaper
+#cd wondershaper
+#./wondershaper -a eth0 -u 4096 -d 8192
+./wondershaper-1/wondershaper -a eth0 -u 4096 -d 8192
