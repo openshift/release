@@ -36,7 +36,7 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 ### Environment Variables
 
 - `BASE_DOMAIN`
-  - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
+  - **Definition**: A fully-qualified domain or subdomain name.  The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
   - **If left empty**: The [`firewatch-ipi-aws` workflow](../../../step-registry/firewatch/ipi/aws/firewatch-ipi-aws-workflow.yaml) will fail.
 
 - `OPERATORS`
