@@ -26,7 +26,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # We use the additional workers implemented for heterogeneous clusters as nodes for the hypershift hosted cluster
   # TODO: do this better
   if [[ "$name" =~ worker-a-* ]]; then
-    #MC="$MC
+    #MC=" $ MC
     #  server $name $ip:22623 check inter 1s
     #  server $name-v6 [$ipv6]:22623 check inter 1s"
     APISRV="$APISRV
@@ -83,7 +83,7 @@ $APISRV
 #listen machine-config-server-22623
 #    bind *:22623
 #    mode tcp
-#$MC
+#$ MC
 listen ingress-router-80
     bind *:80
     mode tcp
