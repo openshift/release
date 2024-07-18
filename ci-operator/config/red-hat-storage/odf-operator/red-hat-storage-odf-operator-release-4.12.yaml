@@ -17,39 +17,13 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: odf-operator
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  to: odf-operator-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
-
-    ARG BUNDLE_IMGS=quay.io/ocs-dev/ocs-operator-bundle:latest,quay.io/noobaa/noobaa-operator-bundle:5.9-20211115
-
-    RUN opm index add \
-    --bundles "${BUNDLE_IMGS}" \
-    --out-dockerfile index.Dockerfile \
-    --generate
-  from: opm-builder
-  to: odf-operator-index-gen
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/opm:latest
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    COPY database/index.db /database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  inputs:
-    odf-operator-index-gen:
-      paths:
-      - destination_dir: .
-        source_path: /database
-  to: odf-operator-deps-index
+- dockerfile_path: catalog.deps.Dockerfile
+  to: odf-operator-catalog-deps
 operator:
   bundles:
-  - as: odf-operator-static-deps
-    base_index: odf-operator-deps-index
+  - as: odf-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/ocs-dev/odf-operator:latest
     with: pipeline:odf-operator
@@ -61,13 +35,8 @@ promotion:
     name: odf-4.12
     namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.12"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
       name: "4.12"
       namespace: ocp
 resources:
@@ -84,15 +53,23 @@ tests:
     test:
     - as: unit-tests
       commands: |
-        export GOFLAGS=''; make test
+        GOFLAGS='' make test
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     - as: e2e-tests
+      cli: latest
       commands: |
-        unset VERSION; export GOFLAGS=''; make e2e-test
+        unset VERSION
+        BUNDLE_IMG="$OO_BUNDLE" CATALOG_DEPS_IMG="$OO_CATALOG" make install-odf
+        GOFLAGS='' ODF_OPERATOR_INSTALL=false ODF_OPERATOR_UNINSTALL=false make e2e-test
+      dependencies:
+      - env: OO_BUNDLE
+        name: odf-operator-bundle
+      - env: OO_CATALOG
+        name: pipeline:odf-operator-catalog-deps
       from: src
       resources:
         requests:
