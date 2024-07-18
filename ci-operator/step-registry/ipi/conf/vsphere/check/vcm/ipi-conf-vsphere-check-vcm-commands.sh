@@ -23,7 +23,6 @@ export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
 # only used in zonal and vsphere environments with
 # multiple datacenters
-declare vsphere_cluster
 declare vsphere_url
 declare VCENTER_AUTH_PATH
 
@@ -351,9 +350,6 @@ done
 # debug, confirm correct subnets.json
 cat "${SHARED_DIR}/subnets.json"
 
-# retrieving resource pools
-RESOURCE_POOLS=$(oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
-
 declare -A pool_usernames
 declare -A pool_passwords
 
@@ -362,24 +358,9 @@ platformSpec='{"vcenters": [],"failureDomains": []}'
 
 log "building local variables and failure domains"
 
-for RESOURCE_POOL in ${RESOURCE_POOLS}; do
-  log "checking to see if ${RESOURCE_POOL} is in use"
-  # check to see if this pool is in use by a lease
-  FOUND=0
-  for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
-    _VCENTER=$(jq -r .status.name < "${_leaseJSON}")
-    log "checking if ${_VCENTER} == ${RESOURCE_POOL}"
-    if [ "${_VCENTER,,}" = "${RESOURCE_POOL,,}" ]; then
-      FOUND=1
-      break
-    fi
-  done
-
-  if [ ${FOUND} -eq 0 ]; then
-    log "resource pool ${RESOURCE_POOL} isn't in use. excluding from failure domains"
-    continue
-  fi
-
+# Iterate through each lease and generate the failure domain and vcenters information
+for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
+  RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
   oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
@@ -411,31 +392,24 @@ for RESOURCE_POOL in ${RESOURCE_POOLS}; do
   fi
   platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
 
+  # Add / Update vCenter list
+  if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
+    # Check and make sure the datacenter doesn't already exist in the vcenter definition
+    if ! echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" --arg DC "$datacenter" '.vcenters[] | select(.server == $VCENTER) | any(.datacenters[]; . == $DC)' ; then
+      log "Adding additional datacenter to vcenter ${VCENTER}"
+      platformSpec=$(echo "${platformSpec}" | jq -r --arg VCENTER "$VCENTER" --arg DC "$datacenter" '(.vcenters[] | select(.server == $VCENTER)) |= (.datacenters[.datacenters | length] |= .+ $DC)')
+    fi
+  else
+    log "Adding vcenter ${VCENTER} to config"
+    platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ["'"${datacenter}"'"]}]')
+  fi
+
   cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
 done
 
-log "building vcenters for platform spec"
-
-# append vCenters to platform spec
-for VCENTER in "${!pool_usernames[@]}"; do
-  log "building ${VCENTER} in platform spec"
-  declare -A _datacenters
-  for _poolJSON in "${SHARED_DIR}"/POOL*; do
-    log "processing $_poolJSON";
-    _VCENTER=$(jq -r .spec.server < "${_poolJSON}")
-    _DATACENTER=$(jq -r .spec.topology.datacenter < "${_poolJSON}")
-    if [ "${_VCENTER}" = "${VCENTER}" ]; then
-      _datacenters[${_DATACENTER}]=${_DATACENTER}
-    fi
-  done
-  printf -v joined '"%s",' "${_datacenters[@]}"
-  log "found datacenters ${joined%,}"
-
-  platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ['"${joined%,}"']}]')
-done
-
+# For legacy spec, the below will merge the following json to the existing json.
 if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
-  platformSpec=$(echo "${platformSpec}" | jq -r '. += {"vcenter": "'"${server}"'", "username": "'"${vsphere_user}"'", "password": "'"${vsphere_password}"'", "defaultDatastore": '"$(basename "${datastore}")"' ,"network": '"$(basename "${network}")"' , "cluster": '"$(basename "${cluster}")"', "datacenter": '"$(basename "${datacenter}")"'}')  
+  platformSpec='{"vcenter": "'"${server}"'", "username": "'"${vsphere_user}"'", "password": "'"${vsphere_password}"'", "defaultDatastore": "'"$(basename "${datastore}")"'" ,"network": "'"$(basename "${network}")"'" , "cluster": "'"$(basename "${cluster}")"'", "datacenter": "'"$(basename "${datacenter}")"'"}'
 fi
 
 # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
@@ -450,12 +424,6 @@ jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
 source /tmp/envvars
-
-if [ $IPI -eq 0 ]; then
-  resource_pool=${vsphere_cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
-else
-  resource_pool=${vsphere_cluster}/Resources/ipi-ci-clusters
-fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF
