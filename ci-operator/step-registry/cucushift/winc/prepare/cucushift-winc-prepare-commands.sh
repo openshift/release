@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
       - name: linux-webserver
-        image: quay.io/openshifttest/hello-openshift:multiarch-winc
+        image: quay.io/openshifttest/hello-openshift@sha256:2a3edeadd7aa12a6156e9a27de1daae73d0569cbb0a761a7885944738245f11e
         ports:
         - containerPort: 8080
 EOF
