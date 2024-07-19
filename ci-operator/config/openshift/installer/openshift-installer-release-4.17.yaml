@@ -750,10 +750,18 @@ tests:
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
 - as: agent-integration-tests
-  commands: hack/go-integration-test.sh
-  container:
-    from: src-oc
   run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    test:
+    - as: agent-integration-tests
+      commands: hack/go-integration-test.sh
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-agent-compact-ipv4
   cluster: build05
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -888,7 +896,23 @@ tests:
       CONTROL_ARCH: arm64
       FEATURE_GATES: '["MultiArchInstallAWS=true"]'
       FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
     workflow: openshift-e2e-aws-heterogeneous-day-0
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-heterogeneous
+  optional: true
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
+    workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17

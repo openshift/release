@@ -5,7 +5,10 @@ set -o errexit
 set -o pipefail
 
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
@@ -21,8 +24,6 @@ vcenter_datacenter=$(oc get cm cloud-provider-config -n openshift-config -o json
 vcenter_folder=$(oc get cm cloud-provider-config -n openshift-config -o json | jq -r .data.config | grep -oP 'folder = \K.*' | tr -d '\"')
 
 echo "$(date -u --rfc-3339=seconds) - Config govc exports..."
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
 export GOVC_FOLDER=${vcenter_folder}
 
 set -x
