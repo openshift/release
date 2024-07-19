@@ -6,15 +6,13 @@ set -o pipefail
 
 echo "************ add-workers metal3 command ************"
 
-HOSTED_CLUSTER_NAME="$(<"${SHARED_DIR}/hostedcluster_name")"
-HOSTED_CLUSTER_NAME_NS=clusters-${HOSTED_CLUSTER_NAME}
+HOSTED_CLUSTER_NAME="$(echo -n "$PROW_JOB_ID" | sha256sum | cut -c-20)"
+HOSTED_CLUSTER_NAME_NS=HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -o=jsonpath="{.items[?(@.metadata.name=='$CLUSTER_NAME')].metadata.namespace}")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 mkdir -p "$SHARED_DIR/bmh-manifests/"
 pushd $SHARED_DIR/bmh-manifests
 
-# TODO: is the namespace correct?
 oc create -f - <<EOF
 apiVersion: agent-install.openshift.io/v1beta1
 kind: InfraEnv
