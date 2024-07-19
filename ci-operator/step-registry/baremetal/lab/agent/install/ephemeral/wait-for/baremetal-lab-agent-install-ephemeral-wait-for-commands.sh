@@ -91,7 +91,7 @@ if ! wait $!; then
   exit 1
 fi
 
-update_image_registry &
+update_image_registry
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &

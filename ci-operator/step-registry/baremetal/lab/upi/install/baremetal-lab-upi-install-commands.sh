@@ -329,7 +329,7 @@ fi
 
 destroy_bootstrap &
 approve_csrs &
-update_image_registry &
+update_image_registry
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
