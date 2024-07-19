@@ -4,7 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
@@ -19,8 +18,8 @@ cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
 sno_node_count:
 public_vlan: false
-ocp_release_image: $OCP_RELEASE_IMAGE
-openshift_version: "$OCP_VERSION_SHORT"
+ocp_version: $OCP_VERSION
+ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
@@ -42,7 +41,7 @@ controlplane_pub_network_gateway:
 jumbo_mtu: false
 rwn_lab_interface: eno1np0
 rwn_network_interface: ens1f0
-install_rh_crucible: "$CRUCIBLE"
+install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
 
@@ -52,10 +51,30 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory root@${bastion}:~/jetlag/ansible/inventory/telco.inv
 
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "./clean-resources.sh"
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
 
 # Setup Bastion
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+   set -e
+   set -o pipefail
+   cd jetlag
+   if [[ -n '$JETLAG_PR' ]]; then
+     git checkout main
+     git branch -D dev
+     git fetch origin pull/$JETLAG_PR/head:dev
+     git checkout dev
+   else
+     git checkout main
+   fi
+   git branch
+   source bootstrap.sh
+   ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-deploy-$(date +%s)"
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+   set -e
+   set -o pipefail
+   cd jetlag
+   git branch
+   source bootstrap.sh
+   ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
