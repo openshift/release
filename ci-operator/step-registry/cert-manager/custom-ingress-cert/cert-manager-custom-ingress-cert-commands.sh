@@ -90,12 +90,12 @@ do
     sleep $INTERVAL
 done
 
-echo "Creating a project from test usage."
-TEST_PROJECT=test-ingress-cert
-oc new-project $TEST_PROJECT
+echo "Creating a namespace from test usage."
+TEST_NAMESPACE=test-ingress-cert
+oc create ns $TEST_NAMESPACE
 
 echo "Creating the hello-openshift app and exposing a route from it."
-oc new-app -n $TEST_PROJECT quay.io/openshifttest/hello-openshift@sha256:4200f438cf2e9446f6bcff9d67ceea1f69ed07a2f83363b7fb52529f7ddd8a83
+oc new-app -n $TEST_NAMESPACE quay.io/openshifttest/hello-openshift@sha256:4200f438cf2e9446f6bcff9d67ceea1f69ed07a2f83363b7fb52529f7ddd8a83
 # Wait for the hello-openshift pod to be running
 MAX_RETRY=12
 INTERVAL=10
@@ -103,20 +103,20 @@ COUNTER=0
 while :;
 do
     echo "Checking the hello-openshift pod status for the #${COUNTER}-th time ..."
-    if [ "$(oc get pods -n $TEST_PROJECT -l deployment='hello-openshift' -o=jsonpath='{.items[*].status.phase}')" == "Running" ]; then
+    if [ "$(oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift' -o=jsonpath='{.items[*].status.phase}')" == "Running" ]; then
         echo "The hello-openshift pod is up and running."
         break
     fi
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
         echo "The hello-openshift pod is not running after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get pods -n $TEST_PROJECT --l deployment='hello-openshift'
+        oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift'
         exit 1
     fi
     sleep $INTERVAL
 done
-oc create route edge -n $TEST_PROJECT --service hello-openshift
-TEST_ROUTE=$(oc get route -n $TEST_PROJECT hello-openshift -o=jsonpath='{.status.ingress[?(@.routerName=="default")].host}')
+oc create route edge -n $TEST_NAMESPACE --service hello-openshift
+TEST_ROUTE=$(oc get route -n $TEST_NAMESPACE hello-openshift -o=jsonpath='{.status.ingress[?(@.routerName=="default")].host}')
 echo "The exposed route's hostname is $TEST_ROUTE"
 
 echo "Validating the cert-manager customized default ingress certificate"
@@ -144,8 +144,8 @@ do
     sleep $INTERVAL
 done
 
-echo "Deleting the project as curl validation finished."
-oc delete project $TEST_PROJECT
+echo "Deleting the namespace as curl validation finished."
+oc delete ns $TEST_NAMESPACE
 
 # Update KUBECONFIG WRT CA of ingress certificate otherwise oc login command will fail
 cp "$KUBECONFIG" "$KUBECONFIG".before-custom-ingress.bak

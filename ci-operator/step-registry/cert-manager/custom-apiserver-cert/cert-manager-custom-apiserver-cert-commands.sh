@@ -178,7 +178,7 @@ do
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
         echo "The clusteroperator kube-apiserver rollout did not start after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusteroperator kube-apiserver -o=jsonpath='{.status}'
+        oc get clusteroperator kube-apiserver -o=jsonpath='{.status.conditions[?(@.type=="Progressing")]}'
         exit 1
     fi
     sleep $INTERVAL
