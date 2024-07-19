@@ -164,6 +164,14 @@ images:
   dockerfile_path: Dockerfile
   from: base-anaconda-python-3.8
   to: jupyter-datascience-anaconda-python-3.8
+- context_dir: runtimes/rocm-pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: amd-ubi9-python-3.9
+  to: runtime-rocm-pytorch-ubi9-python-3.9
+- context_dir: runtimes/rocm-tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: amd-ubi9-python-3.9
+  to: runtime-rocm-tensorflow-ubi9-python-3.9
 promotion:
   to:
   - namespace: opendatahub-io
@@ -916,6 +924,24 @@ tests:
       IMAGE_REPO: workbench-images
       RELEASE_VERSION: amd-jupyter-minimal-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-pytorch-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-pytorch-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/amd-ubi9-python-3.9\/*)|(runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
 - as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
   run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
   steps:
@@ -1450,6 +1476,46 @@ tests:
       dependencies:
       - env: JUPYTER_INTEL_ML_IMAGE
         name: jupyter-intel-ml-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: amd-runtimes-ubi9-e2e-tests
+  run_if_changed: (runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)|(runtimes\/rocm-tensorlow\/ubi9-python-3.9\/*)
+  steps:
+    cluster_profile: gcp-opendatahub
+    test:
+    - as: runtime-rocm-pytorch-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project runtimes-rocm-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_PYTORCH_IMAGE}"
+        make deploy9-runtimes-rocm-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=runtime-rocm-pytorch-ubi9-python-3.9
+        make undeploy9-runtimes-rocm-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_ROCM_PYTORCH_IMAGE
+        name: runtime-rocm-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: runtime-rocm-tensorflow-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project runtimes-rocm-tensorflow-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_TENSORFLOW_IMAGE}"
+        make deploy9-runtimes-rocm-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=runtime-rocm-tensorflow-ubi9-python-3.9
+        make undeploy9-runtimes-rocm-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_ROCM_TENSORFLOW_IMAGE
+        name: runtime-rocm-tensorflow-ubi9-python-3.9
       from: src
       resources:
         requests:
