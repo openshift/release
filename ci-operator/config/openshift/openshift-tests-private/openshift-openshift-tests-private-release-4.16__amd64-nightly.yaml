@@ -343,6 +343,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
       TEST_SCENARIOS: MCO
@@ -356,6 +357,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
@@ -369,6 +371,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical|Medium|Low
       TEST_SCENARIOS: MCO
@@ -617,7 +620,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftINSTALL&
       TEST_SCENARIOS: Hypershift
     test:
-    - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-ovn-hypershift-mgmt-critical-f28
@@ -1520,7 +1522,7 @@ tests:
     cluster_profile: azure-qe
     env:
       EXTRA_ARGS: --fips
-      HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.16"
+      HYPERSHIFT_OLM_CATALOG_PLACEMENT: guest
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -1535,7 +1537,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftINSTALL&
       TEST_SCENARIOS: Hypershift
     test:
-    - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
 - as: azure-ipi-ovn-hypershift-etcd-disk-encryption-guest-f7
@@ -2996,6 +2997,17 @@ tests:
       TEST_TIMEOUT: "90"
     test:
     - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-longduration-reliability-test-f14
+  cron: 31 13 8,23 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
+      TEST_TIMEOUT_DISASTERRECOVERY: "900"
+    test:
+    - ref: idp-htpasswd
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: vsphere-ipi-ovn-dualstack-f28
   cron: 26 0 3 * *
