@@ -243,3 +243,5 @@ do
 done
 
 oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
+
+sleep 6h
