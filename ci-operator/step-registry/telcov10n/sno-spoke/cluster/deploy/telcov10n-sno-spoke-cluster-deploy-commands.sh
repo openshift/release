@@ -34,16 +34,31 @@ function generate_baremetal_secret {
   echo "************ telcov10n Generate Baremetal Secrets ************"
 }
 
-function clone_gitea_repo {
+function run_script_in_the_hub_cluster {
+  local helper_img="quay.io/centos/centos:stream9"
+  local script_file=$1
+  shift && local ns=$1
+  [ $# -gt 1 ] && shift && local pod_name="${1}"
 
-  echo "************ telcov10n clone Gitea repo ************"
-
-  gitea_ssh_uri="$(cat ${SHARED_DIR}/gitea_ssh_uri.txt)"
-  ssh_pri_key_file=${SHARED_DIR}/ssh-key-ztp-gitea
-
-  root_ztp_repo_dir=$(mktemp -d)
   set -x
-  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git clone ${gitea_ssh_uri} ${root_ztp_repo_dir}
+  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
+    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
+      oc -n ${ns} run ${pod_name} \
+        --image=${helper_img} --restart=Never -- sleep infinity ; \
+      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
+    }
+    oc -n ${ns} exec -i ${pod_name} -- \
+      bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
+  else
+    oc -n ${ns} run -i ${pod_name} \
+      --image=${helper_img} --restart=Never -- \
+        bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  fi
   set +x
 }
 
@@ -51,12 +66,9 @@ function generate_site_config {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
 
-  clone_gitea_repo
+  site_config_file=$(mktemp --dry-run)
 
-  mkdir -pv ${root_ztp_repo_dir}/siteconfig/sno-extra-manifest
-  site_config_file=${root_ztp_repo_dir}/siteconfig/site_config.yaml
-
-cat << EOF > ${site_config_file}
+  cat << EOF > ${site_config_file}
 apiVersion: ran.openshift.io/v1
 kind: SiteConfig
 metadata:
@@ -130,30 +142,58 @@ spec:
                   table-id: 254
 EOF
 
-  pushd .
-  cd ${root_ztp_repo_dir}
-  set -x
-  git commit -a -m 'Generated SiteConfig file'
-  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main
-  cat ${site_config_file}
-  set +x
-  popd
 }
 
 function push_site_config {
 
   echo "************ telcov10n Pushing SiteConfig file ************"
+
+  gitea_ssh_uri="$(cat ${SHARED_DIR}/gitea-ssh-uri.txt)"
+  ssh_pri_key_file=${SHARED_DIR}/ssh-key-ztp-gitea
+
+  run_script=$(mktemp --dry-run)
+
+  cat <<EOF > ${run_script}
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo "$(cat ${ssh_pri_key_file})" > /tmp/ssh-prikey
+chmod 0400 /tmp/ssh-prikey
+
+set -x
+# TODO: Use a image that already have Git package installed
+dnf install -y git
+
+ztp_repo_dir=\$(mktemp -d --dry-run)
+git config --global user.email "ztp-spoke-cluster@telcov10n.com"
+git config --global user.name "ZTP Spoke Cluster Telco Verification"
+GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
+mkdir -pv \${ztp_repo_dir}/siteconfig/sno-extra-manifest
+echo "$(cat ${site_config_file})" > \${ztp_repo_dir}/siteconfig/site_config.yaml
+
+cd \${ztp_repo_dir}
+git add .
+git commit -m 'Generated SiteConfig file'
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main
+EOF
+
+  gitea_project="ztp-gitea"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project}
 }
 
 function get_openshift_baremetal_install_tool {
-  echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
 
+  echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
+
+  set -x
   pull_secret=${SHARED_DIR}/pull-secret
   oc adm release extract \
     -a ${pull_secret} \
     --command=openshift-baremetal-install \
     quay.io/openshift-release-dev/ocp-release:4.15.22-x86_64
     # "${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}"
+  set +x
 }
 
 function extract_rhcos_images {

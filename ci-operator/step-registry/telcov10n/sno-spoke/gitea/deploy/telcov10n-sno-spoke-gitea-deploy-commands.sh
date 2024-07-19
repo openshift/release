@@ -68,11 +68,6 @@ gitea:
       ADAPTER: memory
     queue:
       TYPE: level
-
-service:
-  ssh:
-    type: NodePort
-    nodePort: 30022
 EOF
 
   # cat ${helm_gitea_values}
@@ -111,8 +106,11 @@ spec:
   wildcardPolicy: None
 EOF
 
+  set -x
   echo -n "https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')" > ${SHARED_DIR}/gitea-url.txt
-
+  # hub_cluster_base_domain=$(oc whoami --show-console|awk -F'apps.' '{print $2}')
+  # echo -n "https://gitea-${gitea_project}.apps.${hub_cluster_base_domain}" > ${SHARED_DIR}/gitea-url.txt
+  set +x
 }
 
 function generate_gitea_ssh_keys {
@@ -158,35 +156,78 @@ function generate_gitea_ssh_uri {
 
   echo "************ telcov10n Generate ZTP Git SSH uri ************"
 
-  gitea_ssh_host=$(oc get node openshift-master-0.lab.eng.rdu2.redhat.com -ojsonpath='{.status.addresses[?(.type=="InternalIP")].address}')
-  gitea_ssh_nodeport=$(oc -n ${gitea_project} get service gitea-ssh -ojsonpath='{.spec.ports[?(.name=="ssh")].nodePort}')
+  gitea_ssh_host="gitea-ssh.${gitea_project}"
+  gitea_ssh_port="2222"
+  gitea_ssh_uri="ssh://git@${gitea_ssh_host}:${gitea_ssh_port}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
 
-  gitea_ssh_uri="ssh://git@${gitea_ssh_host}:${gitea_ssh_nodeport}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
-  echo -n "${gitea_ssh_uri}" > ${SHARED_DIR}/gitea_ssh_uri.txt
+  set -x
+  echo -n "${gitea_ssh_uri}" > ${SHARED_DIR}/gitea-ssh-uri.txt
+  set +x
+}
+
+function run_script_in_the_hub_cluster {
+  local helper_img="quay.io/centos/centos:stream9"
+  local script_file=$1
+  shift && local ns=$1
+  [ $# -gt 1 ] && shift && local pod_name="${1}"
+
+  set -x
+  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
+    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
+      oc -n ${ns} run ${pod_name} \
+        --image=${helper_img} --restart=Never -- sleep infinity ; \
+      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
+    }
+    oc -n ${ns} exec -i ${pod_name} -- \
+      bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
+  else
+    oc -n ${ns} run -i ${pod_name} \
+      --image=${helper_img} --restart=Never -- \
+        bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  fi
+  set +x
 }
 
 function create_ztp_branch {
 
   echo "************ telcov10n Create ZTP Git branch ************"
 
-  ztp_repo_dir=$(mktemp -d)
-  pushd .
-  cd ${ztp_repo_dir}
-  echo "# Telco Verification" > README.md
-  echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
-  git config --global user.email "ztp-gitea@telcov10n.com"
-  git config --global user.name "ZTP Gitea Telco Verification"
-  git config --global init.defaultBranch main
-  git init
-  git checkout -b main
-  git add README.md
-  git commit -m "First commit"
-  #ssh://git@gitlab.consulting.redhat.com:2222/
-  set -x
-  git remote add origin ${gitea_ssh_uri}
-  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push -u origin main
-  set +x
-  popd
+  run_script=$(mktemp --dry-run)
+
+  cat <<EOF > ${run_script}
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo "$(cat ${ssh_pri_key_file})" > /tmp/ssh-prikey
+chmod 0400 /tmp/ssh-prikey
+
+set -x
+# TODO: Use a image that already have these two packages
+dnf install -y nmap-ncat git
+nc -vz ${gitea_ssh_host} ${gitea_ssh_port}
+
+ztp_repo_dir=\$(mktemp -d)
+cd \${ztp_repo_dir}
+echo "# Telco Verification" > README.md
+echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
+git config --global user.email "ztp-gitea@telcov10n.com"
+git config --global user.name "ZTP Gitea Telco Verification"
+git config --global init.defaultBranch main
+git init
+git checkout -b main
+git add README.md
+git commit -m "First commit"
+git remote add origin ${gitea_ssh_uri}
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main
+EOF
+
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "gitea-pod-helper"
 }
 
 function main {

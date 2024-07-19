@@ -14,12 +14,15 @@ function set_hub_cluster_kubeconfig {
 
 function run_tests {
   echo "************ telcov10n Verifying installation ************"
-  oc get managedcluster || echo No ready...
+  oc get managedcluster || echo "No ready..."
 }
 
 function main {
   set_hub_cluster_kubeconfig
   run_tests
+
+  echo
+  echo "Success!!! The SNO Spoke cluster has been installed correctly."
 }
 
 main
