@@ -9,7 +9,7 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
-  oc_hub="oc --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
 function check_hub_cluster_is_alive {
@@ -18,7 +18,7 @@ function check_hub_cluster_is_alive {
 
   echo
   set -x
-  $oc_hub get node,clusterversion
+  oc get node,clusterversion
   set +x
   echo
 }

@@ -9,8 +9,7 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
-  oc_hub="oc --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
-  helm_hub="helm --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
 function test_gitea_deployment {
@@ -23,10 +22,10 @@ function test_gitea_deployment {
   gitea_url=$(cat ${SHARED_DIR}/gitea-url.txt)
 
   set -x
-  $helm_hub list --all-namespaces | grep "${gitea_project}"
+  helm list --all-namespaces | grep "${gitea_project}"
   curl -vkI ${gitea_url}
   nc -vz ${gitea_ssh_host} ${gitea_ssh_nodeport}
-  $oc_hub -n ${gitea_project} get all
+  oc -n ${gitea_project} get all
   set +x
 
   clone_and_test_gitea_repo

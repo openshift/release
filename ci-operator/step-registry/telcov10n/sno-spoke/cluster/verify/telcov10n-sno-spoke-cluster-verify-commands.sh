@@ -9,12 +9,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Get Hub kubeconfig from \${SHARED_DIR}/hub-kubeconfig location ************"
-  oc_hub="oc --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
 function run_tests {
   echo "************ telcov10n Verifying installation ************"
-  $oc_hub get managedcluster || echo No ready...
+  oc get managedcluster || echo No ready...
 }
 
 function main {

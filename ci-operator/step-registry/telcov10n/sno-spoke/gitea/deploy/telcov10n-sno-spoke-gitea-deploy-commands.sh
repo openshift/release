@@ -9,8 +9,7 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from \${SHARED_DIR}/hub-kubeconfig location ************"
-  oc_hub="oc --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
-  helm_hub="helm --kubeconfig ${SHARED_DIR}/hub-kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
 function create_gitea_deployment {
@@ -19,7 +18,7 @@ function create_gitea_deployment {
 
   gitea_project="ztp-gitea"
 
-  cat <<EOF | $oc_hub apply -f -
+  cat <<EOF | oc apply -f -
 ---
 apiVersion: v1
 kind: Namespace
@@ -77,13 +76,13 @@ service:
 EOF
 
   # cat ${helm_gitea_values}
-  $oc_hub adm policy add-scc-to-user anyuid system:serviceaccount:${gitea_project}:gitea
-  $oc_hub -n ${gitea_project} create serviceaccount gitea || echo
+  oc adm policy add-scc-to-user anyuid system:serviceaccount:${gitea_project}:gitea
+  oc -n ${gitea_project} create serviceaccount gitea || echo
   helm repo add gitea-charts https://dl.gitea.com/charts/ || echo
 
   set -x
-  $helm_hub status gitea -n ${gitea_project} 2> /dev/null || \
-  $helm_hub install gitea gitea-charts/gitea --values ${helm_gitea_values} -n ${gitea_project} --wait
+  helm status gitea -n ${gitea_project} 2> /dev/null || \
+  helm install gitea gitea-charts/gitea --values ${helm_gitea_values} -n ${gitea_project} --wait
   set +x
 
   setup_openshift_route
@@ -94,7 +93,7 @@ function setup_openshift_route {
 
   echo "************ telcov10n Setup route to Gitea repo ************"
 
-  cat << EOF | $oc_hub apply -f -
+  cat << EOF | oc apply -f -
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -112,8 +111,7 @@ spec:
   wildcardPolicy: None
 EOF
 
-  hub_cluster_base_domain=$(oc whoami --show-console|awk -F'apps.' '{print $2}')
-  echo -n "https://gitea-${gitea_project}.apps.${hub_cluster_base_domain}" > ${SHARED_DIR}/gitea-url.txt
+  echo -n "https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')" > ${SHARED_DIR}/gitea-url.txt
 
 }
 
