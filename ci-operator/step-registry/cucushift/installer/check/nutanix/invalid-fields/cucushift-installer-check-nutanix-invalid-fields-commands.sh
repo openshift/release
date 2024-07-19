@@ -16,6 +16,7 @@ function run_install() {
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
+  set -o errexit
 }
 
 dir=/tmp/installer
@@ -44,7 +45,6 @@ else
   echo "Fail: failed to check prismCentral field"
   check_result=$((check_result + 1))
 fi
-set -o errexit
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
@@ -71,7 +71,6 @@ else
   echo "Fail: failed to check prismCentral port field"
   check_result=$((check_result + 1))
 fi
-set -o errexit
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
@@ -97,7 +96,6 @@ else
   echo "Fail: failed to check username field"
   check_result=$((check_result + 1))
 fi
-set -o errexit
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
@@ -123,7 +121,6 @@ else
   echo "Fail: failed to check password field"
   check_result=$((check_result + 1))
 fi
-set -o errexit
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
@@ -174,7 +171,6 @@ else
   echo "Fail: failed to check subnetUUIDs field"
   check_result=$((check_result + 1))
 fi
-set -o errexit
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
