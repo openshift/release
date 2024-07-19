@@ -749,10 +749,18 @@ tests:
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
 - as: agent-integration-tests
-  commands: hack/go-integration-test.sh
-  container:
-    from: src-oc
   run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    test:
+    - as: agent-integration-tests
+      commands: hack/go-integration-test.sh
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-agent-compact-ipv4
   cluster: build05
   run_if_changed: ^(cmd|pkg|data).*/agent/
