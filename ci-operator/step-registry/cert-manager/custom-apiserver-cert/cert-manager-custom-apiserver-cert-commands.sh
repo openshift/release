@@ -164,21 +164,21 @@ spec:
         name: cert-manager-managed-alt-api-tls
 "
 
-# Wait for the clusteroperator kube-apiserver to finish rollout
+# Wait for the clusteroperator kube-apiserver to start rollout
 # Note, if $NEW_API_FQDN is $ORIGINAL_API_FQDN other than an alternative FQDN, all oc commands afterwards need to add the --insecure-skip-tls-verify flag before the KUBECONFIG is updated later
 MAX_RETRY=20
 INTERVAL=10
 COUNTER=0
 while :;
 do
-    echo "Checking clusteroperator kube-apiserver Progressing status for the #${COUNTER}-th time ..."
+    echo "Checking if clusteroperator kube-apiserver rollout has started for the #${COUNTER}-th time ..."
     if [ "$(oc get clusteroperator kube-apiserver -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" == True ]; then
-        echo "The clusteroperator kube-apiserver Progressing status becomes True." && break
+        echo "The clusteroperator kube-apiserver Progressing status becomes True, indicates rollout has started." && break
     fi
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The clusteroperator kube-apiserver Progressing status is not True after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusteroperator kube-apiserver -o jsonpath='{.status.conditions[?(@.type=="Progressing")]}'
+        echo "The clusteroperator kube-apiserver rollout did not start after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get clusteroperator kube-apiserver -o=jsonpath='{.status.conditions[?(@.type=="Progressing")]}'
         exit 1
     fi
     sleep $INTERVAL
@@ -189,25 +189,36 @@ INTERVAL=30
 COUNTER=0
 while :;
 do
-    echo "Checking clusteroperator kube-apiserver status for the #${COUNTER}-th time ..."
+    echo "Checking if clusteroperator kube-apiserver rollout finished for the #${COUNTER}-th time ..."
     if [ "$(oc get --no-headers clusteroperator kube-apiserver | awk '{print $3 $4 $5}')" == TrueFalseFalse ]; then
-        echo 'The clusteroperator kube-apiserver status becomes "True False False".' && break
+        echo 'The clusteroperator kube-apiserver status becomes "True False False", indicates rollout finished.' && break
     fi
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
         echo "The clusteroperator kube-apiserver status is not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusteroperator kube-apiserver
+        oc get clusteroperator kube-apiserver -o=jsonpath='{.status}'
         exit 1
     fi
     sleep $INTERVAL
 done
 
 echo "Validating the cert-manager customized Apiserver serving certificate."
-CURL_OUTPUT=$(curl -IsS --cacert $CA_FILE --connect-timeout 30 "https://$NEW_API_FQDN:6443" 2>&1 || true)
-if [[ ! "$CURL_OUTPUT" =~ "HTTP/2 403" ]]; then
-    echo -e "Fails to validate the cert-manager customized Apiserver serving certificate. Dumping the curl output:\n${CURL_OUTPUT}"
-    exit 1
-fi
+MAX_RETRY=12
+INTERVAL=10
+COUNTER=0
+while :;
+do
+    CURL_OUTPUT=$(curl -IsS -v --cacert $CA_FILE --connect-timeout 30 "https://$NEW_API_FQDN:6443" 2>&1 || true)
+    if [[ "$CURL_OUTPUT" =~ "HTTP/2 403" ]]; then
+        echo "The customized certificate is serving as expected." && break
+    fi
+    ((++COUNTER))
+    if [[ $COUNTER -eq $MAX_RETRY ]]; then
+        echo -e "Timeout after $((MAX_RETRY * INTERVAL)) seconds waiting for curl validation succeeded. Dumping the curl output:\n${CURL_OUTPUT}."
+        exit 1
+    fi
+    sleep $INTERVAL
+done
 
 # Update KUBECONFIG WRT CA of Apiserver certificate
 cp "$KUBECONFIG" "$KUBECONFIG".before-custom-api.bak
