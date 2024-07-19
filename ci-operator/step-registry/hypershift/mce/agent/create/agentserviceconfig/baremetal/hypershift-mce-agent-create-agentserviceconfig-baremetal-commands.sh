@@ -69,8 +69,8 @@ spec:
   name: 'assisted-mirror-config'
  osImages:
  - openshiftVersion: "${CLUSTER_VERSION}"
-   version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "'"$architecture"'").version')
-   url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "'"$architecture"'").url')
+   version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "x86_64").version')
+   url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "x86_64").url')
    cpuArchitecture: x86_64
 $(agentserviceconfig_config)
 EOF
