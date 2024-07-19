@@ -17,6 +17,7 @@ pip3 list
 
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
 CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+RELEASE_STREAM=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '-' -f1-2) || echo "Cluster Install Failed"
 OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -69,6 +70,10 @@ do
 	fi
 done
 
+cat <<EOL > "${SHARED_DIR}/workload_user_metadata.yaml"
+prevocpMajorVersion: $RELEASE_STREAM
+prevocpVersion: $CURRENT_VERSION
+EOL
 echo "All OCP Cluster Operator is Ready, Upgrade Started"
 START_TIME=$(($(date +%s) - 600))
 echo $START_TIME > ${SHARED_DIR}/workload_start_time.txt
