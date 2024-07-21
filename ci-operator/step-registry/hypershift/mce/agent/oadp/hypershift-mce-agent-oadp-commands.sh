@@ -58,6 +58,36 @@ oc wait --timeout=20m --all --for=jsonpath='{.status.phase}'=Available backupSto
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc create namespace oadp-helper
+IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+TOOLS_IMAGE=$(oc adm release info ${IMAGE} --image-for=tools)
+oc create secret generic oadp-kubeconfig-secret --from-file=kubeconfig="$KUBECONFIG" -n oadp-helper
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oadp-helper
+  namespace: oadp-helper
+spec:
+  containers:
+    - name: patch-container
+      image: ${TOOLS_IMAGE}
+      command: [ "sh", "-c", "while true; do sleep 3600; done" ]
+      volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubernetes
+          readOnly: true
+  volumes:
+    - name: kubeconfig
+      secret:
+        secretName: oadp-kubeconfig-secret
+EOF
+oc annotate pod -n local-cluster oadp-helper \
+    post.hook.restore.velero.io/container=postgres \
+    post.hook.restore.velero.io/command='["/bin/bash", "-c", "oc get hostedcluster -n local-cluster '"${CLUSTER_NAME}"'" && oc patch hostedcluster -n local-cluster '"${CLUSTER_NAME}"'" -p '\''{\"spec\":{\"pausedUntil\":null}}'\'' --type=merge"]' \
+    post.hook.restore.velero.io/wait-timeout=5m \
+    post.hook.restore.velero.io/exec-timeout=45s \
+    post.hook.restore.velero.io/on-error=Continue
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
 kind: Backup
@@ -71,6 +101,7 @@ spec:
   includedNamespaces:
   - local-cluster
   - local-cluster-${CLUSTER_NAME}
+  - oadp-helper
   includedResources: []
   excludedResources: []
   storageLocation: dpa-sample-1
@@ -81,30 +112,46 @@ spec:
 EOF
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 
-oc patch hostedcluster -n local-cluster ${CLUSTER_NAME} -p '{"spec":{"pausedUntil":null}}' --type=merge
-oc patch nodepool -n local-cluster ${CLUSTER_NAME} -p '{"spec":{"pausedUntil":null}}' --type=merge
+oc patch hostedcluster -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
+oc patch nodepool -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
 oc delete hostedcluster/${CLUSTER_NAME} -n local-cluster
 #
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: Restore
-metadata:
-  name: hc-clusters-hosted-restore
-  namespace: openshift-adp
-spec:
-  includedNamespaces:
-  - local-cluster
-  backupName: hc-clusters-hosted-backup
-  restorePVs: true
-  existingResourcePolicy: update
-  excludedResources:
-  - nodes
-  - events
-  - events.events.k8s.io
-  - backups.velero.io
-  - restores.velero.io
-  - resticrepositories.velero.io
-EOF
-oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
-oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
-oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
+#cat <<EOF | oc apply -f -
+#apiVersion: velero.io/v1
+#kind: Restore
+#metadata:
+#  name: hc-clusters-hosted-restore
+#  namespace: openshift-adp
+#spec:
+#  includedNamespaces:
+#  - local-cluster
+#  backupName: hc-clusters-hosted-backup
+#  restorePVs: true
+#  existingResourcePolicy: update
+#  excludedResources:
+#  - nodes
+#  - events
+#  - events.events.k8s.io
+#  - backups.velero.io
+#  - restores.velero.io
+#  - resticrepositories.velero.io
+#  hooks:
+#    resources:
+#    - name: oadp-helper
+#      includedNamespaces:
+#      - oadp-helper
+#      postHooks:
+#      - exec:
+#          execTimeout: 1m
+#          waitTimeout: 5m
+#          container: oadp-helper
+#          command:
+#          - /bin/bash
+#          - -c
+#          - |
+#            oc get hostedcluster -n local-cluster ${CLUSTER_NAME} && \
+#            oc patch hostedcluster -n local-cluster ${CLUSTER_NAME} -p '{"spec":{"pausedUntil":null}}' --type=merge
+#EOF
+#oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
+#oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
+#oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
