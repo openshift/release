@@ -264,10 +264,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
-\$portgroup = "${vsphere_portgroup}"
-\$datastore = "${vsphere_datastore}"
-\$datacenter = "${vsphere_datacenter}"
-\$cluster = "${vsphere_cluster}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
