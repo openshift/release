@@ -943,14 +943,14 @@ function run_upgrade_e2e() {
     parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
      export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @admin\" -p junit"' || true
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @admin\" -p junit"' >> "${ARTIFACT_DIR}/e2etest-log.txt" || true
 
     # run admin tests
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin-${idx}"
     parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
      export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and @admin\" -p junit"' || true
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and @admin\" -p junit"' >> "${ARTIFACT_DIR}/e2etest-log.txt" || true
 
     summarize_test_results
     popd
