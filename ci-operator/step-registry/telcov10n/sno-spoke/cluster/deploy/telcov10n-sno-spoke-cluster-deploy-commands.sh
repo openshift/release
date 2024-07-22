@@ -199,20 +199,101 @@ function get_openshift_baremetal_install_tool {
 function extract_rhcos_images {
 
   echo "************ telcov10n Extract RHCOS images ************"
-  # OPENSTACK_IMAGE=$(${BIN_PATH}/openshift-baremetal-install coreos print-stream-json | jq '.architectures.x86_64.artifacts.openstack.formats."qcow2.gz".disk.location' | tr -d '"')
-  # OPENSTACK_IMAGE_FILE=$(basename ${OPENSTACK_IMAGE} | tr -d '"')
-  # QEMU_IMAGE=$(${BIN_PATH}/openshift-baremetal-install coreos print-stream-json | jq '.architectures.x86_64.artifacts.qemu.formats."qcow2.gz".disk.location' | tr -d '"')
-  # QEMU_IMAGE_FILE=$(basename ${QEMU_IMAGE} | tr -d '"')
-  get_openshift_baremetal_install_tool
+  # get_openshift_baremetal_install_tool
 
-  ./openshift-baremetal-install coreos print-stream-json | jq '.architectures.x86_64.artifacts.metal'
+  # ./openshift-baremetal-install coreos print-stream-json | jq '.architectures.x86_64.artifacts.metal'
+  openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
+  rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
+  iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
 
+}
+
+# function create_persistent_volumes_for_assisted_installer_service {
+
+#   echo "************ telcov10n Create PVs for the assisted install service to be deployed by AgentServiceConfig CR ************"
+#   cat << EOF | oc apply -f -
+# apiVersion: local.storage.openshift.io/v1
+# kind: LocalVolume
+# metadata:
+#   name: assisted-service
+#   namespace: openshift-local-storage
+# spec:
+#   logLevel: Normal
+#   managementState: Managed
+#   storageClassDevices:
+#     - devicePaths:
+#         - /dev/vdb
+#       storageClassName: assisted-service
+#       volumeMode: Filesystem
+# EOF
+
+#   set -x
+#   oc wait localvolume -n openshift-local-storage assisted-service --for condition=Available --timeout 10m
+#   oc get sc,pv
+#   set +x
+# }
+
+function generate_agent_service_config {
+
+  echo "************ telcov10n Generate and Deploy AgentServiceConfig CR ************"
+
+  echo "Enabling assisted installer service on bare metal"
+  set -x
+  oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true }}'
+  set +x
+
+  sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
+
+  cat << EOF | oc apply -f -
+apiVersion: agent-install.openshift.io/v1beta1
+kind: AgentServiceConfig
+metadata:
+ name: agent
+spec:
+  databaseStorage:
+    storageClassName: ${sc_name}
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+  filesystemStorage:
+    storageClassName: ${sc_name}
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+  imageStorage:
+    storageClassName: ${sc_name}
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 50Gi
+  osImages:
+  - cpuArchitecture: x86_64
+    openshiftVersion: "4.15"
+    rootFSUrl: ${rootfs_url}
+    url: ${iso_url}
+    version: ${openshift_release}
+EOF
+
+  set -x
+  oc get AgentServiceConfig agent -oyaml
+  # oc -n openshift-local-storage wait localvolume localstorage-disks --for condition=Available --timeout 10m
+  oc -n multicluster-engine wait --for=condition=Ready \
+    pod/assisted-image-service-0 \
+    pod/$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | grep "^assisted-service")
+  oc -n multicluster-engine get sc,pv,pod,pvc
+  set +x
 }
 
 function main {
   set_hub_cluster_kubeconfig
   check_hub_cluster_is_alive
   extract_rhcos_images
+  generate_agent_service_config
   generate_image_source
   generate_baremetal_secret
   generate_site_config
