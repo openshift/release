@@ -17,7 +17,7 @@ mkdir -p /tmp/go/bin $GOCACHE \
 git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
 git checkout -b downstream-release "${INTEROP_TESTS_COMMIT}"
-make build
+# make build
 
 #Enable user workload monitoring.
 oc apply -f tests/e2e-openshift/monitoring/01-workload-monitoring.yaml
