@@ -186,13 +186,14 @@ function get_openshift_baremetal_install_tool {
 
   echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
 
+# INFO[2024-07-22T17:31:16Z] Importing release image latest.
+# INFO[2024-07-22T17:31:16Z] Requesting a release from https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.15.0-0.nightly/latest
+# INFO[2024-07-22T17:31:16Z] Resolved release latest to registry.ci.openshift.org/ocp/release:4.15.0-0.nightly-2024-07-22-104333
+# INFO[2024-07-22T17:31:35Z] Importing release 4.15.0-0.nightly-2024-07-22-104333 created at 2024-07-22 10:45:17 +0000 UTC with 191 images to tag release:latest ...
+# INFO[2024-07-22T17:33:11Z] Imported release 4.15.0-0.nightly-2024-07-22-104333 created at 2024-07-22 10:45:17 +0000 UTC with 191 images to tag release:latest
   set -x
   pull_secret=${SHARED_DIR}/pull-secret
-  oc adm release extract \
-    -a ${pull_secret} \
-    --command=openshift-baremetal-install \
-    quay.io/openshift-release-dev/ocp-release:4.15.22-x86_64
-    # "${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}"
+  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
   set +x
 }
 
@@ -282,9 +283,8 @@ EOF
   set -x
   oc get AgentServiceConfig agent -oyaml
   # oc -n openshift-local-storage wait localvolume localstorage-disks --for condition=Available --timeout 10m
-  oc -n multicluster-engine wait --for=condition=Ready \
-    pod/assisted-image-service-0 \
-    pod/$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | grep "^assisted-service")
+  assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | grep "^assisted-service")
+  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name}
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x
 }
