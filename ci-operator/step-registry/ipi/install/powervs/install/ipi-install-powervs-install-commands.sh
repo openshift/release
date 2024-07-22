@@ -228,7 +228,7 @@ function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
-  export HOME=/tmp
+  export HOME=/output
 
   hash ibmcloud || exit 1
   echo "Checking ibmcloud version..."
@@ -241,7 +241,10 @@ function install_required_tools() {
   # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
   #
   for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
-    ibmcloud plugin install ${I}
+    #
+    # NOTE: If a plugin is already installed then don't do another install. If not, then install it.
+    # 
+    yes N | ibmcloud plugin install ${I}
   done
   ibmcloud plugin list
 
@@ -253,12 +256,19 @@ function install_required_tools() {
       exit 1
     fi
   done
+  echo "Installing yq-v4"
+  # Install yq manually if its not found in installer image
+  cmd_yq="$(which yq-v4 2>/dev/null || true)"
+  mkdir -p /tmp/bin
+  if [ ! -x "${cmd_yq}" ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
+  fi
+  PATH=${PATH}:/tmp/bin
+  export PATH
 
   hash jq || exit 1
   hash yq-v4 || exit 1
-
-  PATH=${PATH}:$(pwd)/bin
-  export PATH
 }
 
 function init_ibmcloud() {
@@ -645,13 +655,13 @@ function dump_resources() {
   echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
   (
     if [ -d "${dir}/.clusterapi_output" ]; then
-      /tmp/yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+      yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
 
       echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
       for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
       do
 	echo ${FILE}
-        /tmp/yq-v4 eval .status.conditions ${FILE}
+        yq-v4 eval .status.conditions ${FILE}
 	echo
       done
     fi
@@ -875,24 +885,30 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
+if [ ${ret} -gt 0 ]; then
+  SKIP_WAIT_FOR=false
+else
+  SKIP_WAIT_FOR=true
+fi
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
 # If we need to try again, then does the CAPI cluster status yaml file exist?
 if [ ${ret} -gt 0 ]; then
-  SFILE="/tmp/installer/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests*yaml"
-  ls -l ${SFILE} || true
-  if [ -f ${SFILE} ]; then
-    # How many statuses are False?
-    SLINES=$(/tmp/yq-v4 eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
-    echo "Skip? SLINES=${SLINES}"
-    if [ ${SLINES} -gt 0 ]; then
-      echo "Skipping wait-for install-complete since detected CAPI problem"
-      ret=0
+  echo "Checking CAPI cluster status:"
+  ls -l /tmp/installer/.clusterapi_output/IBMPowerVS*yaml || true
+  for SFILE in /tmp/installer/.clusterapi_output/IBMPowerVS*yaml
+  do
+    echo "${SFILE}"
+    yq-v4 eval .status.ready ${SFILE}
+    RESULT=$(yq-v4 eval .status.ready ${SFILE})
+    if [ "${RESULT}" == "false" ]; then
+      SKIP_WAIT_FOR=true
     fi
-  fi
+  done
 fi
 
-if [ ${ret} -gt 0 ]; then
+echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
+if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'

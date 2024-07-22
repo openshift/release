@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -210,6 +210,12 @@ releases:
       include_built_images: true
       name: 4.17-priv
       namespace: ocp-private
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -310,6 +316,19 @@ tests:
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
@@ -379,6 +398,15 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
   run_if_changed: (gcp|google)
@@ -397,6 +425,15 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - as: e2e-azure-ovn-shared-vpc
@@ -627,7 +664,7 @@ tests:
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -650,7 +687,7 @@ tests:
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-zones
@@ -664,7 +701,7 @@ tests:
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-zones
@@ -744,10 +781,18 @@ tests:
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
 - as: agent-integration-tests
-  commands: hack/go-integration-test.sh
-  container:
-    from: src-oc
   run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    test:
+    - as: agent-integration-tests
+      commands: hack/go-integration-test.sh
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-agent-compact-ipv4
   cluster: build05
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -869,6 +914,36 @@ tests:
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-heterogeneous
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallAWS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
+    workflow: openshift-e2e-aws-heterogeneous-day-0
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-heterogeneous
+  optional: true
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
+    workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master

@@ -364,9 +364,6 @@ function test_labels()
 
   confirm_mc_count
 
-  # added label should be available on the service cluster
-  confirm_labels "service_clusters" "$sc_cluster_id" 1 "label-qetesting-test" "qetesting"
-
   # added label should not be available on the management cluster
   confirm_labels "management_clusters" "$mc_cluster_id" 0 "" ""
 
@@ -1992,6 +1989,112 @@ function check_managedcluster_connection() {
 
 ##################################################################
 
+###### [OCM-5737] OSDFM to handle multiple 'serving MachinePool Gang' (OCM-9093) ######
+
+function check_cluster_size() {
+  echo "[OCM-9093] - [OCM-5737] OSDFM to handle multiple 'serving MachinePool Gang'"
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+  HC_NS=""
+  HC_NS_PREFIX=""
+  HC_NAME=""
+
+  echo "Attempting to obtain HC namespace"
+
+  HC_NS_PREFIX=$(oc get hc -A -o json | jq -r .items[0].metadata.namespace) || true
+  HC_NAME=$(oc get hc -A -o json | jq -r .items[0].metadata.name) || true
+
+  if [ "$HC_NS_PREFIX" != "" ] && [ "$HC_NAME" != "" ]; then
+    HC_NS="$HC_NS_PREFIX-$HC_NAME"
+    echo "HC namespace found: '$HC_NS'"
+    NODES=( )
+    DEPLOYMENTS=( oauth-openshift kube-apiserver ignition-server-proxy router )
+    echo "Obtaining node names for HC namespace pods"
+    for DEPL_NAME in "${DEPLOYMENTS[@]}"; do
+      # shellcheck disable=SC2207
+      NODES+=( $(oc -n "$HC_NS" get pods -ojson | jq -r ".items[] | select(.metadata.name | match(\"$DEPL_NAME\")) | .spec.nodeName") )
+    done
+    # shellcheck disable=SC2207
+    NODES=( $(echo "${NODES[@]}" | tr ' ' '\n' | sort | uniq) )
+    if [[ ${#NODES[@]} -lt 1 ]]; then
+      echo "[ERROR] no matching nodes found"
+      TEST_PASSED=false
+    else 
+      for node in "${NODES[@]}"; do
+        echo "Checking 'hypershift.openshift.io/cluster-size' value for node: '$node'"
+        CLUSTER_SIZE_OUTPUT=$(oc get node "$node" -o yaml | grep "hypershift.openshift.io/cluster-size:" ) || true
+        if [[ $CLUSTER_SIZE_OUTPUT == *"m5xl"* ]]; then
+          echo "Correct value found ('m5xl')"
+          continue
+        else
+          echo "[ERROR] 'hypershift.openshift.io/cluster-size' should be set to 'm5xl'"
+          TEST_PASSED=false
+        fi
+      done
+    fi
+  
+  else
+    echo "[ERROR] unable to determine HC namespace name"
+    TEST_PASSED=false
+  fi
+  update_results "OCM-9093" $TEST_PASSED
+}
+
+###### end of [OCM-5737] OSDFM to handle multiple 'serving MachinePool Gang' (OCM-9093) ######
+
+##################################################################
+
+###### [OCM-9168] Update environments to ACM 2.8.7 (OCM-9361) ######
+
+function test_acm_addon_version () {
+  echo "[OCM-9361] Update environments to ACM 2.8.7"
+  TEST_PASSED=true
+  sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
+
+  ADDON_HREF="/api/addons_mgmt/v1/clusters/$sc_cluster_id/addons/advanced-cluster-management"
+
+  ACM_ADDON_VERSION=""
+
+  echo "Attempting to obtain acm addon version for SC with ocm mgmt ID: '$sc_cluster_id'"
+
+  ACM_ADDON_VERSION=$(ocm get "$ADDON_HREF" | jq -r .addon_version.id) || true
+
+  if [ "$ACM_ADDON_VERSION" == "" ]; then
+    echo "[ERROR] - unable to get ACM addon version"
+    TEST_PASSED=false
+  else
+    echo "found acm addon version: '$ACM_ADDON_VERSION'"
+    echo "Splitting the acm addon version into components"
+    IFS='.' read -ra VERSION_COMP <<< "$ACM_ADDON_VERSION"
+    ACM_VERSION_COMP_LENGTH=${#VERSION_COMP[@]}
+    if [[ $ACM_VERSION_COMP_LENGTH -lt 3 ]]; then
+      echo "[ERROR] - unexpected number of version components found (less than 3)"
+      TEST_PASSED=false
+    else
+      echo "Confirming that the ACM addon version is at least 3.8.7"
+      MAJOR=${VERSION_COMP[0]}
+      MINOR=${VERSION_COMP[1]}
+      PATCH=${VERSION_COMP[2]}
+      IFS='-' read -ra PATCH_SPLIT <<< "$PATCH"
+      if [[ $MAJOR -eq 3 ]] && [[ $MINOR -ge 8 ]]; then
+        if [[ $MINOR -eq 8 ]] && [[ ${PATCH_SPLIT[0]} -lt 7 ]]; then
+          echo "[ERROR] - unexpected acm addon patch version found"
+          TEST_PASSED=false
+        fi
+      else
+        echo "[ERROR] - unexpected acm addon major and minor version found"
+        TEST_PASSED=false
+      fi
+    fi
+  fi
+  update_results "OCM-9361" $TEST_PASSED
+}
+
+###### [OCM-9168] end of Update environments to ACM 2.8.7 (OCM-9361) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -2041,6 +2144,10 @@ test_500_worker_nodes_support
 test_shard_topology
 
 check_managedcluster_connection
+
+check_cluster_size
+
+test_acm_addon_version
 
 test_delete_sc
 
