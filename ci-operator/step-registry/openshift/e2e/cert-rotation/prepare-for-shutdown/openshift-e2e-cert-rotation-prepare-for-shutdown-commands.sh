@@ -51,26 +51,30 @@ function copy-file-from-first-master {
 
 cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  echo -n "Approving CSRs"
-  attempts=0
-  max_attempts=5
-  while true; do
-    echo -n '.'
-    mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName='kubernetes.io/kube-apiserver-client-kubelet' --no-headers | grep Pending | cut -f1 -d" ")
-    if [[ ${#csrs[@]} -gt 0 ]]; then
-      echo ""
-      oc adm certificate approve ${csrs} && attempts=0
-    else
-      (( attempts++ ))
-    fi
-    if (( attempts > max_attempts )); then
-      echo ""
-      echo "Timeout waiting for new CSRs"
-      break
-    fi
-    sleep 5s
+  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
+  for field in ${fields[@]}; do
+    echo "Approving ${field} CSRs at $(date)"
+    (( required_csrs=${#control_nodes[@]} + ${#compute_nodes[@]} ))
+    approved_csrs=0
+    attempts=0
+    max_attempts=40
+    while (( required_csrs >= approved_csrs )); do
+      echo -n '.'
+      mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      if [[ ${#csrs[@]} -gt 0 ]]; then
+        echo ""
+        oc adm certificate approve ${csrs} && attempts=0 && (( approved_csrs=approved_csrs+${#csrs[@]} ))
+      else
+        (( attempts++ ))
+      fi
+      if (( attempts > max_attempts )); then
+        break
+      fi
+      sleep 10s
+    done
+    echo ""
   done
-  echo "Done"
+  echo "Finished CSR approval at $(date)"
 EOZ
 chmod a+x /tmp/approve-csrs-with-timeout.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
@@ -111,6 +115,10 @@ function pod-restart-workarounds {
   oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-15827
+  # Restart console and console-operator pods
+  oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
+  oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
 }
 
 function prepull-tools-image-for-gather-step {
@@ -154,12 +162,51 @@ oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patc
 oc patch OperatorHub cluster --type json \
     -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
+# Generate custom ingress certificate valid for 10 years
+tenYears=3650
+baseDomain=$(oc get dns.config cluster -o=jsonpath='{.spec.baseDomain}')
+temp_dir=$(mktemp -d)
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout "${temp_dir}/ca.key" -x509 -days ${tenYears} -subj "/CN=$baseDomain" -out "${temp_dir}/ca.crt"
+
+openssl genrsa -out "${temp_dir}/ca.key" 4096
+openssl req -x509 -sha256 -key "${temp_dir}/ca.key" -nodes -new -days ${tenYears} -out "${temp_dir}/ca.crt" -subj "/CN=${baseDomain}" -set_serial 1
+
+oc create configmap custom-ca \
+     --from-file=ca-bundle.crt="${temp_dir}/ca.crt" \
+     -n openshift-config
+
+oc patch proxy/cluster \
+     --type=merge \
+     --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+
+defaultIngressDomain=$(oc get ingresscontroller default -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
+cat <<EOZ > "${temp_dir}/tmp.conf"
+[cus]
+subjectAltName = DNS:*.${defaultIngressDomain}
+EOZ
+openssl genrsa -out "${temp_dir}/server.key" 4096
+openssl req -new -key "${temp_dir}/server.key" -subj "/CN=${defaultIngressDomain}" -addext "subjectAltName = DNS:*.${defaultIngressDomain}" -out "${temp_dir}/server.csr"
+openssl x509 -req -days ${tenYears} -CA "${temp_dir}/ca.crt" -CAkey "${temp_dir}/ca.key" -CAserial caproxy.srl -CAcreateserial -extfile "${temp_dir}/tmp.conf" -extensions cus -in "${temp_dir}/server.csr" -out "${temp_dir}/server.crt"
+
+oc create secret tls custom-cert \
+     --cert="${temp_dir}/server.crt" \
+     --key="${temp_dir}/server.key" \
+     -n openshift-ingress
+
+oc patch ingresscontroller.operator default \
+     --type=merge -p \
+     '{"spec":{"defaultCertificate": {"name": "custom-cert"}}}' \
+     -n openshift-ingress-operator
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
+
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
 # Sync host and node timezones to avoid possible errors when skewing time
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
 run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
+
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
 
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager

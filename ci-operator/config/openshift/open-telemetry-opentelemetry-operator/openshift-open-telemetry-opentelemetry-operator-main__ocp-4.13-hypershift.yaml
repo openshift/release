@@ -15,12 +15,13 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
-binary_build_commands: make manager && make targetallocator && make operator-opamp-bridge
+binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
+  operator-opamp-bridge
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -56,7 +57,7 @@ images:
 operator:
   bundles:
   - as: opentelemetry-bundle
-    context_dir: .
+    context_dir: ./bundle/openshift
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:.*
@@ -85,8 +86,6 @@ tests:
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
         ]
-      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
-        tests/e2e-openshift/otlp-metrics-traces
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
@@ -105,7 +104,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
-    - ref: distributed-tracing-tests-opentelemetry
+    - ref: distributed-tracing-tests-opentelemetry-upstream
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 zz_generated_metadata:
   branch: main

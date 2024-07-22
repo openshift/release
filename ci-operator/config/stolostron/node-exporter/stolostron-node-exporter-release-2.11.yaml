@@ -3,22 +3,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
+  stolostron_builder_go1.21-linux:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.21-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.21-linux
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.21-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
   to: node-exporter
 promotion:
   to:
@@ -41,7 +41,7 @@ resources:
       memory: 200Mi
 tests:
 - as: test-unit
-  commands: make test
+  commands: make -f Makefile.prow test
   container:
     from: src
 - as: ocm-ci-rbac
@@ -56,7 +56,7 @@ tests:
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: test-e2e
-  commands: make test
+  commands: make -f Makefile.prow test
   container:
     from: src
 - as: sonar-pre-submit

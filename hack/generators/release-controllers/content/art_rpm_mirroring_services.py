@@ -85,7 +85,9 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                         '--path=/tmp/config',
                                         '--max-size=5g',
                                         '--timeout=30m',
-                                        '/tmp/repos'],
+                                        '/tmp/repos',
+                                        "/tmp/key",
+                                        "/tmp/mirror-enterprise-basic-auth"],
                             'image': ' ',
                             'name': 'mirror',
                             'ports': [{

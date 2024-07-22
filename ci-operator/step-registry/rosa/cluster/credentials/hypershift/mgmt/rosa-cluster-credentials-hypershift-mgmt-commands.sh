@@ -6,11 +6,28 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
 OCM_VERSION=$(ocm version)
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+OCM_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${OCM_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
+  ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+else
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  exit 1
+fi
 
 # Get the kubeconfig of the management cluster who manages the hosted cluster
 echo "Get the kubeconfig of the manangement cluster ..."

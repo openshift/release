@@ -7,13 +7,13 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # mirror registry
-install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-if [ ! -f "${install_config_icsp_patch}" ]; then
-    echo "File ${install_config_icsp_patch} does not exist."
+install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
+if [ ! -f "${install_config_mirror_patch}" ]; then
+    echo "File ${install_config_mirror_patch} does not exist."
     exit 1
 fi
 
-echo -e "image registry:\n$(cat ${install_config_icsp_patch})"
+echo -e "image registry:\n$(cat ${install_config_mirror_patch})"
 
 # mirror registry credential
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
@@ -43,6 +43,6 @@ EOF
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
 # imageContentSources patch
-yq-go m -x -i "${CONFIG}" "${install_config_icsp_patch}"
+yq-go m -x -i "${CONFIG}" "${install_config_mirror_patch}"
 
 rm -f "${mirror_registry_pull_secret}"

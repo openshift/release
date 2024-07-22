@@ -169,6 +169,11 @@ cat > run_test_playbook.yaml <<-"EOF"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
     CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
     BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
+  pre_tasks:
+    - name: wait for ssh
+      ansible.builtin.wait_for_connection:
+        sleep: 30
+        delay: 30
   tasks:
     # Some Packet images have a file /usr/config left from the provisioning phase.
     # The problem is that sos expects it to be a directory. Since we don't care

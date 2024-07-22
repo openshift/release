@@ -67,6 +67,7 @@ export QE_USAGE=${QE_USAGE}
 export WAIT_OPERATORS=${WAIT_OPERATORS}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
+export RHCS_URL=${RHCS_URL}
 export RHCS_TOKEN=${RHCS_TOKEN}
 export VERSION=${VERSION}
 export REGION=${REGION}
@@ -92,6 +93,11 @@ ginkgo run \
 save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
+
+# clean files before leaving
+rm -rf ${SHARED_DIR}/tf-manifests
+rm -rf ${SHARED_DIR}/rhcs_preparation.log
+
 if [ ! -z "$prepareFailure" ]; then
     exit 1
 fi

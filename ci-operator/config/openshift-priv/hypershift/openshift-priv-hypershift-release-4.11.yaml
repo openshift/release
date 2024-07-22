@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.11-priv
-    namespace: ocp-private
-    tag: base
   cli:
     name: 4.11-priv
     namespace: ocp-private
@@ -11,6 +7,10 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: hypershift-operator
+  ocp_4.11_base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
@@ -21,8 +21,10 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
 - dockerfile_path: Dockerfile.control-plane
-  from: base
   inputs:
+    ocp_4.11_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:base
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
@@ -70,6 +72,7 @@ tests:
       MANAGED_CLUSTER_TYPE: iks
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks-release.kubeconfig
       TEST_TYPE: release
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e-release
 - as: e2e-ibmcloud-roks
   optional: true
@@ -80,6 +83,7 @@ tests:
       MANAGED_CLUSTER_TYPE: openshift
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks-release.kubeconfig
       TEST_TYPE: release
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e-release
 zz_generated_metadata:
   branch: release-4.11

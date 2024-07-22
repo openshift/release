@@ -127,11 +127,20 @@ promotion:
   to:
   - additional_images:
       artifacts: artifacts
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.16"
     namespace: ocp
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - rhel-coreos
+    - hyperkube
+    - kubernetes-tests
+    - pod
+    - installer-kube-apiserver-artifacts
+    name: scos-4.16
+    namespace: origin
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -256,7 +265,8 @@ tests:
     memory_backed_volume:
       size: 6Gi
 - as: verify
-  commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
+  commands: |
+    KUBE_VERIFY_GIT_BRANCH="${PULL_BASE_REF:-master}" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
   container:
     from: src
 - as: verify-commits
@@ -362,11 +372,24 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
   steps:
     cluster_profile: aws
     test:

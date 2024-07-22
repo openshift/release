@@ -99,7 +99,7 @@ case "${PLATFORM}" in
     fi
 
     if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
-      ARGS+=( "--node-selector ${CONTROL_PLANE_NODE_SELECTOR}" )
+      ARGS+=( "--node-selector \"${CONTROL_PLANE_NODE_SELECTOR}\"" )
     fi
 
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"

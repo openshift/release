@@ -35,6 +35,23 @@ function is_valid_es(){
   fi
 }
 
+calculate_install_ready() {
+  timers=$(jq -s .[0].timers.install $1)
+  sum=0
+  for key in $(jq -r 'keys[]' <<< "$timers") ; do
+    value=$(jq -r ".$key" <<< "$timers")
+    sum=$((sum + value))
+  done
+  echo $sum
+}
+
+calculate_cluster_ready() {
+  co_wait_time=$(jq -r -s .[0].timers.co_wait_time $2)
+  sum=$(($co_wait_time + $1))
+  echo $sum
+}
+
+
 index_metadata(){
   METADATA="${1}"
   URL="${2}/${3}/_doc"
@@ -54,8 +71,12 @@ index_metadata(){
 if [[ "${INDEX_ENABLED}" == "true" ]] ; then
   ES_SERVER=$(cat "/secret/host")
   if is_valid_es "${ES_SERVER}" "${ES_INDEX}" && is_valid_json "${SHARED_DIR}/${METADATA_FILE}" ; then
-    jq --arg uuid "$(uuidgen)" '. + { "uuid": $uuid }' "${SHARED_DIR}/${METADATA_FILE}" > "${SHARED_DIR}/${METADATA_FILE}_es"
-    cat "${SHARED_DIR}/${METADATA_FILE}_es" | jq 'to_entries | map(select(.key | contains("AWS") | not)) | from_entries | .timestamp |= (now | strftime("%Y-%m-%dT%H:%M:%SZ"))' > "${SHARED_DIR}/${METADATA_FILE}_filtered"
-    index_metadata "${SHARED_DIR}/${METADATA_FILE}_filtered" "${ES_SERVER}" "${ES_INDEX}"
+    install_ready=$(calculate_install_ready ${SHARED_DIR}/${METADATA_FILE})
+    cluster_ready=$(calculate_cluster_ready $install_ready ${SHARED_DIR}/${METADATA_FILE})
+    echo $cluster_ready
+    jq --arg uuid "$(uuidgen)" '. + { "uuid": $uuid }' "${SHARED_DIR}/${METADATA_FILE}" > "${SHARED_DIR}/${METADATA_FILE}_1"
+    jq --arg install_ready $install_ready --arg cluster_ready $cluster_ready '.timers += { "install_ready": $install_ready, "cluster_ready": $cluster_ready }' "${SHARED_DIR}/${METADATA_FILE}_1" > "${SHARED_DIR}/${METADATA_FILE}_2"
+    cat "${SHARED_DIR}/${METADATA_FILE}_2" | jq 'to_entries | map(select(.key | contains("AWS") | not)) | from_entries | .timestamp |= (now | strftime("%Y-%m-%dT%H:%M:%SZ"))' > "${SHARED_DIR}/${METADATA_FILE}_3"
+    index_metadata "${SHARED_DIR}/${METADATA_FILE}_3" "${ES_SERVER}" "${ES_INDEX}"
   fi
 fi

@@ -28,7 +28,14 @@ export CYPRESS_USERNAME=${OCP_CRED_USR}
 export CYPRESS_PASSWD=${OCP_CRED_PSW}
 export CYPRESS_AUTH_PROVIDER="kube:admin"
 
-yarn cypress:run:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
+# for flaky tests
+export CYPRESS_RETRIES=2
+export TEST_GROUP="not @crd-validation and not @multi-cluster and not @skip-lpinterop"
+yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
+export TEST_GROUP="@crd-validation and not @multi-cluster and not @skip-lpinterop"
+yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
+
+# merge all reports together
 yarn cypress:combine:reports
 
 echo "Copying result xml and screenshots to ${ARTIFACT_DIR}"
