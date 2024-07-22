@@ -200,7 +200,7 @@ function get_openshift_baremetal_install_tool {
 function extract_rhcos_images {
 
   echo "************ telcov10n Extract RHCOS images ************"
-  # get_openshift_baremetal_install_tool
+  get_openshift_baremetal_install_tool
 
   # ./openshift-baremetal-install coreos print-stream-json | jq '.architectures.x86_64.artifacts.metal'
   openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
