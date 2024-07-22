@@ -8,7 +8,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.14"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -23,15 +23,13 @@ tests:
     test:
     - as: e2e
       commands: |
-        export GRADLE_USER_HOME=/var/tmp
-        export HOME=/var/tmp
-        echo $HOME
+        export GRADLE_USER_HOME=/var/tmp_gradle
         sha256sum gradle/wrapper/gradle-wrapper.jar
         curl -s --location --output gradle-wrapper.jar.sha256 https://services.gradle.org/distributions/gradle-8.5-wrapper.jar.sha256
         echo " gradle/wrapper/gradle-wrapper.jar" >> gradle-wrapper.jar.sha256
         sha256sum --check gradle-wrapper.jar.sha256
         echo "Running gradle build"
-        NO_FS_ROOTS_ACCESS_CHECK=true ./gradlew integrationTest --no-daemon -Dplugin.verifier.home.dir=/var/tmp/ides
+        NO_FS_ROOTS_ACCESS_CHECK=true ./gradlew integrationTest --no-daemon -Dplugin.verifier.home.dir=/var/tmp_gradle/ides -Dtools.dl.path=/var/tmp_tools
       from: src
       resources:
         requests:
