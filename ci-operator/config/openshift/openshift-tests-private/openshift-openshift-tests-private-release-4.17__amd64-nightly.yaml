@@ -280,18 +280,6 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-longduration-reliability-test-f14
-  cron: 31 11 14,30 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
-      TEST_TIMEOUT_DISASTERRECOVERY: "900"
-    test:
-    - ref: idp-htpasswd
-    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-hive-sd-rosa
   cron: 5 19 7,16,25 * *
   steps:
@@ -1255,18 +1243,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-longduration-reliability-test-f14
-  cron: 31 18 14,30 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
-      TEST_TIMEOUT_DISASTERRECOVERY: "900"
-    test:
-    - ref: idp-htpasswd
-    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-marketplace-mini-perm-f5
   cron: 35 19 3,8,13,18,23,28 * *
   steps:
@@ -1294,7 +1270,7 @@ tests:
     cluster_profile: azure-qe
     env:
       EXTRA_ARGS: --fips
-      HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.16"
+      HYPERSHIFT_OLM_CATALOG_PLACEMENT: guest
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -1332,7 +1308,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftINSTALL&
       TEST_SCENARIOS: Hypershift
     test:
-    - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
 - as: azure-ipi-ovn-hypershift-etcd-disk-encryption-mgmt-f28
@@ -1831,6 +1806,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
       TEST_SCENARIOS: MCO
@@ -1844,6 +1820,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
@@ -1857,8 +1834,39 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "100"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-longduration-tp-mco-g1-f9
+  cron: 43 5 6,15,24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "100"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-longduration-tp-mco-g2-f9
+  cron: 44 5 7,16,25 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "100"
     test:
@@ -1976,17 +1984,6 @@ tests:
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
-    workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-longduration-reliability-test-f14
-  cron: 31 19 14,30 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
-      TEST_TIMEOUT_DISASTERRECOVERY: "900"
-    test:
-    - ref: idp-htpasswd
-    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-workers-rhel8-fips-f28
   cron: 56 23 16 * *
@@ -3019,7 +3016,7 @@ tests:
 - as: vsphere-upi-platform-external-f28
   cron: 56 10 19 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       PLATFORM_NAME: vsphere
     test:
@@ -3028,7 +3025,7 @@ tests:
 - as: vsphere-upi-platform-external-f28-destructive
   cron: 1 22 12 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       PLATFORM_NAME: vsphere
     test:
@@ -3037,14 +3034,14 @@ tests:
 - as: vsphere-upi-platform-none-f28
   cron: 41 4 4 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-platform-none-f28-destructive
   cron: 16 11 30 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
