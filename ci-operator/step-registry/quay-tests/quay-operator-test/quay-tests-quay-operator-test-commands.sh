@@ -93,6 +93,12 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
+echo "list generated shared resources"
+ls ${SHARED_DIR}
+cat ${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS
+cat ${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
+cat ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
+
 echo "Run extended-platform-tests"
  
 extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
