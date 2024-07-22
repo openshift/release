@@ -463,6 +463,7 @@ echo "Ignition file '${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign' created"
 
 rm -rf "${workdir}"
 curl -L https://github.com/liqcui/wondershaper/archive/refs/tags/v1.tar.gz>wondershap.tar.gz
+chmod 755 wondershap.tar.gz
 tar -xvf wondershap.tar.gz
 #git clone https://github.com/SachinNinganure/wondershaper
 #cd wondershaper
