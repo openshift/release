@@ -21,8 +21,7 @@ function check_if_hypershift_env () {
     elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
         export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
     else
-        echo "This idp-htpasswd step is being run as a day-2 operation for a HyperShift guest cluster. We need the kubeconfig of management cluster, but it does not exist!"
-        exit 1
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
     
     count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
