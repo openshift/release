@@ -197,22 +197,6 @@ EOF
   cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars
 }
 
-function cleanup_duplicate_sshkeys() {
-  echo "Cleaning up duplicate SSH Keys"
-  PUB_KEY_DATA=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
-  for KEY in $(ic is keys --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
-  do
-    KEY_DATA=$(ic is key "${KEY}" --output json | jq -r '.public_key')
-    if [ "${KEY_DATA}" == "${PUB_KEY_DATA}" ]
-    then
-      echo "Duplicate key found"
-      retry "ic is keyd ${KEY} -f"
-      echo "Duplicate key deleted"
-      sleep 10
-    fi
-  done
-}
-
 function create_mac_vpc_resources() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/ || true
   "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file var-mac-vpc.tfvars -auto-approve || true
@@ -270,7 +254,6 @@ case "$CLUSTER_TYPE" in
     cleanup_ibmcloud_vpc
     setup_mac_vpc_workspace
     create_mac_vpc_tf_varfile
-    cleanup_duplicate_sshkeys
     create_mac_vpc_resources
   fi
 ;;
