@@ -67,6 +67,7 @@ metadata:
   name: metallb
   namespace: metallb-system
 EOF
+fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
