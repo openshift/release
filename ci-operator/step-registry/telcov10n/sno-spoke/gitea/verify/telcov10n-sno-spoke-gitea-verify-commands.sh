@@ -13,7 +13,7 @@ function set_hub_cluster_kubeconfig {
 }
 
 function run_script_in_the_hub_cluster {
-  local helper_img="quay.io/centos/centos:stream9"
+  local helper_img="${GITEA_HELPER_IMG}"
   local script_file=$1
   shift && local ns=$1
   [ $# -gt 1 ] && shift && local pod_name="${1}"

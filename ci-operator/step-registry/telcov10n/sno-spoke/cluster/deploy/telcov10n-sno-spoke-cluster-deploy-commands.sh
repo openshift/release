@@ -35,7 +35,7 @@ function generate_baremetal_secret {
 }
 
 function run_script_in_the_hub_cluster {
-  local helper_img="quay.io/centos/centos:stream9"
+  local helper_img="${GITEA_HELPER_IMG}"
   local script_file=$1
   shift && local ns=$1
   [ $# -gt 1 ] && shift && local pod_name="${1}"
@@ -162,9 +162,6 @@ echo "$(cat ${ssh_pri_key_file})" > /tmp/ssh-prikey
 chmod 0400 /tmp/ssh-prikey
 
 set -x
-# TODO: Use a image that already have Git package installed
-dnf install -y git
-
 ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
