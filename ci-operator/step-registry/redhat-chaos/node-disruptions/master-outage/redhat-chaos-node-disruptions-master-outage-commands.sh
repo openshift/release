@@ -61,6 +61,7 @@ elif [ "$platform" = "IBMCloud" ]; then
     export region
     export IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
     export IBMC_APIKEY=${CLUSTER_PROFILE_DIR}/ibmcloud-api-key
+    export ACTION="$CLOUD_TYPE-node-reboot"
 fi 
 
 #export AWS_ACCESS_KEY_ID=$aws_access_key_id
