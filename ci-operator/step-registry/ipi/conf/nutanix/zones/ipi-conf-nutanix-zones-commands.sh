@@ -67,4 +67,42 @@ platform:
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
-echo "Updated failureDomains in '${CONFIG}'."
+echo "Updated failureDomains in '${CONFIG}'"
+
+if [[ "$COMPUTE_ZONE" != "" ]]; then
+  PATCH="${SHARED_DIR}/install-config-failureDomains-compute.yaml"
+
+cat >"${PATCH}" <<EOF
+compute:
+- platform:
+    nutanix:
+      failureDomains:
+$(
+    for zone in $COMPUTE_ZONE; do
+        echo "        - $zone"
+    done
+)
+EOF
+
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated compute failureDomains in '${CONFIG}'"
+fi
+
+if [[ "$CONTROL_PLANE_ZONE" != "" ]]; then
+  PATCH="${SHARED_DIR}/install-config-failureDomains-control-plane.yaml"
+
+cat >"${PATCH}" <<EOF
+controlPlane:
+  platform:
+    nutanix:
+      failureDomains:
+$(
+    for zone in $CONTROL_PLANE_ZONE; do
+        echo "        - $zone"
+    done
+)
+EOF
+
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated control plane failureDomains in '${CONFIG}'"
+fi

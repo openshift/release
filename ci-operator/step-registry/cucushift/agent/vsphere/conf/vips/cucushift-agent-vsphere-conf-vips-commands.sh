@@ -17,7 +17,8 @@ fi
 declare vlanid
 declare primaryrouterhostname
 source "${SHARED_DIR}/vsphere_context.sh"
-
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
