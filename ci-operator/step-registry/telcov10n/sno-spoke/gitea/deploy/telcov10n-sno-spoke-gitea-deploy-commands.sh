@@ -37,8 +37,8 @@ gitea_admin_pass="$(cat /var/run/telcov10n/ztp-left-shifting/gitea-admin-pass)"
 
 cat <<EOF > ${helm_gitea_values}
 image:
-  registry: "quay.io"
-  repository: ccardenosa/gitea
+  registry: "${GITEA_REGISTRY}"
+  repository: "${GITEA_REPO}"
 
 serviceAccount:
   name: gitea
@@ -77,7 +77,7 @@ EOF
 
   set -x
   helm status gitea -n ${gitea_project} 2> /dev/null || \
-  helm install gitea gitea-charts/gitea --values ${helm_gitea_values} -n ${gitea_project} --wait
+  helm install gitea gitea-charts/gitea --version ${GITEA_HELM_VERSION} --values ${helm_gitea_values} -n ${gitea_project} --wait
   set +x
 
   setup_openshift_route
