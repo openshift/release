@@ -236,8 +236,19 @@ function generate_agent_service_config {
   echo "************ telcov10n Generate and Deploy AgentServiceConfig CR ************"
 
   echo "Enabling assisted installer service on bare metal"
+  cat <<EOF | oc apply -f -
+apiVersion: metal3.io/v1alpha1
+kind: Provisioning
+metadata:
+  name: provisioning-configuration
+spec:
+  preProvisioningOSDownloadURLs: {}
+  provisioningNetwork: Disabled
+  watchAllNamespaces: true
+EOF
+
   set -x
-  oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true }}'
+  oc get Provisioning provisioning-configuration -oyaml
   set +x
 
   sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
