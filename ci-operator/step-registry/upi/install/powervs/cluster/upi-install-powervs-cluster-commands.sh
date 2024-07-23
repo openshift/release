@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -ignore-os-checks -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
@@ -197,7 +197,6 @@ function create_upi_powervs_cluster() {
   echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
   echo "Done copying the kubeconfig"
-  exit 0
 }
 
 function ic() {
@@ -628,7 +627,7 @@ case "$CLUSTER_TYPE" in
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
-  exit 0
+  echo "Created UPI powervs cluster"
 ;;
 *)
   echo "Creating UPI based PowerVS cluster using ${CLUSTER_TYPE} is not implemented yet..."

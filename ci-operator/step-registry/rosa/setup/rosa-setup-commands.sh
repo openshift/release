@@ -9,9 +9,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE}
 export COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
-export OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+export VERSION=${VERSION:-}
 export CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
+
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 
 log(){
@@ -26,12 +27,19 @@ fi
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
   export AWS_DEFAULT_REGION=${REGION:-$LEASED_RESOURCE}
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
+fi
+
+# Configure shared vpc aws account file
+if [[ -f ${CLUSTER_PROFILE_DIR}/.awscred_shared_account ]];then
+  echo "Got awscred_shared_account and set it to env variable SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE"
+  export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 fi
 
 # Log in

@@ -110,6 +110,11 @@ if [ "W${FORCE_SUCCESS_EXIT}W" == "WyesW" ]; then
 fi
 
 testFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_tests.log | { grep "\[FAIL\]" || true; })
+
+# clean files before leaving
+rm -rf ${SHARED_DIR}/tf-manifests
+rm -rf ${SHARED_DIR}/rhcs_tests.log
+
 if [ ! -z "$testFailure" ]; then
     sleep 1800 #Sleep 1800 to debug why cluster dns not ready
     exit 1

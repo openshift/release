@@ -11,22 +11,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_4.16_base:
-    name: "4.17"
-    namespace: ocp
-    tag: base
-  ocp_4.16_base-rhel9:
-    name: "4.17"
-    namespace: ocp
-    tag: base-rhel9
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -61,9 +49,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.aws-ebs
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -73,9 +58,6 @@ images:
   to: aws-ebs-csi-driver-operator
 - dockerfile_path: Dockerfile.aws-efs
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -85,18 +67,18 @@ images:
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
-    ocp_4.16_base:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: aws-efs-csi-operator-create-efs
 - dockerfile_path: Dockerfile.azure-disk
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -109,9 +91,9 @@ images:
   to: azure-disk-csi-driver-operator-test
 - dockerfile_path: Dockerfile.azure-file
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -121,9 +103,9 @@ images:
   to: azure-file-csi-driver-operator-test
 - dockerfile_path: Dockerfile.samba
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -140,7 +122,7 @@ operator:
     update_graph: replaces
   - as: aws-efs-csi-driver-operator-bundle
     base_index: operator-index
-    context_dir: legacy/aws-efs-csi-driver-operator/config
+    context_dir: config/aws-efs
     dockerfile_path: bundle.Dockerfile
     update_graph: replaces
   substitutions:
