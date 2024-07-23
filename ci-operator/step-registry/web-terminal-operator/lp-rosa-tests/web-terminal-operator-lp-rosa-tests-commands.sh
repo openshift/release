@@ -4,8 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#set path for oc binary
-export PATH=$PATH:/workdir/ 
+
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
@@ -24,6 +23,5 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
-cd /workdir
 
 sleep 3600
