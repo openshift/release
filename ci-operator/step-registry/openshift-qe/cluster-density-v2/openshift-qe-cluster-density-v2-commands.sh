@@ -13,8 +13,11 @@ source ./venv_qe/bin/activate
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
 if [[ $ES_HOST == *"-acs-"* ]]; then
-    ES_PASSWORD=$(cat "/secret/password_acs")
-    ES_USERNAME=$(cat "/secret/username_acs")
+    ES_PASSWORD=$(cat "/secret_stackrox/password")
+    ES_USERNAME=$(cat "/secret_stackrox/username")
+    if [ -e /secret_stackrox/host ]; then
+        ES_HOST=$(cat "/secret_stackrox/host")
+    fi
 else
     ES_PASSWORD=$(cat "/secret/password")
     ES_USERNAME=$(cat "/secret/username")
