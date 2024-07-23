@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#
+# Wait for cluster operators is reporting as stable before
+# provisioning the test environment.
+#
+
 set -o nounset
 set -o errexit
 set -o pipefail
