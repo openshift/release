@@ -309,6 +309,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -333,6 +335,9 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
@@ -347,6 +352,9 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     post:
     - chain: ipi-aws-post
     - ref: ipi-deprovision-aws-custom-security-groups
@@ -390,6 +398,8 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
@@ -454,6 +464,9 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-upgrade-aws-latestinstaller
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upi
@@ -495,6 +508,8 @@ tests:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "8.4"
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
@@ -680,7 +695,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-zones
@@ -707,6 +722,18 @@ tests:
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-vsphere-multi-vcenter-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-crc
   optional: true
   steps:
@@ -725,6 +752,9 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
@@ -741,6 +771,8 @@ tests:
     cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
     - chain: ipi-aws-pre
@@ -860,6 +892,9 @@ tests:
   run_if_changed: /aws/subnet.go
   steps:
     cluster_profile: aws
+    env:
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 - always_run: false
@@ -875,6 +910,8 @@ tests:
     cluster_profile: aws
     env:
       CLUSTER_NETWORK_MTU: "1200"
+      SPOT_INSTANCES: "true"
+      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-network-mtu
   timeout: 6h0m0s
 - always_run: false
