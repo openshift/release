@@ -464,13 +464,12 @@ echo "Ignition file '${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign' created"
 rm -rf "${workdir}"
 curl -L https://github.com/liqcui/wondershaper/archive/refs/tags/v1.tar.gz>/tmp/wondershap.tar.gz
 cd /tmp/
-ls -lrt
 #chmod 755 wondershap.tar.gz
 tar xvf wondershap.tar.gz
 
 
 #git clone https://github.com/SachinNinganure/wondershaper
-cd wondershaper-1
+
+#cd wondershaper-1
 #./wondershaper -a eth0 -u 4096 -d 8192
-sudo su -
-wondershaper -a eth0 -u 70000 -d 80000
+#wondershaper -a eth0 -u 70000 -d 80000
