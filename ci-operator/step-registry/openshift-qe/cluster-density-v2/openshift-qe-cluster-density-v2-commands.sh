@@ -18,6 +18,7 @@ if [[ $ES_HOST == *"-acs-"* ]]; then
     if [ -e /secret_stackrox/host ]; then
         ES_HOST=$(cat "/secret_stackrox/host")
     fi
+    echo "Using stackrox ES_HOST=${ES_HOST}"
 else
     ES_PASSWORD=$(cat "/secret/password")
     ES_USERNAME=$(cat "/secret/username")
