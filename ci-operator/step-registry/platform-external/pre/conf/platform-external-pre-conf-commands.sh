@@ -41,15 +41,29 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
 fi
 
 #
-# Render the install-config.yaml
+# Setting up the platform config
 #
-log "Creating install-config.yaml patch"
-cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+
+platform_config="
 platform:
   external:
     platformName: ${PROVIDER_NAME}
-    cloudControllerManager: ${CONFIG_PLATFORM_EXTERNAL_CCM}
+    cloudControllerManager: ${CONFIG_PLATFORM_EXTERNAL_CCM}"
+
+if [[ "${PLATFORM_TYPE}" == "none" ]]; then
+  platform_config="
+platform:
+  external: {}"
+fi
+
+#
+# Render the install-config.yaml
+#
+
+log "Creating install-config.yaml patch"
+cat > "${PATCH}" << EOF
+baseDomain: ${BASE_DOMAIN}
+${platform_config}
 compute:
 - name: worker
   replicas: 3

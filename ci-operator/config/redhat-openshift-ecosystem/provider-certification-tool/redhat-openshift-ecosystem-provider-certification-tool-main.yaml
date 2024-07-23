@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make linux-amd64
@@ -12,13 +12,19 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.17"
       namespace: ocp
   latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.15"
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -31,25 +37,28 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
-- as: platform-none-vsphere
-  cron: 0 5 * * 0
+- always_run: false
+  as: platform-none-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:stable
+      OPCT_DEV_EXTRA_CMD: --plugins-image=plugin-openshift-tests:stable
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
-- as: platform-external-vsphere
-  cron: 0 10 * * 0
+- always_run: false
+  as: platform-external-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:stable
+      OPCT_DEV_EXTRA_CMD: --plugins-image=plugin-openshift-tests:stable
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
-- as: platform-none-vsphere-upgrade
-  cron: 0 15 * * 0
+- always_run: false
+  as: platform-none-vsphere-upgrade
+  optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -61,4 +70,3 @@ zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
   repo: provider-certification-tool
-  variant: "4.14"
