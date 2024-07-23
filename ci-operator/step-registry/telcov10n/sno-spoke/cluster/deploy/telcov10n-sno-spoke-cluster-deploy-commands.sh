@@ -292,7 +292,7 @@ EOF
   oc get AgentServiceConfig agent -oyaml
   # oc -n openshift-local-storage wait localvolume localstorage-disks --for condition=Available --timeout 10m
   assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | grep "^assisted-service")
-  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=10m
+  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x
 }

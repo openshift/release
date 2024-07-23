@@ -16,10 +16,10 @@ function clean_up {
 
   echo "************ telcov10n Clean up AgentServiceConfig CR ************"
   set -x
-  oc delete AgentServiceConfig || echo "The CR didn't exist..."
+  oc delete AgentServiceConfig agent || echo "The CR didn't exist..."
   assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
     grep "^assisted-service" || echo "assisted-service")
-  oc -n multicluster-engine wait --for=delete pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=10m
+  oc -n multicluster-engine wait --for=delete pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
   set +x
 }
 
