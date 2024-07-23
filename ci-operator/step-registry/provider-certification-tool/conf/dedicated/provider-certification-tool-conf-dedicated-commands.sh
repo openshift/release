@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#
+# Setup the OPCT dedicated node to be used exclisvely for the
+# aggregator server and workflow steps (plugin openshift-tests).
+# The selector algorith tries to not use the nodes with prometheus
+# server, heaviest workloads running in worker nodes, to prevent
+# disruptions and total time to setup the environment.
+#
+
 set -o nounset
 set -o errexit
 set -o pipefail

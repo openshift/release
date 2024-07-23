@@ -5,22 +5,20 @@ set -o errexit
 set -o pipefail
 
 # Downloading latest stable
-BIN_NAME="openshift-provider-cert"
-BIN_OS="linux"
-BIN_ARCH="amd64"
-BIN_FULLNAME="${BIN_NAME}-${BIN_OS}-${BIN_ARCH}"
-BIN_PATH="/usr/bin/${BIN_FULLNAME}"
-OPCT_IS="registry.ci.openshift.org/ci/opct:latest"
 CI_CREDENTIALS="/var/run/ci-credentials/registry/.dockerconfigjson"
-
 WORKDIR="/tmp"
-OPCT_EXEC="/tmp/${BIN_FULLNAME}-latest"
 
-cat <<EOF > "${SHARED_DIR}/install-env"
+OPCT_CLI_NAME="opct"
+OPCT_CLI_OS="linux"
+OPCT_CLI_ARCH="amd64"
+OPCT_CLI_NAME="${OPCT_CLI_NAME}-${OPCT_CLI_OS}-${OPCT_CLI_ARCH}"
+OPCT_CLI_PATH_IMAGE=/usr/bin/${OPCT_CLI_NAME}
+OPCT_CLI=/tmp/${OPCT_CLI_NAME}
+WORKDIR=/tmp
+
+cat <<EOF > "${SHARED_DIR}/env"
 # OPCT mirroed from ImageStream
-export OPCT_IS="${OPCT_IS}"
-export BIN_PATH="${BIN_PATH}"
-export OPCT_EXEC="${OPCT_EXEC}"
+export OPCT_CLI="${OPCT_CLI}"
 export CI_CREDENTIALS="${CI_CREDENTIALS}"
 export WORKDIR=${WORKDIR}
 
@@ -37,57 +35,33 @@ function show_msg() {
 # Extract OPCT from ImageStream
 function extract_opct() {
   pushd ${WORKDIR}
-  show_msg "Extracting OPCT binary from image stream ${OPCT_IS}"
-  oc image extract ${OPCT_IS} \
-    --file=${BIN_PATH} \
-    --registry-config=${CI_CREDENTIALS}
-
-  show_msg "Extracted! Moving ./${BIN_FULLNAME} to ${OPCT_EXEC}"
-  mv ./${BIN_FULLNAME} ${OPCT_EXEC}
-
-  show_msg "Granting execution permissions"
-  chmod u+x ${OPCT_EXEC}
-
-  show_msg "Running ${OPCT_EXEC} version"
-  ${OPCT_EXEC} version
+  show_msg "Extracting OPCT binary from image stream ${OPCT_CLI_IMAGE}"
+  oc image extract ${OPCT_CLI_IMAGE} \
+    --registry-config=${CI_CREDENTIALS} \
+    --file=${OPCT_CLI_PATH_IMAGE} && \
+    chmod u+x ${OPCT_CLI}
+  
+  show_msg "Running ${OPCT_CLI} version"
+  ${OPCT_CLI} version
   popd
-}
-
-# Install awscli
-function install_awscli() {
-  # Install AWS CLI
-  if ! command -v aws &> /dev/null
-  then
-      show_msg "Installing AWS cli..."
-      export PATH="${HOME}/.local/bin:${PATH}"
-      if command -v pip3 &> /dev/null
-      then
-          pip3 install --user awscli
-      else
-          if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-          then
-            easy_install --user 'pip<21'
-            pip install --user awscli
-          else
-            show_msg "No pip available exiting..."
-            exit 1
-          fi
-      fi
-  fi
 }
 EOF
 
+set -x
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/install-env"
+source "${SHARED_DIR}/env"
 extract_opct
 
-test ! -x "$OPCT_EXEC" && show_msg "OPCT binary $OPCT_EXEC not found, check image stream!"
+if [[ ! -x "${OPCT_CLI}" ]]; then
+  show_msg "OPCT binary ${OPCT_CLI} not found, check image stream!"
+  exit 1
+fi
 
 # Extracting OPCT version
 show_msg "Extracting OPCT_VERSION..."
-$OPCT_EXEC version | tee "${ARTIFACT_DIR}/opct-version"
+$OPCT_CLI version | tee "${ARTIFACT_DIR}/opct-version"
 
-OPCT_VERSION=$($OPCT_EXEC version | grep ^OpenShift | grep -Po '(v\d+.\d+.\d+)')
+OPCT_VERSION=$($OPCT_CLI version | grep ^"OPCT CLI" | awk -F': ' '{print$2}' | awk -F'+' '{print$1}' || true)
 OPCT_MODE="${OPCT_RUN_MODE:-default}"
 
 # Populate env var required by OPCT_VERSION
@@ -104,18 +78,9 @@ OCP_TOPOLOGY=$(oc get infrastructures cluster -o jsonpath='{.status.controlPlane
 # The steps below will discovers the stable 4.y+1 based on the
 # cincinnati graph data, then extract the Image Digest and set it as
 # env var consumed by the 'run' step.
+cmd_jq="$(which yq 2>/dev/null || true)"
 if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
   pushd ${WORKDIR}
-  cmd_jq="$(which yq 2>/dev/null || true)"
-  if [ ! -x "${cmd_jq}" ]; then
-      cmd_jq="${WORKDIR}/yq"
-      echo "# jq not found, installing on $cmd_jq..."
-      wget --quiet https://github.com/mikefarah/yq/releases/download/v4.33.3/yq_linux_amd64 \
-          -O $cmd_jq
-
-      echo "# granting exec permissions"
-      chmod +x $cmd_jq
-  fi
 
   UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
   current_version_x=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
@@ -171,13 +136,13 @@ OBJECT_META="OPCT_VERSION=${OPCT_VERSION},OPCT_MODE=${OPCT_MODE},OCP=${OCP_VERSI
 
 # Update install-env script
 
-cat <<EOF >> "${SHARED_DIR}/install-env"
+cat <<EOF >> "${SHARED_DIR}/env"
 
 # Required by results
-export OPCT_VERSION=${OPCT_VERSION}
+export OPCT_VERSION="${OPCT_VERSION}"
 export OBJECT_PATH="${OBJECT_PATH}"
 export OBJECT_META="${OBJECT_META}"
 export TARGET_RELEASE_IMAGE="${TARGET_RELEASE_IMAGE:-}"
 EOF
 
-cp "${SHARED_DIR}/install-env" "${ARTIFACT_DIR}/install-env"
+cp "${SHARED_DIR}/env" "${ARTIFACT_DIR}/env"
