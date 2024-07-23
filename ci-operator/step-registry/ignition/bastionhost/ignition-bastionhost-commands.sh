@@ -472,4 +472,4 @@ tar xvf wondershap.tar.gz
 #git clone https://github.com/SachinNinganure/wondershaper
 cd wondershaper-1
 #./wondershaper -a eth0 -u 4096 -d 8192
-./wondershaper-1/wondershaper -a eth0 -u 70000 -d 80000
+./wondershaper -a eth0 -u 70000 -d 80000
