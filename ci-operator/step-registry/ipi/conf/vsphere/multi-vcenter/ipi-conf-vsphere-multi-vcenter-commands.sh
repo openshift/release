@@ -10,6 +10,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 
