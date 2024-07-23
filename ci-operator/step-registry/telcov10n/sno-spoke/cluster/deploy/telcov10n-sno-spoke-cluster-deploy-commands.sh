@@ -83,7 +83,7 @@ spec:
   clusters:
   - clusterName: "${SPOKE_CLUSTER_NAME}"
     networkType: "OVNKubernetes"
-    installConfigOverrides: "${INSTALL_CONFIG_OVERRIDES}"
+    installConfigOverrides: '${INSTALL_CONFIG_OVERRIDES}'
     extraManifestPath: sno-extra-manifest/
     clusterType: sno
     clusterProfile: du
@@ -101,7 +101,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${NTP_SRC}
-    ignitionConfigOverride: "\'${GLOBAL_IGNITION_CONF_OVERRIDE}\'"
+    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "sno.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
@@ -111,7 +111,7 @@ spec:
         bootMACAddress: "${BOOT_MAC}"
         bootMode: "UEFI"
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ignitionConfigOverride: "\'${NODE_IGNITION_CONF_OVERRIDE}\'"
+        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
         nodeNetwork:
           interfaces:
             - name: "${NODE_NIC}"
@@ -166,8 +166,15 @@ ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
-mkdir -pv \${ztp_repo_dir}/siteconfig/sno-extra-manifest
-echo "$(cat ${site_config_file})" > \${ztp_repo_dir}/siteconfig/site_config.yaml
+mkdir -pv \${ztp_repo_dir}/site-configs/sno-extra-manifest
+mkdir -pv \${ztp_repo_dir}/site-policies
+echo "$(cat ${site_config_file})" > \${ztp_repo_dir}/site-configs/site-config.yaml
+cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
+generators:
+  - site-config.yaml
+EOK
+touch \${ztp_repo_dir}/site-configs/sno-extra-manifest/.placeholder
+touch \${ztp_repo_dir}/site-policies/.placeholder
 
 cd \${ztp_repo_dir}
 git add .

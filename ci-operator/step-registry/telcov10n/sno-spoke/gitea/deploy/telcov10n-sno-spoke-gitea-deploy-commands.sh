@@ -88,6 +88,10 @@ function setup_openshift_route {
 
   echo "************ telcov10n Setup route to Gitea repo ************"
 
+  set -x
+  gitea_k8s_service_name=$(oc -n ${gitea_project} get service --no-headers -o custom-columns=":metadata.name"|grep http)
+  gitea_k8s_service_port=$(oc -n ${gitea_project} get service ${gitea_k8s_service_name} -ojsonpath='{.spec.ports[?(.name=="http")].port}' | jq -r)
+  set +x
   cat << EOF | oc apply -f -
 ---
 apiVersion: route.openshift.io/v1
@@ -98,14 +102,15 @@ metadata:
 spec:
   to:
     kind: Service
-    name: gitea-http
+    name: ${gitea_k8s_service_name}
   port:
-    targetPort: 3000
+    targetPort: ${gitea_k8s_service_port}
   tls:
     termination: edge
   wildcardPolicy: None
 EOF
 
+  gitea_url_k8s_service="http://${gitea_k8s_service_name}.${gitea_project}:${gitea_k8s_service_port}"
   gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
   echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
   echo "Wait until Gitea endpoint is reachable via openshift route..."
@@ -157,6 +162,8 @@ function create_ztp_gitea_repo {
     -d '{"name":"'${repo_name}'"}' \
     "$(cat ${SHARED_DIR}/gitea-url.txt)/api/v1/user/repos"
   set +x
+
+  echo -n "${gitea_url_k8s_service}/${GITEA_ADMIN_USERNAME}/${repo_name}" > ${SHARED_DIR}/gitea-http-repo-uri.txt
 }
 
 function generate_gitea_ssh_uri {
