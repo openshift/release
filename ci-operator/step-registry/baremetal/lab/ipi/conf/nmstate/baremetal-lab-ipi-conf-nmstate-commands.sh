@@ -93,6 +93,9 @@ spec:
       files:
 EOF
 
+master_ignore_array_tmp=()
+worker_ignore_array_tmp=()
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -131,12 +134,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       dhcp: false"
   br_ex_contents_source="$(echo "${br_ex_configuration}" | base64 -w0)"
 
-  ignore_iface_configuration="
-  [device-${baremetal_iface}]
-  match-device=interface-name:${baremetal_iface}
-  keep-configuration=no"
-  ignore_iface_configuration="$(echo "${ignore_iface_configuration}" | base64 -w0)"
-
   if [[ "$name" =~ master* ]]; then
     cat >> "${MASTER_BR_MANIFEST}" <<EOF
       - contents:
@@ -145,15 +142,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    cat >> "${MASTER_IGNORE_MANIFEST}" <<EOF
-      - contents:
-          source: data:text/plain;charset=utf-8;base64,${ignore_iface_configuration}
-        mode: 0644
-        overwrite: true
-        path: /etc/NetworkManager/conf.d/10-ignore-${baremetal_iface}.conf
-EOF
+    master_ignore_array_tmp+=(${baremetal_iface})
   fi
-
   if [[ "$name" =~ worker* ]]; then
     cat >> "${WORKER_BR_MANIFEST}" <<EOF
       - contents:
@@ -162,15 +152,46 @@ EOF
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    cat >> "${WORKER_IGNORE_MANIFEST}" <<EOF
+    worker_ignore_array_tmp+=(${baremetal_iface})
+  fi
+done
+
+master_ignore_array=($(echo "${master_ignore_array_tmp[@]}" | tr ' ' '\n' | sort | uniq))
+worker_ignore_array=($(echo "${worker_ignore_array_tmp[@]}" | tr ' ' '\n' | sort | uniq))
+echo "master_ignore_array: ${master_ignore_array[@]}"
+echo "worker_ignore_array: ${worker_ignore_array[@]}"
+
+for iface in "${master_ignore_array[@]}"; do
+  ignore_iface_configuration="
+  [device-${iface}]
+  match-device=interface-name:${iface}
+  keep-configuration=no"
+  ignore_iface_configuration="$(echo "${ignore_iface_configuration}" | base64 -w0)"
+
+  cat >> "${MASTER_IGNORE_MANIFEST}" <<EOF
       - contents:
           source: data:text/plain;charset=utf-8;base64,${ignore_iface_configuration}
         mode: 0644
         overwrite: true
-        path: /etc/NetworkManager/conf.d/10-ignore-${baremetal_iface}.conf
+        path: /etc/NetworkManager/conf.d/10-ignore-${iface}.conf
 EOF
-  fi
 done
+for iface in "${worker_ignore_array[@]}"; do
+  ignore_iface_configuration="
+  [device-${iface}]
+  match-device=interface-name:${iface}
+  keep-configuration=no"
+  ignore_iface_configuration="$(echo "${ignore_iface_configuration}" | base64 -w0)"
+
+  cat >> "${WORKER_IGNORE_MANIFEST}" <<EOF
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${ignore_iface_configuration}
+        mode: 0644
+        overwrite: true
+        path: /etc/NetworkManager/conf.d/10-ignore-${iface}.conf
+EOF
+done
+
 
 echo "manifests for br-ex configuration on masters"
 cat "${MASTER_BR_MANIFEST}"
