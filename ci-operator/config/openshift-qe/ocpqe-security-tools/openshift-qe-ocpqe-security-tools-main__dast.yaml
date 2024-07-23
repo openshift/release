@@ -6,20 +6,7 @@ base_images:
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/python-311
-      USER root
-      ENV GOVERSION=1.21.7
-      RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
-          yum clean all && rm -rf /var/cache/dnf/*
-      # Install Go. This version will only be used for unit tests. The
-      # official builds are done via their own container image Dockerfiles
-      RUN rm -rf /usr/local/go && \
-          curl -fsSL https://go.dev/dl/go${GOVERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
-      ENV PATH=$PATH:/usr/local/go/bin
-      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
-          chmod 700 get_helm.sh && \
-          ./get_helm.sh
-      RUN pip install virtualenv
+      FROM quay.io/redhatproductsecurity/rapidast:2.6.0
 images:
 - dockerfile_literal: |
     FROM src
@@ -74,7 +61,7 @@ tests:
     env:
       API_URL_LIST: admissionregistration.k8s.io/v1
     test:
-    - ref: openshift-qe-ocpqe-security-tools-dast
+    - ref: openshift-qe-ocpqe-security-tools-dast-python
   timeout: 1h0m0s
 - as: security-second-half
   cron: 0 16 15 * *
