@@ -36,8 +36,8 @@ trap 'rm -f "${PROMTOKEN}"' EXIT
 oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.ci-monitoring.app.ci.token.txt > "${PROMTOKEN}"
 
 set -x
-${CONTAINER_ENGINE} pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/prow-job-dispatcher:latest
-${CONTAINER_ENGINE} run ${CONTAINER_ENGINE_OPTS} --rm -v "$PWD:/release${VOLUME_MOUNT_FLAGS}" -v "${PROMTOKEN}:/promtoken${VOLUME_MOUNT_FLAGS}" registry.ci.openshift.org/ci/prow-job-dispatcher:latest "$@" \
+${CONTAINER_ENGINE} pull ${CONTAINER_ENGINE_OPTS} quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
+${CONTAINER_ENGINE} run ${CONTAINER_ENGINE_OPTS} --rm -v "$PWD:/release${VOLUME_MOUNT_FLAGS}" -v "${PROMTOKEN}:/promtoken${VOLUME_MOUNT_FLAGS}" quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest "$@" \
     --target-dir=/release \
     --config-path=/release/core-services/sanitize-prow-jobs/_config.yaml \
     --prow-jobs-dir=/release/ci-operator/jobs \
