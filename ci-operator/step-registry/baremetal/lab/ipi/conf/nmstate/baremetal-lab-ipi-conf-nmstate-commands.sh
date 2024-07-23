@@ -93,8 +93,8 @@ spec:
       files:
 EOF
 
-master_ignore_array_tmp=()
-worker_ignore_array_tmp=()
+master_ignore_array=()
+worker_ignore_array=()
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -142,7 +142,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    master_ignore_array_tmp+=(${baremetal_iface})
+    if [[ ! "${master_ignore_array[*]}" =~ "${baremetal_iface}" ]]; then
+      master_ignore_array+=("${baremetal_iface}")
+    fi
   fi
   if [[ "$name" =~ worker* ]]; then
     cat >> "${WORKER_BR_MANIFEST}" <<EOF
@@ -152,14 +154,14 @@ EOF
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    worker_ignore_array_tmp+=(${baremetal_iface})
+    if [[ ! "${worker_ignore_array[*]}" =~ "${baremetal_iface}" ]]; then
+      worker_ignore_array+=("${baremetal_iface}")
+    fi
   fi
 done
 
-master_ignore_array=($(echo "${master_ignore_array_tmp[@]}" | tr ' ' '\n' | sort | uniq))
-worker_ignore_array=($(echo "${worker_ignore_array_tmp[@]}" | tr ' ' '\n' | sort | uniq))
-echo "master_ignore_array: ${master_ignore_array[@]}"
-echo "worker_ignore_array: ${worker_ignore_array[@]}"
+echo "${master_ignore_array[@]}"
+echo "${worker_ignore_array[@]}"
 
 for iface in "${master_ignore_array[@]}"; do
   ignore_iface_configuration="
