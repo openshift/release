@@ -10,23 +10,31 @@ ref:
     - name: MCO_CONF_DAY2_CUSTOM_MCP_NAME
       default: ""
       documentation: |
-        The name of the custom MachineConfigPool that will be created
-        If the name is empty, then no custom MCP will be created and this step will be skipped
+        An space separated list of names that will be used to create custom machine config pools
+        If the this value is empty, then no custom MCP will be created and this step will be skipped
     - name: MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES
-      default: "1"
+      default: ""
       documentation: |
-        The number of nodes that will be removed from the worker pool and added to the new custom pool
-        If the value is an empty string "" all nodes matching the MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL label will be added to the pool
+        A space separated list with the number of nodes that will be removed from the worker pool and added to the new custom pool
+        If the value is negative all nodes matching the label will be added to the pool
     - name: MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT
       default: "20m"
       documentation: |
         Maximum time that we will wait for the new custom pool to be updated
     - name: MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL
-      default: "node-role.kubernetes.io/worker"
+      default: ""
       documentation: |
-        The label used to filter the nodes that can be added to the new pool. 
-        By default we take any node fomr the worker pool, but we can narrow it by adding more lables
+        A space separated list with the label used to filter the nodes that can be added to the new pools. 
+        By default we take any node from the worker pool, but we can narrow it by adding more labels
         For example, "node-role.kubernetes.io/worker,beta.kubernetes.io/arch=amd64" will take only worker nodes with arch=amd64
         We should always specify the worker role, to make sure that we don't try to add a master node
+    - name: MCO_CONF_DAY2_CUSTOM_MCP_DEFAULT_FROM_LABEL
+      default: "node-role.kubernetes.io/worker"
+      documentation: |
+        If we define a list of custom pools, but we do not define the labels to create those pools, then this value will be used as the default label
+    - name: MCO_CONF_DAY2_CUSTOM_MCP_DEFAULT_NUM_NODES
+      default: "1"
+      documentation: |
+        If we define a list of custom pools, but we do not define the number of nodes that we want for each pool, then this value will be used as the default number of nodes per pool
   documentation: |-
     Creates a new custom MachineConfigPool and add nodes to this new pool
