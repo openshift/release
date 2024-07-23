@@ -106,10 +106,17 @@ spec:
   wildcardPolicy: None
 EOF
 
+  gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
+  echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
+  echo "Wait until Gitea endpoint is reachable via openshift route..."
   set -x
-  echo -n "https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')" > ${SHARED_DIR}/gitea-url.txt
-  # hub_cluster_base_domain=$(oc whoami --show-console|awk -F'apps.' '{print $2}')
-  # echo -n "https://gitea-${gitea_project}.apps.${hub_cluster_base_domain}" > ${SHARED_DIR}/gitea-url.txt
+  curl -vIk ${gitea_url} || {
+    attempts=0 ;
+    while sleep 1m ; do 
+      [ $(( attempts=${attempts} + 1 )) -lt 10 ] || exit 1;
+      curl -vIk ${gitea_url} && break ;
+    done ;
+  }
   set +x
 }
 
