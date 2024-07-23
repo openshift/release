@@ -142,7 +142,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    if [[ ! "${master_ignore_array[*]}" =~ "${baremetal_iface}" ]]; then
+    if [[ ! "${master_ignore_array[*]}" =~ ${baremetal_iface} ]]; then
       master_ignore_array+=("${baremetal_iface}")
     fi
   fi
@@ -154,7 +154,7 @@ EOF
         overwrite: true
         path: /etc/nmstate/openshift/${name}.yml
 EOF
-    if [[ ! "${worker_ignore_array[*]}" =~ "${baremetal_iface}" ]]; then
+    if [[ ! "${worker_ignore_array[*]}" =~ ${baremetal_iface} ]]; then
       worker_ignore_array+=("${baremetal_iface}")
     fi
   fi
