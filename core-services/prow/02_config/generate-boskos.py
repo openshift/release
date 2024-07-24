@@ -290,6 +290,8 @@ CONFIG = {
         'wdc06': 1,
     },
     'powervs-5-quota-slice': {},
+    'powervs-6-quota-slice': {},
+    'powervs-7-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -467,6 +469,12 @@ for i in [1148]:
 
 for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-6-quota-slice']['lon04-powervs-6-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
 
 config = {
