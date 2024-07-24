@@ -17,7 +17,7 @@ ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve
 ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
 ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
 if [ -e "${ES_SECRETS_PATH}/host" ]; then
-    ES_HOST=$(cat "/secret_stackrox/host")
+    ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 echo "Using ES_HOST=${ES_HOST} from ${ES_SECRETS_PATH}"
 
