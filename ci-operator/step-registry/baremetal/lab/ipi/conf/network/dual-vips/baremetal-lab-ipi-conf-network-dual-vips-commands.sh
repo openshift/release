@@ -11,9 +11,7 @@ cat > "${SHARED_DIR}/dual_vips_patch_install_config.yaml" <<EOF
 platform:
   baremetal:
     apiVIPs:
-      - $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
       - $(yq ".api_vip_v6" "${SHARED_DIR}/vips.yaml")
     ingressVIPs:
-      - $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
       - $(yq ".ingress_vip_v6" "${SHARED_DIR}/vips.yaml")
 EOF
