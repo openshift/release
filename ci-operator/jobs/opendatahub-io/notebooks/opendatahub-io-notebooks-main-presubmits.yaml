@@ -6,87 +6,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/amd-runtimes-ubi9-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-notebooks-main-amd-runtimes-ubi9-e2e-tests
-    rerun_command: /test amd-runtimes-ubi9-e2e-tests
-    run_if_changed: (runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)|(runtimes\/rocm-tensorlow\/ubi9-python-3.9\/*)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/amd-runtimes-ubi9-e2e-tests-cluster-profile
-        - --target=amd-runtimes-ubi9-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/amd-runtimes-ubi9-e2e-tests-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-gcp-opendatahub
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )amd-runtimes-ubi9-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
     context: ci/prow/anaconda-ubi8-e2e-tests
     decorate: true
     decoration_config:
@@ -2536,6 +2455,87 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/rocm-runtimes-ubi9-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-notebooks-main-rocm-runtimes-ubi9-e2e-tests
+    rerun_command: /test rocm-runtimes-ubi9-e2e-tests
+    run_if_changed: (runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)|(runtimes\/rocm-tensorflow\/ubi9-python-3.9\/*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/rocm-runtimes-ubi9-e2e-tests-cluster-profile
+        - --target=rocm-runtimes-ubi9-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/rocm-runtimes-ubi9-e2e-tests-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp-opendatahub
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rocm-runtimes-ubi9-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/rstudio-notebook-e2e-tests
     decorate: true
     decoration_config:
@@ -3319,7 +3319,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-notebooks-main-runtime-rocm-pytorch-ubi9-python-3-9-pr-image-mirror
     rerun_command: /test runtime-rocm-pytorch-ubi9-python-3-9-pr-image-mirror
-    run_if_changed: (base\/amd-ubi9-python-3.9\/*)|(runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)
+    run_if_changed: (base\/rocm-ubi9-python-3.9\/*)|(runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)
     spec:
       containers:
       - args:
@@ -3373,6 +3373,69 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-notebooks-main-runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
+    rerun_command: /test runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
+    run_if_changed: (base\/rocm-ubi9-python-3.9\/*)|(runtimes\/rocm-tensorflow\/ubi9-python-3.9\/*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/runtimes-ubi8-e2e-tests
     decorate: true
     decoration_config:
@@ -3384,7 +3447,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-notebooks-main-runtimes-ubi8-e2e-tests
     rerun_command: /test runtimes-ubi8-e2e-tests
-    run_if_changed: (runtimes\/datascience\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)|(runtimes\/tensorlow\/ubi8-python-3.8\/*)
+    run_if_changed: (runtimes\/datascience\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
     spec:
       containers:
       - args:
@@ -3465,7 +3528,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-notebooks-main-runtimes-ubi9-e2e-tests
     rerun_command: /test runtimes-ubi9-e2e-tests
-    run_if_changed: (base\/ubi9-python-3.9\/*)|(runtimes\/datascience\/ubi9-python-3.9\/*)|(runtimes\/pytorch\/ubi9-python-3.9\/*)|(runtimes\/tensorlow\/ubi9-python-3.9\/*)
+    run_if_changed: (base\/ubi9-python-3.9\/*)|(runtimes\/datascience\/ubi9-python-3.9\/*)|(runtimes\/pytorch\/ubi9-python-3.9\/*)|(runtimes\/tensorflow\/ubi9-python-3.9\/*)
     spec:
       containers:
       - args:
