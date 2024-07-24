@@ -139,6 +139,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-perfscale-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
