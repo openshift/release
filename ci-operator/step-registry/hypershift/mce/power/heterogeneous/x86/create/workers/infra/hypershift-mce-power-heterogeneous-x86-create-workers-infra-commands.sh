@@ -9,7 +9,7 @@ export HOSTED_CLUSTER_NAME
 # VPC VSI(Virtual Server Instance) configs
 VPC_VSI_NAME="hcp-ci-${HOSTED_CLUSTER_NAME}-worker"
 PROFILE_NAME="bx2-2x8"
-IMAGE_ID="r014-63b824ce-ee4b-4494-b92f-f888630746c5"
+IMAGE_ID="r006-cf915612-e159-4f82-b871-34f6eabfe05c"
 SSH_KEY_ID="r006-af38c53e-708d-494f-b41d-c70d36c0db14"
 
 # Installing required tools
