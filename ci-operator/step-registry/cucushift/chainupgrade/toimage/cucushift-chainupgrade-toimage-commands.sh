@@ -924,10 +924,6 @@ function run_upgrade_e2e() {
           and not @upgrade-prepare
           and not @serial
     "
-    local e2e_start_time e2e_end_time
-
-    e2e_start_time=$(date +%s)
-    echo "Starting the upgrade e2e tests on $(date "+%F %T")"
     E2E_RUN_TAGS="$E2E_RUN_TAGS and $E2E_SKIP_TAGS"
 
     filter_tests
@@ -954,9 +950,6 @@ function run_upgrade_e2e() {
 
     summarize_test_results
     popd
-    echo "Ending the upgrade e2e tests on $(date "+%F %T")"
-    e2e_end_time=$(date +%s)
-    echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
 }
 
 function set_channel(){
@@ -1051,6 +1044,16 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
-        run_upgrade_e2e "${index}"
+        local e2e_start_time e2e_end_time
+        e2e_start_time=$(date +%s)
+        echo "Starting the upgrade e2e tests on $(date "+%F %T")"
+
+        local test_log_dir="${ARTIFACT_DIR}/test-logs"
+        mkdir -p ${test_log_dir}
+        run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt"
+
+        echo "Ending the upgrade e2e tests on $(date "+%F %T")"
+        e2e_end_time=$(date +%s)
+        echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
     fi
 done
