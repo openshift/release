@@ -59,6 +59,7 @@ update:
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
 	$(MAKE) template-allowlist
+	$(MAKE) release-controllers
 
 template-allowlist:
 	VOLUME_MOUNT_FLAGS="${VOLUME_MOUNT_FLAGS}" ./hack/generate-template-allowlist.sh
