@@ -207,6 +207,8 @@ openstack*)
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    # Add IBM secret for dr test cases
+    oc create secret generic qe-ibmcloud-creds --from-literal=apiKey=${IC_API_KEY} -n kube-system
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
@@ -298,6 +300,7 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
+    sleep 6h
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
