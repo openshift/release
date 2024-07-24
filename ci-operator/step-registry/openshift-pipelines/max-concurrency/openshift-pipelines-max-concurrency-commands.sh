@@ -50,6 +50,20 @@ fi
 cd "$(mktemp -d)"
 git clone --branch main https://github.com/openshift-pipelines/performance.git .
 
+# Delete all benchmark namespaces used for testing
+function cleanup_namespaces() {
+    echo "Cleaning up benchmark namespaces"
+    for namespace_idx in $(seq 1 ${TEST_NAMESPACE});
+    do
+        namespace_tag=$([ "$TEST_NAMESPACE" -eq 1 ] && echo "" || echo "$namespace_idx")
+        namespace="benchmark${namespace_tag}"
+
+        if ! oc delete --cascade=foreground --timeout=30m namespace "$namespace"; then
+            echo "[WARNING] Namespace $namespace failed to delete"
+        fi
+    done
+}
+
 # Setup Tekton cluster
 ./ci-scripts/setup-cluster.sh
 
@@ -58,10 +72,13 @@ export TEST_DO_CLEANUP=false
 export TEST_TOTAL=20
 export TEST_CONCURRENT=10
 ci-scripts/load-test.sh
-oc delete namespace/benchmark
+cleanup_namespaces
 rm -f tests/scaling-pipelines/benchmark-tekton.json
 rm -f tests/scaling-pipelines/benchmark-stats.csv
+rm -f tests/scaling-pipelines/cluster-benchmark-stats.csv
 rm -f tests/scaling-pipelines/benchmark-output.json
+rm -f tests/scaling-pipelines/pipelineruns-stats.csv
+rm -f tests/scaling-pipelines/taskruns-stats.csv
 sleep 60
 
 for scenario in $TEST_SCENARIOS; do
@@ -75,8 +92,6 @@ for scenario in $TEST_SCENARIOS; do
     oc -n benchmark get pods -o json >"$artifacts/pods.json"
     oc -n benchmark get taskruns -o json >"$artifacts/taskruns.json"
     oc -n benchmark get pipelineruns -o json >"$artifacts/pipelineruns.json"
-    if ! oc delete --cascade=foreground --timeout=30m namespace/benchmark; then
-        echo "[WARNING] Namespace benchmark failed, ignoring it"
-    fi
+    cleanup_namespaces
     sleep 60
 done
