@@ -502,6 +502,10 @@ function inject_spot_instance_config() {
   # Don't rely on file names; iterate through all the manifests and match
   # by kind.
   for manifest in $manifests; do
+    # E.g, CPMS is not present for single node clusters
+    if [[ ! -f ${manifest} ]]; then
+      continue
+    fi
     kind=$(/tmp/yq r "${manifest}" kind)
     case "${kind}" in
       MachineSet)  # Workers, both tf and CAPA, run through MachineSet today.
