@@ -12,7 +12,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
-if [[ $ES_HOST == *"-acs-"* ]]; then
+if [[ $ES_HOST == "search-acs-perfscale"* ]]; then
     ES_PASSWORD=$(cat "/secret_stackrox/password")
     ES_USERNAME=$(cat "/secret_stackrox/username")
     if [ -e /secret_stackrox/host ]; then
