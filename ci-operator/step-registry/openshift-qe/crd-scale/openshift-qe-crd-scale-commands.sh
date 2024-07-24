@@ -11,18 +11,15 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
-if [[ $ES_HOST == "search-acs-perfscale"* ]]; then
-    ES_PASSWORD=$(cat "/secret_stackrox/password")
-    ES_USERNAME=$(cat "/secret_stackrox/username")
-    if [ -e /secret_stackrox/host ]; then
-        ES_HOST=$(cat "/secret_stackrox/host")
-    fi
-    echo "Using stackrox ES_HOST=${ES_HOST}"
-else
-    ES_PASSWORD=$(cat "/secret/password")
-    ES_USERNAME=$(cat "/secret/username")
+ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+if [ -e "${ES_SECRETS_PATH}/host" ]; then
+    ES_HOST=$(cat "/secret_stackrox/host")
 fi
+echo "Using ES_HOST=${ES_HOST} from ${ES_SECRETS_PATH}"
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
