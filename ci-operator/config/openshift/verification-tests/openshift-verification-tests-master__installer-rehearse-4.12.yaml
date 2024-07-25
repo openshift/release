@@ -37,18 +37,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-debug
+- as: installer-rehearse-debug-vsphere
   cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: vsphere-dis-2
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       SLEEP_DURATION: 2h
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-proxy-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
