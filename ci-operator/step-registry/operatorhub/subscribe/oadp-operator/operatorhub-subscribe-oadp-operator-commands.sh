@@ -32,6 +32,8 @@ metadata:
   name: "${OADP_OPERATOR_SUB_INSTALL_NAMESPACE}"
   labels:
     openshift.io/cluster-monitoring: "true"
+    pod-security.kubernetes.io/enforce: "privileged"
+    security.openshift.io/scc.podSecurityLabelSync: "true"
 EOF
 
 # deploy new operator group
