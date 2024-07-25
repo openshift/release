@@ -1,12 +1,16 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.14"
+    name: "4.17"
     namespace: origin
     tag: operator-sdk
+  tempo-bundle-old:
+    name: tempo-operator-bundle
+    namespace: ci
+    tag: old
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -34,26 +38,20 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.17"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tempo-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 6 * * 2
+- as: tempo-operator-upgrade
+  cron: 0 4 * * 4
   steps:
+    cluster_profile: azure-qe
     env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -65,7 +63,22 @@ tests:
       cli: latest
       commands: |
         oc create namespace tempo-operator
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n tempo-operator "$OO_BUNDLE"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n tempo-operator "$OO_BUNDLE_OLD"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE_OLD
+        name: tempo-bundle-old
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: distributed-tracing-tests-tempo-pre-upgrade
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n tempo-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
@@ -75,11 +88,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
-    - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: ocp4.14-amd64
+  variant: upstream-upgrade-ocp-4.17-amd64-azure
