@@ -28,6 +28,6 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
 
     echo "${DOCKERFILE_IMAGE_PAIRS}" | tr -d '[:space:]' | awk -F , 'BEGIN{RS="|"}{printf("-f %s -t %s\n", \$1, \$2)}' | \
     while read -r params ; do
-      docker buildx build --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x . \${EXTRA_PARAMS} \$params
+      docker -D -l debug buildx build --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x . \${EXTRA_PARAMS} \$params
     done
 EOF
