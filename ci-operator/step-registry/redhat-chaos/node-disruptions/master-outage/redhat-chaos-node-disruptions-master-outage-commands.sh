@@ -45,10 +45,14 @@ elif [ "$platform" = "Azure" ]; then
     export CLOUD_TYPE="azure"
     export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     # jq is not available in the ci image...
-    export AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
-    export AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
-    export AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
-    export AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
+    AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
+    export AZURE_SUBSCRIPTION_ID
+    AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
+    export AZURE_TENANT_ID
+    AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
+    export AZURE_CLIENT_ID
+    AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
+    export AZURE_CLIENT_SECRET
 fi
 
 
