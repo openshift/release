@@ -35,6 +35,7 @@ platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.ty
 if [ "$platform" = "AWS" ]; then
     mkdir -p $HOME/.aws
     cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+    export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     export AWS_DEFAULT_REGION=us-west-2
 elif [ "$platform" = "GCP" ]; then
     export CLOUD_TYPE="gcp"
@@ -45,24 +46,11 @@ elif [ "$platform" = "Azure" ]; then
     export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     # jq is not available in the ci image...
     export AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
-
     export AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
-
     export AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
-    
     export AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
+fi
 
-elif [ "$platform" = "IBMCloud" ]; then
-# https://github.com/openshift/release/blob/3afc9cb376776ca27fbb1a4927281e84295f4810/ci-operator/step-registry/openshift-extended/upgrade/pre/openshift-extended-upgrade-pre-commands.sh#L158
-    export IBMCLOUD_CLI=ibmcloud
-    export IBMCLOUD_HOME=/output   
-    region="${LEASED_RESOURCE}"
-    export CLOUD_TYPE="ibmcloud"
-    export region
-    export IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
-    export IBMC_APIKEY=${CLUSTER_PROFILE_DIR}/ibmcloud-api-key
-    export ACTION="$CLOUD_TYPE-node-reboot"
-fi 
 
 #export AWS_ACCESS_KEY_ID=$aws_access_key_id
 #export AWS_SECRET_ACCESS_KEY=$aws_secret_access_key
