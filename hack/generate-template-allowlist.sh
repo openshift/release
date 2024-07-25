@@ -18,8 +18,8 @@ fi
 
 set -x
 
-${SKIP_PULL} || ${CONTAINER_ENGINE} pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/template-deprecator:latest
-${CONTAINER_ENGINE} run ${CONTAINER_ENGINE_OPTS} --rm -v "$PWD:/release${VOLUME_MOUNT_FLAGS}" registry.ci.openshift.org/ci/template-deprecator:latest \
+${SKIP_PULL} || ${CONTAINER_ENGINE} pull ${CONTAINER_ENGINE_OPTS} quay.io/openshift/ci-public:ci_template-deprecator_latest
+${CONTAINER_ENGINE} run ${CONTAINER_ENGINE_OPTS} --rm -v "$PWD:/release${VOLUME_MOUNT_FLAGS}" quay.io/openshift/ci-public:ci_template-deprecator_latest \
     ${ARGS:-} \
     --prow-jobs-dir /release/ci-operator/jobs \
     --prow-config-path /release/core-services/prow/02_config/_config.yaml \
