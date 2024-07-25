@@ -1,14 +1,10 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: cli
-  opentelemetry-bundle-old:
-    name: opentelemetry-operator-bundle
-    namespace: ci
-    tag: old
   operator-sdk:
-    name: "4.14"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
@@ -63,26 +59,19 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.16"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: opentelemetry-operator-upgrade
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
-  cron: 0 6 * * 4
+- as: opentelemetry-e2e-tests
+  cron: 0 4 * * 2
   steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
@@ -95,21 +84,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace opentelemetry-operator
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE_OLD"
-        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
-      dependencies:
-      - env: OO_BUNDLE_OLD
-        name: opentelemetry-bundle-old
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
-    - ref: distributed-tracing-tests-opentelemetry-pre-upgrade
-    - as: upgrade
-      cli: latest
-      commands: |
-        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -120,9 +95,9 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: ocp-4.13-amd64-upgrade
+  variant: upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
