@@ -27,10 +27,6 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-minimal-ubi8-python-3.8
   to: cuda-jupyter-datascience-ubi8-python-3.8
-- context_dir: jupyter/trustyai/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: jupyter-trustyai-ubi8-python-3.8
 - context_dir: habana/1.10.0/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi8-python-3.8
@@ -153,14 +149,26 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-c9s-python-3.9
   to: cuda-rstudio-c9s-python-3.9
-- context_dir: amd/c9s-python-3.9
+- context_dir: rocm/ubi9-python-3.9
   dockerfile_path: Dockerfile
-  from: base-c9s-python-3.9
-  to: amd-c9s-python-3.9
+  from: base-ubi9-python-3.9
+  to: rocm-ubi9-python-3.9
 - context_dir: jupyter/minimal/ubi9-python-3.9
   dockerfile_path: Dockerfile
-  from: amd-c9s-python-3.9
-  to: amd-jupyter-minimal-c9s-python-3.9
+  from: rocm-ubi9-python-3.9
+  to: rocm-jupyter-minimal-ubi9-python-3.9
+- context_dir: jupyter/data-science/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-jupyter-minimal-ubi9-python-3.9
+  to: rocm-jupyter-datascience-ubi9-python-3.9
+- context_dir: jupyter/rocm/tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi9-python-3.9
+  to: rocm-jupyter-tensorflow-ubi9-python-3.9
+- context_dir: jupyter/rocm/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi9-python-3.9
+  to: rocm-jupyter-pytorch-ubi9-python-3.9
 - context_dir: base/anaconda-python-3.8
   dockerfile_path: Dockerfile
   to: base-anaconda-python-3.8
@@ -168,6 +176,14 @@ images:
   dockerfile_path: Dockerfile
   from: base-anaconda-python-3.8
   to: jupyter-datascience-anaconda-python-3.8
+- context_dir: runtimes/rocm-pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-ubi9-python-3.9
+  to: runtime-rocm-pytorch-ubi9-python-3.9
+- context_dir: runtimes/rocm-tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-ubi9-python-3.9
+  to: runtime-rocm-tensorflow-ubi9-python-3.9
 promotion:
   to:
   - namespace: opendatahub-io
@@ -303,26 +319,6 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-trustyai-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-trustyai-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/trustyai\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-trustyai-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
   postsubmit: true
@@ -901,44 +897,101 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-amd-c9s-python-3-9-image-mirror
+- as: notebook-rocm-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: amd-c9s-python-3.9
+      SOURCE_IMAGE_REF: rocm-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: amd-c9s-python-3.9
+      RELEASE_VERSION: rocm-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-amd-c9s-python-3-9-pr-image-mirror
-  run_if_changed: (base\/c9s-python-3.9\/*)|(amd\/c9s-python-3.9\/*)
+- as: notebook-rocm-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(rocm\/ubi9-python-3.9\/*)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: amd-c9s-python-3.9
+      SOURCE_IMAGE_REF: rocm-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: amd-c9s-python-3.9
+      RELEASE_VERSION: rocm-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-amd-jupyter-minimal-c9s-python-3-9-image-mirror
+- as: notebook-rocm-jupyter-tf-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: amd-jupyter-minimal-c9s-python-3.9
+      SOURCE_IMAGE_REF: rocm-jupyter-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: amd-jupyter-minimal-c9s-python-3.9
+      RELEASE_VERSION: rocm-jupyter-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
-  run_if_changed: (amd\/c9s-python-3.9\/*)|(base\/c9s-python-3.9\/*)|(jupyter\/minimal\/ubi9-python-3.9\/*)
+- as: notebook-rocm-jupyter-tf-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (rocm\/ubi9-python-3.9\/*)|(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/rocm\/tensorflow\/ubi9-python-3.9\/*)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: amd-jupyter-minimal-c9s-python-3.9
+      SOURCE_IMAGE_REF: rocm-jupyter-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
-      RELEASE_VERSION: amd-jupyter-minimal-c9s-python-3.9
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-rocm-jupyter-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rocm-jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-rocm-jupyter-pyt-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (rocm\/ubi9-python-3.9\/*)|(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rocm-jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-pytorch-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-pytorch-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/rocm-ubi9-python-3.9\/*)|(runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/rocm-ubi9-python-3.9\/*)|(runtimes\/rocm-tensorflow\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
   run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
@@ -951,7 +1004,7 @@ tests:
       RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-ubi8-e2e-tests
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/pytorch\/ubi8-python-3.8\/*)|(jupyter\/tensorflow\/ubi8-python-3.8\/*)|(jupyter\/trustyai\/ubi8-python-3.8\/*)
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/pytorch\/ubi8-python-3.8\/*)|(jupyter\/tensorflow\/ubi8-python-3.8\/*)
   steps:
     cluster_profile: gcp-opendatahub
     test:
@@ -1018,23 +1071,6 @@ tests:
       dependencies:
       - env: JUPYTER_DATA_SCIENCE_IMAGE
         name: cuda-jupyter-datascience-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: jupyter-trustyai-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-trustyai-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TRUSTYAI_IMAGE}"
-        make deploy8-jupyter-trustyai-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-trustyai-ubi8-python-3.8
-        make undeploy8-jupyter-trustyai-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_TRUSTYAI_IMAGE
-        name: jupyter-trustyai-ubi8-python-3.8
       from: src
       resources:
         requests:
@@ -1236,7 +1272,7 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp
 - as: runtimes-ubi8-e2e-tests
-  run_if_changed: (runtimes\/datascience\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)|(runtimes\/tensorlow\/ubi8-python-3.8\/*)
+  run_if_changed: (runtimes\/datascience\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
   steps:
     cluster_profile: gcp-opendatahub
     test:
@@ -1293,7 +1329,7 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp
 - as: runtimes-ubi9-e2e-tests
-  run_if_changed: (base\/ubi9-python-3.9\/*)|(runtimes\/datascience\/ubi9-python-3.9\/*)|(runtimes\/pytorch\/ubi9-python-3.9\/*)|(runtimes\/tensorlow\/ubi9-python-3.9\/*)
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(runtimes\/datascience\/ubi9-python-3.9\/*)|(runtimes\/pytorch\/ubi9-python-3.9\/*)|(runtimes\/tensorflow\/ubi9-python-3.9\/*)
   steps:
     cluster_profile: gcp-opendatahub
     test:
@@ -1497,6 +1533,85 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: rocm-notebooks-e2e-tests
+  run_if_changed: (rocm\/ubi9-python-3.9\/*)||(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.9\/*)||(jupyter\/rocm\/tensorflow\/ubi9-python-3.9\/*)
+  steps:
+    cluster_profile: gcp-opendatahub
+    test:
+    - as: rocm-jupyter-tensorflow-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project rocm-jupyter-tensorflow-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__TENSORFLOW_IMAGE}"
+        make deploy9-jupyter-rocm-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-rocm-tensorflow-ubi9-python-3.9
+        make undeploy9-jupyter-rocm-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_rocm__TENSORFLOW_IMAGE
+        name: rocm-jupyter-tensorflow-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: rocm-jupyter-pytorch-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project rocm-jupyter-pytorch-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__PYTORCH_IMAGE}"
+        make deploy9-jupyter-rocm-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-rocm-pytorch-ubi9-python-3.9
+        make undeploy9-jupyter-rocm-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_rocm__PYTORCH_IMAGE
+        name: rocm-jupyter-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: rocm-runtimes-ubi9-e2e-tests
+  run_if_changed: (runtimes\/rocm-pytorch\/ubi9-python-3.9\/*)|(runtimes\/rocm-tensorflow\/ubi9-python-3.9\/*)
+  steps:
+    cluster_profile: gcp-opendatahub
+    test:
+    - as: runtime-rocm-pytorch-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project runtimes-rocm-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_PYTORCH_IMAGE}"
+        make deploy9-runtimes-rocm-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=runtime-rocm-pytorch-ubi9-python-3.9
+        make undeploy9-runtimes-rocm-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_ROCM_PYTORCH_IMAGE
+        name: runtime-rocm-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: runtime-rocm-tensorflow-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project runtimes-rocm-tensorflow-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_TENSORFLOW_IMAGE}"
+        make deploy9-runtimes-rocm-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=runtime-rocm-tensorflow-ubi9-python-3.9
+        make undeploy9-runtimes-rocm-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_ROCM_TENSORFLOW_IMAGE
+        name: runtime-rocm-tensorflow-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

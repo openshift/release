@@ -85,6 +85,30 @@ tests:
           cpu: 500m
           memory: 1000Mi
     workflow: generic-claim
+- as: scorecard
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  steps:
+    test:
+    - as: scorecard-test
+      cli: latest
+      commands: |
+        set -x
+        curl -Lso /tmp/operator-sdk.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/operator-sdk/4.15.21/operator-sdk-v1.31.0-ocp-linux-x86_64.tar.gz
+        ls -al /tmp/operator-sdk.tar.gz
+        tar -xvzf /tmp/operator-sdk.tar.gz --strip=2 -C /tmp
+        /tmp/operator-sdk scorecard bundle -o text --kubeconfig $KUBECONFIG -n default
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: operator-e2e-old-ocp-published-graph-data
   cluster_claim:
     architecture: amd64

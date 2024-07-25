@@ -1051,6 +1051,10 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
-        run_upgrade_e2e "${index}"
+	echo "Start e2e test..."
+	test_log_dir="${ARTIFACT_DIR}/test-logs"
+        mkdir -p ${test_log_dir}
+        run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt"
+	echo "End e2e test..."
     fi
 done

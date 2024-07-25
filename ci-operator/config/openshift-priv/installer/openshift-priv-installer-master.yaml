@@ -316,6 +316,19 @@ tests:
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
@@ -385,6 +398,15 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
   run_if_changed: (gcp|google)
@@ -403,6 +425,15 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - as: e2e-azure-ovn-shared-vpc
@@ -649,7 +680,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-zones
@@ -674,6 +705,18 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-multi-vcenter-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - always_run: false
   as: e2e-crc
@@ -749,11 +792,19 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
-- as: agent-integration-tests
-  commands: hack/go-integration-test.sh
-  container:
-    from: src-oc
-  run_if_changed: ^(cmd|pkg|data).*/agent/
+- as: integration-tests
+  run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
+  steps:
+    test:
+    - as: integration-tests
+      commands: hack/go-integration-test.sh
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-agent-compact-ipv4
   cluster: build05
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -876,9 +927,9 @@ tests:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-heterogeneous
+- as: e2e-aws-ovn-heterogeneous
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     dependencies:
@@ -888,7 +939,43 @@ tests:
       CONTROL_ARCH: arm64
       FEATURE_GATES: '["MultiArchInstallAWS=true"]'
       FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous-day-0
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-heterogeneous
+  optional: true
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
+    workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master

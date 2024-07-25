@@ -255,10 +255,9 @@ cat /etc/pki/ca-trust/source/anchors/ca.pem > $HOME/custom_manifests/ca.pem
 cat /etc/pki/ca-trust/source/anchors/server.pem >> $HOME/custom_manifests/ca.pem
 echo "export REGISTRY_CA_PATH=$HOME/custom_manifests/ca.pem" >> ~/config.sh
 
-kubectl -n assisted-installer delete pods -l app=assisted-service
+kubectl patch deployment -n assisted-installer assisted-service --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mirror-registry-ca", "mountPath": "/etc/pki/tls/certs/ca-bundle.crt", "readOnly": true, "subPath": "mirror_ca.pem"}}]'
 kubectl -n assisted-installer rollout status deploy/assisted-service
-POD_NAME=$(kubectl -n assisted-installer get pod -l app=assisted-service -o name)
-kubectl -n assisted-installer exec ${POD_NAME} -- cp -r /etc/pki/ca-trust/extracted/pem/mirror_ca.pem /etc/pki/tls/certs/ca-bundle.crt
+kubectl -n assisted-installer get -o yaml deploy/assisted-service
 
 # Point assisted service to mirror first
 MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
