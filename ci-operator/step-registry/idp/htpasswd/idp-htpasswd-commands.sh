@@ -6,13 +6,14 @@ set -o pipefail
 set -x
 
 function check_if_hypershift_env () {
-    if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
-        IS_HYPERSHIFT_ENV="yes"
-    else
-        # We must set IS_HYPERSHIFT_ENV="no" otherwise OCP CI will fail because this script sets "set -u".
-        IS_HYPERSHIFT_ENV="no"
+    if [ ! -f "${SHARED_DIR}/cluster-type" ] || ! grep -q "hypershift-guest" "${SHARED_DIR}"/cluster-type ; then
+        echo "This is not a HyperShift guest cluster CI job."
+        # We must set IS_HYPERSHIFT_GUEST_ENV="no" otherwise OCP CI will fail in "set_common_variables" later because this script sets "set -u".
+        IS_HYPERSHIFT_GUEST_ENV="no"
         return 0
     fi
+
+    IS_HYPERSHIFT_GUEST_ENV="yes"
     MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
     if [ -f "${MC_KUBECONFIG_FILE}" ]; then
         export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
@@ -21,7 +22,7 @@ function check_if_hypershift_env () {
     elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
         export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
     else
-        echo "This idp-htpasswd step is being run as a day-2 operation for a HyperShift guest cluster. We need the kubeconfig of management cluster, but it does not exist!"
+        echo "The IS_HYPERSHIFT_GUEST_ENV is 'yes'. So, this idp-htpasswd step is being run as a day-2 operation for a HyperShift guest cluster. We need the kubeconfig of management cluster, but it does not exist!"
         exit 1
     fi
     
@@ -36,12 +37,14 @@ function check_if_hypershift_env () {
 }
 
 function set_common_variables () {
-    if [ "$IS_HYPERSHIFT_ENV" == "yes" ]; then
+    # "yes" means IDP will be configured in HostedCluster's .spec.configuration.oauth.identityProviders
+    if [ "$IS_HYPERSHIFT_GUEST_ENV" == "yes" ]; then
         # In some HyperShift CI, the namespace of hostedcluster is local-cluster instead of clusters.
         MIDDLE_NAMESPACE="$HYPERSHIFT_NAMESPACE"
         TARGET_RESOURCE="hostedcluster/$cluster_name -n $MIDDLE_NAMESPACE"
         OAUTH_NAMESPACE="$MIDDLE_NAMESPACE-$cluster_name"
         IDP_FIELD=".spec.configuration.oauth.identityProviders"
+    # "no" means IDP will be configured in oauth/cluster's .spec.identityProviders
     else
         MIDDLE_NAMESPACE="openshift-config"
         TARGET_RESOURCE="oauth/cluster"
