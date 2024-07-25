@@ -95,6 +95,8 @@ echo "$(date) Get workers hostnames"
 IFS=' ' read -r -a HOST_NAMES <<< "${INSTANCE_NAMES}"
 echo "HOST_NAMES: ${HOST_NAMES[@]}"  # Debug statement
 
+sleep 5h
+
 for ((i=1; i<=20; i++)); do
     agents=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json)
 
