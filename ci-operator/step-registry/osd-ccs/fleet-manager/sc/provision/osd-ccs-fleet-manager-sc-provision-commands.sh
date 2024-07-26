@@ -19,6 +19,7 @@ function wait_for_cluster() {
   return 0
 }
 
+
 function wait_for_provision_shard() {
   while true; do
     shard_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r '.provision_shard_reference.id // empty') || true
