@@ -104,21 +104,20 @@ function clone_upi_artifacts(){
   PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
   echo "${PULL_SECRET}" > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/pull-secret.txt
 
-  if [ -f "${SHARED_DIR}"/var-mac-upi.tfvars ]
+  if [ -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
   then
-    cp "${SHARED_DIR}"/var-mac-upi.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
-    cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
+    cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars
   fi
 
-  if [ -f "${SHARED_DIR}"/terraform-mac-upi.tfstate ]
+  if [ -f "${SHARED_DIR}"/terraform-multi-arch-upi.tfstate ]
   then
-    cp "${SHARED_DIR}"/terraform-mac-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform-multi-arch-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
   fi
 }
 
 function destroy_upi_powervs_cluster() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-mac-upi.tfvars -force-destroy || true
+  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-multi-arch-upi.tfvars -force-destroy || true
 }
 
 function cleanup_ibmcloud_powervs() {
@@ -269,7 +268,7 @@ ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROU
 retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 
 # Delete the UPI PowerVS cluster created
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars ]
+if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars ]
 then
   echo "Starting the delete on the UPI PowerVS cluster resources"
   destroy_upi_powervs_cluster

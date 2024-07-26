@@ -16,7 +16,7 @@ echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-export NAME_PREFIX="rdr-mac-${CLEAN_VERSION}"
+export NAME_PREFIX="rdr-multi-arch-${CLEAN_VERSION}"
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)
 export WORKSPACE_NAME
 VPC_NAME="${WORKSPACE_NAME}-vpc"
@@ -90,7 +90,7 @@ function setup_terraform_cli() {
 }
 
 function cleanup_ibmcloud_vpc() {
-  cos_name="${NAME_PREFIX}-mac-intel-cos"
+  cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
 
   echo "Cleaning up Instances"
   for INS in $(ic is instances --output json | jq -r '.[].id')
@@ -119,10 +119,10 @@ function cleanup_ibmcloud_vpc() {
 function setup_mac_vpc_workspace(){
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME_FOLDER}" || true
-  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/release-${OCP_CLEAN_VERSION}.tar.gz" -o ./ocp4-mac-vpc.tar.gz
-  tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc.tar.gz
-  mv ocp4-upi-compute-powervs-ibmcloud-release-"${OCP_CLEAN_VERSION}" ocp4-mac-vpc || true
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc || true
+  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/release-${OCP_CLEAN_VERSION}.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
+  tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc.tar.gz
+  mv ocp4-upi-compute-powervs-ibmcloud-release-"${OCP_CLEAN_VERSION}" ocp4-multi-arch-vpc || true
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc || true
   ${IBMCLOUD_HOME_FOLDER}/terraform init
 }
 
@@ -141,25 +141,25 @@ function clone_mac_vpc_artifacts(){
     return
   fi
 
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/ || true
-  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/data/id_rsa.pub
-  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/data/id_rsa
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
+  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/data/id_rsa.pub
+  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/data/id_rsa
 
-  if [ -f "${SHARED_DIR}"/var-mac-vpc.tfvars ]
+  if [ -f "${SHARED_DIR}"/var-multi-arch-vpc.tfvars ]
   then
-    cp "${SHARED_DIR}"/var-mac-vpc.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars
-    cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars
+    cp "${SHARED_DIR}"/var-multi-arch-vpc.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars
+    cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars
   fi
 
-  if [ -f "${SHARED_DIR}"/terraform-mac-vpc.tfstate ]
+  if [ -f "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate ]
   then
-    cp "${SHARED_DIR}"/terraform-mac-vpc.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/terraform.tfstate
   fi
 }
 
 function destroy_mac_vpc_resources() {
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/ || true
-  "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file var-mac-vpc.tfvars -auto-approve || true
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
+  "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file var-multi-arch-vpc.tfvars -auto-approve || true
 }
 
 echo "Invoking upi deprovision heterogeneous vpc for ${VPC_NAME}"
@@ -181,11 +181,11 @@ retry "ic plugin install -f vpc-infrastructure tg-cli power-iaas"
 # transit_gateway_routes_report
 
 # Delete the MAC VPC resources
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars ]
+if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars ]
 then
   echo "Starting the delete on the MAC VPC resources"
   destroy_mac_vpc_resources
-  rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc
+  rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc
 fi
 
 # Delete the workspace created

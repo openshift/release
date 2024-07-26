@@ -3,20 +3,22 @@
 set -o nounset
 
 error_handler() {
-  echo "Error: ($1) occurred on $2"
+  echo "Error: (${1}) occurred on ${2}"
 }
 
 trap 'error_handler $? $LINENO' ERR
 
-IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 echo "Invoking installation of UPI based heterogeneous VPC"
 echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
+
+echo "Loading Environment for run"
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-export NAME_PREFIX="rdr-mac-${CLEAN_VERSION}"
+export NAME_PREFIX="rdr-multi-arch-${CLEAN_VERSION}"
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)
 export WORKSPACE_NAME
 VPC_NAME="${WORKSPACE_NAME}-vpc"
@@ -29,18 +31,12 @@ BASTION_PUBLIC_IP=$(< "${SHARED_DIR}/BASTION_PUBLIC_IP")
 export BASTION_PUBLIC_IP
 KUBECONFIG="${SHARED_DIR}"/kubeconfig
 export KUBECONFIG
-echo "POWERVS_SERVICE_INSTANCE_ID:- ${POWERVS_SERVICE_INSTANCE_ID}"
-echo "BASTION_PRIVATE_IP:- ${BASTION_PRIVATE_IP}"
-echo "BASTION_PUBLIC_IP:- ${BASTION_PUBLIC_IP}"
 
+echo "Loading PowerVS Details"
 POWERVS_REGION=$(< "${SHARED_DIR}/POWERVS_REGION")
 POWERVS_ZONE=$(< "${SHARED_DIR}/POWERVS_ZONE")
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 VPC_ZONE=$(< "${SHARED_DIR}/VPC_ZONE")
-echo "POWERVS_REGION:- ${POWERVS_REGION}"
-echo "POWERVS_ZONE:- ${POWERVS_ZONE}"
-echo "VPC_REGION:- ${VPC_REGION}"
-echo "VPC_ZONE:- ${VPC_ZONE}"
 export POWERVS_REGION
 export POWERVS_ZONE
 export VPC_REGION
@@ -79,14 +75,6 @@ function retry {
   done
 }
 
-function setup_jq() {
-  if [ -z "$(command -v jq)" ]
-  then
-    echo "jq is not installed, proceed to installing jq"
-    curl -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux64" -o /tmp/jq && chmod +x /tmp/jq
-  fi
-}
-
 function setup_ibmcloud_cli() {
   if [ -z "$(command -v ibmcloud)" ]
   then
@@ -99,10 +87,6 @@ function setup_ibmcloud_cli() {
 }
 
 function setup_terraform_cli() {
-  if [ -z "$(command -v terraform)" ]
-  then
-    echo "terraform CLI doesn't exist, installing"
-  fi
   curl -L "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o "${IBMCLOUD_HOME_FOLDER}"/terraform.zip
   cd "${IBMCLOUD_HOME_FOLDER}" || true
   unzip -o "${IBMCLOUD_HOME_FOLDER}"/terraform.zip
@@ -110,7 +94,7 @@ function setup_terraform_cli() {
 }
 
 function cleanup_ibmcloud_vpc() {
-  cos_name="${NAME_PREFIX}-mac-intel-cos"
+  cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
 
   echo "Cleaning up Instances"
   for INS in $(ic is instances --output json | jq -r '.[].id')
@@ -145,10 +129,10 @@ function get_ready_nodes_count() {
 function setup_mac_vpc_workspace(){
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME_FOLDER}" || true
-  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/release-${OCP_CLEAN_VERSION}.tar.gz" -o ./ocp4-mac-vpc.tar.gz
-  tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc.tar.gz
-  mv ocp4-upi-compute-powervs-ibmcloud-release-"${OCP_CLEAN_VERSION}" ocp4-mac-vpc || true
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc || true
+  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/release-${OCP_CLEAN_VERSION}.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
+  tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc.tar.gz
+  mv ocp4-upi-compute-powervs-ibmcloud-release-"${OCP_CLEAN_VERSION}" ocp4-multi-arch-vpc || true
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc || true
   ${IBMCLOUD_HOME_FOLDER}/terraform init
 }
 
@@ -167,11 +151,11 @@ function create_mac_vpc_tf_varfile(){
     return
   fi
 
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/ || true
-  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/data/id_rsa.pub
-  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/data/id_rsa
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
+  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/data/id_rsa.pub
+  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/data/id_rsa
 
-  cat <<EOF >${IBMCLOUD_HOME_FOLDER}/ocp4-mac-vpc/var-mac-vpc.tfvars
+  cat <<EOF >${IBMCLOUD_HOME_FOLDER}/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars
 ibmcloud_api_key = "${IBMCLOUD_API_KEY}"
 vpc_name   = "${VPC_NAME}"
 vpc_region = "${VPC_REGION}"
@@ -194,14 +178,14 @@ EOF
 EOF
   cp "/tmp/powervs-config.json" "${SHARED_DIR}"/powervs-config.json
 
-  cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars "${SHARED_DIR}"/var-mac-vpc.tfvars
-  cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/var-mac-vpc.tfvars
+  cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars "${SHARED_DIR}"/var-multi-arch-vpc.tfvars
+  cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars
 }
 
 function create_mac_vpc_resources() {
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/ || true
-  "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file var-mac-vpc.tfvars -auto-approve || true
-  cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-mac-vpc/terraform.tfstate "${SHARED_DIR}"/terraform-mac-vpc.tfstate
+  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
+  "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file var-multi-arch-vpc.tfvars -auto-approve || true
+  cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/terraform.tfstate "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate
 }
 
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
@@ -241,7 +225,6 @@ case "$CLUSTER_TYPE" in
     mkdir -p "${IBMCLOUD_HOME_FOLDER}"
     export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
 
-    setup_jq
     setup_ibmcloud_cli
     setup_terraform_cli
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
@@ -263,7 +246,7 @@ case "$CLUSTER_TYPE" in
   exit 4
 esac
 
-if [ -f "${SHARED_DIR}"/terraform-mac-vpc.tfstate ]
+if [ -f "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate ]
 then
   echo "Wait for the nodes to become ready..."
   wait_for_nodes_readiness ${EXPECTED_NODES}
