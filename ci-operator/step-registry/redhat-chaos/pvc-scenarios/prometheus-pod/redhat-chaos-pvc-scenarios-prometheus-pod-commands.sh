@@ -28,10 +28,10 @@ data:
 EOF
 }
 
-ls -la /root/kraken
-
 #Create PV and PVC for prometheus
 cluster_monitoring_config
+echo "Sleeping for 60 seconds for the PV and PVC to be bound"
+sleep 60
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"

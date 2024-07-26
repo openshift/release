@@ -139,6 +139,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-perfscale-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
@@ -249,7 +254,6 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
-    'vsphere-2-quota-slice':{},
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
@@ -286,6 +290,8 @@ CONFIG = {
         'wdc06': 1,
     },
     'powervs-5-quota-slice': {},
+    'powervs-6-quota-slice': {},
+    'powervs-7-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -446,9 +452,6 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in [1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238]:
-    CONFIG['vsphere-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
 for i in [990,1169,1166,1164,1146]:
     CONFIG['vsphere-dis-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
@@ -466,6 +469,12 @@ for i in [1148]:
 
 for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-6-quota-slice']['lon04-powervs-6-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
 
 config = {
