@@ -297,8 +297,20 @@ EOF
 
   set -x
   oc get AgentServiceConfig agent -oyaml
+  set +x
+
+  echo "Wait until Multicluster Engine PODs are avaliable..."
   # oc -n openshift-local-storage wait localvolume localstorage-disks --for condition=Available --timeout 10m
-  assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | grep "^assisted-service")
+  set -x
+  attempts=0 ;
+  while sleep 10s ; do
+    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || exit 1;
+    assisted_service_pod_name=$( \
+      oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
+      grep "^assisted-service" || echo)
+    [ -n "${assisted_service_pod_name}" ] && \
+    oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} && break ;
+  done ;
   oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x

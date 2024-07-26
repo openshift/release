@@ -84,6 +84,18 @@ EOF
 
 }
 
+function wait_until_command_is_ok {
+  cmd=$1 ; shift
+  [ $# -gt 0 ] && sleep_for=${1} && shift && \
+  [ $# -gt 0 ] && max_attempts=${1}  && shift
+  set -x
+  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
+    eval "${cmd}" && { set +x ; return ; }
+    sleep ${sleep_for:='1m'}
+  done
+  exit 1
+}
+
 function setup_openshift_route {
 
   echo "************ telcov10n Setup route to Gitea repo ************"
@@ -114,15 +126,7 @@ EOF
   gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
   echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
   echo "Wait until Gitea endpoint is reachable via openshift route..."
-  set -x
-  curl -vIk ${gitea_url} || {
-    attempts=0 ;
-    while sleep 1m ; do 
-      [ $(( attempts=${attempts} + 1 )) -lt 10 ] || exit 1;
-      curl -vIk ${gitea_url} && break ;
-    done ;
-  }
-  set +x
+  wait_until_command_is_ok "curl -vIk ${gitea_url}"
 }
 
 function generate_gitea_ssh_keys {
