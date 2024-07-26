@@ -51,7 +51,7 @@ def get_missed_profiles(e2e_jobs, upgrade_jobs):
             - as: vsphere-upi-zones-f28
     """
     missed_profiles = []
-    skipped_profiles = 'agent|alibaba|aro|cloud|day2-64k-pagesize|destructive|disasterrecovery|fips-check|hive|hypershift|longduration|mco|netobserv|nokubeadmin|ocm|rhel|rosa|security-profiles-operator|stress|to-multiarch|ui|winc|wrs'
+    skipped_profiles = 'agent|alibaba|aro|cloud|day2-64k-pagesize|destructive|disasterrecovery|fips-check|hive|hypershift|longduration|mco|netobserv|nokubeadmin|ocm|regen|rhel|rosa|security-profiles-operator|stress|to-multiarch|ui|winc|wrs'
     str_upgrade_jobs = ','.join(upgrade_jobs)
     for job in e2e_jobs:
         match = re.search(skipped_profiles, job) 
