@@ -21,7 +21,6 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-417
-      SKIP_HEALTH_CHECK: "true"
     post:
     - ref: firewatch-report-issues
     test:
@@ -137,6 +136,30 @@ tests:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
+- as: rosa-classic-sts-layered-product-interop-416
+  cron: 0 0 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":[{"step": "trigger-jobs", "failure_type": "all", "classification": "Rosa-classic-sts Trigger Failure"}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: rosa-classic-sts-lp-interop-jobs
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: rosa-classic-sts-lp-watcher-bot-message-416
+  cron: 0 8 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: rosa-classic-sts-lp-interop-jobs
+      WATCHER_BOT_JOB_GROUP_NAME: ROSA Classic STS Layered Product Scenarios
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
 zz_generated_metadata:
   branch: main
   org: rhpit
