@@ -19,7 +19,6 @@ ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
 if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
-echo "Using ES_HOST=${ES_HOST} from ${ES_SECRETS_PATH}"
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
