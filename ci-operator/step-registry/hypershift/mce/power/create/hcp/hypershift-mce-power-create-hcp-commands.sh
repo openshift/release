@@ -152,6 +152,8 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --node-pool-replicas -1 \
     --render > /tmp/hc-manifests/cluster-agent.yaml
 
+
+
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{5}"
 

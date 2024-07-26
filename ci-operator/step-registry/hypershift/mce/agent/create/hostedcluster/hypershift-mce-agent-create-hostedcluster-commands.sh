@@ -72,6 +72,8 @@ fi
   --ssh-key="${SHARED_DIR}/id_rsa.pub" \
   --release-image ${RELEASE_IMAGE}
 
+
+
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
   oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite

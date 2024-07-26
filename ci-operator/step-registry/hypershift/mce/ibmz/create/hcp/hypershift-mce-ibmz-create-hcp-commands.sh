@@ -13,6 +13,7 @@ export hcp_domain
 # InfraEnv configs
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 ssh_key=$(cat ${ssh_key_file})
+
 export ssh_key
 
 # Creating cluster imageset
@@ -164,6 +165,8 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
     --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
+
+
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
