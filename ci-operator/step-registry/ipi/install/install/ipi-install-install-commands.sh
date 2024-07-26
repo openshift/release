@@ -541,6 +541,67 @@ function inject_spot_instance_config() {
   fi
 }
 
+# inject_experimental_etcd_dedicated_disk_config is an experimental configuration
+# to patch CAPZ AzureMachine control plane objects to:
+# 1) create a dedicated data disk to be used to etcd
+# 2) decrease the size of VM/Instance, and bump the generation (increased to get more IO on OSDisk)
+# 3) decrease the size of OSDisk used to get more performance to etcd
+function inject_experimental_etcd_dedicated_disk_config() {
+  dir=${1}
+  local manifest
+  local patch
+
+  echo ">> Patching Cluster API AzureCluster object to enable failure domains (zones)"
+  cat << EOF > "${ARTIFACT_DIR}"/patch-02_azure-cluster.yaml
+spec:
+  failureDomains:
+    "1":
+      controlPlane: true
+    "2":
+      controlPlane: true
+    "3":
+      controlPlane: true
+EOF
+  echo "> Patching manifest 02_azure-cluster.yaml"
+  /tmp/yq m -x -i "${dir}"/cluster-api/02_azure-cluster.yaml "${ARTIFACT_DIR}"/patch-02_azure-cluster.yaml
+
+  # Force to use PremiumV2_LRS. The following command list supported regions,
+  # all CI regions is there.
+  # az vm list-skus --resource-type disks \
+  #   | jq -r '.[] | select(.name=="PremiumV2_LRS").locations[]'
+  local data_disk_type=PremiumV2_LRS
+  local data_disk_size=16
+  local os_disk_size=128
+  local vm_size=Standard_D4s_v5
+
+  echo ">> Patching Cluster API AzureMachine objects for Control Plane to enable failure domains"
+  ls -lR ${dir}
+  for cpid in $(seq 0 2); do
+    manifest=$(ls "${dir}"/cluster-api/machines/10_inframachine_*-master-"${cpid}".yaml)
+    zone_id=$((cpid + 1))
+
+    echo "Processing patch for control plane on zone ${zone_id}"
+    patch="${ARTIFACT_DIR}/patch-controlplane-${cpid}.yaml"
+    cat << EOF > "${patch}"
+spec:
+  failureDomain: "$zone_id"
+  dataDisks:
+    - nameSuffix: etcd
+      cachingType: None
+      diskSizeGB: ${data_disk_size}
+      lun: 0
+      managedDisk:
+        storageAccountType: ${data_disk_type}
+  osDisk:
+    cachingType: ReadWrite
+    diskSizeGB: ${os_disk_size}
+  vmSize: ${vm_size}
+EOF
+    echo "> Patching manifest ${manifest}"
+    /tmp/yq m -x -i "${manifest}" "${patch}"
+  done
+}
+
 function get_arch() {
   ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
   echo "${ARCH}"
@@ -664,7 +725,12 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+azure4|azure-arm64)
+    inject_boot_diagnostics ${dir}
+    if [[ "${CLUSTER_TYPE:-}"  == 'azure4' ]] && [[ "${EXPERIMENTAL_ETCD_DISK:-}" == 'true' ]]; then
+      inject_experimental_etcd_dedicated_disk_config "${dir}"
+    fi
+    ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"
