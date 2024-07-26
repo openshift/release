@@ -3,8 +3,12 @@
 set -x
 
 # Hosted Control Plane parameters
+HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
+export HC_NAME
 hcp_ns="$HC_NS-$HC_NAME"
 export hcp_ns
+hcp_domain=$(echo -n $PROW_JOB_ID|cut -c-8)-$HYPERSHIFT_BASEDOMAIN
+export hcp_domain
 
 # InfraEnv configs
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
@@ -98,8 +102,10 @@ data:
 EOF
 
 # Creating AgentServiceConfig
+CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
-envsubst <<"EOF" | oc apply -f -
+cat <<EOF | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
@@ -120,10 +126,9 @@ spec:
       requests:
         storage: 10Gi
   osImages:
-    - openshiftVersion: "${OCP_VERSION}"
-      version: "${OCP_RELEASE_VERSION}"
-      url: "${ISO_URL}"
-      rootFSUrl: "${ROOT_FS_URL}"
+    - openshiftVersion: "${CLUSTER_VERSION}"
+      version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").version')
+      url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").url')
       cpuArchitecture: s390x
 EOF
 
@@ -152,8 +157,8 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
     --pull-secret="${PULL_SECRET_FILE}" \
     --agent-namespace=${hcp_ns} \
-    --base-domain=${HYPERSHIFT_BASEDOMAIN} \
-    --api-server-address=api.${HC_NAME}.${HYPERSHIFT_BASEDOMAIN} \
+    --base-domain=${hcp_domain} \
+    --api-server-address=api.${HC_NAME}.${hcp_domain} \
     --ssh-key=${ssh_key_file} \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \

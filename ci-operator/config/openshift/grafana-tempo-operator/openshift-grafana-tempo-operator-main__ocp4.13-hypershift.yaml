@@ -20,7 +20,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -57,8 +57,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
-            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
         ]
+      SKIP_TESTS: tests/e2e-openshift-ossm/*
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
@@ -77,7 +80,7 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: install-operators
-    - ref: distributed-tracing-tests-tempo
+    - ref: distributed-tracing-tests-tempo-upstream
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 zz_generated_metadata:
   branch: main

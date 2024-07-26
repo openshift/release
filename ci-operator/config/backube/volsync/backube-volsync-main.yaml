@@ -1,14 +1,14 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.16"
     namespace: ocp
     tag: cli
   ocp_builder_volsync:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   operator-sdk:
-    name: "4.13"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
   ubi_minimal:
@@ -21,7 +21,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/python-311
       USER root
-      ENV GOVERSION=1.21.7
+      ENV GOVERSION=1.22.5
       RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
@@ -56,7 +56,7 @@ images:
   inputs:
     ocp_builder_volsync:
       as:
-      - golang:1.21
+      - golang:1.22
   to: volsync
 operator:
   bundles:
@@ -78,7 +78,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -110,6 +110,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:
@@ -201,6 +202,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-fips-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:
@@ -292,6 +294,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:

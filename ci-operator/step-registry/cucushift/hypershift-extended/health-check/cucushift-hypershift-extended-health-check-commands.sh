@@ -109,14 +109,15 @@ function check_node_status {
 }
 
 ###Main###
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
     if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         echo "this cluster is ROSA-HyperShift"
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-            source "${SHARED_DIR}/proxy-conf.sh"
-        fi
         print_clusterversion
         check_node_status || exit 1
         retry check_cluster_operators || exit 1
@@ -126,10 +127,12 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
 fi
 
 echo "check mgmt cluster's HyperShift part"
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
-  print_clusterversion
+  # Print clusterversion only if the management cluster is an OpenShift cluster
+  if oc get ns openshift; then
+      print_clusterversion
+  fi
   retry check_control_plane_pod_status || exit 1
 fi
 
@@ -139,3 +142,4 @@ print_clusterversion
 check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
+oc get pod -A > "${ARTIFACT_DIR}/guest-pods"

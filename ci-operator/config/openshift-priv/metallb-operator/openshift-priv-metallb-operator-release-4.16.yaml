@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  kube-rbac-proxy:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: kube-rbac-proxy
   metallb:
     name: 4.16-priv
     namespace: ocp-private
@@ -50,10 +54,14 @@ operator:
     with: pipeline:metallb-operator
   - pullspec: quay.io/openshift/origin-metallb-frr:4.16
     with: pipeline:metallb-frr
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.16
+    with: pipeline:kube-rbac-proxy
 promotion:
   to:
   - disabled: true
-    name: 4.16-priv
+    name: metallb-4.16
+    namespace: origin
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -131,6 +139,13 @@ tests:
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
     workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

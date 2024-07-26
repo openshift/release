@@ -1,13 +1,14 @@
 base_images:
   base:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: base
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  from_repository: true
+promotion:
+  to:
+  - name: "4.17"
+    namespace: ocp
 resources:
   '*':
     limits:
@@ -26,6 +27,18 @@ tests:
     from: src
 - as: build
   commands: make build-coredns
+  container:
+    from: src
+- as: verify-operator
+  commands: make -C operator verify
+  container:
+    from: src
+- as: unit-operator
+  commands: make -C operator test
+  container:
+    from: src
+- as: build-operator
+  commands: make -C operator build
   container:
     from: src
 zz_generated_metadata:

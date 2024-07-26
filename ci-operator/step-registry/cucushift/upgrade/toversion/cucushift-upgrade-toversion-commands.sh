@@ -25,7 +25,7 @@ function debug() {
         echo -e "Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
@@ -182,53 +182,10 @@ function cco_annotation(){
     fi
 }
 
-# Extract oc binary which is supposed to be identical with target release
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${DUMMY_TARGET});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
-    return 0
-}
-
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
     eval "${CMD}"
-}
-
-function run_command_oc() {
-    local try=0 max=40 ret_val
-
-    if [[ "$#" -lt 1 ]]; then
-        return 0
-    fi
-
-    while (( try < max )); do
-        if ret_val=$(oc "$@" 2>&1); then
-            break
-        fi
-        (( try += 1 ))
-        sleep 3
-    done
-
-    if (( try == max )); then
-        echo >&2 "Run:[oc $*]"
-        echo >&2 "Get:[$ret_val]"
-        return 255
-    fi
-
-    echo "${ret_val}"
 }
 
 # Check if a build is signed
@@ -243,17 +200,15 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
     try=0
-    max_retries=2
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    max_retries=3
+    response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
-    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -413,19 +368,14 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# This step slim down for one-hop upgrade only. 
-# If we will call it in chanin upgrade in the future, we need add target loop and health_check back. 
-export OC="run_command_oc"
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
-export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 export DUMMY_TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 # we need this DUMMY_TARGET_VERSION from ci config to download oc and do some pre-check
 DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUMMY_TARGET}" --output=json | jq -r '.metadata.version')"
 echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
-extract_oc
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
@@ -468,9 +418,7 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
-run_command "${upgrade_cmd}"
+run_command "${upgrade_cmd} --force=${FORCE_UPDATE}"
 echo "Upgrading cluster to ${TARGET_VERSION} gets started..."
 check_upgrade_status
 check_history
-
-

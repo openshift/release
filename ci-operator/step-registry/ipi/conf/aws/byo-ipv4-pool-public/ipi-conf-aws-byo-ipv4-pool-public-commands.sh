@@ -41,11 +41,17 @@ expected_ip_available=$(( ( zone_count * 2 ) + 1 ))  # This accounts for API LB 
 
 # IP_POOL_AVAILABLE is automatically populated by CI infrastructure if there are
 # BYOIP addresses available in the region's BYOIP pool.
+echo "AVAILABLE: ${IP_POOL_AVAILABLE:-0}"
 if (( "${IP_POOL_AVAILABLE:-0}" >= "${expected_ip_available}" )); then
   echo "Using custom IPv4 Pool. Sufficient BYOIP addresses (${expected_ip_available}) have been reserved in boskos for this job run in this region."
 else
-  echo "Unable to use custom IPv4 Pool. Insufficient BYOIP addresses (${expected_ip_available}) available in boskos for this job run in this region. Using default (Amazon Provided)"
-  exit 0
+  if [[ ${ENFORCE_IPV4_POOL} == "yes" ]]; then
+    echo "ENFORCE_IPV4_POOL is enabled, but no sufficient BYOIP addresses, exit now."
+    exit 1
+  else
+    echo "Unable to use custom IPv4 Pool. Insufficient BYOIP addresses (${expected_ip_available}) available in boskos for this job run in this region. Using default (Amazon Provided)"
+    exit 0
+  fi
 fi
 
 echo "Retrieving available Public IPv4 Pools in the region..."
@@ -69,6 +75,10 @@ fi
 
 echo "Found ${available_ips} BYOIP address(es) available in custom IPv4 pool ${pool_id}, the installation will use ${expected_ip_available}."
 
+unused_ip_addresses=$((IP_POOL_AVAILABLE-expected_ip_available))
+echo "Releasing $unused_ip_addresses unused ip addresses"
+echo "$unused_ip_addresses" >> "${SHARED_DIR}/UNUSED_IP_COUNT"
+
 CONFIG_PATCH="/tmp/install-config-public-ipv4-pool.yaml.patch"
 cat > "${CONFIG_PATCH}" << EOF
 platform:
@@ -80,3 +90,6 @@ echo "Custom Pool Patch:"
 cat ${CONFIG_PATCH}
 
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+
+# save pool id for post-check
+echo ${pool_id} > ${SHARED_DIR}/ipv4_pool_id

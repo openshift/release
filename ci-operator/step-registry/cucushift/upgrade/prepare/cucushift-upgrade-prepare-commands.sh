@@ -16,20 +16,24 @@ function set_cluster_access() {
     fi
 }
 function preparation_for_test() {
-    if ! which kubectl > /dev/null ; then
+    if ! which kubectl &> /dev/null ; then
         mkdir --parents /tmp/bin
         export PATH=$PATH:/tmp/bin
         ln --symbolic "$(which oc)" /tmp/bin/kubectl
     fi
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
-    upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
-    upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
+    IFS=',' read upuser1 upuser2 _ < <(echo $USERS | cut -d',' -f8-10)
+    apiport="$(yq '.environments.ocp4.api_port' <<< $BUSHSLICER_CONFIG)"
+    version="$(yq '.environments.ocp4.version' <<< $BUSHSLICER_CONFIG)"
+    browser="$(yq '.global.browser' <<< $BUSHSLICER_CONFIG)"
     export BUSHSLICER_CONFIG="
 global:
-  browser: chrome
+  browser: '${browser}'
 environments:
   ocp4:
+    api_port: '${apiport}'
+    version: '${version}'
     static_users_map:
       upuser1: '${upuser1}'
       upuser2: '${upuser2}'
@@ -77,7 +81,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            external|none|powervs)
+            external|kubevirt|none|powervs)
                 export UPGRADE_PRE_RUN_TAGS="@baremetal-upi and ${UPGRADE_PRE_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -105,8 +109,11 @@ function filter_test_by_network() {
         ovnkubernetes)
 	    networktag='@network-ovnkubernetes'
 	    ;;
+        other)
+	    networktag=''
+	    ;;
         *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
+	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
 	    ;;
     esac
     if [[ -n $networktag ]] ; then
@@ -164,11 +171,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
@@ -231,7 +240,7 @@ function filter_tests() {
     echo_upgrade_tags
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
     export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}"
@@ -243,25 +252,42 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    failures=0 errors=0 skipped=0 tests=0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-upgrade-prepare
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+cucushift-upgrade-prepare:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
-    if [ $((failures)) != 0 ] ; then
+
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
-        for (( i=0; i<failures; i++ )) ; do
+        for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi

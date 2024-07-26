@@ -4,11 +4,19 @@ metadata:
   name: helpdesk-faq
   namespace: ci
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: helpdesk-faq
+  namespace: ci
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: helpdesk-faq
   namespace: ci
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"helpdesk-faq:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"helpdesk-faq\")].image"}]'
 spec:
   replicas: 2
   selector:
@@ -19,6 +27,7 @@ spec:
       labels:
         app: helpdesk-faq
     spec:
+      serviceAccountName: helpdesk-faq
       containers:
       - args:
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
@@ -65,3 +74,20 @@ spec:
   ports:
   - name: helpdesk-faq
     port: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: helpdesk-faq
+  name: helpdesk-faq
+  namespace: ci
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: helpdesk-faq

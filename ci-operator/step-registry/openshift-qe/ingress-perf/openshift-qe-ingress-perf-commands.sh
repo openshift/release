@@ -3,7 +3,32 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 cat /etc/os-release
+
+if [ ${BAREMETAL} == "true" ]; then
+  bastion="$(cat /bm/address)"
+  # Copy over the kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  # Setup socks proxy
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  export KUBECONFIG=/tmp/kubeconfig
+  export https_proxy=socks5://localhost:12345
+  export http_proxy=socks5://localhost:12345
+  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
+  cd /tmp
+fi
 oc config view
 oc projects
 python --version
@@ -32,3 +57,8 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+
+if [ ${BAREMETAL} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
+fi

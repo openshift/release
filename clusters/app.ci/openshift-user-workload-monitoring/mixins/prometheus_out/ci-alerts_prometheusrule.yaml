@@ -71,14 +71,6 @@ spec:
       for: 10m
       labels:
         severity: critical
-    - alert: kata-jenkins-operator-Singleton-Down
-      annotations:
-        message: The service kata-jenkins-operator has been down for 10 minutes.
-      expr: |
-        absent(up{job="kata-jenkins-operator"} == 1)
-      for: 10m
-      labels:
-        severity: critical
     - alert: prow-controller-manager-Singleton-Down
       annotations:
         message: The service prow-controller-manager has been down for 10 minutes.
@@ -255,6 +247,14 @@ spec:
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
+      labels:
+        severity: critical
+    - alert: ProbeFailing-Lenient
+      annotations:
+        message: Probing the instance {{ $labels.instance }} has been failing for the past five minutes.
+      expr: |
+        up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
+      for: 5m
       labels:
         severity: critical
   - name: openshift-priv-image-building-jobs-failing

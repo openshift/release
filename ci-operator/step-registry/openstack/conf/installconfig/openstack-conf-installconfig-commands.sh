@@ -151,6 +151,8 @@ if [[ ${ADDITIONAL_WORKERS_NETWORKS:-} != "" ]]; then
 fi
 
 if [ "${FIPS_ENABLED:-}" = "true" ]; then
+	# Since CI does not run with FIPS mode enabled, disable checking for it in openshift-install
+	export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 	echo "Adding 'fips: true' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .fips = true
@@ -191,6 +193,13 @@ spec:
 EOF
         yq --yaml-output --in-place ".
 		| .networking.networkType = \"OVNKubernetes\"
+	" "$INSTALL_CONFIG"
+fi
+
+# Add an additional security group, in case it exists, to the compute nodes
+if test -f "${SHARED_DIR}/securitygroups"; then
+	yq --yaml-output --in-place ".
+		| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"${SHARED_DIR}"/securitygroups)\" ]
 	" "$INSTALL_CONFIG"
 fi
 

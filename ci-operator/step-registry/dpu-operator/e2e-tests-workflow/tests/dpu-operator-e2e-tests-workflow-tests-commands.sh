@@ -3,13 +3,20 @@
 token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
 endpoint=$(cat "/var/run/token/dpu-token/url")
 
-job_url="https://${endpoint}/job/Lab144_DPU_Operator_Test/lastBuild"
+job_url="https://${endpoint}/job/99_Lab217_IPU_Deploy"
 
 endpoint_resolve="${endpoint}:443:10.0.180.88"
 
 max_sleep_duration=86400  # Maximum sleep duration in seconds (2 hours)
 sleep_counter=0
 #this is a queue system in case other jobs are running
+
+BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
+
+if [ $PULL_NUMBER == $BUILD_NUMBER ]; then
+	curl -k -s --resolve "$endpoint_resolve" "${job_url}/stop"
+	sleep 20
+fi
 while : 
 do
     job_check=$(curl -k -s --resolve "$endpoint_resolve" "$job_url/api/json")
@@ -28,7 +35,7 @@ do
     fi
 done
 
-curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/job/Lab144_DPU_Operator_Test/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
+curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/job/99_Lab217_IPU_Deploy/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
 
 echo "Waiting for job completion..."
 max_sleep_duration=7200  # Maximum sleep duration in seconds (2 hours)

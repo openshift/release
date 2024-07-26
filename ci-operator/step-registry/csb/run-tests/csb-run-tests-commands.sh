@@ -97,12 +97,6 @@ spec:
             items:
             - key: test.properties
               path: test.properties
-        - name: credentials
-          secret:
-            secretName: credentials
-            items:
-              - key: credentials.yaml
-                path: credentials.yaml
         - name: tnb-volume
           persistentVolumeClaim:
             claimName: persistent-tnb-tests
@@ -144,9 +138,6 @@ spec:
               mountPath: /tmp/
             - name: test-properties
               mountPath: /mnt/
-            - name: credentials
-              mountPath: /mnt/secrets
-              readOnly: true
             - name: tnb-volume
               mountPath: /tmp/failsafe-reports/
               subPath: failsafe-reports
@@ -168,6 +159,8 @@ function check_tests() {
   oc wait pods -n csb-interop -l deployment=tnb-tests --for jsonpath="{status.phase}"=Running --timeout=120s
   sleep 10
   runningPod=true
+  count=0
+  maxFailures=100
   while $runningPod; do
     tnbtestsPod=$(oc get pods -n csb-interop -l deployment=tnb-tests --no-headers=true | awk '{print $1}')
     sleep 60
@@ -181,9 +174,14 @@ function check_tests() {
       echo "Artifacts re-sync, wait 10 seconds ..."
       sleep 10
       restartPodAfterFailure
+      count=$((count + 1))
+      if [[ $count -gt $maxFailures ]]; then
+        echo "Max retries reached: exiting ..."
+        break
+      fi
       sleep 60
     fi
-    echo "Check if tnb-tests are still running: $runningPod"
+    echo "Check if tnb-tests are still running: $runningPod - attempt # $count"
   done
   echo "Tests completed on $tnbtestsPod"
   sleep 20

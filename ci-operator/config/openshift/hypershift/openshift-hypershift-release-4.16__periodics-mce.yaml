@@ -1,0 +1,190 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.11
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
+  hypershift-tests:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-tests
+  test-bin:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-conformance
+  cron: 20 7 11,15 * *
+  steps:
+    cluster_profile: aws
+    env:
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-aws-conformance
+- as: e2e-agent-connected-ovn-ipv4-manual-conformance
+  cron: 51 17 5,19 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-manual-conformance
+- as: e2e-agent-connected-ovn-ipv4-metal3-conformance
+  cron: 32 18 9,16 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-metal3-conformance
+- as: e2e-agent-connected-ovn-dualstack-metal3-conformance
+  cron: 27 13 12,24 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-metal3-conformance
+- as: e2e-agent-connected-ovn-ipv4-metal3-compact-conformance
+  cron: 48 3 14,28 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=40960
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-metal3-conformance
+- as: e2e-agent-disconnected-ovn-ipv6-metal3-conformance
+  cron: 3 21 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-disconnected-conformance
+- as: e2e-agent-disconnected-ovn-dualstack-metal3-conformance
+  cron: 35 5 9,24 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MIRROR_IMAGES=true
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-disconnected-conformance
+- as: e2e-kubevirt-metal-ovn
+  cron: 38 22 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-ovn-multinet
+  cron: 31 7 9,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      ATTACH_DEFAULT_NETWORK: "false"
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-ovn-multinet-default-net
+  cron: 22 3 14,18 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      ATTACH_DEFAULT_NETWORK: "true"
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-ovn-disconnected
+  cron: 5 8 12,16 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CCS_OPERATOR_CHANNELS: stable-4.15,stable-4.15,stable-4.15,stable-4.15
+      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.6"
+      MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.16
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-mce-kubevirt-baremetalds-disconnected-conformance
+- as: e2e-ibmz-ovn-conformance
+  cron: 12 4 10,28 * *
+  steps:
+    cluster_profile: aws
+    env:
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-ibmz-conformance
+- as: e2e-power-ovn-conformance
+  cron: 24 11 11,20 * *
+  steps:
+    cluster_profile: aws
+    env:
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-power-conformance
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: hypershift
+  variant: periodics-mce

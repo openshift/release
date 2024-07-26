@@ -4,12 +4,26 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
-oc config view
-oc projects
+
+if [ ${BAREMETAL} == "true" ]; then
+  bastion="$(cat /bm/address)"
+  # Copy over the kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  # Setup socks proxy
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  export KUBECONFIG=/tmp/kubeconfig
+  export https_proxy=socks5://localhost:12345
+  export http_proxy=socks5://localhost:12345
+  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
+  cd /tmp
+fi
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
+
+oc config view
+oc projects
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
@@ -37,8 +51,15 @@ export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.j
 export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-rm -f ${SHARED_DIR}/index.json
+echo ${SHARED_DIR}
+
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
+
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+
+if [ ${BAREMETAL} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
+fi

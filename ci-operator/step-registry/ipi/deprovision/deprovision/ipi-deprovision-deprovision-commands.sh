@@ -55,7 +55,7 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
     # all vcenter certificates are in the file below
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
 fi
 
 echo ${SHARED_DIR}/metadata.json

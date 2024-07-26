@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -88,6 +96,8 @@ required_permissions="""
 \"Microsoft.Authorization/roleAssignments/read\",
 \"Microsoft.Authorization/roleAssignments/write\",
 \"Microsoft.Compute/availabilitySets/read\",
+\"Microsoft.Compute/availabilitySets/write\",
+\"Microsoft.Compute/availabilitySets/delete\",
 \"Microsoft.Compute/disks/beginGetAccess/action\",
 \"Microsoft.Compute/disks/delete\",
 \"Microsoft.Compute/disks/read\",
@@ -191,12 +201,13 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
-if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]]; then
-    required_permissions="""
-\"Microsoft.Compute/availabilitySets/write\",
+# optional permission to gather bootstrap bundle log
+required_permissions="""
+\"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",
 ${required_permissions}
 """
-elif [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+
+if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
     required_permissions="""
 \"Microsoft.Compute/images/read\",
 \"Microsoft.Compute/images/write\",
@@ -209,9 +220,6 @@ elif [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
 \"Microsoft.Resources/deployments/operationstatuses/read\",
 ${required_permissions}
 """
-else
-    echo "Unsupported cluster type ${CLUSTER_TYPE_MIN_PERMISSOIN}!"
-    exit 1
 fi
 
 if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then
