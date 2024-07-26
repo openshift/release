@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -33,17 +38,16 @@ declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
-
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+  SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 fi
 
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json."
   exit 1
 fi
 
@@ -145,7 +149,6 @@ echo "${ova_url}" >"${SHARED_DIR}"/ova_url.txt
 ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
-
 
 # select a hardware version for testing
 vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')

@@ -31,32 +31,29 @@ base_images:
     name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
+  coreos-centos-stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.53.1
-  openshift_release_golang-1.21:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  tests:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
+  tests-4.15:
+    name: "4.15"
+    namespace: ocp
+    tag: tests
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.image-service
-  inputs:
-    openshift_release_golang-1.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: assisted-image-service
 - dockerfile_path: Dockerfile.image-service-build
-  inputs:
-    openshift_release_golang-1.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.21
+  from: coreos-centos-stream9
   to: assisted-image-service-build
 promotion:
   to:
@@ -102,7 +99,7 @@ tests:
     make lint
   container:
     clone: true
-    from: golangci-lint
+    from: assisted-image-service-build
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test
   commands: |
@@ -178,6 +175,8 @@ tests:
   optional: true
   steps:
     cluster_profile: oci-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15

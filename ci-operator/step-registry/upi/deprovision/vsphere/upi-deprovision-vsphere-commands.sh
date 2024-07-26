@@ -36,6 +36,7 @@ echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and al
 echo "{\"hw_version\":  \"vmx-${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
 
 set +e
+
 vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}
@@ -62,10 +63,7 @@ cp -t "${installer_dir}" \
     "${SHARED_DIR}/metadata.json" \
     "${SHARED_DIR}/terraform.tfvars" \
     "${SHARED_DIR}/secrets.auto.tfvars" \
-    "${SHARED_DIR}/variables.ps1" \
-    "${SHARED_DIR}/bootstrap.ign" \
-    "${SHARED_DIR}/worker.ign" \
-    "${SHARED_DIR}/master.ign"
+    "${SHARED_DIR}/variables.ps1"
 
 cp -t "${installer_dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \

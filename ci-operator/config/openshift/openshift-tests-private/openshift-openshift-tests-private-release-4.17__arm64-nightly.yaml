@@ -295,6 +295,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-longduration-reliability-test-f14
+  cron: 31 11 14,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
+      TEST_TIMEOUT_DISASTERRECOVERY: "900"
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-ovn-ipsec-to-multiarch-f2
   cron: 53 13 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   steps:
@@ -327,7 +343,6 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - ref: idp-htpasswd
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: aws-ipi-private-f9-longduration-apiserver
@@ -390,7 +405,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - ref: idp-htpasswd
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-to-multiarch-f2
@@ -411,6 +425,21 @@ tests:
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-longduration-reliability-test-f14
+  cron: 31 18 14,30 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
+      TEST_TIMEOUT_DISASTERRECOVERY: "900"
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-compact-agent-ipv4-dynamic-connected-f7
   cluster: build05
@@ -590,7 +619,6 @@ tests:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     test:
-    - ref: idp-htpasswd
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-to-multiarch-f14
@@ -611,20 +639,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-upi-f28-ui
-  cron: 3 5 17 * *
+- as: gcp-ipi-longduration-reliability-test-f14
+  cron: 31 19 14,30 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BOOTSTRAP_NODE_TYPE: t2a-standard-4
       COMPUTE_NODE_TYPE: t2a-standard-4
-      CONTROL_PLANE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
+      TEST_SCENARIOS_DISASTERRECOVERY: "67718"
+      TEST_TIMEOUT_DISASTERRECOVERY: "900"
     test:
-    - chain: openshift-e2e-test-qe-ui
-    workflow: cucushift-installer-rehearse-gcp-upi
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

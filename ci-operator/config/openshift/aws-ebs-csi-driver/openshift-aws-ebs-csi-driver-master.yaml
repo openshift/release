@@ -7,10 +7,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.17
   tests-private:
     name: tests-private
     namespace: ci
@@ -25,9 +25,9 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: aws-ebs-csi-driver
 promotion:
   to:
@@ -52,7 +52,7 @@ tests:
 - as: verify
   commands: |
     # Set $HOME for golangci-lint cache
-    HOME=/tmp make verify
+    GOFLAGS="-mod=readonly" HOME=/tmp make verify
   container:
     from: src
 - as: verify-deps
@@ -61,7 +61,7 @@ tests:
     - ref: go-verify-deps
 - as: unit
   commands: |
-    make test
+    GOFLAGS="-mod=readonly" make test
   container:
     from: src
 - as: e2e-aws-ovn-upgrade

@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -122,7 +130,7 @@ addressPrefix=$(echo $addressPrefix_output)
 azure_fqdns_list="management.azure.com *.blob.core.windows.net login.microsoftonline.com"
 # For nightly build
 redhat_fqdns_list="*.ci.openshift.org"
-redhat_fqdns_list="${redhat_fqdns_list} *.cloudfront.net"
+redhat_fqdns_list="${redhat_fqdns_list} *.cloudfront.net *.r2.cloudflarestorage.com"
 # For registries
 redhat_fqdns_list="${redhat_fqdns_list} registry.redhat.io access.redhat.com quay.io cdn.quay.io cdn01.quay.io cdn02.quay.io cdn03.quay.io sso.redhat.com"
 # For Telemetry
