@@ -61,6 +61,8 @@ else
   exit 1
 fi
 
+sleep 10h
+
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id" || true)
 if [[ -z "$CLUSTER_ID" ]]; then
   CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name" || true)
