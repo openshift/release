@@ -35,3 +35,7 @@ for try in $(seq "${RETRIES}"); do
     sleep 30
   fi
 done
+
+# some debug commands
+oc get StorageCluster -n openshift-storage --show-managed-fields=true -o yaml
+oc get -n local-cluster configurationpolicies policy-odf-cluster --show-managed-fields=true -o yaml
