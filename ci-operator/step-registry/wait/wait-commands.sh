@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sleep "$SLEEP_DURATION" &
+sleep 3h &
 wait

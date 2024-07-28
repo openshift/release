@@ -236,3 +236,4 @@ govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data.encoding=gzi
 govc vm.power -on "${LB_VMNAME}"
 
 touch $SHARED_DIR/external_lb
+sleep 5
