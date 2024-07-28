@@ -24,8 +24,8 @@ Example of a multi-arch cluster where a new MachineConfigPool named 'infra' has 
     env:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker,kubernetes.io/arch=arm64
-      MCO_CONF_DAY2_CUSTOM_MCP_NAME: infra
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'
     test:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-e2e-test-qe
@@ -46,14 +46,8 @@ This script creates a MachineConfigPool resource and joins the nodes matching th
 ### Environment Variables
 
 - `MCO_CONF_DAY2_CUSTOM_MCP_NAME`
-  - **Definition**: The name of the custom MachineConfigPool that will be created
+  - **Definition**: A json format of list string to define multiple custom MCPs. Example: `'[{"mcp_name": "infra", "mcp_node_num": "1", "mcp_node_label": "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'`. `mcp_name` element is required; `mcp_node_num` element is `1` by default; `mcp_node_label` element is `node-role.kubernetes.io/worker` by default. 
   - **If left empty**: No custom MCP will be created and this step will be skipped
-- `MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES`
-  - **Definition**: The number of nodes that will be removed from the worker pool and added to the new custom pool
-  - **If left empty**: It will default to 1. It the value is an empty string "" all nodes matching the MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL label will be added to the pool
-- `MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL`
-  - **Definition**: The label used to filter the nodes that can be added to the new pool. 
-  - **If left empty**: It will default to "node-role.kubernetes.io/worker" label
 - `MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT`
   - **Definition**: Maximum time that we will wait for the new custom pool to be updated
   - **If left empty**: It will default to 20m
