@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-azure-etcd-datadisk
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-etcd-datadisk
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-azure-post
+    env:
+      EXPERIMENTAL_ETCD_DISK: true
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+  documentation: |-
+    (EXPERIMENTAL job to monitor stability and costs)
+    The Openshift E2E Azure `etcd-datadisk` workflow executes the 
+    default end-to-end test suite on Azure with a custom configuration
+    on control plane nodes by:
+    A) patching the Cluster API AzureMachine objects to:
+      1) decrease the size of VM,
+      2) decrease the OSDisk size,
+      3) create data disk with PremiumV2 tier dedicated to etcd
+    B) create MachineConfig objects to mount additional data disk on etcd path.
