@@ -95,8 +95,6 @@ echo "$(date) Get workers hostnames"
 IFS=' ' read -r -a HOST_NAMES <<< "${INSTANCE_NAMES}"
 echo "HOST_NAMES: ${HOST_NAMES[@]}"  # Debug statement
 
-sleep 3h
-
 for ((i=1; i<=20; i++)); do
     agents=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json)
 
@@ -145,4 +143,4 @@ done
 echo "$(date) Setup nested_kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 
-#sleep 5h
+sleep 5h
