@@ -11,10 +11,6 @@ log(){
 }
 
 TEST_LABEL_FILTERS=${TEST_LABEL_FILTERS:-}
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-log "Working on the cluster: $CLUSTER_ID"
-export CLUSTER_ID # maybe we should get cluster_id by TEST_PROFILE
-
 
 # Configure aws
 REGION=${REGION:-${LEASED_RESOURCE}}
