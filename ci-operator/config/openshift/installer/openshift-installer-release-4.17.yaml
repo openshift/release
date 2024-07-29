@@ -309,8 +309,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -335,9 +333,6 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
@@ -352,9 +347,6 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
-    env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     post:
     - chain: ipi-aws-post
     - ref: ipi-deprovision-aws-custom-security-groups
@@ -398,8 +390,6 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
@@ -464,9 +454,6 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-upgrade-aws-latestinstaller
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upi
@@ -508,8 +495,6 @@ tests:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "8.4"
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
@@ -752,9 +737,6 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
-    env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
@@ -771,8 +753,6 @@ tests:
     cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
     - chain: ipi-aws-pre
@@ -812,11 +792,11 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
-- as: agent-integration-tests
-  run_if_changed: ^(cmd|pkg|data).*/agent/
+- as: integration-tests
+  run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
   steps:
     test:
-    - as: agent-integration-tests
+    - as: integration-tests
       commands: hack/go-integration-test.sh
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
@@ -892,9 +872,6 @@ tests:
   run_if_changed: /aws/subnet.go
   steps:
     cluster_profile: aws
-    env:
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 - always_run: false
@@ -910,8 +887,6 @@ tests:
     cluster_profile: aws
     env:
       CLUSTER_NETWORK_MTU: "1200"
-      SPOT_INSTANCES: "true"
-      SPOT_MASTERS: "true"
     workflow: openshift-e2e-aws-network-mtu
   timeout: 6h0m0s
 - always_run: false
@@ -952,9 +927,9 @@ tests:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-heterogeneous
+- as: e2e-aws-ovn-heterogeneous
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     dependencies:
@@ -964,7 +939,17 @@ tests:
       CONTROL_ARCH: arm64
       FEATURE_GATES: '["MultiArchInstallAWS=true"]'
       FEATURE_SET: CustomNoUpgrade
-      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous-day-0
   timeout: 6h0m0s
 - always_run: false
@@ -979,7 +964,17 @@ tests:
       CONTROL_ARCH: arm64
       FEATURE_GATES: '["MultiArchInstallGCP=true"]'
       FEATURE_SET: CustomNoUpgrade
-      TEST_SKIPS: oc new-app should succeed\| build can reference a cluster service
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
 zz_generated_metadata:

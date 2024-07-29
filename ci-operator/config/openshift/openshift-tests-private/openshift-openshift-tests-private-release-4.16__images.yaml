@@ -15,18 +15,10 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.16"
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
   ocp_4.16_tools:
     name: "4.16"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -48,6 +40,12 @@ images:
       - registry.ci.openshift.org/ci/tests-private-builder:4.16
   to: tests-private
 - dockerfile_literal: |
+    # have to keep it as rhel8
+    #   image_stream_tag:
+    #   name: builder
+    #   namespace: ocp
+    #   tag: rhel-8-golang-1.21-openshift-4.16
+    # because UI image does not support rhel9, and already notice UI team
     FROM src AS builder
     FROM registry.ci.openshift.org/ci/tests-private-baseui:4.16
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
@@ -89,27 +87,13 @@ images:
       - registry.ci.openshift.org/ocp/4.16:tools
   optional: true
   to: tests-private-base
-- dockerfile_path: images/Dockerfile.base.rhel9
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-  optional: true
-  to: tests-private-base-rhel9
 - dockerfile_path: images/Dockerfile.builder
-  inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  optional: true
-  to: tests-private-builder
-- dockerfile_path: images/Dockerfile.builder.rhel9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   optional: true
-  to: tests-private-builder-rhel9
+  to: tests-private-builder
 promotion:
   to:
   - namespace: ci

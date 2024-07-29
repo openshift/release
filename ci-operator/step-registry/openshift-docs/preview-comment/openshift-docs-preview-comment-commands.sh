@@ -5,6 +5,13 @@
 # set -o errexit
 # set -o pipefail
 
+PR_AUTHOR=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].author')
+
+if [ "$PR_AUTHOR" == "openshift-cherrypick-robot" ]; then
+  echo "openshift-cherrypick-robot PRs don't need a full docs build."
+  exit 0
+fi
+
 GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 
 export GITHUB_AUTH_TOKEN
