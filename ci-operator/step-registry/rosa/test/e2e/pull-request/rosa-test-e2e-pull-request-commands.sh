@@ -24,7 +24,10 @@ rosa login --env "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Variables
 COMMIT_FOCUS="/rosa/tests/ci/data/commit-focus"
-FOCUS=$(cat "${COMMIT_FOCUS}")
+FOCUS=""
+if [[ -f $COMMIT_FOCUS ]];then
+  FOCUS=$(cat "${COMMIT_FOCUS}")
+fi
 FOCUS_LABEL_FILTER=""
 FOCUS_SWITCH="--ginkgo.focus '${FOCUS}'"
 if [[ -z "$FOCUS" ]]; then
