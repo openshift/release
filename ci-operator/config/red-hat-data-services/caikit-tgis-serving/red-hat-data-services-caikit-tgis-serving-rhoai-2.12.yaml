@@ -1,0 +1,45 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: caikit-tgis-serving
+promotion:
+  to:
+  - namespace: red-hat-data-services
+    tag: rhoai-2.12-final
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-tgis-serving
+    env:
+      IMAGE_REPO: caikit-tgis-serving
+      RELEASE_VERSION: rhoai-2.12
+    workflow: red-hat-data-services-ci-image-mirror
+zz_generated_metadata:
+  branch: rhoai-2.12
+  org: red-hat-data-services
+  repo: caikit-tgis-serving
