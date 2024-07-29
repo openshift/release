@@ -14,18 +14,18 @@ function set_hub_cluster_kubeconfig {
 
 function clean_up {
 
-  echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
+  echo "************ telcov10n Clean up Gitops deployment ************"
   set -x
+  oc -n openshift-gitops delete apps clusters policies || echo "Gitops k8s apps didn't exist..."
   set +x
 }
-
 
 function main {
   set_hub_cluster_kubeconfig
   clean_up
 
   echo
-  echo "Success!!! The SNO Spoke cluster related objects have been removed correctly."
+  echo "Success!!! The Gitops k8s service has been removed correctly."
 }
 
 main

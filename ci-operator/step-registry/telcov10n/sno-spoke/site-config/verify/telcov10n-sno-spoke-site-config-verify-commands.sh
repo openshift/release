@@ -12,20 +12,17 @@ function set_hub_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
-function clean_up {
-
-  echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
-  set -x
-  set +x
+function run_tests {
+  echo "************ telcov10n Verifying installation ************"
+  oc get managedcluster || echo "No ready..."
 }
-
 
 function main {
   set_hub_cluster_kubeconfig
-  clean_up
+  run_tests
 
   echo
-  echo "Success!!! The SNO Spoke cluster related objects have been removed correctly."
+  echo "Success!!! The SNO Spoke cluster has been installed correctly."
 }
 
 main

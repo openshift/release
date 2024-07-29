@@ -14,8 +14,12 @@ function set_hub_cluster_kubeconfig {
 
 function clean_up {
 
-  echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
+  echo "************ telcov10n Clean up AgentServiceConfig CR ************"
   set -x
+  oc delete AgentServiceConfig agent || echo "The CR didn't exist..."
+  assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
+    grep "^assisted-service" || echo "assisted-service")
+  oc -n multicluster-engine wait --for=delete pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
   set +x
 }
 
@@ -25,7 +29,7 @@ function main {
   clean_up
 
   echo
-  echo "Success!!! The SNO Spoke cluster related objects have been removed correctly."
+  echo "Success!!! The SNO Spoke cluster CRs have been removed correctly."
 }
 
 main
