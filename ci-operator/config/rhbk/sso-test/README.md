@@ -12,7 +12,7 @@
 
 ## General Information
 
-- **Test Repository**: [RHBK/interop-ocp-ci](https://github.com/rhbk/interop-ocp-ci.git)
+- **Test Repository**: [RHBK/sso-test](https://github.com/rhbk/sso-test.git)
 - **Product Tested**: Red Hat Single Sign-On
 
 ## Purpose
@@ -48,6 +48,6 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 
 ### Custom Images
 - `rhsso-runner`
-  - [Dockerfile](https://github.com/rhbk/interop-ocp-ci/blob/main/docker-container-executor/Dockerfile) - This image is used to execute RHSSO test suite. It basically copies the test repository (https://github.com/rhbk/interop-ocp-ci.git) into /tmp/tests/ansible-test directory on the container
+  - [Dockerfile](https://github.com/rhbk/sso-test/blob/main/docker-container-executor/Dockerfile) - This image is used to execute RHSSO test suite. It basically copies the test repository (https://github.com/rhbk/sso-test.git) into /tmp/tests/ansible-test directory on the container
 
 
