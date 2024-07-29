@@ -29,6 +29,7 @@ EOF
 }
 
 #Create PV and PVC for prometheus
+echo "Creating PV and PVC"
 cluster_monitoring_config
 echo "Sleeping for 60 seconds for the PV and PVC to be bound"
 sleep 60
@@ -54,6 +55,18 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
+#Check if PVC is created
+PVC_CHECK=$(oc get pvc $PVC_NAME -n $TARGET_NAMESPACE --no-headers --ignore-not-found)
+
+if [ -z "$PVC_CHECK" ]; then
+  echo "PVC '$PVC_NAME' does not exist in namespace '$NAMESPACE'."
+  echo "Creating PV and PVC"
+  cluster_monitoring_config
+  echo "Sleeping for 60 seconds for the PV and PVC to be bound"
+  sleep 60
+else
+  echo "PVC '$PVC_NAME' exists in namespace '$NAMESPACE'."
+fi
 
 ./pvc-scenario/prow_run.sh
 rc=$?
