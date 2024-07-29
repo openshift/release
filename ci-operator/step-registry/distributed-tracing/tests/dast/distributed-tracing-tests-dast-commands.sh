@@ -24,3 +24,6 @@ chainsaw test \
 --report-format "XML" \
 --test-dir \
 tests/e2e-rh-sdl
+
+echo "start debugging"
+sleep 18000
