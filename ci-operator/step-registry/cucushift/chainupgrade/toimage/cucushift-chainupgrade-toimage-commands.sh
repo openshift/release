@@ -604,7 +604,7 @@ function check_signed() {
     response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
@@ -1051,6 +1051,10 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
-        run_upgrade_e2e "${index}"
+	echo "Start e2e test..."
+	test_log_dir="${ARTIFACT_DIR}/test-logs"
+        mkdir -p ${test_log_dir}
+        run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt"
+	echo "End e2e test..."
     fi
 done

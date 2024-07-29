@@ -125,6 +125,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -194,6 +196,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -263,6 +267,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -332,6 +338,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -393,6 +401,150 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
+- as: mesh-e2e-aws-412
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: serverless-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: mesh-e2e-aws-412-c
+  cron: 4 1 * * 1,5
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: serverless-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: serverless-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: serverless-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+  timeout: 5h0m0s
 - as: mesh-upgrade-aws-412
   optional: true
   steps:
@@ -401,6 +553,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -469,6 +623,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -531,13 +687,15 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
 - as: operator-e2e-aws-412-c
-  cron: 4 1 * * 1,5
+  cron: 16 5 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -606,6 +764,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -668,13 +828,15 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
 - as: test-upgrade-aws-412-c
-  cron: 16 5 * * 1,5
+  cron: 41 0 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -745,6 +907,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -807,13 +971,15 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
 - as: ui-e2e-aws-412-c
-  cron: 41 0 * * 1,5
+  cron: 35 4 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -883,6 +1049,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -952,6 +1120,8 @@ tests:
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -1014,13 +1184,15 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
 - as: upstream-e2e-kafka-aws-412-c
-  cron: 35 4 * * 1,5
+  cron: 42 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: aws-serverless
     env:
       BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true

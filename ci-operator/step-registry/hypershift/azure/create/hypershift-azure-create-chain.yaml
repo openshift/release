@@ -48,6 +48,9 @@ chain:
     - name: HYPERSHIFT_CUSTOM_NSG
       default: "false"
       documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
+    - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
+      default: ""
+      documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra arguments to pass to the hypershift create cluster azure command."
@@ -111,6 +114,10 @@ chain:
             EXTRA_ARGS+=" --annotations=${line}"
           fi
         done < "$HC_ANNOTATIONS_FILE"
+      fi
+      
+      if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
+        EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
       fi
       
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \

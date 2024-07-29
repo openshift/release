@@ -212,7 +212,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous-day-0
-  cron: 08 11 * * 5
+  interval: 24h
   steps:
     cluster_profile: aws-2
     dependencies:
@@ -221,6 +221,8 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallAWS=true"]'
+      FEATURE_SET: CustomNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -619,7 +621,7 @@ tests:
   cluster: build01
   cron: 0 9,21 * * *
   steps:
-    cluster_profile: powervs-5
+    cluster_profile: powervs-7
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -717,6 +719,30 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-ovn
+- as: ocp-e2e-gcp-ovn-heterogeneous-day-0
+  interval: 24h
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: multi
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-upgrade-gcp-ovn-heterogeneous
   interval: 72h

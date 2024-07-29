@@ -39,101 +39,68 @@ resources:
       memory: 300Mi
 tests:
 - always_run: false
-  as: pr-rosa-hcp
+  as: pr-rosa-hcp-advanced
   optional: true
+  run_if_changed: tests/.*
   steps:
     cluster_profile: aws-sd-qe
+    env:
+      TEST_PROFILE: rosa-hcp-advanced
     test:
     - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-hcp
+    workflow: rosa-lifecycle
 - always_run: false
-  as: pr-rosa-hcp-byo-kms-oidc-auditlog
+  as: pr-rosa-sts-advanced
+  optional: true
+  run_if_changed: tests/.*
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      TEST_PROFILE: rosa-advanced
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-hcp-private-link
   optional: true
   steps:
     cluster_profile: aws-sd-qe
     env:
-      ENABLE_AUTOSCALING: "true"
-      MAX_REPLICAS: "6"
-      MIN_REPLICAS: "3"
+      TEST_PROFILE: rosa-hcp-pl
     test:
     - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
+    workflow: rosa-lifecycle
 - always_run: false
-  as: pr-rosa-hcp-private-proxy
-  optional: true
-  steps:
-    cluster_profile: aws-sd-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-hcp-private-proxy
-- always_run: false
-  as: pr-rosa-hcp-security-group
-  optional: true
-  steps:
-    cluster_profile: aws-sd-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-hcp-security-group
-- always_run: false
-  as: pr-rosa-non-sts
-  optional: true
-  steps:
-    cluster_profile: aws-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-non-sts
-- always_run: false
-  as: pr-rosa-sts
-  optional: true
-  steps:
-    cluster_profile: aws-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts
-- always_run: false
-  as: pr-rosa-sts-byo-kms-oidc-fips
+  as: pr-rosa-sts-private-link
   optional: true
   steps:
     cluster_profile: aws-qe
     env:
-      ENABLE_AUTOSCALING: "true"
-      MAX_REPLICAS: "6"
-      MIN_REPLICAS: "3"
+      TEST_PROFILE: rosa-private-link
     test:
     - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-byo-kms-oidc
+    workflow: rosa-lifecycle
 - always_run: false
-  as: pr-rosa-sts-localzone
+  as: pr-rosa-shared-vpc
   optional: true
   steps:
     cluster_profile: aws-qe
+    env:
+      TEST_PROFILE: rosa-shared-vpc
     test:
     - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-localzone
+    workflow: rosa-lifecycle
 - always_run: false
-  as: pr-rosa-sts-private-proxy
+  as: pr-rosa-hcp-arm
   optional: true
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-sd-qe
+    env:
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      TEST_PROFILE: rosa-hcp-advanced
     test:
     - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-private-proxy
-- always_run: false
-  as: pr-rosa-sts-security-group
-  optional: true
-  steps:
-    cluster_profile: aws-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-security-group
-- always_run: false
-  as: pr-rosa-sts-shared-vpc-auto
-  optional: true
-  steps:
-    cluster_profile: aws-qe
-    test:
-    - ref: rosa-test-e2e-pull-request
-    workflow: rosa-aws-sts-shared-vpc-auto
+    workflow: rosa-lifecycle
 zz_generated_metadata:
   branch: master
   org: openshift

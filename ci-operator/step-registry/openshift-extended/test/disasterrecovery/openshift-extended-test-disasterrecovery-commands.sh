@@ -206,7 +206,17 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    # Add IBM secret for dr test cases
+    if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+        IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+        echo "using the specified key for minimal permission!!"
+        oc create secret generic qe-ibmcloud-creds --from-file=apiKey="${SHARED_DIR}/ibmcloud-min-permission-api-key" -n kube-system || true
+    else
+        IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+        echo "try to create secret with ibmcloud-api-key"
+        oc create secret generic qe-ibmcloud-creds --from-file=apiKey="${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -n kube-system || true
+    fi
+    oc get secret qe-ibmcloud-creds -n kube-system || true
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
