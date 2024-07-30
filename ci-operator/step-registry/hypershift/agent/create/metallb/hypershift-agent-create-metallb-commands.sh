@@ -94,7 +94,7 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
+  - "${IPV4_POOL}"
 EOF
 elif [[ $IP_STACK == "v4v6" ]]; then
   oc create -f - <<EOF
@@ -106,8 +106,8 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
-  - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
+  - "${IPV4_POOL}"
+  - "${IPV6_POOL}"
 EOF
 elif [[ $IP_STACK == "v6" ]]; then
   oc create -f - <<EOF
@@ -120,7 +120,7 @@ spec:
   protocol: layer2
   autoAssign: false
   addresses:
-  - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
+  - "${IPV6_POOL}"
 EOF
 else
   echo "$IP_STACK don't support"
