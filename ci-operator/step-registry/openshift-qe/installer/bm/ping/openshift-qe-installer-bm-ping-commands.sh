@@ -6,4 +6,4 @@ set -x
 
 bastion=$(cat "/secret/address")
 
-ping -c 5 10.1.38.49
+nc -zv 10.1.38.49 22
