@@ -14,7 +14,23 @@ function set_hub_cluster_kubeconfig {
 
 function run_tests {
   echo "************ telcov10n Verifying installation ************"
+
   oc get managedcluster || echo "No ready..."
+
+  secret_kubeconfig=${SPOKE_CLUSTER_NAME}-admin-kubeconfig
+  secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
+
+  echo "username: kubeadmin" >| ${ARTIFACT_DIR}/admin-pass-${SPOKE_CLUSTER_NAME}.yaml
+  echo "password: $(cat ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml)" \
+    >> ${ARTIFACT_DIR}/admin-pass-${SPOKE_CLUSTER_NAME}.yaml
+
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo
+    echo "------------------------ Spoke Details --------------------------------------------------------"
+    echo "kubeconfig: export KUBECONFIG=${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
+    echo "Console: $(oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml whoami --show-console)"
+    cat ${ARTIFACT_DIR}/admin-pass-${SPOKE_CLUSTER_NAME}.yaml
+  fi
 }
 
 function main {
@@ -22,7 +38,7 @@ function main {
   run_tests
 
   echo
-  echo "Success!!! The SNO Spoke cluster has been installed correctly."
+  echo "Success!!! The SNO Spoke cluster has been verified."
 }
 
 main

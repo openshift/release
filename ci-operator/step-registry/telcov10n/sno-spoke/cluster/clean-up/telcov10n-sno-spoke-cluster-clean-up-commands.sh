@@ -15,10 +15,14 @@ function set_hub_cluster_kubeconfig {
 function clean_up {
 
   echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
-  set -x
-  set +x
-}
 
+  # ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-assisted-deployment-pull-secret"
+  # bmc_login_secret_name="${SPOKE_CLUSTER_NAME}-bmc-secret"
+
+  # set -x
+  # oc -n ${SPOKE_CLUSTER_NAME} delete secret ${ai_dp_secret_name} ${bmc_login_secret_name} || echo
+  # set +x
+}
 
 function main {
   set_hub_cluster_kubeconfig

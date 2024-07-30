@@ -83,7 +83,7 @@ spec:
   clusters:
   - clusterName: "${SPOKE_CLUSTER_NAME}"
     networkType: "OVNKubernetes"
-    installConfigOverrides: '${INSTALL_CONFIG_OVERRIDES}'
+    # installConfigOverrides: '${INSTALL_CONFIG_OVERRIDES}'
     extraManifestPath: sno-extra-manifest/
     clusterType: sno
     clusterProfile: du
@@ -110,8 +110,10 @@ spec:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
         bootMACAddress: "${BOOT_MAC}"
         bootMode: "UEFI"
+        rootDeviceHints:
+          deviceName: /dev/nvme0n1
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
+        # ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
         nodeNetwork:
           interfaces:
             - name: "${NODE_NIC}"
@@ -198,6 +200,11 @@ function get_openshift_baremetal_install_tool {
   set -x
   pull_secret=${SHARED_DIR}/pull-secret
   oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
+  attempts=0
+  while sleep 5s ; do
+    ./openshift-baremetal-install version && break
+    [ $(( attempts=${attempts} + 1 )) -lt 2 ] || exit 1
+  done
   set +x
 }
 
