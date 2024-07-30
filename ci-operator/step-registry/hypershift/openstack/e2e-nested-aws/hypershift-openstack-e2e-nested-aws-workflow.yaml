@@ -1,0 +1,26 @@
+workflow:
+  as: hypershift-openstack-e2e-nested-aws
+  documentation: |-
+    The HyperShift openstack e2e nestes aws workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in the `osd-hypershift` AWS account and is destroyed after tests
+    complete.
+  steps:
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+      IPV4_POOL: "10.0.0.7-10.0.0.7"
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-openstack-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-openstack-create
