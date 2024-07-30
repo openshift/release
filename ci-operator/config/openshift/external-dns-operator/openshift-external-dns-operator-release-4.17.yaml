@@ -16,20 +16,15 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift/origin-external-dns-operator:latest
     with: pipeline:external-dns-operator
-promotion:
-  to:
-  - disabled: true
-    name: "4.16"
-    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -156,7 +151,33 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-azure
+- as: e2e-aws-shared-vpc-phz-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: external-dns-operator-bundle
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: external-dns-operator
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n external-dns-operator rollout status deployment external-dns-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e-sharedvpc
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws-shared-vpc-phz
 zz_generated_metadata:
-  branch: release-4.16
+  branch: release-4.17
   org: openshift
   repo: external-dns-operator
