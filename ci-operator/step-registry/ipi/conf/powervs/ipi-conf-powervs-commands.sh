@@ -200,8 +200,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
-      PLATFORM_ARGS_COMPUTE+=( "sysType" "e980" )
-      PLATFORM_ARGS_WORKER+=( "sysType" "e980" )
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -253,6 +251,17 @@ if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
   PLATFORM_ARGS_COMPUTE+=( "procType" "Dedicated" )
   PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
 fi
+
+#
+# Find out the largest system pool type
+#
+curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.1.7/PowerVS-get-largest-system-pool-v0.1.7-linux-amd64.tar.gz
+tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
+chmod u+x /tmp/PowerVS-get-largest-system-pool
+POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")" -serviceGUID ${POWERVS_SERVICE_INSTANCE_ID})
+echo "POOL_TYPE=${POOL_TYPE}"
+PLATFORM_ARGS_COMPUTE+=( "sysType" "${POOL_TYPE}" )
+PLATFORM_ARGS_WORKER+=( "sysType" "${POOL_TYPE}" )
 
 FILE=$(mktemp)
 
