@@ -1,9 +1,8 @@
 build_root:
   project_image:
-    dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/ubi
-      RUN dnf install -y --nodocs make git golang jq python3.9 python3-pip
-      RUN pip3.9 install --upgrade pip
+    dockerfile_literal: "FROM registry.access.redhat.com/ubi8/ubi\nRUN dnf install
+      -y --nodocs make git golang jq python3.9 python3-pip openssl \nRUN pip3.9 install
+      --upgrade pip\n"
 images:
 - dockerfile_path: Dockerfile
   to: model-registry
@@ -34,6 +33,12 @@ tests:
     - as: e2e-odh-mr
       cli: latest
       commands: |
+        ### Install Kustomize ###
+        curl -LO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+        mv kustomize_kustomize.v3.2.3_linux_amd64 kustomize
+        chmod +x kustomize
+        export PATH="$PATH:$(pwd)"
+        kustomize version
         ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
@@ -53,6 +58,12 @@ tests:
     - as: e2e-odh-mr
       cli: latest
       commands: |
+        ### Install Kustomize ###
+        curl -LO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+        mv kustomize_kustomize.v3.2.3_linux_amd64 kustomize
+        chmod +x kustomize
+        export PATH="$PATH:$(pwd)"
+        kustomize version
         ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
@@ -91,6 +102,12 @@ tests:
         TEST_MODE=Python python3.9 -m robot test/robot/MRandLogicalModel.robot
         """
 
+        ### Install Kustomize ###
+        curl -LO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+        mv kustomize_kustomize.v3.2.3_linux_amd64 kustomize
+        chmod +x kustomize
+        export PATH="$PATH:$(pwd)"
+        kustomize version
         ### RUN TEST CODE ###
         # Print last commit of current code
         git show
