@@ -20,28 +20,8 @@ fi
 oc config view
 oc projects
 
-# Create infra-nodes for ingress-perf testing
-if [ ${INFRA} == "true" ]; then
-  if [[ $(oc get nodes -l node-role.kubernetes.io/infra= --no-headers | wc -l) != 2 ]]; then
-    for node in `oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -2 | awk '{print $1}'`; do
-      oc label node $node node-role.kubernetes.io/infra=""
-      oc label node $node node-role.kubernetes.io/worker-;
-    done
-  fi
-fi
-
-if [ ${TELCO} == "true" ]; then
-# Label the nodes
-if [ ${LABEL} ]; then
-  for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")
-  do
-    oc label node $node ${LABEL}="" --overwrite
-  done
-fi
-
 # Install the SRIOV operator
-if [ ${SRIOV} == "true" ]; then
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -50,7 +30,7 @@ metadata:
     workload.openshift.io/allowed: management
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -61,7 +41,7 @@ spec:
   - openshift-sriov-network-operator
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -75,15 +55,28 @@ spec:
 EOF
 
 # Wait for the operator to be ready
-  until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-network-operator > /dev/null; echo $?)" == 0 ];
-    do echo "Waiting for SRIOV operator"
-    sleep 5
-  done
-  kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
-  sleep 60
+until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-network-operator > /dev/null; echo $?)" == 0 ];
+  do echo "Waiting for SRIOV operator"
+  sleep 5
+done
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
+sleep 60
+
+cat << EOF| oc apply -f -
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovOperatorConfig
+metadata:
+  name: default
+  namespace: openshift-sriov-network-operator
+spec:
+  disableDrain: false
+  enableInjector: true
+  enableOperatorWebhook: true
+  logLevel: 2
+EOF
 
 # Create the SRIOV network policy
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
@@ -100,8 +93,6 @@ spec:
   numVfs: ${SRIOV_NUM_VFS}
   resourceName: ${SRIOV_RESOURCE_NAME}
 EOF
-fi
-fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
