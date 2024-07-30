@@ -62,6 +62,7 @@ done
 kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
 sleep 60
 
+{
 cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovOperatorConfig
@@ -74,6 +75,7 @@ spec:
   enableOperatorWebhook: true
   logLevel: 2
 EOF
+} || echo Failed to apply SriovOperatorConfig
 
 # Create the SRIOV network policy
 cat << EOF| oc apply -f -
