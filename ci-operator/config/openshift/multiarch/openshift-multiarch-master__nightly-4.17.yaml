@@ -75,23 +75,12 @@ releases:
       version: "4.17"
   initial:
     candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.17"
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.17"
-  multi-initial:
-    candidate:
       architecture: multi
       product: ocp
       relative: 1
       stream: nightly
       version: "4.17"
-  multi-latest:
+  latest:
     candidate:
       architecture: multi
       product: ocp
@@ -134,7 +123,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-multi-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: s390x
       ADDITIONAL_WORKER_VM_TYPE: bz2-4x16
@@ -158,7 +147,7 @@ tests:
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       IBMCLOUD_CIS_CRN: 'crn:v1:bluemix:public:internet-svcs:global:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:8a93b3a8-b109-4c74-952c-7578dca2c4ee::'
@@ -182,21 +171,25 @@ tests:
     workflow: openshift-e2e-powervs-heterogeneous-upi
   timeout: 6h0m0s
 - as: ocp-e2e-aws-ovn-heterogeneous-upgrade
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous
+  cluster: build10
   cron: 08 11 * * 5
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -212,11 +205,13 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous-day-0
+  cluster: build10
   interval: 24h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_ARCH: amd64
@@ -236,12 +231,13 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous-day-0
 - as: ocp-e2e-serial-aws-ovn-heterogeneous
+  cluster: build10
   cron: 19 23 * * 2
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-      RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: EgressIPs can be assigned automatically\| OpenShift alerting rules\|
@@ -252,64 +248,81 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-upgrade-aws-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
+  cluster: build10
   interval: 24h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: ipi-aws-ovn
 - as: ocp-image-ecosystem-aws-ovn-arm64
+  cluster: build10
   interval: 96h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-image-ecosystem
 - as: ocp-e2e-ovn-serial-aws-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      RELEASE_IMAGE_LATEST: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn-serial
 - as: ocp-e2e-aws-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-upi-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
@@ -319,21 +332,27 @@ tests:
       WORKER_INSTANCE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-upi
 - as: ocp-e2e-aws-ovn-arm64-single-node
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-single-node
 - as: ocp-e2e-aws-ovn-arm64-techpreview
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -341,11 +360,14 @@ tests:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws
 - as: ocp-e2e-aws-ovn-arm64-techpreview-serial
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -357,7 +379,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: ppc64le
       BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
@@ -387,23 +409,29 @@ tests:
     workflow: openshift-e2e-ibmcloud-heterogeneous-upi
   timeout: 6h0m0s
 - as: ocp-e2e-azure-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: azure-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: ci.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: openshift-e2e-azure-ovn
 - as: ocp-e2e-upgrade-azure-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: azure-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       BASE_DOMAIN: ci.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
@@ -429,7 +457,7 @@ tests:
   steps:
     cluster_profile: libvirt-s390x-amd64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
@@ -455,7 +483,7 @@ tests:
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
@@ -467,7 +495,7 @@ tests:
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
@@ -547,7 +575,7 @@ tests:
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
@@ -559,7 +587,7 @@ tests:
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
@@ -611,7 +639,7 @@ tests:
   steps:
     cluster_profile: powervs-4
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
@@ -625,7 +653,7 @@ tests:
   steps:
     cluster_profile: powervs-7
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
@@ -636,11 +664,13 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-azure-ovn-heterogeneous
+  cluster: build10
   cron: 0 11 * * 0
+  node_architecture: arm64
   steps:
     cluster_profile: azure-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
@@ -662,12 +692,14 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
 - as: ocp-e2e-upgrade-azure-ovn-heterogeneous
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: azure-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
@@ -676,33 +708,41 @@ tests:
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-azure-heterogeneous
 - as: ocp-e2e-gcp-ovn-arm64
+  cluster: build10
   cron: 0 11 * * 0
+  node_architecture: arm64
   steps:
     cluster_profile: gcp-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-upgrade-gcp-ovn-arm64
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: gcp-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp
 - as: ocp-e2e-gcp-ovn-heterogeneous
+  cluster: build10
   cron: 0 11 * * 0
+  node_architecture: arm64
   steps:
     cluster_profile: gcp-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
@@ -723,11 +763,13 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-gcp-ovn-heterogeneous-day-0
+  cluster: build10
   interval: 24h
+  node_architecture: arm64
   steps:
     cluster_profile: gcp-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -747,12 +789,14 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-upgrade-gcp-ovn-heterogeneous
+  cluster: build10
   interval: 72h
+  node_architecture: arm64
   steps:
     cluster_profile: gcp-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
