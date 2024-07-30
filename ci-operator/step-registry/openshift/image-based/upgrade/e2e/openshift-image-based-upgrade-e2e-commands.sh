@@ -17,15 +17,28 @@ host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
 PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 
-TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
-target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
+TEST_VM_NAME="unknown"
+case $TEST_CLUSTER in
+  "target")
+    TEST_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
+    ;;
+  "seed")
+    TEST_VM_NAME=$(cat ${SHARED_DIR}/seed_vm_name)
+    ;;
+  *)
+    echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
+    exit 1
+    ;;
+esac
+
+test_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TEST_VM_NAME}/auth/kubeconfig
 remote_artifacts_dir=${remote_workdir}/artifacts
 
 cat <<EOF > ${SHARED_DIR}/e2e_test.sh
 #!/bin/bash
 set -euo pipefail
 
-export KUBECONFIG='${target_kubeconfig}'
+export KUBECONFIG='${test_kubeconfig}'
 export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export TESTS_PULL_REF='${TESTS_PULL_REF}'
 export REGISTRY_AUTH_FILE='${PULL_SECRET_FILE}'

@@ -15,13 +15,27 @@ remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
-TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
-target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
+
+TEST_VM_NAME="unknown"
+case $TEST_CLUSTER in
+  "target")
+    TEST_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
+    ;;
+  "seed")
+    TEST_VM_NAME=$(cat ${SHARED_DIR}/seed_vm_name)
+    ;;
+  *)
+    echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
+    exit 1
+    ;;
+esac
+
+test_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TEST_VM_NAME}/auth/kubeconfig
 
 cat <<EOF > ${SHARED_DIR}/e2e_test_config.sh
 #!/bin/bash
 set -euo pipefail
-export KUBECONFIG='${target_kubeconfig}'
+export KUBECONFIG='${test_kubeconfig}'
 
 date
 
