@@ -233,8 +233,6 @@ for instance in "${INSTANCE_ID[@]}"; do
     ibmcloud pi ins act $instance -o soft-reboot
 done
 
-sleep 2h
-
 # Wait and approve the agents as they appear
 echo "$(date) Approve the agents as they appear"
 instanceNameIndex=0
@@ -300,3 +298,5 @@ export http_proxy=http://${BASTION}:2005/
 export https_proxy=http://${BASTION}:2005/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
+
+sleep 1h
