@@ -32,11 +32,12 @@ fi
 
 if [ ${TELCO} == "true" ]; then
 # Label the nodes
-if [ ${LABEL} ]; then
-  for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")
-  do
-    oc label node $node ${LABEL}="" --overwrite
-  done
+  if [ ${LABEL} ]; then
+    for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")
+    do
+      oc label node $node ${LABEL}="" --overwrite
+    done
+  fi
 fi
 
 if [ ${BAREMETAL} == "true" ]; then
