@@ -301,8 +301,12 @@ checkout_submodules(){
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
-else
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 echo "Go version: $(go version)"

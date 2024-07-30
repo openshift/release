@@ -74,6 +74,10 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
+    'aws-splat-quota-slice': {
+        'us-east-1': 5,
+        'us-west-2': 5
+    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
@@ -138,6 +142,11 @@ CONFIG = {
         'southcentralus': 8,
         'eastus': 8,
         'westus2': 8
+    },
+    'azure-perfscale-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
     },
     'azurestack-quota-slice': {
         'ppe3': 2
@@ -252,7 +261,6 @@ CONFIG = {
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
-    'vsphere-multi-vcenter-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
@@ -285,6 +293,8 @@ CONFIG = {
         'wdc06': 1,
     },
     'powervs-5-quota-slice': {},
+    'powervs-6-quota-slice': {},
+    'powervs-7-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -457,11 +467,14 @@ for i in [1287,1289,1296,1298,1300,1302]:
 for i in range(0,100):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
-for i in [1148]:
-    CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
 for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-6-quota-slice']['lon04-powervs-6-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
 
 config = {
