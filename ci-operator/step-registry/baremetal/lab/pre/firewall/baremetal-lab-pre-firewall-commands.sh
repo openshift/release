@@ -13,6 +13,29 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+setup_proxy() {
+  proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
+  cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
+  export HTTP_PROXY=${proxy}
+  export HTTPS_PROXY=${proxy}
+  export NO_PROXY="localhost,127.0.0.1"
+
+  export http_proxy=${proxy}
+  export https_proxy=${proxy}
+  export no_proxy="localhost,127.0.0.1"
+EOF
+}
+# shellcheck disable=SC2154
+if [ "${masters}" -eq 1 ]; then
+  setup_proxy
+fi
+
+if [ "${ipv6_enabled:-}" == "true" ]; then
+# ipi-conf-proxy will run only if a specific file is found, see step code
+ cp "${CLUSTER_PROFILE_DIR}/proxy_private_url" "${SHARED_DIR}/proxy_private_url"
+ setup_proxy
+fi
+
 if [ x"${DISCONNECTED}" != x"true" ]; then
   echo 'Skipping firewall configuration'
   exit
@@ -45,14 +68,7 @@ EOF
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=${proxy}
-export HTTPS_PROXY=${proxy}
-
-export http_proxy=${proxy}
-export https_proxy=${proxy}
-EOF
+setup_proxy
 
 if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
   # ipi-conf-proxy will run only if a specific file is found, see step code
