@@ -104,16 +104,16 @@ spec:
     ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
     cpuPartitioningMode: AllNodes
     nodes:
-      - hostName: "sno.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
-        bmcAddress: "idrac-VirtualMedia://10.1.29.44/redfish/v1/Systems/System.Embedded.1"
+      - hostName: "worker-a-00.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
+        bmcAddress: "redfish-virtualmedia://192.168.70.127/redfish/v1/Systems/System.Embedded.1"
         bmcCredentialsName:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
         bootMACAddress: "${BOOT_MAC}"
         bootMode: "UEFI"
         rootDeviceHints:
-          deviceName: /dev/nvme0n1
+          deviceName: /dev/sda
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        # ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
+        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
         nodeNetwork:
           interfaces:
             - name: "${NODE_NIC}"
@@ -125,23 +125,10 @@ spec:
                 state: up
                 ipv4:
                   enabled: true
-                  address:
-                    - ip: 10.1.153.100
-                      prefix-length: 24
-                  dhcp: false
+                  dhcp: true
                 ipv6:
-                  enabled: false
-
-            dns-resolver:
-              config:
-                server:
-                  - 10.46.0.32
-            routes:
-              config:
-                - destination: 0.0.0.0/0
-                  next-hop-address: 10.1.153.254
-                  next-hop-interface: "${NODE_NIC}"
-                  table-id: 254
+                  enabled: true
+                  dhcp: true
 EOF
 
 }
