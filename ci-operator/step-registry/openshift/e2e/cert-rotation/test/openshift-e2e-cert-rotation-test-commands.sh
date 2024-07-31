@@ -21,11 +21,34 @@ trap collect_artifacts EXIT TERM
 echo "### Copying test binaries"
 scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
 
-cat <<'EOF' > ${SHARED_DIR}/test-list
+if [ -z "${TEST_SUITE}" ]; then
+    cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 EOF
-echo "### Copying test-list file"
-scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
+    echo "### Copying test-list file"
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
+else
+    echo "### Collecting tests for ${TEST_SUITE}"
+    cat >"${SHARED_DIR}"/collect-e2e-tests.sh <<EOF
+#!/bin/bash
+set -euxo pipefail
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "\$KUBECONFIG" ]; then
+for kubeconfig in \$(find \${KUBECONFIG} -type f); do
+    export KUBECONFIG=\${kubeconfig}
+done
+fi
+openshift-tests run ${TEST_SUITE} --dry-run > /tmp/test-list
+EOF
+chmod +x "${SHARED_DIR}"/collect-e2e-tests.sh
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/collect-e2e-tests.sh "root@${IP}:/usr/local/bin"
+timeout --kill-after 10m 480m \
+ssh \
+    "${SSHOPTS[@]}" \
+    "root@${IP}" \
+    /usr/local/bin/collect-e2e-tests.sh
+fi
+
 
 cat >"${SHARED_DIR}"/run-e2e-tests.sh <<'EOF'
 #!/bin/bash
