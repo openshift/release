@@ -514,8 +514,12 @@ function dump_resources() {
   LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("machine-config-server")) | .id' ${LB_INT_FILE})
   if [ -z "${LB_MCS_ID}" ]
   then
-    echo "Error: LB_MCS_ID is empty"
-    exit
+    LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("additional-pool-22623")) | .id' ${LB_INT_FILE})
+    if [ -z "${LB_MCS_ID}" ]
+    then
+      echo "Error: LB_MCS_ID is empty"
+      exit
+    fi
   fi
 
   echo "8<--------8<--------8<--------8<-------- LB Machine Config Server 8<--------8<--------8<--------8<--------"
