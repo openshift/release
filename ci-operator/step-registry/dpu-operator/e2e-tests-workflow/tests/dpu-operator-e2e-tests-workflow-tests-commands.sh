@@ -87,7 +87,7 @@ wait_for_job_to_finish_running() {
 }
 token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
 endpoint=$(cat "/var/run/token/dpu-token/url")
-header=$(cat "/var/run/token/header")
+header=$(cat "/var/run/token/dpu-token/header")
 test_name="bare-test"
 
 job_url="https://${endpoint}/view/dpu-test/job/${test_name}/lastBuild"
