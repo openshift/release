@@ -14,11 +14,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
   tools:
     name: "4.9"
     namespace: ocp
@@ -66,6 +66,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
+  intermediate416:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   latest:
     release:
       architecture: amd64
@@ -76,7 +82,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -84,7 +90,7 @@ resources:
       memory: 200Mi
 tests:
 - as: azure-ipi-f28
-  cron: 44 16 22 * *
+  cron: 30 7 7 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -92,9 +98,11 @@ tests:
       LOKI_ENABLED: "false"
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
       - env: RELEASE_IMAGE_INTERMEDIATE415
         name: release:intermediate415
       - env: RELEASE_IMAGE_INTERMEDIATE414
@@ -117,7 +125,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
-  branch: release-4.16
+  branch: release-4.17
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.16-upgrade-from-stable-4.9
+  variant: amd64-nightly-4.17-upgrade-from-stable-4.9

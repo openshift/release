@@ -11,18 +11,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openstack-installer:
-    name: "4.14"
-    namespace: ocp
-    tag: openstack-installer
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
   tools:
     name: "4.14"
     namespace: ocp
@@ -31,48 +27,47 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
-  intermediate415:
+  intermediate416:
     release:
-      architecture: amd64
-      channel: candidate
-      version: "4.15"
-  latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.14"
-  target:
-    release:
-      architecture: amd64
+      architecture: multi
       channel: candidate
       version: "4.16"
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.15"
+  target:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.17"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: gcp-ipi-basecap-none-f14
-  cron: 24 13 2,16 * *
+- as: azure-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 36 22 4 * *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: azure-qe
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASELINE_CAPABILITY_SET: None
-      PERSISTENT_MONITORING: "false"
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}" >
         ${SHARED_DIR}/upgrade-edge
       dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -80,10 +75,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: ipi-install-heterogeneous
     - ref: cucushift-chainupgrade-toimage
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 zz_generated_metadata:
-  branch: release-4.16
+  branch: release-4.17
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-stable-4.16-upgrade-from-stable-4.14
+  variant: multi-stable-4.17-upgrade-from-stable-4.15
