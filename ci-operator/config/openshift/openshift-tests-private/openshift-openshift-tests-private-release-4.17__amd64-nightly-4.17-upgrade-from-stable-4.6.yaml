@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.10"
+    name: "4.17"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.10"
+    name: "4.17"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -14,17 +14,17 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
   tools:
-    name: "4.10"
+    name: "4.17"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.10"
+    name: "4.6"
     namespace: ocp
     tag: upi-installer
   verification-tests:
@@ -32,6 +32,26 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  intermediate47:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.7"
+  intermediate48:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.8"
+  intermediate49:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.9"
+  intermediate410:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.10"
   intermediate411:
     release:
       architecture: amd64
@@ -61,32 +81,40 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
-  latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
-  target:
+  intermediate416:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
       version: "4.16"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.6"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: vsphere-ipi-ovn-ipsec-f28
-  cron: 2 16 7 * *
+- as: gcp-ipi-proxy-private-f28
+  cron: 2 2 12 * *
   steps:
-    cluster_profile: vsphere-elastic
+    cluster_profile: gcp-qe
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
       - env: RELEASE_IMAGE_INTERMEDIATE415
         name: release:intermediate415
       - env: RELEASE_IMAGE_INTERMEDIATE414
@@ -97,6 +125,14 @@ tests:
         name: release:intermediate412
       - env: RELEASE_IMAGE_INTERMEDIATE411
         name: release:intermediate411
+      - env: RELEASE_IMAGE_INTERMEDIATE410
+        name: release:intermediate410
+      - env: RELEASE_IMAGE_INTERMEDIATE49
+        name: release:intermediate49
+      - env: RELEASE_IMAGE_INTERMEDIATE48
+        name: release:intermediate48
+      - env: RELEASE_IMAGE_INTERMEDIATE47
+        name: release:intermediate47
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -105,9 +141,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-chainupgrade
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 zz_generated_metadata:
-  branch: release-4.16
+  branch: release-4.17
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.16-upgrade-from-stable-4.10
+  variant: amd64-nightly-4.17-upgrade-from-stable-4.6
