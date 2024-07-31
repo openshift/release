@@ -1,0 +1,110 @@
+base_images:
+  osde2e:
+    name: osde2e
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rosa-classic-sts
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: rosa,sts,stage,e2e-suite
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    test:
+    - ref: osde2e-test
+- as: conformance-rosa-classic-sts
+  cron: 0 9 * * 1
+  steps:
+    env:
+      CONFIGS: rosa,sts,stage,blocking-suite
+      INSTALL_LATEST_NIGHTLY: "4.18"
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_CLUSTER_HEALTH_CHECKS: "true"
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    pre:
+    - ref: osde2e-provision
+    test:
+    - ref: osde2e-test
+- as: osd-aws
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: aws,stage,e2e-suite
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    test:
+    - ref: osde2e-test
+- as: conformance-osd-aws
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: aws,stage,blocking-suite
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_CLUSTER_HEALTH_CHECKS: "true"
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    pre:
+    - ref: osde2e-provision
+    test:
+    - ref: osde2e-test
+- as: osd-gcp
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: gcp,stage,e2e-suite
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    test:
+    - ref: osde2e-test
+- as: conformance-osd-gcp
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: gcp,stage,blocking-suite
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_CLUSTER_HEALTH_CHECKS: "true"
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    pre:
+    - ref: osde2e-provision
+    test:
+    - ref: osde2e-test
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: osde2e
+  variant: nightly-4.18
