@@ -6,4 +6,4 @@ set -x
 
 bastion=$(cat "/secret/address")
 
-nc -zv 10.1.38.49 22
+nc -zv 10.1.38.49 443
