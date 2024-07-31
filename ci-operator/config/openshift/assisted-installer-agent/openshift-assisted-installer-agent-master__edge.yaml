@@ -39,12 +39,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
   tests:
     name: "4.16"
+    namespace: ocp
+    tag: tests
+  tests-4.12:
+    name: "4.12"
     namespace: ocp
     tag: tests
   tests-4.14:
@@ -59,10 +59,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+  from: coreos-centos-stream9
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
   from: coreos-centos-stream9
@@ -284,6 +281,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

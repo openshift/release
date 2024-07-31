@@ -16,7 +16,7 @@ mkdir -p /tmp/go/bin $GOCACHE \
 git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
 git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
-make build
+# make build
 mkdir /tmp/kuttl-manifests && cp minio.yaml /tmp/kuttl-manifests
 
 # Remove test cases to be skipped from the test run

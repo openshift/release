@@ -33,6 +33,10 @@ if [[ "${AKS}" == "true" ]]; then
   fi
 fi
 
+if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
+    export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run='^TestCreateCluster.*|^TestNodePool$' \
   -test.parallel=20 \

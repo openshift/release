@@ -20,7 +20,7 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-
+control_plane_arch="${CONTROL_ARCH:-${OCP_ARCH}}"
 case "${SIZE_VARIANT}" in
   "xlarge")
     master_type_suffix="standard-32"
@@ -32,7 +32,7 @@ case "${SIZE_VARIANT}" in
     master_type_suffix="standard-8"
   ;;
   *)
-    if [[ "${CONTROL_ARCH}" == "arm64" ]]; then
+    if [[ "${control_plane_arch}" == "arm64" ]]; then
       master_type_suffix="standard-4"
     else
       # Temporary test to see if this helps the consistent high CPU alerts and random test failures
@@ -43,19 +43,21 @@ case "${SIZE_VARIANT}" in
   ;;
 esac
 
-if [[ "${CONTROL_ARCH}" == "amd64" ]]; then
+if [[ "${control_plane_arch}" == "amd64" ]]; then
   master_type="e2-${master_type_suffix}"
-elif [[ "${CONTROL_ARCH}" == "arm64" ]]; then
+elif [[ "${control_plane_arch}" == "arm64" ]]; then
   master_type="t2a-${master_type_suffix}"
 fi
 
+compute_arch="${COMPUTE_ARCH:-${OCP_ARCH}}"
 if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
-  if [[ "${COMPUTE_ARCH}" == "arm64" ]]; then
+  if [[ "${compute_arch}" == "arm64" ]]; then
     COMPUTE_NODE_TYPE="t2a-standard-4"
   else
     COMPUTE_NODE_TYPE="e2-standard-4"
   fi
 fi
+
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -64,7 +66,7 @@ platform:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
 controlPlane:
-  architecture: ${CONTROL_ARCH:-${OCP_ARCH}}
+  architecture: ${control_plane_arch}
   name: master
   platform:
     gcp:
@@ -74,7 +76,7 @@ controlPlane:
         diskSizeGB: 200
   replicas: ${masters}
 compute:
-- architecture: ${COMPUTE_ARCH:-${OCP_ARCH}}
+- architecture: ${compute_arch}
   name: worker
   replicas: ${workers}
   platform:

@@ -93,6 +93,11 @@ ginkgo run \
 save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
+
+# clean files before leaving
+rm -rf ${SHARED_DIR}/tf-manifests
+rm -rf ${SHARED_DIR}/rhcs_preparation.log
+
 if [ ! -z "$prepareFailure" ]; then
     exit 1
 fi

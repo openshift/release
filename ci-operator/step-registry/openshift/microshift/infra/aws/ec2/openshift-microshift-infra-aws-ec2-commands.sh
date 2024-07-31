@@ -86,11 +86,13 @@ Mappings:
    MetalMachine:
      PrimaryVolumeSize: "300"
      SecondaryVolumeSize: "0"
-     Throughput: 500
+     Throughput: 750
+     Iops: 6000
    VirtualMachine:
      PrimaryVolumeSize: "200"
      SecondaryVolumeSize: "10"
      Throughput: 125
+     Iops: 3000
 Parameters:
   EC2Type:
     Default: 'VirtualMachine'
@@ -340,6 +342,7 @@ Resources:
             VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
             VolumeType: gp3
             Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
+            Iops: !FindInMap [VolumeSize, !Ref EC2Type, Iops]
         - !If
           - AddSecondaryVolume
           - DeviceName: /dev/sdc

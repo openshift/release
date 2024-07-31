@@ -5,6 +5,13 @@
 # set -o errexit
 # set -o pipefail
 
+PR_AUTHOR=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].author')
+
+if [ "$PR_AUTHOR" == "openshift-cherrypick-robot" ]; then
+  echo "openshift-cherrypick-robot PRs don't need a full docs build."
+  exit 0
+fi
+
 GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 
 export GITHUB_AUTH_TOKEN
@@ -22,7 +29,7 @@ if [ -e "${SHARED_DIR}/UPDATED_PAGES" ]; then
         done < "${SHARED_DIR}/UPDATED_PAGES"
     else
         cp "${SHARED_DIR}/UPDATED_PAGES" "${ARTIFACT_DIR}"/updated_preview_urls.txt
-        COMMENT_DATA+="${PREVIEW_URL}\nComplete list of updated preview URLs: [artifacts/updated_preview_urls.txt](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_openshift-docs/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy-preview/openshift-docs-preview-comment-pages/artifacts/updated_preview_urls.txt)"
+        COMMENT_DATA+="${PREVIEW_URL}\nComplete list of updated preview URLs: [artifacts/updated_preview_urls.txt](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_openshift-docs/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/validate-asciidoc/openshift-docs-preview-comment-pages/artifacts/updated_preview_urls.txt)"
     fi
 fi
 
