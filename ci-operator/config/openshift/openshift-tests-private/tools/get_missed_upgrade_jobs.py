@@ -6,8 +6,9 @@ Here is the example to run this script:
 ```
 e2e_yaml="/home/jianl/1_code/release/ci-operator/config/openshift/openshift-tests-private/openshift-openshift-tests-private-release-4.16__amd64-nightly.yaml"
 upgrade_yaml="/home/jianl/1_code/release/ci-operator/config/openshift/openshift-tests-private/openshift-openshift-tests-private-release-4.17__amd64-nightly-4.17-upgrade-from-stable-4.16.yaml"
+mode='y' # default is 'y'
 
-python ci-operator/config/openshift/openshift-tests-private/tools/get_missed_upgrade_jobs.py $e2e_yaml $upgrade_yaml
+python ci-operator/config/openshift/openshift-tests-private/tools/get_missed_upgrade_jobs.py $e2e_yaml $upgrade_yaml $mode
 ```
 """
 
@@ -36,13 +37,14 @@ def get_jobs(yaml_file):
     str_out = out.decode("utf-8")
     return str_out.split("\n")
 
-def get_missed_profiles(e2e_jobs, upgrade_jobs):
+def get_missed_profiles(e2e_jobs, upgrade_jobs, mode='y'):
     """
     Get missed e2e jobs in upgrade jobs
     
     Args:
         e2e_jobs: e2e jobs
         upgrade_jobs: existing upgrade jobs
+        mode: upgrade mode, 'y' or 'z'
     Returns:
         Job name list, the jobs may not exact correct, need manual check.
         for example:
@@ -51,7 +53,41 @@ def get_missed_profiles(e2e_jobs, upgrade_jobs):
             - as: vsphere-upi-zones-f28
     """
     missed_profiles = []
-    skipped_profiles = 'agent|alibaba|aro|cloud|day2-64k-pagesize|destructive|disasterrecovery|fips-check|hive|hypershift|longduration|mco|netobserv|nokubeadmin|ocm|regen|rhel|rosa|security-profiles-operator|stress|to-multiarch|ui|winc|wrs'
+    common_skipped_profiles=[
+        'agent',
+        'alibaba',
+        'aro',
+        'cloud',
+        'day2-64k-pagesize',
+        'destructive',
+        'disasterrecovery',
+        'disconnecting',
+        'fips-check',
+        'hive',
+        'hypershift',
+        'longduration',
+        'mco',
+        'netobserv',
+        'nokubeadmin',
+        'ocm',
+        'regen',
+        'rhel',
+        'rosa',
+        'security-profiles-operator',
+        'stress',
+        'to-multiarch',
+        'ui',
+        'winc',
+        'wrs'
+    ]
+    if mode == 'y':
+        common_skipped_profiles.append('tp')
+        skipped_profiles = '|'.join(common_skipped_profiles)
+    elif mode == 'z':
+        skipped_profiles = '|'.join(common_skipped_profiles)
+    else:
+        print("Unknown upgrade mode, available mode are 'y' and 'z'")
+        exit()
     str_upgrade_jobs = ','.join(upgrade_jobs)
     for job in e2e_jobs:
         match = re.search(skipped_profiles, job) 
@@ -67,12 +103,15 @@ def get_missed_profiles(e2e_jobs, upgrade_jobs):
 
 if __name__ == "__main__":
     args = sys.argv
-    if len(args) != 3:
-        raise Exception("Missing e2e config file or missing upgrade config file or given extra parameters")
+    if len(args) < 3:
+        raise Exception("Missing e2e config file or upgrade config file")
     
     e2e_jobs = get_jobs(args[1])
     upgrade_jobs = get_jobs(args[2])
+    
+    # upgrade mode, y means y version upgrade, z means z version upgrade
+    mode = args[3] if len(args) == 4 else 'y'
 
-    missed_jobs = get_missed_profiles(e2e_jobs, upgrade_jobs)
+    missed_jobs = get_missed_profiles(e2e_jobs, upgrade_jobs, mode=mode)
     missed_jobs.sort()
     print('\n'.join(missed_jobs))
