@@ -22,7 +22,7 @@ winworker_machineset_name="winworker"
 export ref_machineset_name winworker_machineset_name
 # Get a templated json from worker machineset, apply Windows specific settings
 # and pass it to `oc` to create a new machineset
-oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
+machineset_json=$(oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
   jq --arg winworker_machineset_name "${winworker_machineset_name}" \
      --arg win_os_id "${WINDOWS_OS_ID}" \
      --arg user_data_secret "${WINDOWS_USER_DATA_SECRET}" \
@@ -38,7 +38,14 @@ oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
       del(.status) |
       del(.metadata.selfLink) |
       del(.metadata.uid)
-     ' | oc create -f -
+     ')
+
+# Add last-applied-configuration annotation
+machineset_json=$(echo "$machineset_json" | jq --argjson orig "$machineset_json" \
+  '.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration" = ($orig | tostring)')
+
+# Create the new machineset
+echo "$machineset_json" | oc create -f -
 
 # Scale machineset to expected number of replicas
 oc -n openshift-machine-api scale machineset/"${winworker_machineset_name}" --replicas="${WINDOWS_NODE_REPLICAS}"
