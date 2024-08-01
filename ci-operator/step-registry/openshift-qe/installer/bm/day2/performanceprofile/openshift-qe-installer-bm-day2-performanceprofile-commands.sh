@@ -64,7 +64,7 @@ spec:
 EOF
 
 sleep 60
-kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=10m mcp worker
+kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=30m mcp worker
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
