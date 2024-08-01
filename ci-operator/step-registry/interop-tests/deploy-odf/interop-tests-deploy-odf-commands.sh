@@ -10,6 +10,9 @@ ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
+ODF_DEFAULT_STORAGE_CLASS=ocs-storagecluster-ceph-rbd
+# ODF_DEFAULT_STORAGE_CLASS=ocs-storagecluster-ceph-rbd-virtualization
+DEFAULT_STORAGE_CLASS=${DEFAULT_STORAGE_CLASS:-${ODF_DEFAULT_STORAGE_CLASS}}
 
 readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 readonly ODF_CATALOG_NAME=odf-catalogsource
@@ -62,7 +65,7 @@ wait_mcp_for_updated() {
   local attempts=${1:-60}
   local mcp_updated="false"
   local mcp_stat_file=''
-  
+
   mcp_stat_file="$(mktemp "${TMPDIR:-/tmp}"/mcp-stat.XXXXX)"
 
   sleep 30
@@ -222,11 +225,11 @@ echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
     -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='180m'
 
-echo "Remove is-default-class annotation from all the storage classes"
+echo " 🚮 Remove is-default-class annotation from all the storage classes"
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
 
-echo "Make ocs-storagecluster-ceph-rbd the default storage class"
-oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
+echo " ⭐ Make ${DEFAULT_STORAGE_CLASS} the default storage class"
+oc annotate storageclass ${DEFAULT_STORAGE_CLASS} storageclass.kubernetes.io/is-default-class=true
 
 
 echo "ODF/OCS Operator is deployed successfully"
