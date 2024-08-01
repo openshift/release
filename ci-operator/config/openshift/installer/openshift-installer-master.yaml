@@ -360,6 +360,22 @@ tests:
     - ref: openshift-e2e-test
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-aws-ovn-custom-iam-profile
+  optional: true
+  steps:
+    cluster_profile: aws
+    post:
+    - chain: ipi-aws-post
+    - ref: aws-deprovision-iam-profile
+    pre:
+    - ref: aws-provision-iam-profile
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-byo-iam-profile
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-aws-ovn-edge-zones
   optional: true
   run_if_changed: aws
@@ -796,7 +812,13 @@ tests:
   steps:
     test:
     - as: integration-tests
-      commands: hack/go-integration-test.sh
+      commands: |
+        export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+        hack/go-integration-test.sh
+      credentials:
+      - mount_path: /var/secrets/registry-pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         name: release:latest
