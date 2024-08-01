@@ -34,17 +34,13 @@ metadata:
       {"allowedUnsafeSysctls":["net.ipv6.conf.all.accept_ra"]}
 spec:
   cpu:
-    # node0 CPUs: 0,2,..,126
-    # node1 CPUs: 1,3,..,127
-    # siblings: (0,64), (1,65)...
-    isolated: 2-63,66-127
-    reserved: 0,1,64,65
+    isolated: ${ISOLATED_CORES}
+    reserved: ${RESERVED_CORES}
   globallyDisableIrqLoadBalancing: false
   hugepages:
     defaultHugepagesSize: 1G
     pages:
-    # 32GB per numa node
-    - count: 64
+    - count: ${HUGEPAGES_COUNT}
       size: 1G
   machineConfigPoolSelector:
     pools.operator.machineconfiguration.openshift.io/worker: ''
