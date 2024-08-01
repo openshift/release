@@ -143,4 +143,4 @@ done
 echo "$(date) Setup nested_kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 
-sleep 5h
+sleep 1h
