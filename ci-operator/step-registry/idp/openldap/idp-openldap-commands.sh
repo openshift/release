@@ -4,22 +4,48 @@ set -e
 set -u
 set -o pipefail
 
-# Check if any IDP is already configured
-function check_idp () {
-    # Check if runtime_env exists and then check if $USERS is not empty
-    if [ -f "${SHARED_DIR}/runtime_env" ]; then
-        source "${SHARED_DIR}/runtime_env"
+function check_if_hypershift_env () {
+    if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+        IS_HYPERSHIFT_ENV="yes"
     else
-        echo "runtime_env does not exist, continuing checking..."
-        USERS=""
+        # We must set IS_HYPERSHIFT_ENV="no" otherwise OCP CI will fail because this script sets "set -u".
+        IS_HYPERSHIFT_ENV="no"
+        return 0
+    fi
+    MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
+    if [ -f "${MC_KUBECONFIG_FILE}" ]; then
+        export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+        _jsonpath="{.items[?(@.metadata.name==\"$(cat ${SHARED_DIR}/cluster-name)\")].metadata.namespace}"
+        HYPERSHIFT_NAMESPACE=$(oc get hostedclusters -A -ojsonpath="$_jsonpath")
+    elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+    else
+        echo "This idp-openldap step is being run as a day-2 operation for a HyperShift guest cluster. We need the kubeconfig of management cluster, but it does not exist!"
+        exit 1
     fi
 
-    # Fetch the detailed identityProviders configuration if any
-    current_idp_config=$(oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{" "}{.type}{"\n"}{end}')
+    count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
+    echo "hostedcluster count: $count"
+    if [ "$count" -lt 1 ]  ; then
+        echo "namespace clusters don't have hostedcluster"
+        exit 1
+    fi
+    # Limitation: we always & only select the first hostedcluster to add idp-openldap. "
+    cluster_name=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
+}
 
-    if [ -n "$current_idp_config" ] && [ "$current_idp_config" != "null" ] && [ -n "$USERS" ]; then
-        echo -e "Skipping addition of new OpenLDAP IDP because already configured IDP as below:\n$current_idp_config"
-        exit 0
+function set_common_variables () {
+    if [ "$IS_HYPERSHIFT_ENV" == "yes" ]; then
+        # In some HyperShift CI, the namespace of hostedcluster is local-cluster instead of clusters.
+        MIDDLE_NAMESPACE="$HYPERSHIFT_NAMESPACE"
+        TARGET_RESOURCE="hostedcluster/$cluster_name -n $MIDDLE_NAMESPACE"
+        OAUTH_NAMESPACE="$MIDDLE_NAMESPACE-$cluster_name"
+        IDP_FIELD=".spec.configuration.oauth.identityProviders"
+    else
+        MIDDLE_NAMESPACE="openshift-config"
+        TARGET_RESOURCE="oauth/cluster"
+        OAUTH_NAMESPACE="openshift-authentication"
+        IDP_FIELD=".spec.identityProviders"
     fi
 }
 
@@ -33,9 +59,22 @@ function set_proxy () {
     fi
 }
 
-function set_kubeconfig() {
-    if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+# Check if any IDP is already configured
+function check_idp() {
+    # Check if runtime_env exists and then check if $USERS is not empty
+    if [ -f "${SHARED_DIR}/runtime_env" ]; then
+        source "${SHARED_DIR}/runtime_env"
+    else
+        echo "runtime_env does not exist, continuing checking..."
+        USERS=""
+    fi
+
+    # Fetch the detailed identityProviders configuration if any
+    current_idp_config=$(oc get $TARGET_RESOURCE -o jsonpath='{range '$IDP_FIELD'[*]}{.name}{" "}{.type}{"\n"}{end}')
+
+    if [ -n "$current_idp_config" ] && [ "$current_idp_config" != "null" ] && [ -n "$USERS" ]; then
+        echo -e "Skipping addition of new OpenLDAP IDP because already configured IDP as below:\n$current_idp_config"
+        exit 0
     fi
 }
 
@@ -86,7 +125,6 @@ userPassword: $password
     # Optionally, you can output the path of the temporary file
     echo "Updated ldif file is located at: $temp_ldif"
 }
-
 
 function configure_openldap() {
     echo "Configuring OpenLDAP in OpenShift"
@@ -184,56 +222,44 @@ EOF
 function configure_identity_provider() {
     echo "Configuring OpenShift identity provider with OpenLDAP"
 
-    # current generation
-    gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
-
-    # Prepare the new LDAP identity provider configuration as a JSON object
-    new_ldap_idp='{
-        "ldap": {
-            "attributes": {
-                "email": ["mail"],
-                "id": ["dn"],
-                "name": ["cn"],
-                "preferredUsername": ["cn"]
-            },
-            "bindDN": "",
-            "bindPassword": {
-                "name": ""
-            },
-            "insecure": true,
-            "url": "ldap://ldap.ldap.svc:389/ou=people,ou=rfc2307,dc=example,dc=com?cn"
-        },
-        "mappingMethod": "claim",
-        "name": "ldapidp",
-        "type": "LDAP"
-    }'
-
-    # Since no IDP is configured, create a new array with the LDAP IDP
-    combined_idp_config="[$new_ldap_idp]"
-
-    # Construct the JSON patch using a here-document
-    json_patch=$(cat <<EOF
-{
-  "spec": {
-    "identityProviders": $combined_idp_config
-  }
-}
+    # Create network policy to allow access from hypershift namespace to ldap namespace
+    if [ "$IS_HYPERSHIFT_ENV" == "yes" ]; then
+        cat <<EOF | oc apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-ingress-egress
+  namespace: $OAUTH_NAMESPACE
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}
+  egress:
+  - {}
 EOF
-)
-
-    # Apply the patch
-    if ! oc patch oauth cluster --type=merge -p "$json_patch"; then
-        echo "Failed to apply the patch to configure OpenLDAP IDP"
-        exit 1
     fi
 
-    # wait for oauth-openshift to rollout
+
+    # Current generation
+    gen=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.metadata.generation}')
+
+    # Prepare the new LDAP identity provider configuration
+    oauth_file_src=/tmp/cucushift-oauth-src.yaml
+    oauth_file_dst=/tmp/cucushift-oauth-dst.yaml
+    # Don't quote the $TARGET_RESOURCE variable because it may include spaces
+    oc get $TARGET_RESOURCE -o json > "${oauth_file_src}"
+    jq $IDP_FIELD' += [{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["cn"],"preferredUsername":["cn"]},"bindDN":"","bindPassword":{"name":""},"insecure":true,"url":"ldap://ldap.ldap.svc:389/ou=people,ou=rfc2307,dc=example,dc=com?cn"},"mappingMethod":"claim","name":"ldapidp","type":"LDAP"}]' "${oauth_file_src}" > "${oauth_file_dst}"
+    oc replace -f "${oauth_file_dst}"
+
+    # Wait for oauth-openshift to rollout
     wait_auth=true
-    expected_replicas=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.spec.replicas}')
-    while $wait_auth;
-    do
-        available_replicas=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.status.availableReplicas}')
-        new_gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
+    expected_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.spec.replicas}')
+    while $wait_auth; do
+        available_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.status.availableReplicas}')
+        new_gen=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.metadata.generation}')
         if [[ $expected_replicas == "$available_replicas" && $((new_gen)) -gt $((gen)) ]]; then
             wait_auth=false
         else
@@ -247,7 +273,6 @@ EOF
     fi
     runtime_env=${SHARED_DIR}/runtime_env
     users=${users::-1}
-
 
     cat <<EOF >>"${runtime_env}"
 export USERS=${users}
@@ -263,7 +288,7 @@ function handle_error() {
 # Check cluster type and skip steps if necessary
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
-    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]] || [[ "$CLUSTER_TYPE" == "hypershift-guest" ]]; then
+    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         echo "Skip the step. The managed clusters generate the testing accounts by themselves"
         exit 0
     fi
@@ -271,7 +296,8 @@ fi
 
 # Main script execution with error handling
 set_proxy || handle_error "set_proxy"
-set_kubeconfig || handle_error "set_kubeconfig"
+check_if_hypershift_env || handle_error "check_if_hypershift_env"
+set_common_variables || handle_error "set_common_variables"
 check_idp || handle_error "check_idp"
 update_ldif || handle_error "update_ldif"
 configure_openldap || handle_error "configure_openldap"
