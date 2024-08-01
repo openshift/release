@@ -4,15 +4,19 @@ set -o errexit
 set -o pipefail
 
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
+if [ "${ipv6_enabled:-}" == "true" ]; then
+ RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ipv6" "${SHARED_DIR}/hosts.yaml")"
+fi
 
 # Create an agent-config file containing only the minimum required configuration
 
+ntp_host=$(< "${CLUSTER_PROFILE_DIR}/ntp-host")
 cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
 apiVersion: v1beta1
 kind: AgentConfig
 rendezvousIP: ${RENDEZVOUS_IP}
 additionalNTPSources:
-- ${AUX_HOST}
+- ${ntp_host}
 EOF
 
 cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
@@ -20,7 +24,7 @@ apiVersion: v1beta1
 kind: AgentConfig
 rendezvousIP: ${RENDEZVOUS_IP}
 additionalNTPSources:
-- ${AUX_HOST}
+- ${ntp_host}
 hosts: []
 EOF
 
@@ -52,6 +56,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: ${ipv4_enabled}
       ipv6:
         enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}
+        auto-gateway: ${ipv6_enabled}
+        auto-routes: ${ipv6_enabled}
+        autoconf: ${ipv6_enabled}
+        auto-dns: ${ipv6_enabled}
 "
 
 # Workaround: Comment out this code until OCPBUGS-34849 is fixed

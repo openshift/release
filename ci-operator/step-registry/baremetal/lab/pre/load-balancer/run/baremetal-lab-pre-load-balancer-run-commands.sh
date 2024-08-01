@@ -104,6 +104,9 @@ if [ "${#api_ip}" -eq 0 ]; then
   exit 1
 fi
 printf "ingress_vip: %s\napi_vip: %s" "$api_ip" "$api_ip" > "$BUILD_DIR/external_vips.yaml"
+# Add IPv6 vips to the external_vips.yaml file
+yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' $BUILD_DIR/vips.yaml $BUILD_DIR/external_vips.yaml > $BUILD_DIR/temp_vips.yaml
+mv $BUILD_DIR/temp_vips.yaml $BUILD_DIR/external_vips.yaml
 # TODO[disconnected/BM/IPI]
 #if [ "$DISCONNECTED" == "true" ] && IPI; then
 #  cp "$BUILD_DIR/vips.yaml" "$BUILD_DIR/external_vips.yaml"

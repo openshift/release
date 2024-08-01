@@ -73,8 +73,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -88,6 +86,17 @@ if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
+echo "[INFO] Looking for patches to the install-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+  fi
+done
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
@@ -98,9 +107,6 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -109,6 +115,7 @@ controlPlane:
 "
 
 if [ "${masters}" -eq 1 ]; then
+  yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 platform:
   none: {}
@@ -122,6 +129,7 @@ fi
 
 if [ "${masters}" -gt 1 ]; then
   if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
+  yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
@@ -138,27 +146,9 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
 "
   fi
 fi
-
-echo "[INFO] Looking for patches to the install-config.yaml..."
-
-shopt -s nullglob
-for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
-do
-  if test -f "${f}"
-  then
-      echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
-  fi
-done
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
