@@ -35,7 +35,7 @@ if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]
     INTERNAL_ONLY=false
 else
     # Run other jobs on any cluster
-    INTERNAL_ONLY=false
+    INTERNAL_ONLY=true
 fi
 # Whether to use the bastion environment
 BASTION_ENV=true
