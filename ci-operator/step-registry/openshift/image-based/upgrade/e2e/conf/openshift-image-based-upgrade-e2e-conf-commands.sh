@@ -16,19 +16,12 @@ instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
 
-TEST_VM_NAME="unknown"
-case $TEST_CLUSTER in
-  "target")
-    TEST_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
-    ;;
-  "seed")
-    TEST_VM_NAME=$(cat ${SHARED_DIR}/seed_vm_name)
-    ;;
-  *)
-    echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
-    exit 1
-    ;;
-esac
+if [[ "$TEST_CLUSTER" != "seed" && "$TEST_CLUSTER" != "target" ]]; then
+  echo "TEST_CLUSTER is an invalid value: '${TEST_CLUSTER}'"
+  exit 1
+fi
+
+TEST_VM_NAME="$(cat ${SHARED_DIR}/${TEST_CLUSTER}_vm_name)"
 
 test_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TEST_VM_NAME}/auth/kubeconfig
 
