@@ -16,12 +16,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 
 # shellcheck disable=SC1090
-if [ "${ipv6_enabled:-}" == "true" ]; then
-  . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/vips.yaml)
-else
-  . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
-fi
-
+. <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 # shellcheck disable=SC2154
 if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
   echo "Unable to parse VIPs"

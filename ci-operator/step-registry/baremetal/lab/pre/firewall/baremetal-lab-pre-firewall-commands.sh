@@ -30,10 +30,14 @@ if [ "${masters}" -eq 1 ]; then
   setup_proxy
 fi
 
-if [ "${ipv6_enabled:-}" == "true" ]; then
-# ipi-conf-proxy will run only if a specific file is found, see step code
- cp "${CLUSTER_PROFILE_DIR}/proxy_private_url" "${SHARED_DIR}/proxy_private_url"
- setup_proxy
+if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
+  # ipi-conf-proxy will run only if a specific file is found, see step code
+  cp "${CLUSTER_PROFILE_DIR}/proxy" "${SHARED_DIR}/proxy_private_url"
+  if [ "${ipv6_enabled:-}" == "true" ]; then
+  # ipi-conf-proxy will run only if a specific file is found, see step code
+   cp "${CLUSTER_PROFILE_DIR}/proxy_private_url" "${SHARED_DIR}/proxy_private_url"
+   setup_proxy
+  fi
 fi
 
 if [ x"${DISCONNECTED}" != x"true" ]; then
@@ -70,7 +74,3 @@ cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_u
 
 setup_proxy
 
-if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
-  # ipi-conf-proxy will run only if a specific file is found, see step code
-  cp "${CLUSTER_PROFILE_DIR}/proxy" "${SHARED_DIR}/proxy_private_url"
-fi
