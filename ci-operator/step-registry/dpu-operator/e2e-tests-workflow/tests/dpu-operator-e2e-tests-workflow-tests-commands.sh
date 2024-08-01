@@ -1,14 +1,17 @@
 #!/bin/bash
 
 manage_queue() {
-	GET_QUEUE=$(curl -k -s --resolve "$endpoint_resolve" "https://${endpoint}/queue/api/json")
 
-	QUEUE_FILTERED_JOB_NAME=$(echo $GET_QUEUE | jq --arg testname "$test_name" '.items[] | select(.task.name == $testname)')
+	JSON_FILE=$(mktemp /tmp/queue.XXX)
+	curl -k -s --resolve "$endpoint_resolve" "https://${endpoint}/queue/api/json" > $JSON_FILE
+
+	cat $JSON_FILE | jq --arg testname "$test_name" '.items[] | select(.task.name == $testname)' > $JSON_FILE
 	if [[ $? != 0 ]]; then
 		echo "jq command failed exiting"
 		exit 1
 	fi
-	QUEUE_FILTERED_PULL_REQUEST=$(echo $QUEUE_FILTERED_JOB_NAME | jq --arg pullnumber "$PULL_NUMBER" '.items[] | select(.actions[] | select(._class == "hudson.model.ParametersAction" and (.parameters[] | select(.name == "pullnumber" and .value == $pullnumber))))')
+	
+	cat $JSON_FILE | jq --arg pullnumber "$PULL_NUMBER" '.items[] | select(.actions[] | select(._class == "hudson.model.ParametersAction" and (.parameters[] | select(.name == "pullnumber" and .value == $pullnumber))))' > $JSON_FILE
 	
 	if [[ $? != 0 ]]; then
         	echo "jq command failed exiting"
@@ -16,12 +19,12 @@ manage_queue() {
         fi
 
 
-	if [[ -z "$QUEUE_FILTERED_PULL_REQUEST" ]]; then
+	if [[ ! -s $JSON_FILE ]]; then
         	echo "Job does not exist in queue proceeding..."
 
 	else
-        	QUEUE_ID=$(echo $QUEUE_FILTERED_PULL_REQUEST | jq -r '.id')
-        	curl -X POST -k --resolve "$endpoint_resolve" "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" "$header"
+        	QUEUE_ID=$(cat $JSON_FILE | jq -r '.id')
+        	curl -X POST -k  --resolve "$endpoint_resolve" "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" "$header"
 	fi
 
 }
@@ -30,15 +33,15 @@ wait_for_job_to_run() {
 	echo "Waiting for job to start..."
 	max_sleep_duration=432000  # Maximum sleep duration in seconds (5 days)
 	sleep_counter=0
-
 	while :
 	do
-    		job_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json")
+		JSON_FILE=$(mktemp /tmp/pullnumber.XXX)
+    		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
 
-    		pullnumber_job=$(echo "$job_info" | jq -r '.actions[] | select(.parameters) | .parameters[] | select(.name == "pullnumber") | .value')
+    		pullnumber_job=$(cat $JSON_FILE | jq -r '.actions[] | select(.parameters) | .parameters[] | select(.name == "pullnumber") | .value')
 
     		if [[ "$pullnumber_job" == "$PULL_NUMBER" ]]; then
-			ID=$(echo "$job_info" | jq -r '.id')	
+			ID=$(cat $JSON_FILE | jq -r '.id')	
 			break
     		else
         		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
@@ -55,13 +58,13 @@ wait_for_job_to_finish_running() {
 	job_url_id="https://${endpoint}/job/view/dpu-test/job/$test_name/$ID"
 	max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
 	sleep_counter=0
-
 	while :
-	do
-    		job_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url_id}/api/json")
+	do	
+		JSON_FILE=$(mktemp /tmp/output.XXX)
+		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
 
     		# Extract the result field
-    		result=$(echo "$job_info" | jq -r '.result')
+    		result=$(cat $JSON_FILE | jq -r '.result')
 
     		if [[ "$result" != "null" ]]; then
         		# Job has completed
