@@ -5,7 +5,9 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: aks-create
       commands: |
-        /usr/bin/openshift-ci.sh create aks
+        /usr/bin/openshift-ci.sh create aks || \
+        (sleep 30; /usr/bin/openshift-ci.sh create aks) || \
+        (sleep 60; /usr/bin/openshift-ci.sh create aks)
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
