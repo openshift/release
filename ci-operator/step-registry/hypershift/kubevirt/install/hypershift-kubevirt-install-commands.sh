@@ -14,8 +14,7 @@ fi
 
 # Get yq tool
 YQ="/tmp/yq"
-curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-chmod +x ${YQ}
+curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o ${YQ} && chmod +x ${YQ}
 
 # Dynamically get CNV catalog image that was provided to the job via gangway API
 CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
