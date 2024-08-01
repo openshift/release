@@ -33,8 +33,10 @@ curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}"
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
-make deploy_test || /bin/true
 
+# Overwrite the default configuration file used for testing
+export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
+make deploy_test || /bin/true
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
