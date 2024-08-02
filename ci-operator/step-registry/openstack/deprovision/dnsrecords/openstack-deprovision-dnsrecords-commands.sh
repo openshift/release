@@ -8,6 +8,10 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
 
+if [ -z "${AWS_PROFILE:-}" ]; then
+  unset AWS_PROFILE
+fi 
+
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
             --dns-name "${BASE_DOMAIN}" \
