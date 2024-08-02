@@ -88,7 +88,7 @@ auth_param basic realm proxy
 #prfsr90
 delay_pools 1
 delay_class 1 1
-delay_parameters 1  8750000/8750000 8750000/8750000 8750000/8750000
+delay_parameters 1 10000000/10000000 10000000/10000000 10000000/10000000
 http_port 3128
 
 acl authenticated proxy_auth REQUIRED
