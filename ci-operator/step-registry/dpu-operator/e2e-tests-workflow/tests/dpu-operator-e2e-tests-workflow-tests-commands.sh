@@ -24,7 +24,8 @@ manage_queue() {
 
 	else
         	QUEUE_ID=$(cat $JSON_FILE | jq -r '.id')
-        	curl -X POST -k  --resolve "$endpoint_resolve" "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" "$header"
+		curl_cmd_queue=$(echo "curl -X POST -k  --resolve $endpoint_resolve "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" $header")
+        	eval "$curl_cmd_queue"
 	fi
 
 }
@@ -100,7 +101,8 @@ endpoint_resolve="${endpoint}:443:10.0.180.88"
 BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
 
 if [[ "$PULL_NUMBER" == "$BUILD_NUMBER" ]]; then
-	curl -X POST -k -s --resolve "$endpoint_resolve" "${job_url}/stop" "$stop_job_header"
+	curl_cmd=$(echo "curl -X POST -k -s --resolve ${endpoint_resolve} "${job_url}/stop" $stop_job_header")
+        eval "$curl_cmd"
 	sleep 20
 fi
 
