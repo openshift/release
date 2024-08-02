@@ -1,0 +1,91 @@
+ref:
+  as: telcov10n-functional-ocp-cnf-tests
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  commands: telcov10n-functional-ocp-cnf-tests-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: kni-qe-41
+    mount_path: /var/run/ssh-key
+  - namespace: test-credentials
+    name: bastion-ip-addr
+    mount_path: /var/run/bastion-ip-addr
+  - namespace: test-credentials
+    name: jenkins-credentials
+    mount_path: /var/run/jenkins-credentials
+  env:
+  - name: LOCK_LBL_HOST
+    documentation: "Jenkins Agent Label"
+
+  - name: PULL_SPEC
+    documentation: "Where to get build from"
+
+  - name: CNF_TEST_IMAGE_TAG
+    default: "registry.redhat.io/openshift4/cnf-tests-rhel8:latest"
+    documentation: "Where to get cnf-tests image from,
+     e.g.: registry.redhat.io/openshift4/cnf-tests-rhel8:latest"
+
+  - name: DPDK_TEST_IMAGE_TAG
+    default: "registry.redhat.io/openshift4/dpdk-base-rhel8:latest"
+    documentation: "Where to get dpdk image from,
+     e.g.: registry.redhat.io/openshift4/dpdk-base-rhel8:latest"
+
+  - name: FULL_VERSION
+    default: "4.7"
+    documentation: "OCP version: Major.Minor, e.g.: 4.4"
+
+  - name: KUBECONFIG_PATH
+    default: "clusterconfigs/auth/kubeconfig"
+    documentation: "kubeconfig file location"
+
+  - name: CNF_TEST_FEATURES_LIST
+    default: "performance, sriov, ptp, sctp, dpdk"
+    documentation: "CNF Features to test in CSV format"
+
+  - name: CNF_TEST_ROLE
+    default: "workercnf"
+    documentation: "Node role that should be used by cnf-tests"
+
+  - name: CNF_NODES_NUMBER
+    default: "2"
+    documentation: "A number of nodes that should have CNF_TEST_ROLE label"
+
+  - name: CNF_PERF_TEST_PROFILE
+    default: ""
+    documentation: "Performance profile name that should be tested."
+
+  - name: SCTPTEST_HAS_NON_CNF_WORKERS
+    default: "true"
+    documentation: "No cnf worker in sctp tests, some sctp tests will be skipped if enabled"
+
+  - name: RUN_PREPARE_STAGES
+    default: "true"
+    documentation: "Run prepare and SCTP set up stages"
+
+  - name: CNF_POLARION_REPORTING
+    default: "false"
+    documentation: "Report CNF test results to Polarion"
+
+  - name: DISCOVERY_MODE
+    default: "true"
+    documentation: "Run cnf-test in discovery mode"
+
+  - name: PROFILE_NAME
+    default: ""
+    documentation: "File to read environment specification from"
+
+  - name: OCP_EDGE_REPO
+    default: "https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+    documentation: "Repo to clone containing deployment and other automation,
+     e.g https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+
+  - name: OCP_EDGE_BRANCH
+    default: "master"
+    documentation: "Branch to use for deployment and other automation, e.g master"

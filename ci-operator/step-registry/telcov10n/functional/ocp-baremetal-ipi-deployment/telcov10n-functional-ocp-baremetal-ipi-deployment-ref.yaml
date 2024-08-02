@@ -1,0 +1,262 @@
+ref:
+  as: telcov10n-functional-ocp-baremetal-ipi-deployment
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  commands: telcov10n-functional-ocp-baremetal-ipi-deployment-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: kni-qe-41
+    mount_path: /var/run/ssh-key
+  - namespace: test-credentials
+    name: bastion-ip-addr
+    mount_path: /var/run/bastion-ip-addr
+  - namespace: test-credentials
+    name: jenkins-credentials
+    mount_path: /var/run/jenkins-credentials
+  env:
+    - name: LOCK_LBL_HOST
+      documentation: "Jenkins Agent Label"
+
+    - name: OCP_MAJOR_VERSION
+      default: "4"
+      documentation: "Major OCP version"
+
+    - name: OCP_MINOR_VERSION
+      default: "11"
+      documentation: "Minor OCP version"
+
+    - name: OPENSHIFT_RELEASE_IMAGE
+      documentation: "Override OCP image used for deployment. Leave blank to use default.
+       Use latest_pasing to retrieve the last successful build of the same IPI version and Deploy Type (IPV6/IPV4/Dualstack).
+      Format: registry.ci.openshift.org/ocp/release:IMAGE_ID. Images are listed <a href=https://amd64.ocp.releases.ci.openshift.org/>here.</a>"
+
+    - name: PROVISION
+      default: "true"
+      documentation: "Run Provision stage. Caution: this removes the previous deployment and cleans the workspace"
+
+    - name: DEPLOY
+      default: "true"
+      documentation: "Run Deploy stage"
+
+    - name: DEPLOY_BREAKPOINTS
+      default: ""
+      documentation: "Breakpoints during deployment playbook.
+       pre_deploy stops before openshift-baremetal-install create cluster. By default do not use breakpoints."
+
+    - name: MANAGEMENT_INTERFACE_TYPE
+      default: "RedFish"
+      documentation: "Management interface type.
+       Default: RedFish. Note1: OCP 4.3 only works with IPMI.
+        Note2: RedFish-VirtualMedia works on virtual env for OCP4.6 and above. 
+        When provisioning network is disabled must be set to RedFish-VirtualMedia.
+         To deploy by virtualmedia on Dell(idrac) setup use idrac-VirtualMedia"
+
+    - name: PROVISIONING_NETWORK_STATE
+      default: "Managed"
+      documentation: "Set optional ProvisioningNetwork state(for OCP >=4.6).
+       Deploy OCP cluster using external DHCP (dhcpd) on Provisioning Host (unmanaged state).
+        Unmanaged currently supported for provisioning IPv4 / connected install."
+
+    - name: NETWORK_TYPE
+      default: "OVNKubernetes"
+      documentation: "Network type to deploy, could be OpenShiftSDN, OVNKubernetes or OVNKubernetesHybrid"
+
+    - name: ENABLE_IPSEC
+      default: "false"
+      documentation: "Enable IPSec on Baremetal network"
+
+    - name: BAREMETAL_NET_IPV4
+      default: "false"
+      documentation: "IPv4 networking"
+
+    - name: BAREMETAL_NET_IPV6
+      default: "true"
+      documentation: "IPv6 networking"
+
+    - name: PROVISIONING_NET_IPV6
+      default: "true"
+      documentation: "Enable IPv6 for provisioning network."
+
+    - name: DHCP_LEASE_TIME
+      default: "60"
+      documentation: "Custom DHCP lease time (in minutes) for baremetal libvirt network.
+       RHEL 8.3 with libvirt 6.6 hypervisor is required."
+
+    - name: USE_BOND_INTERFACE
+      default: "false"
+      documentation: "OCP nodes have 1 x provisioning net nic + 2 x baremetal net nics grouped in a bond."
+
+    - name: BOND_CONFIG
+      default: "{\"bond0\": {\"interfaces\": \"ens4f0,ens4f1\", \"options\": \"mode=802.3ad miimon=100\"}}"
+      documentation: "Bond configuration to be used with USE_BOND_INTERFACE parameter.
+       For virt deploy interfaces should be: \"enp0s4,enp0s5\""
+
+    - name: USE_STATIC_IP_CONFIG
+      default: "false"
+      documentation: "disable DHCP and deploy all cluster nodes using static ip configuration"
+
+    - name: DISCONNECTED_INSTALL
+      default: "false"
+      documentation: "Perform installation in disconnected environment"
+
+    - name: USE_NEXUS_CACHE
+      default: "true"
+      documentation: "false --> force clone images --> dry_run=false"
+
+    - name: PROXY_INSTALL
+      default: "false"
+      documentation: "Perform installation via proxy server"
+
+    - name: PREDEPLOY_VALIDATE
+      default: "true"
+      documentation: "Validate parameters before deployment"
+
+    - name: FIPS_MODE
+      default: "false"
+      documentation: "Enable FIPS mode. Default OFF"
+
+    - name: BM_IRONIC_BOOT_MODE
+      default: ""
+      documentation: "Nodes boot mode. Note1: UEFISecureBoot supported only for OCP 4.8 and above.
+                      Note2: Relevant only for the real BM setups."
+
+    - name: VM_UEFI_FIRMWARE
+      default: "true"
+      documentation: "Configure VMs with UEFI firmware"
+
+    - name: CLUSTER_NAME
+      default: "ocp-edge-cluster"
+      documentation: "OpenShift Cluster Name"
+
+    - name: CLUSTER_COUNT
+      default: "1"
+      documentation: "Number of clusters to deploy.
+       If > 1 additional clusters get deployed via Hive from the first cluster. Default: 1"
+
+    - name: BASE_DOMAIN
+      default: "qe.lab.redhat.com"
+      documentation: "OpenShift Cluster Base Domain Name"
+
+    - name: PRESERVE_BOOTSTRAP
+      default: "false"
+      documentation: "Preserve BOOTSTRAP VM after deployment"
+
+    - name: NESTED_BOOTSTRAP_VM
+      default: "false"
+      documentation: "Run bootstrap VM on hypervisor or provision host VM.
+       Set to true to run it as a nested VM inside provision host VM."
+
+    - name: PROVISION_MASTER_COUNT
+      default: "3"
+      documentation: "Amount of master VMs to provision. Minimum of 3 is required. Applies only for VM environments."
+
+    - name: DEPLOY_MASTER_COUNT
+      default: "3"
+      documentation: "Amount of master nodes to deploy in the cluster. Minimum of 3 is required."
+
+    - name: MASTER_DISK_SIZE
+      default: "40"
+      documentation: "Size of masters HDD"
+
+    - name: MASTER_VCPUS
+      default: "16"
+      documentation: "Amount of VCPUs for a master node"
+
+    - name: MASTER_EXTRA_DISK_COUNT
+      default: "0"
+      documentation: "Amount of extra disks to provision"
+
+    - name: MASTER_EXTRA_DISK_SIZE
+      default: "10"
+      documentation: "Size of extra disk"
+
+    - name: MASTER_MEMORY
+      default: "32768"
+      documentation: "Memory allocated for master VMs"
+
+    - name: MASTER_ROOT_DISK_HINT_NAME
+      default: "deviceName"
+      documentation: "rootDiskHintName for master nodes. Default: deviceName"
+
+    - name: MASTER_ROOT_DISK_HINT_VALUE
+      default: "/dev/sda"
+      documentation: "rootDiskHintValue for master nodes.
+       Default: /dev/sda. The installer uses the first discovered device that matches the hint value"
+
+    - name: PROVISION_WORKER_COUNT
+      default: "2"
+      documentation: "Amount of worker VMs to provision. Minimum of 2 is required. Applies only for VM environments."
+
+    - name: DEPLOY_WORKER_COUNT
+      default: "2"
+      documentation: "Amount of worker nodes to deploy in the cluster. Minimum of 2 is required."
+
+    - name: WORKER_DISK_SIZE
+      default: "40"
+      documentation: "Size of workers HDD"
+
+    - name: WORKER_VCPUS
+      default: "8"
+      documentation: "Amount of VCPUs for a worker node"
+
+    - name: WORKER_EXTRA_DISK_COUNT
+      default: "0"
+      documentation: "Amount of extra disks to provision"
+
+    - name: WORKER_EXTRA_DISK_SIZE
+      default: "10"
+      documentation: "Size of extra disk"
+
+    - name: WORKER_MEMORY
+      default: "32768"
+      documentation: "Memory allocated for worker VMs"
+
+    - name: WORKER_ROOT_DISK_HINT_NAME
+      default: "deviceName"
+      documentation: "rootDiskHintName for worker nodes. Default: deviceName"
+
+    - name: WORKER_ROOT_DISK_HINT_VALUE
+      default: "/dev/sda"
+      documentation: "rootDiskHintValue for worker nodes.
+       Default: /dev/sda. The installer uses the first discovered device that matches the hint value"
+
+    - name: OCP_EDGE_REPO
+      default: "https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+      documentation: "Repo to clone containing Jenkinsifle and other build automation,
+       e.g https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+
+    - name: OCP_EDGE_BRANCH
+      default: "master"
+      documentation: "Branch to use for Jenkins pipeline file and other automation, e.g master"
+
+    - name: PROFILE_NAME
+      default: ""
+      documentation: "Profile to read environment specification from"
+
+    - name: PROFILE_OVERRIDE
+      default: ""
+      documentation: "Values from profile to override params"
+
+    - name: COLLECT_LOGS
+      default: "true"
+      documentation: "Run must-gather to collect logs if a deployment fails.
+      This requires the number of executors on a node to be ≥ 2."
+
+    - name: CREATE_QEMU_SNAPSHOT
+      default: "false"
+      documentation: "Create post-deploy qemu_snapshot"
+
+    - name: JOB_RETRIES
+      default: "0"
+      documentation: "Number of retries if the job fails. The default 0 will not retry if the job fails."
+
+    - name: PRECLEAN_LOCAL_REGISTRY
+      default: "false"
+      documentation: "Completely remove local image registry cache prior to deploying the cluster"
