@@ -92,10 +92,10 @@ create_ds() {
         - name: model-server
           image: $img
           imagePullPolicy: Always
-          command: ["python3.8","-u","src/server/model_server.py"]
+          command: ["python3.10","-u","src/server/model_server.py"]
 EOF
 
-	validate_ds default dummy-model-server 5 20 || {
+	validate_ds default dummy-model-server 10 30 || {
 		echo "daemonset not in ready state"
 		oc get daemonset -n default -o yaml | tee "$LOGS_DIR/model-server-ds.yaml" >/dev/null
 		return 1
