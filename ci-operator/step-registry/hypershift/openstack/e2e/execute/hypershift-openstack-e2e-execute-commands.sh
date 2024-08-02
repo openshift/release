@@ -16,6 +16,7 @@ make e2e
 
 OPENSTACK_COMPUTE_FLAVOR=$(cat "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
 OPENSTACK_EXTERNAL_NETWORK=$(cat "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+INGRESS_FIP=$(cat "${SHARED_DIR}/INGRESS_IP")
 
 if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
     >&2 echo clouds.yaml has not been generated
@@ -37,5 +38,7 @@ hack/ci-test-e2e.sh \
 	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
         --e2e.openstack-external-network-name="${OPENSTACK_EXTERNAL_NETWORK}" \
+	--e2e.openstack-ingress-floating-ip="${INGRESS_FIP}" \
+	--e2e.openstack-ingress-provider="Octavia" \
         --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}" \
 	--e2e.openstack-node-image-name="rhcos-4.17-hcp-nodepool"
