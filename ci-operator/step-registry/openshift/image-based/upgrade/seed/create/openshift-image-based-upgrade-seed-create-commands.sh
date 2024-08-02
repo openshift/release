@@ -102,6 +102,11 @@ cd ${remote_workdir}/ib-orchestrate-vm
 # Create the seed vm
 make seed
 
+if [[ "${CREATE_CLUSTER_ONLY}" == "true" ]]; then
+  echo "CREATE_CLUSTER_ONLY was specified, exiting"
+  exit 0
+fi
+
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
