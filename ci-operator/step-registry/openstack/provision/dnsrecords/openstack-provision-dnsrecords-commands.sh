@@ -8,6 +8,10 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
 
+if [ -z "${AWS_PROFILE:-}" ]; then
+  unset AWS_PROFILE
+fi 
+
 TMP_DIR=$(mktemp -d)
 
 if [ -f "${SHARED_DIR}/CLUSTER_NAME" ]; then
