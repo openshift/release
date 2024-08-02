@@ -34,6 +34,7 @@ function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
   cat << EOF | oc apply -f -
@@ -56,9 +57,16 @@ function generate_baremetal_secret {
 
   echo "************ telcov10n Generate Baremetal Secrets ************"
 
-  bmc_login_secret_name="${SPOKE_CLUSTER_NAME}-bmc-secret"
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
-  cat <<EOF | oc apply -f -
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+
+    bmc_login_secret_name="${SPOKE_CLUSTER_NAME}-bmc-secret"
+
+    cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Secret
 metadata:
@@ -66,13 +74,15 @@ metadata:
   namespace: "${SPOKE_CLUSTER_NAME}"
 type: Opaque
 data:
-  username: $(echo "${BMC_USER}" | base64)
-  password: $(cat /var/run/telcov10n/ztp-left-shifting/bmc-admin-pass | base64)
+  username: $(echo "${bmc_user}" | base64)
+  password: $(echo "${bmc_pass}" | base64)
 EOF
 
-  set -x
-  oc -n $SPOKE_CLUSTER_NAME get secret $bmc_login_secret_name
-  set +x
+    set -x
+    oc -n $SPOKE_CLUSTER_NAME get secret $bmc_login_secret_name
+    set +x
+
+  done
 }
 
 function checking_installation_progress {

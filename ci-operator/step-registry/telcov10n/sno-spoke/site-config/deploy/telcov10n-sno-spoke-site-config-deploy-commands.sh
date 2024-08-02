@@ -23,17 +23,6 @@ function check_hub_cluster_is_alive {
   echo
 }
 
-function generate_image_source {
-
-  echo "************ telcov10n Generate Image Source ************"
-
-}
-
-function generate_baremetal_secret {
-
-  echo "************ telcov10n Generate Baremetal Secrets ************"
-}
-
 function run_script_in_the_hub_cluster {
   local helper_img="${GITEA_HELPER_IMG}"
   local script_file=$1
@@ -62,7 +51,7 @@ EOF
   set +x
 }
 
-function generate_site_config {
+function generate_site_config_local {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
 
@@ -131,6 +120,106 @@ spec:
                   dhcp: true
 EOF
 
+}
+
+function generate_site_config {
+
+  echo "************ telcov10n Generate SiteConfig file from template ************"
+
+  # site_config_file=$(mktemp --dry-run)
+  site_config_file=/tmp/site-config.yaml
+
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+    SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/bastion_public_address)
+
+    cat << EOF > ${site_config_file}
+apiVersion: ran.openshift.io/v1
+kind: SiteConfig
+metadata:
+  name: "site-plan-${SPOKE_CLUSTER_NAME}"
+  namespace: ${SPOKE_CLUSTER_NAME}
+spec:
+  baseDomain: "${SPOKE_BASE_DOMAIN}"
+  pullSecretRef:
+    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
+  # CLUSTER_IMG_SET_REF: img4.15.24-x86-64-appsub
+  clusterImageSetNameRef: "${CLUSTER_IMG_SET_REF}"
+  sshPublicKey: "$(cat ${SHARED_DIR}/ssh-key-ztp-gitea.pub)"
+  clusters:
+  - clusterName: "${SPOKE_CLUSTER_NAME}"
+    networkType: "OVNKubernetes"
+    # installConfigOverrides: '${INSTALL_CONFIG_OVERRIDES}'
+    extraManifestPath: sno-extra-manifest/
+    clusterType: sno
+    clusterProfile: du
+    clusterLabels:
+      du-profile: "${DU_PROFILE}"
+      group-du-sno: ""
+      common: true
+      sites : "${SPOKE_CLUSTER_NAME}"
+    clusterNetwork:
+      - cidr: "10.128.0.0/14"
+        hostPrefix: 23
+    machineNetwork:
+      - cidr: ${INTERNAL_NET_CIDR}
+    serviceNetwork:
+      - "172.30.0.0/16"
+    additionalNTPSources:
+      - ${AUX_HOST}
+    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    cpuPartitioningMode: AllNodes
+    nodes:
+      - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
+        bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
+        bmcCredentialsName:
+          name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
+        bootMACAddress: "${provisioning_mac}"
+        bootMode: "UEFI"
+        rootDeviceHints:
+          deviceName: ${root_device}
+        # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
+        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
+        nodeNetwork:
+          interfaces:
+            - name: "${baremetal_iface}"
+              macAddress: "${mac}"
+          config:
+            interfaces:
+              - name: ${baremetal_iface}
+                type: ethernet
+                state: up
+                ipv4:
+                  enabled: true
+                  # address:
+                  # - ip: 10.1.153.100
+                  #   prefix-length: 24
+                  # dhcp: false
+                  dhcp: true
+                ipv6:
+                  # enabled: false
+                  enabled: true
+                  dhcp: true
+
+            # dns-resolver:
+            #   config:
+            #     server:
+            #       - 10.46.0.32
+            # routes:
+            #   config:
+            #     - destination: 0.0.0.0/0
+            #       next-hop-address: 10.1.153.254
+            #       next-hop-interface: "${NODE_NIC}"
+            #       table-id: 254
+EOF
+
+  cat $site_config_file
+
+  done
 }
 
 function push_site_config {
@@ -315,8 +404,7 @@ function main {
   check_hub_cluster_is_alive
   extract_rhcos_images
   generate_agent_service_config
-  generate_image_source
-  generate_baremetal_secret
+  # generate_site_config_local
   generate_site_config
   push_site_config
 }

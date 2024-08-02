@@ -19,9 +19,14 @@ function clean_up {
   # ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-assisted-deployment-pull-secret"
   # bmc_login_secret_name="${SPOKE_CLUSTER_NAME}-bmc-secret"
 
-  # set -x
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+
+  set -x
   # oc -n ${SPOKE_CLUSTER_NAME} delete secret ${ai_dp_secret_name} ${bmc_login_secret_name} || echo
-  # set +x
+  oc -n ${SPOKE_CLUSTER_NAME} delete agentclusterinstalls.extensions.hive.openshift.io ${SPOKE_CLUSTER_NAME} || echo
+  # TODO: Review this...
+  # oc -n ${SPOKE_CLUSTER_NAME} delete bmh master-00.${SPOKE_CLUSTER_NAME}.lab.eng.rdu2.redhat.com
+  set +x
 }
 
 function main {
