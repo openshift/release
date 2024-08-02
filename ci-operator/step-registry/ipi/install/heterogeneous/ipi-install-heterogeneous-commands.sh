@@ -6,9 +6,13 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-trap 'FRC=$?; createHeterogeneousJunit; debug' EXIT TERM
+trap 'FRC=$?; createHeterogeneousJunit; debug; sleepTwoHours' EXIT TERM
 
 # Print failed node, co, machine information for debug purpose
+function sleepTwoHours() {
+  sleep 7200
+}
+
 function debug() {
     if (( FRC != 0 )); then
         echo -e "Describing abnormal nodes...\n"
@@ -232,20 +236,31 @@ case $CLUSTER_TYPE in
     --tenant "$azure_auth_tenant_id" --output none
   az account set --subscription "${azure_subscription_id}"
   echo "Setting up the boot image for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers..."
+  echo "get vhd_url value"
   vhd_url=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
     yq-v4 ".data.stream \
          | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.\"rhel-coreos-extensions\".\"azure-disk\".url")
+  echo "vhd_url: $vhd_url"
   vhd_name=$(basename "${vhd_url}")
   infra_id=$(yq-v4 '.infraID' < "${SHARED_DIR}"/metadata.json)
   rg_name="${infra_id}-rg"
+  echo "run: az storage account list -g $rg_name"
   sa_name=$(az storage account list -g "${rg_name}" | yq-v4 '.[] | select(.name == "cluster*").name')
+  az storage account list -g "${rg_name}" | yq-v4 '.[] | select(.name == "cluster*").name'
+  echo "sa_name is $sa_name"
+  echo "run: az storage account keys list -g ${rg_name} --account-name ${sa_name}"
   AZURE_STORAGE_KEY=$(az storage account keys list -g "${rg_name}" --account-name "${sa_name}" --query "[0].value" -o tsv)
+  az storage account keys list -g "${rg_name}" --account-name "${sa_name}" --query "[0].value" -o tsv
+  echo "run: export AZURE_STORAGE_KEY"
   export AZURE_STORAGE_KEY
+  echo "vhd_url: $vhd_url vhd_name: $vhd_name sa_name: $sa_name"
+  echo "az storage blob copy start"
   az storage blob copy start --account-name "${sa_name}" \
       --destination-blob "${vhd_name}" --destination-container vhd --source-uri "$vhd_url"
   gallery_name=$(az sig list -g "${rg_name}" | yq-v4 '.[].name')
   image_name="${infra_id}-gen2-${ADDITIONAL_WORKER_ARCHITECTURE}"
   storage_blob_url=$(az storage blob url --account-name "${sa_name}" --container-name vhd --name "${vhd_name}" -o tsv)
+  echo "az sig image-definition create"
   az sig image-definition create --resource-group "${rg_name}" --gallery-name "${gallery_name}" \
     --gallery-image-definition "${image_name}" --publisher "RedHat" --offer "rhcos" \
     --sku "rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}" --os-type linux --hyper-v-generation V2 \
