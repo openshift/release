@@ -58,15 +58,6 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    set -e
    set -o pipefail
    cd jetlag
-   if [[ -n '$JETLAG_PR' ]]; then
-     git checkout main
-     git branch -D dev
-     git fetch origin pull/$JETLAG_PR/head:dev
-     git checkout dev
-   else
-     git checkout main
-   fi
-   git branch
    source bootstrap.sh
    ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
