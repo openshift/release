@@ -103,13 +103,10 @@ oc wait --timeout=20m --for=condition=Reconciled DataProtectionApplication/dpa-s
 oc wait --timeout=20m --all --for=jsonpath='{.status.phase}'=Available backupStorageLocation -n openshift-adp
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -o=jsonpath="{.items[?(@.metadata.name=='$CLUSTER_NAME')].metadata.namespace}")
 if [[ -z ${AGENT_NAMESPACE} ]] ; then
+  HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -o=jsonpath="{.items[?(@.metadata.name=='$CLUSTER_NAME')].metadata.namespace}")
   AGENT_NAMESPACE=${HOSTED_CLUSTER_NS}"-"${CLUSTER_NAME}
 fi
-NODEPOOL_REPLICAS=$(oc get nodepool -n local-cluster "${CLUSTER_NAME}" -ojsonpath='{.spec.replicas}')
-echo "scale down ${NODEPOOL_REPLICAS} => 0"
-oc scale nodepool ${CLUSTER_NAME} -n local-cluster --replicas 0
 oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
@@ -149,6 +146,7 @@ spec:
   - hostedcontrolplane
   - cluster
   - agentcluster
+  - clusterdeployment
   - agentmachinetemplate
   - agentmachine
   - machinedeployment
@@ -166,11 +164,6 @@ EOF
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 
 #oc delete hostedcluster/${CLUSTER_NAME} -n local-cluster
-#remove_finalizer machine ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME}
-#oc delete agentcluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
-#remove_finalizer hostedcluster ${CLUSTER_NS}
-#oc delete cluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
-#remove_finalizer cluster ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME}
 #cat <<EOF | oc apply -f -
 #apiVersion: velero.io/v1
 #kind: Restore
