@@ -28,7 +28,7 @@ base_images:
     namespace: ci
     tag: v0.29.0
   tests:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: tests
   tests-4.12:
@@ -47,8 +47,12 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: tests
+  tests-4.16:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
   upi-installer:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -74,13 +78,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -234,13 +238,35 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-16-periodic
+  cron: 00 03 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.16
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-cnv
+  as: e2e-metal-assisted-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.16
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-cnv-4-16
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -251,12 +277,12 @@ tests:
         WORKER_MEMORY=9216
         WORKER_CPU=4
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-periodic
-  cron: 30 06 * * 0-5
+- as: e2e-metal-assisted-cnv-4-16-periodic
+  cron: 15 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -297,12 +323,12 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-odf
+  as: e2e-metal-assisted-odf-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -343,12 +369,12 @@ tests:
         METALLB_API_IP=10.0.0.1
         METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-periodic
-  cron: 30 08 * * 0-5
+- as: e2e-metal-assisted-odf-4-16-periodic
+  cron: 30 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -502,16 +528,16 @@ tests:
         PLATFORM=external
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-external-4-14
+  as: e2e-metal-assisted-external-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-external-periodic
   cron: 30 15 * * 0-5
@@ -741,34 +767,6 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
-  as: e2e-vsphere-assisted-4-12
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.12
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-13
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.13
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
   as: e2e-vsphere-assisted-4-14
   optional: true
   steps:
@@ -780,6 +778,34 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.15
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-16
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.16
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
@@ -889,23 +915,6 @@ tests:
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - always_run: false
-  as: e2e-nutanix-assisted-4-13
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.13
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
-- always_run: false
   as: e2e-nutanix-assisted-4-14
   cluster: build01
   optional: true
@@ -929,7 +938,7 @@ tests:
   steps:
     cluster_profile: nutanix
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -937,6 +946,23 @@ tests:
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_VERSION=4.15
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- always_run: false
+  as: e2e-nutanix-assisted-4-16
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.16
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
@@ -952,36 +978,20 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
-- as: e2e-nutanix-assisted-4-14-periodic
-  cluster: build01
-  interval: 48h
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
-- as: e2e-nutanix-assisted-4-15-periodic
+- as: e2e-nutanix-assisted-4-16-periodic
   cluster: build01
   interval: 24h
   steps:
     cluster_profile: nutanix
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_VERSION=4.16
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - always_run: false
@@ -1043,15 +1053,15 @@ tests:
     workflow: assisted-oci-opct
   timeout: 7h0m0s
 - always_run: false
-  as: e2e-oci-assisted-4-14
+  as: e2e-oci-assisted-4-16
   optional: true
   steps:
     cluster_profile: oci-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_VERSION=4.16
     workflow: assisted-oci
 - always_run: false
   as: e2e-oci-assisted-iscsi
@@ -1062,15 +1072,6 @@ tests:
       ASSISTED_CONFIG: |
         OCI_BOOT_VOLUME_TYPE="ISCSI"
     workflow: assisted-oci
-- always_run: false
-  as: e2e-metal-assisted-rocky-8
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      PACKET_OS: rocky_8
-      PACKET_PLAN: m3.small.x86
-    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift
