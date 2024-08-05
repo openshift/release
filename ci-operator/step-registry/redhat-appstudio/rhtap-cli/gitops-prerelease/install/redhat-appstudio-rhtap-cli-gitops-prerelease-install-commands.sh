@@ -124,8 +124,12 @@ install_prerelease_gitops(){
   apiVersion: operators.coreos.com/v1alpha1
   kind: Subscription
   metadata:
+    labels:
+      app.kubernetes.io/managed-by: "Helm"
     annotations:
       helm.sh/resource-policy: keep
+      meta.helm.sh/release-name: "rhtap-subscriptions"
+      meta.helm.sh/release-namespace: "rhtap"
     name: openshift-gitops-operator
     namespace: openshift-operators
   spec:
