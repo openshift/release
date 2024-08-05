@@ -182,3 +182,4 @@ for _ in {1..60}; do
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
 oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
