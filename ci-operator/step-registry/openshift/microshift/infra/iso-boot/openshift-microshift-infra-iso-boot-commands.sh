@@ -98,15 +98,38 @@ trap 'finalize' EXIT
 # by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
-SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
+# Determine the tests to run depending on the job name and type.
+# Exclude long-running tests from presubmit jobs.
 EXCLUDE_CNCF_CONFORMANCE=false
+if [ "${JOB_TYPE}" == "presubmit" ]; then
+  EXCLUDE_CNCF_CONFORMANCE=true
+fi
+
+# Implement scenario directory check with fallbacks. Simplify or remove the
+# function when the structure is homogenised in all the active releases.
+function get_source_dir() {
+  local -r base="/home/${HOST_USER}/microshift/test"
+  local -r ndir="${base}/$1"
+  local -r fdir="${base}/$2"
+
+  # We need the variable to expand on the client side
+  # shellcheck disable=SC2029
+  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
+    echo "${ndir}"
+  else
+    echo "${fdir}"
+  fi
+}
 
 if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
-  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-bootc"
-elif [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
-  if [ "${JOB_TYPE}" == "presubmit" ]; then
-    EXCLUDE_CNCF_CONFORMANCE=true
+  SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
+  if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
+    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
+  fi
+else
+  SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
+  if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
+    SCENARIO_SOURCES=$(get_source_dir "scenarios/periodics" "scenarios-periodics")
   fi
 fi
 
