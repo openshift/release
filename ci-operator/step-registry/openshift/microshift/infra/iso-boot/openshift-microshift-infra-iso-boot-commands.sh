@@ -109,13 +109,15 @@ fi
 # function when the structure is homogenised in all the active releases.
 function get_source_dir() {
   local -r base="/home/${HOST_USER}/microshift/test"
-  local -r ndir="$1"
-  local -r fdir="$2"
+  local -r ndir="${base}/$1"
+  local -r fdir="${base}/$2"
 
-  if [ -e "${base}/${ndir}" ] && [ -d "${base}/${ndir}" ] ; then
-    echo "${base}/${ndir}"
+  # We need the variable to expand on the client side
+  # shellcheck disable=SC2029
+  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
+    echo "${ndir}"
   else
-    echo "${base}/${fdir}"
+    echo "${fdir}"
   fi
 }
 
