@@ -24,7 +24,8 @@ manage_queue() {
 
 	else
         	QUEUE_ID=$(cat $JSON_FILE | jq -r '.id')
-        	curl -X POST -k  --resolve "$endpoint_resolve" "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" "$header"
+		curl_cmd_queue=$(echo "curl -X POST -k  --resolve $endpoint_resolve "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" $header")
+        	eval "$curl_cmd_queue"
 	fi
 
 }
@@ -91,6 +92,7 @@ wait_for_job_to_finish_running() {
 token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
 endpoint=$(cat "/var/run/token/dpu-token/url")
 header=$(cat "/var/run/token/dpu-token/header")
+stop_job_header=$(cat "/var/run/token/dpu-token/stop-job-header")
 test_name="bare-test"
 
 job_url="https://${endpoint}/view/dpu-test/job/${test_name}/lastBuild"
@@ -99,7 +101,8 @@ endpoint_resolve="${endpoint}:443:10.0.180.88"
 BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
 
 if [[ "$PULL_NUMBER" == "$BUILD_NUMBER" ]]; then
-	curl -k -s --resolve "$endpoint_resolve" "${job_url}/stop"
+	curl_cmd=$(echo "curl -X POST -k -s --resolve ${endpoint_resolve} "${job_url}/stop" $stop_job_header")
+        eval "$curl_cmd"
 	sleep 20
 fi
 
