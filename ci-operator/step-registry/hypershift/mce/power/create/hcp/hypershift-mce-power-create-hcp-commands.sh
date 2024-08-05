@@ -188,5 +188,21 @@ done
 echo "$(date) Applying agent cluster manifests"
 ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
 
+cat <<EOF | oc create -f -
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+  annotations:
+    hypershift.openshift.io/ingress-controller-load-balancer-scope: "External"
+spec:
+  domain: apps.${HOSTED_CLUSTER_NAME}.hypershift.cis.ibm.net
+  endpointPublishingStrategy:
+    type: LoadBalancerService
+  replicas: 2
+EOF
+
+
 oc wait --timeout=15m --for=condition=Available --namespace=${CLUSTERS_NAMESPACE} hostedcluster/${HOSTED_CLUSTER_NAME}
 echo "$(date) Agent cluster is available"
