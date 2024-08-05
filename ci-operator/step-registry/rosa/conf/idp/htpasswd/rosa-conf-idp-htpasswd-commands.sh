@@ -82,6 +82,7 @@ echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-ve
 
 # Grant cluster-admin access to the cluster
 rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
+rosa grant user dedicated-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
 
 echo "Waiting for idp ready..."
 set_proxy
