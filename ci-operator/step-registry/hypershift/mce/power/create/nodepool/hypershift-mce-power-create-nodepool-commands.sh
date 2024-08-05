@@ -287,7 +287,7 @@ ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --nam
 #   oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "kubernetes.io/hostname": "'"${INSTANCE_NAMES[0]}"'"}}, "tolerations": [{ "effect": "NoSchedule", "key": "kubernetes.io/hostname", "operator": "Exists"}]}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
 # fi
 
-#oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION}:2005/
