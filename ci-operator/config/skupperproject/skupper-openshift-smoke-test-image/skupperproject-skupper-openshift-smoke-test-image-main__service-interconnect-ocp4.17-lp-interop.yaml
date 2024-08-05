@@ -47,6 +47,30 @@ tests:
     test:
     - ref: rhsi-run-tests
     workflow: firewatch-ipi-aws
+- as: rhsi-interop-aws-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "rhsi-run-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rhsi-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "SKUPPER", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","rhsi-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario rhsi
+    test:
+    - ref: rhsi-run-tests
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: skupperproject
