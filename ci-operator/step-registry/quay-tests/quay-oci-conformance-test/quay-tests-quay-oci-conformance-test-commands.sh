@@ -37,5 +37,6 @@ export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFO
 #Generate test result to ARTIFACT_DIR
 export OCI_REPORT_DIR
 
-echo "Begin conformance test"
+echo "Start Quay OCI Conformance Testing"
 ./conformance.test || true
+echo "Complete Quay OCI Conformance Testing"
