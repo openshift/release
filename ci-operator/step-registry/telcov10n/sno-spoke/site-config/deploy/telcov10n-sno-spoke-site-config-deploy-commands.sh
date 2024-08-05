@@ -201,9 +201,9 @@ spec:
                   # dhcp: false
                   dhcp: true
                 ipv6:
-                  # enabled: false
-                  enabled: true
-                  dhcp: true
+                  enabled: false
+                  # enabled: true
+                  # dhcp: true
 
             # dns-resolver:
             #   config:

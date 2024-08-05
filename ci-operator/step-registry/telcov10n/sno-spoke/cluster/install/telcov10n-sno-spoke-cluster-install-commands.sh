@@ -137,7 +137,7 @@ function main {
   generate_cluster_image_set
   generate_assisted_deployment_pull_secret
   generate_baremetal_secret
-  checking_installation_progress 10s
+  checking_installation_progress 1m
   get_and_save_kubeconfig_and_creds
 
   echo
