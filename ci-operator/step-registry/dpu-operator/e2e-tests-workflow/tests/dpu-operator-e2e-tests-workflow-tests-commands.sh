@@ -101,8 +101,10 @@ endpoint_resolve="${endpoint}:443:10.0.180.88"
 BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
 
 if [[ "$PULL_NUMBER" == "$BUILD_NUMBER" ]]; then
+	echo "it has entered this statement"
 	curl_cmd=$(echo "curl -X POST -k -s --resolve ${endpoint_resolve} "${job_url}/stop" $stop_job_header")
         eval "$curl_cmd"
+	echo " this is the curl cmd $curl_cmd"
 	sleep 20
 fi
 
