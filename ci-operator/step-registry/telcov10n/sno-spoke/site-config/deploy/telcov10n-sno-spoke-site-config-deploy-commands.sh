@@ -178,7 +178,7 @@ spec:
         bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
         bmcCredentialsName:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${provisioning_mac}"
+        bootMACAddress: "${mac}"
         bootMode: "UEFI"
         rootDeviceHints:
           deviceName: ${root_device}
