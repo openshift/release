@@ -1,5 +1,4 @@
 #!/bin/bash
-sleep 14400
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -29,6 +28,7 @@ if ! which kubectl; then
     ln -s "$(which oc)" ${HOME}/kubectl
 fi
 
+sleep 14400
 which extended-platform-tests
 
 # setup proxy
