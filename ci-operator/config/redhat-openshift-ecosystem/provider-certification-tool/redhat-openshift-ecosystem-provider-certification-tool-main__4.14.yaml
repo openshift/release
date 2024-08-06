@@ -7,30 +7,12 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
-binary_build_commands: make linux-amd64
+binary_build_commands: echo wontdo-use-build-image
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.21
-images:
-- dockerfile_literal: |
-    FROM quay.io/ocp-cert/opct:v0.5.0-alpha.1
-    WORKDIR /opct
-    COPY oc /usr/bin/oc
-    # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-    ADD "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" ./awscliv2.zip
-    RUN  microdnf install zip \
-        && unzip awscliv2.zip && ./aws/install \
-        && aws --version \
-        && rm -f awscliv2.zip  \
-        && microdnf clean all
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: opct-runner
 releases:
   latest:
     release:
@@ -53,8 +35,6 @@ tests:
   cron: 0 0 * * 6
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
 - as: platform-external-vsphere
@@ -62,7 +42,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s

@@ -8,13 +8,18 @@ set -o pipefail
 CI_CREDENTIALS="/var/run/ci-credentials/registry/.dockerconfigjson"
 WORKDIR="/tmp"
 
+declare -g IMAGE_EXTRACT_OPTS
 OPCT_CLI_NAME="opct"
-OPCT_CLI_OS="linux"
-OPCT_CLI_ARCH="amd64"
-OPCT_CLI_NAME="${OPCT_CLI_NAME}-${OPCT_CLI_OS}-${OPCT_CLI_ARCH}"
 OPCT_CLI_PATH_IMAGE=/usr/bin/${OPCT_CLI_NAME}
 OPCT_CLI=/tmp/${OPCT_CLI_NAME}
 WORKDIR=/tmp
+
+if [[ "${OPCT_CLI_IMAGE}" =~ ^'pipeline'* ]]; then
+  NEW_IMAGE="image-registry.openshift-image-registry.svc.cluster.local:5000/${NAMESPACE}/${OPCT_CLI_IMAGE}"
+  echo "Overriding OPCT_CLI_IMAGE image from ${OPCT_CLI_IMAGE} to ${NEW_IMAGE}"
+  OPCT_CLI_IMAGE=${NEW_IMAGE}
+  IMAGE_EXTRACT_OPTS="--insecure=true"
+fi
 
 cat <<EOF > "${SHARED_DIR}/env"
 # OPCT mirroed from ImageStream
@@ -23,20 +28,20 @@ export CI_CREDENTIALS="${CI_CREDENTIALS}"
 export WORKDIR=${WORKDIR}
 
 # Results archive information
-export AWS_DEFAULT_REGION=us-west-2
-export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/opct/.awscred
+export AWS_DEFAULT_REGION=us-east-1
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/opct/.awscred-vmc-ci-opct-uploader
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 
 function show_msg() {
-  echo "$(date -u --rfc-3339=seconds)> $@"
+  echo -e "$(date -u --rfc-3339=seconds)> \$@"
 }
 
 # Extract OPCT from ImageStream
 function extract_opct() {
   pushd ${WORKDIR}
   show_msg "Extracting OPCT binary from image stream ${OPCT_CLI_IMAGE}"
-  oc image extract ${OPCT_CLI_IMAGE} \
+  oc image extract ${OPCT_CLI_IMAGE} ${IMAGE_EXTRACT_OPTS-} \
     --registry-config=${CI_CREDENTIALS} \
     --file=${OPCT_CLI_PATH_IMAGE} && \
     chmod u+x ${OPCT_CLI}
@@ -47,7 +52,6 @@ function extract_opct() {
 }
 EOF
 
-set -x
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
 extract_opct
@@ -70,21 +74,33 @@ OPCT_MODE="${OPCT_RUN_MODE:-default}"
 #
 show_msg "Getting cluster information/versions..."
 DATE_TS=$(date +%Y%m%d)
-OCP_VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.version}')
 OCP_PLAT=$(oc get infrastructures cluster -o jsonpath='{.status.platform}')
 OCP_TOPOLOGY=$(oc get infrastructures cluster -o jsonpath='{.status.controlPlaneTopology}')
+OCP_VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.version}')
+
+current_version_x=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
+current_version_y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
+OCP_VERSION_BASELINE="${current_version_x}.${current_version_y}"
 
 # Populate the required variables to run conformance upgrade
 # The steps below will discovers the stable 4.y+1 based on the
 # cincinnati graph data, then extract the Image Digest and set it as
 # env var consumed by the 'run' step.
-cmd_jq="$(which yq 2>/dev/null || true)"
 if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
   pushd ${WORKDIR}
 
+  echo "Installing yq"
+  cmd_yq="$(which yq 2>/dev/null || true)"
+  mkdir -p /tmp/bin
+  if [ ! -x "${cmd_yq}" ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+  fi
+  PATH=${PATH}:/tmp/bin
+  export PATH
+  cmd_yq="$(which yq 2>/dev/null || true)"
+
   UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
-  current_version_x=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
-  current_version_y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
   target_version_y=$(( current_version_y + 1 ))
   target_version_xy="${current_version_x}.${target_version_y}"
   upgrade_to_channel="${UPGRADE_TO_CHANNEL_TYPE}-${current_version_x}.${target_version_y}"
@@ -114,7 +130,7 @@ $(ls ${WORKDIR}/channels/)
   fi
 
   echo "Looking for target version..."
-  target_release="$($cmd_jq -r .versions[] "${WORKDIR}/channels/${upgrade_to_channel}.yaml" | grep "${target_version_xy}." | tail -n1)"
+  target_release="$($cmd_yq -r .versions[] "${WORKDIR}/channels/${upgrade_to_channel}.yaml" | grep "${target_version_xy}." | tail -n1)"
 
   echo "Found target version [${target_release}], getting Digest..."
   TARGET_RELEASE_IMAGE=$(oc adm release info "${target_release}" -o jsonpath='{.image}')
@@ -139,6 +155,8 @@ OBJECT_META="OPCT_VERSION=${OPCT_VERSION},OPCT_MODE=${OPCT_MODE},OCP=${OCP_VERSI
 cat <<EOF >> "${SHARED_DIR}/env"
 
 # Required by results
+export OCP_PLAT_TYPE="${OCP_PLAT}"
+export OCP_VERSION_BASELINE="${OCP_VERSION_BASELINE}"
 export OPCT_VERSION="${OPCT_VERSION}"
 export OBJECT_PATH="${OBJECT_PATH}"
 export OBJECT_META="${OBJECT_META}"

@@ -14,6 +14,7 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+# TODO: move to 'opct adm setup-node'
 # https://github.com/redhat-openshift-ecosystem/provider-certification-tool/blob/main/docs/user.md#prerequisites
 # Taint one of the compute nodes
 node=$(oc get nodes -l node-role.kubernetes.io/worker= -o name | shuf -n 1)
