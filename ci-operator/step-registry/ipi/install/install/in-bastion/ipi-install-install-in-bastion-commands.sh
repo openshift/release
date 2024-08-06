@@ -113,9 +113,9 @@ else
     exit 1
 fi
 
-REMOTE_DIR="/tmp/"
-REMOTE_INSTALL_DIR="/tmp/installer/"
-REMOTE_ENV_FILE="/tmp/remote_env_file"
+REMOTE_DIR="/home/${BASTION_SSH_USER}"
+REMOTE_INSTALL_DIR="${REMOTE_DIR}/installer/"
+REMOTE_ENV_FILE="${REMOTE_DIR}/remote_env_file"
 dir=/tmp/installer
 mkdir "${dir}/"
 
