@@ -35,12 +35,14 @@ new_application_credentials() {
 	export OS_CLIENT_CONFIG_FILE
 	shift
 
+	openstack --version
+
 	appcred_json="$(
 		openstack application credential create \
 			"${*:---restricted}" \
 			--expiration "$(date -d "$APPLICATION_CREDENTIALS_EXPIRATION" +%Y-%m-%dT%H:%M:%S)" \
 			--description "PROW_CLUSTER_NAME=${CLUSTER_NAME} PROW_JOB_ID=${PROW_JOB_ID}" \
-			--format json --column id --column secret \
+			--format json --column ID --column Secret \
 			"prow-$(date +'%s%N')"
 	)"
 
@@ -52,8 +54,8 @@ new_application_credentials() {
 		| del(.clouds.\"${OS_CLOUD}\".auth.project_name)
 		| del(.clouds.\"${OS_CLOUD}\".auth.project_domain_name)
 		| .clouds.\"${OS_CLOUD}\".auth_type=\"v3applicationcredential\"
-		| .clouds.\"${OS_CLOUD}\".auth.application_credential_id=\"$(jq -r '.id' <<< "$appcred_json")\"
-		| .clouds.\"${OS_CLOUD}\".auth.application_credential_secret=\"$(jq -r '.secret' <<< "$appcred_json")\"
+		| .clouds.\"${OS_CLOUD}\".auth.application_credential_id=\"$(jq -r '.ID' <<< "$appcred_json")\"
+		| .clouds.\"${OS_CLOUD}\".auth.application_credential_secret=\"$(jq -r '.Secret' <<< "$appcred_json")\"
 		" "$OS_CLIENT_CONFIG_FILE"
 }
 
@@ -92,6 +94,7 @@ else
 	fi
 fi
 
+sleep 600
 
 info "The environment variable OPENSTACK_AUTHENTICATION_METHOD is set to '${OPENSTACK_AUTHENTICATION_METHOD}'."
 case "$OPENSTACK_AUTHENTICATION_METHOD" in

@@ -22,6 +22,8 @@ collect_artifacts() {
 }
 trap collect_artifacts EXIT TERM
 
+openstack floating ip create --help
+
 if [[ "${API_FIP_ENABLED}" == "true" ]]; then
 	echo "Creating floating IP for API"
 	API_FIP=$(openstack floating ip create \
