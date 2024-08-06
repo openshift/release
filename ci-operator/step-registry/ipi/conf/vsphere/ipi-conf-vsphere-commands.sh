@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -19,6 +24,9 @@ declare vsphere_cluster
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
@@ -223,7 +231,7 @@ networking:
 EOF
 
 if [ ${Z_VERSION} -gt 9 ]; then
-  PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-config/pull-through-cache-disable"
+  PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-disable"
   CACHE_FORCE_DISABLE="false"
   if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
     CACHE_FORCE_DISABLE=$(cat ${PULL_THROUGH_CACHE_DISABLE})
@@ -232,8 +240,8 @@ if [ ${Z_VERSION} -gt 9 ]; then
   if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
     if [ ${PULL_THROUGH_CACHE} == "enabled" ]; then
       echo "$(date -u --rfc-3339=seconds) - pull-through cache enabled for job"
-      PULL_THROUGH_CACHE_CREDS="/var/run/vault/vsphere-config/pull-through-cache-secret"
-      PULL_THROUGH_CACHE_CONFIG="/var/run/vault/vsphere-config/pull-through-cache-config"
+      PULL_THROUGH_CACHE_CREDS="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-secret"
+      PULL_THROUGH_CACHE_CONFIG="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-config"
       PULL_SECRET="/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret"
       TMP_INSTALL_CONFIG="/tmp/tmp-install-config.yaml"
       if [ -f ${PULL_THROUGH_CACHE_CREDS} ]; then

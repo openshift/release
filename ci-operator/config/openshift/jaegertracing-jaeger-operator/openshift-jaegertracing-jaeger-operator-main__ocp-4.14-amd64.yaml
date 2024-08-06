@@ -12,7 +12,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/jaegertracing/jaeger-operator
 images:
 - build_args:
@@ -27,9 +27,6 @@ images:
   context_dir: .
   dockerfile_path: Dockerfile
   to: jaeger-operator
-- context_dir: .
-  dockerfile_path: Dockerfile.asserts
-  to: jaeger-tests-asserts-e2e
 - context_dir: .
   dockerfile_path: tests/Dockerfile
   to: jaeger-tests-runner
@@ -57,9 +54,11 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-tracing
     product: ocp
-    timeout: 3h0m0s
+    timeout: 1h0m0s
     version: "4.14"
   cron: 0 6 * * 2
   steps:

@@ -1,0 +1,108 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+  origin_4.16_cli:
+    name: "4.16"
+    namespace: origin
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- dockerfile_path: images/Dockerfile.e2e
+  from: origin_4.16_cli
+  inputs:
+    cli-ocm:
+      as:
+      - registry.ci.openshift.org/ci/cli-ocm:latest
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+  to: rosa-aws-cli
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 300Mi
+tests:
+- always_run: false
+  as: pr-rosa-hcp-advanced
+  optional: true
+  run_if_changed: tests/.*
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      TEST_PROFILE: rosa-hcp-advanced
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-sts-advanced
+  optional: true
+  run_if_changed: tests/.*
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      TEST_PROFILE: rosa-advanced
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-hcp-private-link
+  optional: true
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      TEST_PROFILE: rosa-hcp-pl
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-sts-private-link
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      TEST_PROFILE: rosa-private-link
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      TEST_PROFILE: rosa-shared-vpc
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+- always_run: false
+  as: pr-rosa-hcp-arm
+  optional: true
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      TEST_PROFILE: rosa-hcp-advanced
+    test:
+    - ref: rosa-test-e2e-pull-request
+    workflow: rosa-lifecycle
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: rosa
+  variant: e2e-presubmits

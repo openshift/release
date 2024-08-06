@@ -27,4 +27,11 @@ if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
   export LEASED_RESOURCE="${vsphere_portgroup}"
 fi
 
+MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+if [ -f $MIRROR_REGISTRY_FILE ]; then
+  MIRROR_REGISTRY_HOST=$(head -n 1 $MIRROR_REGISTRY_FILE)
+  export MIRROR_REGISTRY_HOST
+  echo "Using mirror registry: $MIRROR_REGISTRY_HOST"
+fi
+
 make run-ci-e2e-test

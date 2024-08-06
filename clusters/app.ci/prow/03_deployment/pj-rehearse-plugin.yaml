@@ -55,8 +55,6 @@ items:
           - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
           - --kubeconfig-dir=/var/kubeconfigs
           - --kubeconfig-suffix=config
-          - --registry-config=/etc/push/.dockerconfigjson
-          - --ci-images-mirror-config-path=/etc/image-mirroring/config.yaml
           - --normal-limit=5
           - --more-limit=10
           - --max-limit=25
@@ -81,9 +79,6 @@ items:
           - name: prow-config
             mountPath: /etc/config
             readOnly: true
-          - name: image-mirroring-config
-            mountPath: /etc/image-mirroring
-            readOnly: true
           - name: hmac
             mountPath: /etc/webhook
             readOnly: true
@@ -92,9 +87,6 @@ items:
             readOnly: true
           - name: cache
             mountPath: /var/tmp
-          - name: push-credentials
-            readOnly: true
-            mountPath: /etc/push
           resources:
             requests:
               memory: "10Gi"
@@ -119,9 +111,6 @@ items:
         - name: prow-config
           configMap:
             name: config
-        - name: image-mirroring-config
-          configMap:
-            name: image-mirroring-config
         - name: hmac
           secret:
             secretName: github-webhook-credentials
@@ -130,6 +119,3 @@ items:
             secretName: github-credentials-openshift-ci-robot
         - name: cache
           emptyDir: {}
-        - name: push-credentials
-          secret:
-            secretName: registry-push-credentials-ci-images-mirror

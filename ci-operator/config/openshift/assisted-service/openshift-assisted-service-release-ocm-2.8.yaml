@@ -16,7 +16,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   cli:
-    name: "4.11"
+    name: "4.13"
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
@@ -96,13 +96,15 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service
 - dockerfile_literal: |
+    FROM quay.io/multi-arch/yq:4.30.5 as yq4
     FROM coreos/centos
+    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
     COPY . .
   from: src
   to: assisted-service-scripts
 - dockerfile_literal: |
     FROM coreos/centos
-    RUN yum install -y skopeo
+    RUN yum install -y --skip-broken skopeo pip
   from: src
   to: assisted-service-publish-index
 operator:
@@ -264,7 +266,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
-  cron: '@weekly'
+  cron: 00 09 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -335,7 +337,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
-  cron: '@weekly'
+  cron: 00 08 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -374,7 +376,7 @@ tests:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: '@weekly'
+  cron: 00 08 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -383,6 +385,7 @@ tests:
     env:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
@@ -397,7 +400,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: '@weekly'
+  cron: 00 09 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -408,6 +411,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
@@ -421,7 +425,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: '@weekly'
+  cron: 00 10 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -431,6 +435,7 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-compact-day2-workers
   optional: true
   steps:
@@ -473,7 +478,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: '@weekly'
+  cron: 00 11 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -485,6 +490,7 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
   optional: true
@@ -501,7 +507,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: '@weekly'
+  cron: 00 12 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -514,6 +520,7 @@ tests:
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
   optional: true
   steps:
@@ -554,7 +561,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: '@weekly'
+  cron: 00 13 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -563,6 +570,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-3masters
   optional: true

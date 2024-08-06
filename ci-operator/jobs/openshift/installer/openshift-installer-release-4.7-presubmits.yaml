@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -86,7 +86,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -167,7 +167,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -249,7 +249,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -330,7 +330,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-rhel8
     decorate: true
     decoration_config:
@@ -456,7 +456,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -537,7 +537,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -618,7 +618,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-upi
     decorate: true
     decoration_config:
@@ -704,7 +704,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -786,7 +786,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -867,7 +867,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -948,7 +948,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -1033,7 +1033,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-crc
     decorate: true
     decoration_config:
@@ -1119,7 +1119,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -1200,12 +1200,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
-    context: ci/prow/e2e-gcp-shared-vpc
+    cluster: build02
+    context: ci/prow/e2e-gcp-byo-vpc
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1214,9 +1214,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.7-e2e-gcp-shared-vpc
+    name: pull-ci-openshift-installer-release-4.7-e2e-gcp-byo-vpc
     optional: true
-    rerun_command: /test e2e-gcp-shared-vpc
+    rerun_command: /test e2e-gcp-byo-vpc
     spec:
       containers:
       - args:
@@ -1225,8 +1225,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-shared-vpc-cluster-profile
-        - --target=e2e-gcp-shared-vpc
+        - --secret-dir=/usr/local/e2e-gcp-byo-vpc-cluster-profile
+        - --target=e2e-gcp-byo-vpc
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1242,7 +1242,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-byo-vpc-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1283,13 +1283,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-byo-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1374,7 +1374,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upi
     decorate: true
     decoration_config:
@@ -1459,7 +1459,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     decoration_config:
@@ -1544,7 +1544,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-libvirt
     decorate: true
     decoration_config:
@@ -1630,7 +1630,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -2035,7 +2035,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -2117,7 +2117,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -2199,7 +2199,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -2292,7 +2292,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.7-e2e-vsphere
@@ -2374,7 +2374,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.7-e2e-vsphere-upi
@@ -2447,7 +2447,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -2503,7 +2503,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -2559,7 +2559,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -2615,7 +2615,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -2672,7 +2672,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build05
+    cluster: build09
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:
@@ -2753,7 +2753,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -2782,7 +2782,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -2812,7 +2812,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -2841,7 +2841,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -2897,7 +2897,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -2952,7 +2952,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -3008,7 +3008,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build03
+    cluster: build05
     context: ci/prow/yaml-lint
     decorate: true
     labels:

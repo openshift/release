@@ -46,8 +46,7 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - disabled: true
-    name: 4.16-priv
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -235,6 +234,16 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-ovn-ipsec-serial
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn-ipsec-serial
+  timeout: 6h0m0s
 - as: e2e-aws-csi
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -248,7 +257,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
@@ -319,12 +328,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -404,12 +415,12 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     workflow: openshift-e2e-vsphere-ovn-dualstack
@@ -458,6 +469,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-edge-zones
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

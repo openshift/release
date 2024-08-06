@@ -51,6 +51,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: oauth-proxy
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -58,6 +62,10 @@ build_root:
     tag: rhel-8-release-golang-1.21-openshift-4.16
 images:
 - from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -128,7 +136,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.13"
@@ -179,62 +189,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
-  optional: true
-  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_CONSOLE_PLUGIN
-        name: pipeline:logging-view-plugin
-      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
-        name: pipeline:logging-view-plugin
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:logging-vector
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: generic-claim
-  timeout: 5h0m0s
-- as: e2e-ocp-target-minus-two
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.11"
   optional: true
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -283,7 +243,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
@@ -327,7 +289,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.13"

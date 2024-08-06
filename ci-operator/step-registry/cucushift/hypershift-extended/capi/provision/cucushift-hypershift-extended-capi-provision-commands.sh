@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 function retry() {
     local check_func=$1
@@ -22,7 +22,7 @@ function retry() {
         fi
     done
 
-    echo "Failed to run check function $1 after $max_retries attempts."
+    echo "Failed to run check function $check_func after $max_retries attempts."
     return 1
 }
 
@@ -32,6 +32,7 @@ function is_hcp_started() {
     if [[ -n "${cluster_res}" ]] ; then
       return 0
     fi
+    rosa logs install -c ${CLUSTER_NAME}
     return 1
 }
 
@@ -56,11 +57,12 @@ function rosa_login() {
      ocm_api_url="https://api.integration.openshift.com"
     fi
 
-    ROSA_VERSION=$(rosa version)
+    # there is a bug for rosa version that would cause panic
+    # ROSA_VERSION=$(rosa version)
     ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
     if [[ ! -z "${ROSA_TOKEN}" ]]; then
-      echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+      # echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
       rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
       ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
     else
@@ -72,24 +74,82 @@ function rosa_login() {
     oc create secret -n default generic rosa-creds-secret --from-literal=ocmToken="${ROSA_TOKEN}" --from-literal=ocmApiUrl="${ocm_api_url}"
 }
 
-function export_envs() {
-    # kubeconfig
-    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-    if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
-      export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+function find_openshift_version() {
+    # Get the openshift version
+    CHANNEL_GROUP=stable
+    version_cmd="rosa list versions --hosted-cp --channel-group ${CHANNEL_GROUP} -o json"
+    if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+      version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
+    else
+      version_cmd="$version_cmd | jq -r '.[].raw_id'"
+    fi
+    versionList=$(eval $version_cmd)
+    echo -e "Available cluster versions:\n${versionList}"
+
+    if [[ -z "$OPENSHIFT_VERSION" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+    elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    else
+      # Match the whole line
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
     fi
 
-    # aws env
-    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-    export AWS_REGION=${REGION}
-    export AWS_PAGER=""
+    if [[ -z "$OPENSHIFT_VERSION" ]]; then
+      echo "Requested cluster version not available!"
+      exit 1
+    fi
+}
 
+function set_eternal_azure_oidc() {
+  ISSUER_URL="$(cat /var/run/hypershift-ext-oidc-app-cli/issuer-url)"
+  CLI_CLIENT_ID="$(cat /var/run/hypershift-ext-oidc-app-cli/client-id)"
+  CONSOLE_CLIENT_ID="$(cat /var/run/hypershift-ext-oidc-app-console/client-id)"
+  CONSOLE_CLIENT_SECRET="$(cat /var/run/hypershift-ext-oidc-app-console/client-secret)"
+  CONSOLE_CLIENT_SECRET_NAME=console-secret
+
+  exist=$(oc -n default get secret ${CONSOLE_CLIENT_SECRET_NAME} --ignore-not-found)
+  if [[ -n "${exist}" ]] ; then
+    oc delete -n default secret ${CONSOLE_CLIENT_SECRET_NAME}
+  fi
+  oc -n default create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret="${CONSOLE_CLIENT_SECRET}"
+
+  #      - componentName: cli
+  #        componentNamespace: openshift-console
+  #        clientID: ${CLI_CLIENT_ID}
+  export EXTERNAL_AUTH_PROVIDERS="  enableExternalAuthProviders: true
+  externalAuthProviders:
+    - name: entra-id
+      issuer:
+        issuerURL: ${ISSUER_URL}
+        audiences:
+          - ${CONSOLE_CLIENT_ID}
+          - ${CLI_CLIENT_ID}
+      oidcClients:
+        - componentName: console
+          componentNamespace: openshift-console
+          clientID: ${CONSOLE_CLIENT_ID}
+          clientSecret:
+            name: ${CONSOLE_CLIENT_SECRET_NAME}
+      claimMappings:
+        username:
+          claim: email
+          prefixPolicy: Prefix
+          prefix: \"oidc-user-test:\"
+        groups:
+          claim: groups
+          prefix: \"oidc-groups-test:\""
+}
+
+function export_envs() {
     # export capi env variables
     prefix="ci-capi-hcp-test-long-name"
     subfix=$(openssl rand -hex 10)
     CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
     echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
     export CLUSTER_NAME=${CLUSTER_NAME}
+
+    find_openshift_version
     export OPENSHIFT_VERSION=${OPENSHIFT_VERSION}
 
     AWS_ACCOUNT_ID=$(aws sts get-caller-identity  | jq '.Account' | cut -d'"' -f2 | tr -d '\n')
@@ -98,10 +158,11 @@ function export_envs() {
     OIDC_CONFIG_ID=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
     export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
 
-    ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
+    CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
+    ACCOUNT_ROLES_PREFIX=$CLUSTER_PREFIX
     export ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX}
 
-    OPERATOR_ROLES_PREFIX=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    OPERATOR_ROLES_PREFIX=$CLUSTER_PREFIX
     export OPERATOR_ROLES_PREFIX=${OPERATOR_ROLES_PREFIX}
 
     OPERATOR_ROLES_ARNS_FILE="${SHARED_DIR}/operator-roles-arns"
@@ -178,11 +239,11 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}"
     fi
 
     if [[ -n "${CLUSTER_SECTOR}" ]]; then
-      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
       if [[ -z "$psList" ]]; then
         echo "no ready provision shard found, trying to find maintenance status provision shard"
         # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
-        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
         if [[ -z "$psList" ]]; then
           echo "No available provision shard!"
           exit 1
@@ -208,15 +269,25 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}"
 
     export NODEPOOL_NAME="nodepool-0"
 
-#    # some other optional spec of rosacontrolplane
-#    export MACHINE_CIDR=${MACHINE_CIDR}
-#    export NETWORK_TYPE=${NETWORK_TYPE}
-#    export ENDPOINT_ACCESS=${ENDPOINT_ACCESS}
+    if [[ "${ENABLE_EXTERNAL_OIDC}" == "true" ]]; then
+      set_eternal_azure_oidc
+    fi
 }
 
 # main
-export_envs
+# kubeconfig
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
+# aws env
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_REGION=${REGION}
+export AWS_PAGER=""
+
 rosa_login
+export_envs
 download_envsubst
 
 # create AWSClusterControllerIdentity
@@ -260,6 +331,7 @@ kind: ROSAControlPlane
 metadata:
   name: "${CLUSTER_NAME}-control-plane"
 spec:
+${EXTERNAL_AUTH_PROVIDERS}
   rosaClusterName: ${CLUSTER_NAME:0:54}
   version: "${OPENSHIFT_VERSION}"
   region: "${AWS_REGION}"
@@ -400,6 +472,29 @@ if [[ "${INFRA_ID}" == "null" ]]; then
   INFRA_ID=$CLUSTER_NAME
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+
+# now the rosa steps are bound to this config file in the SHARED_DIR, generate it to reuse those steps
+cluster_config_file="${SHARED_DIR}/cluster-config"
+cat > ${cluster_config_file} << EOF
+{
+  "name": "${CLUSTER_NAME}",
+  "sts": "true",
+  "hypershift": "true",
+  "region": "${REGION}",
+  "version": {
+    "channel_group": "stable",
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
+  },
+  "tags": "${TAGS}",
+  "disable_scp_checks": "true",
+  "disable_workload_monitoring": "false",
+  "etcd_encryption": ${ETCD_ENCRYPTION},
+  "enable_customer_managed_key": "false",
+  "fips": "false",
+  "private": "${ENDPOINT_ACCESS}"
+}
+EOF
 
 # do not check worker node here
 # wait for cluster machinepool ready

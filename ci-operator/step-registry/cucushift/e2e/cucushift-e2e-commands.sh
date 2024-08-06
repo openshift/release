@@ -39,7 +39,7 @@ function set_cluster_access() {
     fi
 }
 function preparation_for_test() {
-    if ! which kubectl > /dev/null ; then
+    if ! which kubectl &> /dev/null ; then
         mkdir --parents /tmp/bin
         export PATH=$PATH:/tmp/bin
         ln --symbolic "$(which oc)" /tmp/bin/kubectl
@@ -89,7 +89,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            external|none|powervs)
+            external|kubevirt|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -179,11 +179,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
@@ -256,23 +258,35 @@ function test_execution_cucumber() {
     set +x
 }
 function test_execution_default() {
-    # run normal tests in parallel
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
-    SECONDS=0
-    parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-        'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-         export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-         parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
-    show_test_execution_time 'normal'
+    if [[ "${PARALLEL}" = '0' ]] || [[ "${PARALLEL}" = '1' ]] ; then
+        # run normal tests in serial
+        SECONDS=0
+        test_execution_cucumber 'normal' 'not @serial and not @console and not @admin'
+        show_test_execution_time 'normal'
 
-    # run admin tests in parallel
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
-    SECONDS=0
-    parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-        'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-         export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-         parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
-    show_test_execution_time 'admin'
+        # run admin tests in serial
+        SECONDS=0
+        test_execution_cucumber 'admin' 'not @serial and not @console and @admin'
+        show_test_execution_time 'admin'
+    else
+        # run normal tests in parallel
+        SECONDS=0
+        export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
+        parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+            'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+             export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+             parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
+        show_test_execution_time 'normal'
+
+        # run admin tests in parallel
+        SECONDS=0
+        export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
+        parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+            'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+             export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+             parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
+        show_test_execution_time 'admin'
+    fi
 
     # run the rest tests in serial
     SECONDS=0
@@ -295,7 +309,7 @@ function test_execution_ui_destructive {
     test_execution_cucumber 'uidestructive' '@console and @destructive'
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     case "$E2E_TEST_TYPE" in
         default)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @destructive and not @long-duration"
@@ -325,26 +339,42 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    failures=0 errors=0 skipped=0 tests=0
-    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-e2e
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+cucushift-e2e:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
-    if [ $((failures)) != 0 ] ; then
+
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
-        for (( i=0; i<failures; i++ )) ; do
+        for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi

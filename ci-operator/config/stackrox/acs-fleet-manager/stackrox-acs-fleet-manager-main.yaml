@@ -1,68 +1,58 @@
 base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
-  openshift_release_golang-1.20:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-0.10.0
+  openshift_release_golang-1.21:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: golang-1.21
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.21
   use_build_cache: true
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
     src:
       paths:
       - destination_dir: ./
         source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
   to: acs-fleet-manager
+- context_dir: dp-terraform/helm
+  dockerfile_path: Dockerfile
+  to: acs-fleetshard-operator
 - dockerfile_path: .openshift-ci/e2e-runtime/Dockerfile
   inputs:
-    openshift_release_golang-1.20:
+    openshift_release_golang-1.21:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/openshift/release:golang-1.21
     src:
       paths:
       - destination_dir: ./
         source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
   to: e2e-runtime
 releases:
-  initial:
-    integration:
-      name: "4.11"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.11"
-      namespace: ocp
+    release:
+      channel: fast
+      version: "4.14"
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 6000Mi
+test_binary_build_commands: echo 'Placeholder for building test-bin image'
 tests:
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   steps:
+    env:
+      OCP_VERSION: ocp/fast-4.14
     test:
-    - as: claim
-      cli: custom
+    - ref: ipi-install-rbac
+    - as: test
       commands: |
         if [ -x ".openshift-ci/tests/e2e.sh" ]; then
           ./.openshift-ci/tests/e2e.sh
@@ -76,41 +66,14 @@ tests:
       dependencies:
       - env: FLEET_MANAGER_IMAGE
         name: acs-fleet-manager
+      - env: FLEETSHARD_OPERATOR_IMAGE
+        name: acs-fleetshard-operator
       from: e2e-runtime
       resources:
         requests:
           cpu: 2000m
           memory: 6000Mi
-    workflow: generic-claim
-- as: image-push
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: to-quay
-      best_effort: true
-      cli: latest
-      commands: |
-        entrypoint=".openshift-ci/image-push/entrypoint.sh"
-        if [ -x "$entrypoint" ]; then
-          echo "Executing image-push entrypoint."
-          $entrypoint
-        else
-          echo "No image-push entrypoint ($entrypoint) found."
-          exit 1
-        fi
-      credentials:
-      - mount_path: /var/run/rhacs-ms-push
-        name: rhacs-ms-push
-        namespace: test-credentials
-      dependencies:
-      - env: FLEET_MANAGER_IMAGE
-        name: acs-fleet-manager
-      from: base
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 15m0s
+    workflow: stackrox-automation-flavors-ocp-4-e2e
 zz_generated_metadata:
   branch: main
   org: stackrox

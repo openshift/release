@@ -27,11 +27,19 @@ def add_imagestream_namespace_rbac(gendoc):
             'name': 'art-admins'
         })
         # This group contains users with the ability to access the private release-controllers
-        # It's a mapping from the "openshift-private-release-admins" Rover Group
+        # It's a mapping from the "openshift-private-release-admins" Rover Group.
         puller_subjects.append({
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'openshift-private-release-admins'
+        })
+        # Users who are actively working in github.com/openshift-priv and need
+        # access to private release controllers.
+        # It's a mapping from the "openshift-private-ci-reps" Rover Group.
+        puller_subjects.append({
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Group',
+            'name': 'openshift-private-ci-reps'
         })
 
     resources.append({

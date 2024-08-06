@@ -25,8 +25,14 @@ run() {
 }
 
 apply_image_config() {
-    # Create a registry configmap to hold the Stage registry CA bundle.
-    oc create configmap registry-config  -n openshift-config && \
+    # Check if the configmap already exists
+    if oc get configmap registry-config -n openshift-config > /dev/null 2>&1; then
+        echo "Configmap registry-config already exists, continuing with the script..."
+    else
+        # Create a registry configmap to hold the Stage registry CA bundle.
+        oc create configmap registry-config  -n openshift-config
+    fi
+	
     oc set data configmap/registry-config --from-file=registry.stage.redhat.io=${STAGE_CA_BUNDLE} -n openshift-config && \
     oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
 
@@ -95,7 +101,7 @@ create_icsp_connected() {
 		return 1
 	}
 
-	cat <<EOF | oc create -f - || {
+	cat <<EOF | oc apply -f - || {
   apiVersion: operator.openshift.io/v1alpha1
   kind: ImageContentSourcePolicy
   metadata:
@@ -125,7 +131,7 @@ create_catalog_sources() {
 
 	echo "creating catalogsource: $CATALOG_SOURCE"
 
-	cat <<EOF | oc create -f -
+	cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -184,7 +190,7 @@ check_marketplace() {
 		return 0
 	}
 
-	cat <<EOF | oc create -f -
+	cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:

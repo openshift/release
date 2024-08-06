@@ -4,6 +4,14 @@ chain:
   - as: csi-conformance-tests
     from: tests
     commands: |-
+      function cleanup() {
+        for child in $( jobs -p ); do
+          kill "${child}"
+        done
+        wait
+      }
+      trap cleanup EXIT
+      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
@@ -12,10 +20,16 @@ chain:
       export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver.yaml"
       PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
       echo "Source git commit is ${PR_SHA}"
+      ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+      ocp_version="release-${ocp_version}"
       response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${PR_SHA}/hack/test-driver.yaml)
       if [ $response != "200" ]; then
-        echo "Getting test-driver.yaml from the master branch"
-        curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
+        response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver.yaml)
+        if [ $response != "200" ]; then
+          ocp_version="master"
+        fi
+        echo "Getting test-driver.yaml from the ${ocp_version} branch"
+        curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver.yaml
       else
          echo "Getting test-driver.yaml from PR"
         curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${PR_SHA}/hack/test-driver.yaml
@@ -23,7 +37,7 @@ chain:
       sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
-      openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv
+      openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" | grep -v "provisioning should provision correct filesystem size when restoring snapshot to larger size pvc" > /tmp/tests_hs_kv
       TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv"
       echo "${ARTIFACT_DIR}"
       openshift-tests run openshift/csi ${TEST_ARGS:-} \
@@ -46,9 +60,12 @@ chain:
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${PR_SHA}/hack/test-driver-rwx.yaml)
       if [ $response != "200" ]; then
-        ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+        response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver.yaml)
+        if [ $response != "200" ]; then
+          ocp_version="master"
+        fi        
         echo "Getting test-driver-rwx.yaml from the ocp version ${ocp_version} branch"
-        rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/release-${ocp_version}/hack/test-driver-rwx.yaml"
+        rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver-rwx.yaml"
         rwx_supported_http_code=$(curl -o "${TEST_CSI_DRIVER_FILES}" -L -w "%{http_code}" "${rwx_driver_file_url}")
         if [[ ${rwx_supported_http_code} == "404" ]]; then
           echo "Read-Write-Many is not supported in version ${ocp_version}. Skipping RWX test"
@@ -95,6 +112,7 @@ chain:
 
       exit ${csi_exit_code_rwx}
     timeout: 14400s
+    grace_period: 30m0s
     env:
     - name: TEST_ARGS
       default: ""

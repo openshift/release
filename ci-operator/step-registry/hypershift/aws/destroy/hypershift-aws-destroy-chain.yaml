@@ -9,7 +9,9 @@ chain:
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
-      documentation: "The AWS region of the cluster."
+      documentation: |
+        Specifies the AWS region for the cluster. If intentionally left as an empty string, 
+        the region defaults to that of the management cluster.
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
@@ -24,13 +26,14 @@ chain:
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
       fi
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
+      HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster aws \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
         --name ${CLUSTER_NAME} \
-        --region ${HYPERSHIFT_AWS_REGION} \
+        --region ${HC_REGION} \
         --base-domain ${DOMAIN} \
         --cluster-grace-period 40m
       echo "$(date) Finished deleting cluster"

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -22,8 +26,7 @@ images:
   to: gcp-machine-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -71,6 +74,17 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "5400"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

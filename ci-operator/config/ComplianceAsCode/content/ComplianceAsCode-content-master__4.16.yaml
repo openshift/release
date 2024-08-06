@@ -23,6 +23,82 @@ resources:
       memory: 400Mi
 tests:
 - always_run: false
+  as: e2e-aws-ocp4-bsi
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=bsi
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-bsi-node
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=bsi-node
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-bsi
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export PROFILE=bsi
+        export PRODUCT=rhcos4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
   as: e2e-aws-rhcos4-e8
   steps:
     cluster_profile: quay-aws
@@ -417,7 +493,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-e8-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -443,7 +519,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-e8-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -468,7 +544,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-moderate-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -494,7 +570,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-moderate-node-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -520,7 +596,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-cis-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -545,7 +621,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-cis-node-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -570,7 +646,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-moderate-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -599,7 +675,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-stig-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -625,7 +701,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-stig-node-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -651,7 +727,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-pci-dss-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -676,7 +752,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-pci-dss-node-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -701,7 +777,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-high-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -730,7 +806,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-stig-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -759,7 +835,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-high-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
@@ -785,7 +861,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-high-node-weekly
-  cron: 0 23 * * 6
+  cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:

@@ -49,6 +49,13 @@ function run_command_with_retries() {
 
 ibmcloud_login
 
+#OCP-60816 - [IPI-on-IBMCloud] install cluster under BYON with a different resource group
+#after destroyed the cluster, check the pre resource group is existed.
+if [ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]; then
+    resource_group=$(cat "${SHARED_DIR}/ibmcloud_cluster_resource_group")
+    ${IBMCLOUD_CLI} resource group ${resource_group}
+fi
+
 rg_files="${SHARED_DIR}/ibmcloud_resource_group ${SHARED_DIR}/ibmcloud_cluster_resource_group"
 for rg_file in ${rg_files}; do
     if [ -f "${rg_file}" ]; then

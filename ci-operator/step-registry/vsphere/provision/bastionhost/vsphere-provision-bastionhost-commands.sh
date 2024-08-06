@@ -10,6 +10,8 @@ declare vsphere_portgroup
 declare vsphere_bastion_portgroup
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
 
@@ -29,6 +31,10 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 
 #Get available ova template
 echo "$(date -u --rfc-3339=seconds) - Get avaiable ova template..."

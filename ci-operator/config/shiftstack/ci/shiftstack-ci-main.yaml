@@ -1,0 +1,131 @@
+base_images:
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
+  shiftstack-bugwatcher-image:
+    name: tooling
+    namespace: shiftstack
+    tag: bugwatcher
+  shiftstack-prune-image:
+    name: tooling
+    namespace: shiftstack
+    tag: prune
+  shiftstack-scripts-image:
+    name: tooling
+    namespace: shiftstack
+    tag: scripts
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cleanup-vexxhost
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-nfv
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-hwoffload
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-central
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-az0
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: bugwatcher-doctext
+  cron: 0 8 * * 1-5
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-doctext
+- as: bugwatcher-pretriage
+  cron: '*/30 * * * *'
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-pretriage
+- as: bugwatcher-triage
+  cron: 0 8 * * 3
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-triage
+- as: bugwatcher-posttriage
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage
+- as: quotas-vexxhost
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: VEXXHOST managed
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+    workflow: shiftstack-quotas
+- as: quotas-openstack-nfv
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: OpenStack NFV
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+    workflow: shiftstack-quotas
+- as: quotas-openstack-hwoffload
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: OpenStack HW offload
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+    workflow: shiftstack-quotas
+- as: quotas-vh-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha central
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-quotas
+- as: quotas-vh-mecha-az0
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha az0
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+    workflow: shiftstack-quotas
+- as: liveliness-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-liveliness
+- as: liveliness-mecha-az0
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+    workflow: shiftstack-liveliness
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: ci

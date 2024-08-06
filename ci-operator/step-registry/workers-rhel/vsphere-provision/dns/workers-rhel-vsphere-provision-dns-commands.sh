@@ -39,6 +39,14 @@ cluster_hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --dns-name "${cluster_name}.${base_domain}" \
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${cluster_name}.${base_domain}.\`].Id" \
             --output text)"
+if [[ -z "${cluster_hosted_zone_id}" ]]; then
+    if [[ -f "${SHARED_DIR}/hosted-zone.txt" ]]; then
+        cluster_hosted_zone_id=$(< "${SHARED_DIR}/hosted-zone.txt")
+    else
+        echo "Unable to get hosted zone id, exit!"
+	exit 1
+    fi
+fi
 echo "${cluster_hosted_zone_id}" > "${SHARED_DIR}/cluster-hosted-zone.txt"
 
 dns_create_str=""

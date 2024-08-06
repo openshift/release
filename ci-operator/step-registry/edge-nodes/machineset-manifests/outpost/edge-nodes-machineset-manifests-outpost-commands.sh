@@ -16,6 +16,22 @@ machineset_name_postfix=${RANDOM:0:2}
 # keeping manifest_ prefix as this step can be used in manifest injection before installation 
 edge_node_machineset="${SHARED_DIR}/manifest_edge_node_machineset.yaml"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP Version: $ocp_version"
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+
 
 if [[ ${EDGE_NODE_INSTANCE_TYPE} != "" ]]; then
   instance_type=${EDGE_NODE_INSTANCE_TYPE}
@@ -78,11 +94,6 @@ spec:
           placement:
             availabilityZone: ${zone_name}
             region: ${REGION}
-          securityGroups:
-            - filters:
-              - name: tag:Name
-                values:
-                  - PLACEHOLDER_INFRA_ID-worker-sg
           subnet:
             id: ${subnet_id}
           tags:
@@ -91,6 +102,44 @@ spec:
           userDataSecret:
             name: worker-user-data
 EOF
+
+# SG group patch
+sg_patch=`mktemp`
+if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
+  # CAPI
+  cat <<EOF > ${sg_patch}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          securityGroups:
+            - filters:
+              - name: tag:Name
+                values:
+                  - PLACEHOLDER_INFRA_ID-node
+            - filters:
+              - name: tag:Name
+                values:
+                  - PLACEHOLDER_INFRA_ID-lb
+EOF
+else
+  # Terraform
+  cat <<EOF > ${sg_patch}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          securityGroups:
+            - filters:
+              - name: tag:Name
+                values:
+                  - PLACEHOLDER_INFRA_ID-worker-sg
+EOF
+fi
+
+yq-go m -x -i "${edge_node_machineset}" "${sg_patch}"
 
 if [[ "${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
   ip_patch=`mktemp`

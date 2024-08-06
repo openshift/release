@@ -1,0 +1,29 @@
+workflow:
+  as: konflux-ci-ipi
+  steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      BASE_DOMAIN: ci.stonesoupengineering.com
+    pre:
+    - chain: ipi-aws-pre
+    - ref: redhat-appstudio-health-check
+      # Do not let potential failures in this step fail the whole workflow (for now)
+      best_effort: true
+    post:
+    - ref: konflux-ci-unregister-sprayproxy
+      best_effort: true
+    - ref: redhat-appstudio-gather
+      optional_on_success: true
+    - chain: ipi-aws-post
+      best_effort: true
+    - ref: redhat-appstudio-report
+      best_effort: true
+
+  documentation: |-
+    This workflow performs provision of ocp cluster using ipi-aws suitable for installing Konflux and running E2E tests on top of it.
+    It also takes care of collecting artifacts from the cluster and its deprovision.

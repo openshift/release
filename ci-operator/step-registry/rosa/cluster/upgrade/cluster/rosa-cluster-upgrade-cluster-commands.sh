@@ -92,7 +92,7 @@ function upgrade_cluster_to () {
       exit 1
     fi
 
-    rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1
+    rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1 || true
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
       log "Waiting for the previous upgrade schedule to be removed."
@@ -105,9 +105,11 @@ function upgrade_cluster_to () {
 
   # Speed up the upgrading process
   set_proxy
-  log "Force restarting the MUO pod to speed up the upgrading process."
-  muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
-  oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    log "Force restarting the MUO pod to speed up the upgrading process."
+    muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
+    oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+  fi
   unset_proxy
 
   # Upgrade cluster
@@ -176,13 +178,25 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  log "Logging into ${OCM_LOGIN_ENV} with SSO credentials using rosa cli"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
   log "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  log "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  log "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 

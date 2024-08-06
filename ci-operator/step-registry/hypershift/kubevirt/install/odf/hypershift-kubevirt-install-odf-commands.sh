@@ -23,14 +23,9 @@ metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
-# TODO remove this override once https://issues.redhat.com/browse/CLOUDDST-18990 is resolved
-# ODF isn't in the 4.14 catalog, which causes the install to fail. This workaround
-# should work for both 4.13 and 4.14, which are the only two versions being tested
-# at this point in time.
-#
 # Override the subscription source
-ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-13"
-# create the custom catalog source that points to 4.13 regardless of the OCP version
+ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-15"
+# create the custom catalog source that points to 4.15 regardless of the OCP version
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -39,7 +34,7 @@ metadata:
     operatorframework.io/managed-by: marketplace-operator
     target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   generation: 5
-  name: redhat-operators-4-13
+  name: redhat-operators-4-15
   namespace: openshift-marketplace
 spec:
   displayName: Red Hat Operators
@@ -64,7 +59,7 @@ spec:
   icon:
     base64data: ""
     mediatype: ""
-  image: registry.redhat.io/redhat/redhat-operator-index:v4.13
+  image: registry.redhat.io/redhat/redhat-operator-index:v4.15
   priority: -100
   publisher: Red Hat
   sourceType: grpc
@@ -200,3 +195,31 @@ done
 oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
 oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"
+
+# Ensure that the csi-snapshot-controller is restarted so that it picks up the annotation on the volume snapshot class
+replica_count=$(oc get deployment -n openshift-cluster-storage-operator csi-snapshot-controller -o=jsonpath='{@.spec.replicas}')
+echo "Current replica count $replica_count"
+
+if [[ $(oc get csisnapshotcontroller cluster -o=jsonpath='{@.spec.managementState}') ]]; then
+oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "remove", "path": "/spec/managementState"}]' -n openshift-cluster-storage-operator
+fi
+oc scale deployment -n openshift-cluster-storage-operator csi-snapshot-controller --replicas=0
+
+RETRIES=60
+echo "Waiting for pods to be gone"
+for ((i=1; i <= $RETRIES; i++)); do
+    availableReplicas=$(oc get deployment -n openshift-cluster-storage-operator csi-snapshot-controller -o=jsonpath='{@.status.availableReplicas}')
+    if [[ -z "$availableReplicas" ]]; then
+        echo "No csi snapshot controller replicas left"
+        break
+    else
+      echo "Still $availableReplicas replicas available"
+    fi
+    sleep 1
+done
+
+echo "managing deployment again, will restore to needed value"
+oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "add", "path": "/spec/managementState", "value": "Managed"}]' -n openshift-cluster-storage-operator
+echo "waiting for deployment to be ready"
+oc rollout status deployment/csi-snapshot-controller -n openshift-cluster-storage-operator
+

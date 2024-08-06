@@ -52,17 +52,6 @@ then
     export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 fi
 
-# restore external oidc cache dir for oc
-if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
-    echo "Restoring external OIDC cache dir for oc"
-    export KUBECACHEDIR
-    KUBECACHEDIR="/tmp/output/oc-oidc"
-    token_cache_dir="$KUBECACHEDIR/oc"
-    mkdir -p "$token_cache_dir"
-    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
-    oc whoami
-fi
-
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
@@ -89,7 +78,18 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-#setup bastion
+# restore external oidc cache dir for oc
+if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+    echo "Restoring external OIDC cache dir for oc"
+    export KUBECACHEDIR
+    KUBECACHEDIR="/tmp/output/oc-oidc"
+    token_cache_dir="$KUBECACHEDIR/oc"
+    mkdir -p "$token_cache_dir"
+    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    oc whoami
+fi
+
+# setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
     QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
@@ -249,6 +249,34 @@ oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
+function remove_kubeadmin_user() {
+    if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
+        ret_delete_admin=0
+
+        ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+        ## it means you only see hosted cluster in testing
+        if test -f "${SHARED_DIR}/nested_kubeconfig" && diff -q "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/kubeconfig" >/dev/null; then
+            return
+        fi
+
+        echo "KUBEADMIN_REMOVED is set to 'true' and it is not hosted cluster. Deleting kubeadmin secret..."
+        oc --kubeconfig="${SHARED_DIR}/kubeconfig" delete secrets kubeadmin -n kube-system || ret_delete_admin=$?
+        if [ "W${ret_delete_admin}W" != "W0W" ]; then
+            echo "fail to delete kubeadmin-password in mgmt clusger or non-hypershift cluster"
+            if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+                echo "do not force success exit"
+                exit 1
+            fi
+            echo "force success exit"
+            exit 0
+        fi
+        echo "Kubeadmin secret deleted successfully for mgmt cluster or non-hypershift cluster."
+
+    else
+        echo '$KUBEADMIN_REMOVED not set to "true". Skipping deletion.'
+    fi
+}
+
 # execute the cases
 function run {
     test_scenarios=""
@@ -339,6 +367,7 @@ function run {
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
+    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
@@ -361,25 +390,39 @@ function run {
     fi
     # summarize test results
     echo "Summarizing test results..."
-    failures=0 errors=0 skipped=0 tests=0
-    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-ginkgo:
-  type: openshift-extended-test
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+openshift-extended-test:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
 
-    if [ $((failures)) != 0 ] ; then
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
         for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do

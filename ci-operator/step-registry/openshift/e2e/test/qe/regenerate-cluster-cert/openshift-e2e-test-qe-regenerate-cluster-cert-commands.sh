@@ -8,24 +8,6 @@ function download_oc() {
     which oc
     oc version --client
 }
-function extract_oc() {
-    mkdir -p /tmp/client
-    export OC_DIR="/tmp/client"
-    export PATH=${OC_DIR}:$PATH
-    echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${RELEASE_IMAGE_TARGET}); do
-        echo >&2 "Failed to extract oc binary, retry..."
-        ((retry -= 1))
-        if ((retry < 0)); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    which oc
-    oc version --client
-    return 0
-}
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
 ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
@@ -34,9 +16,12 @@ minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
 if [[ -n "$minor_version" && "$minor_version" -lt 10 ]]; then
     echo "Y version is less than 10, using oc 4.10 directly"
     download_oc
-else
-    extract_oc
 fi
+
+echo "Debugging info:"
+which oc
+oc version --client
+
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     # shellcheck disable=SC1091

@@ -1,0 +1,93 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  run_if_changed: ^.github/workflows/push.yaml$|^server|^operator|^ci|^e2e
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        # TODO(sadlerap): take this out once we unify tooling
+        make -C server kustomize
+
+        # set up environment variables
+        export KUSTOMIZE="$(realpath server/bin/kustomize)"
+        export TAG="pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}"
+        export QUAY_REPO="quay.io/konflux-workspaces"
+        export OPERATOR_IMG="${QUAY_REPO}/workspaces-operator:${TAG}"
+        export SERVER_IMG="${QUAY_REPO}/workspaces-server:${TAG}"
+        export NAMESPACE=workspaces-system
+        export USE_INSECURE_TLS=true
+        export SERVER_LOG_LEVEL=-4
+        export E2E_POLL_TIMEOUT=5m
+        echo "${TAG}"
+
+        # needed because the build system for kubesaw deploys the latest
+        # version whenever we make a change to openshift/release, which
+        # makes testing very difficult
+        unset REPO_NAME
+
+        # wait for kubesaw images to become available
+        while [[ -z "$(skopeo list-tags docker://quay.io/konflux-workspaces/host-operator | grep ${TAG})" ]]; do
+            sleep 5
+        done
+
+        # deploy kubesaw
+        ci/toolchain_manager.sh deploy "${TAG}"
+
+        # wait for workspace images to become available
+        while [[ -z "$(skopeo list-tags docker://quay.io/konflux-workspaces/workspaces-operator | grep ${TAG})" ]]; do
+            sleep 5
+        done
+
+        # deploy workspaces
+        make -C e2e deploy-operator deploy-server
+
+        # run tests
+        if make -C e2e test; then
+            exit 0
+        fi
+
+        # tests failed, dump logs
+        printf "operator logs:\n+++\n"
+        kubectl logs -n "${NAMESPACE}" deployments/workspaces-controller-manager manager
+        printf "+++\nserver logs:\n+++\n"
+        kubectl logs -n "${NAMESPACE}" deployments/workspaces-rest-api-server rest-api
+        printf "+++\nproxy logs:\n+++\n"
+        kubectl logs -n "${NAMESPACE}" deployments/workspaces-rest-api-server proxy
+        echo "+++\n"
+        exit 1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: konflux-workspaces
+  repo: workspaces

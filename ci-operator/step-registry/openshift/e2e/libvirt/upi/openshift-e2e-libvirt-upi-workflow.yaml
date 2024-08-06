@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-libvirt-upi
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+      - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    The UPI workflow provides pre- and post- steps that provision and deprovision an OpenShift
+    cluster on libvirt.

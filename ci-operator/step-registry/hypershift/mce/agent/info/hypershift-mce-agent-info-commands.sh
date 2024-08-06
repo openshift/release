@@ -2,7 +2,9 @@
 
 set -x
 
-source "${SHARED_DIR}/packet-conf.sh"
+if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
+  source "${SHARED_DIR}/packet-conf.sh"
+fi
 
 echo "**MGMT cluster**"
 echo "HyperShift repo commit id"
@@ -30,6 +32,7 @@ echo "Agent State"
 oc get agent -A -o jsonpath='{range .items[*]}BMH: {@.metadata.labels.agent-install\.openshift\.io/bmh} Agent: {@.metadata.name} State: {@.status.debugInfo.state}{"\n"}{end}'
 
 echo "**Guest cluster**"
+export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "HostedCluster ClusterOperators"
 oc get clusteroperators
 

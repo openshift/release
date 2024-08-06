@@ -16,6 +16,8 @@ LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
+export BIN_FOLDER="${LOGS_FOLDER}/bin"
+
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
@@ -31,6 +33,9 @@ export OCSCI_DATA_DIR="${ARTIFACT_DIR}"
 mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
 mkdir -p "${CLUSTER_PATH}/data"
+mkdir -p "${BIN_FOLDER}"
+
+export PATH="${BIN_FOLDER}:${PATH}"
 
 cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
 cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
@@ -39,17 +44,20 @@ cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
 cat > "${LOGS_CONFIG}" << __EOF__
 ---
 RUN:
+  bin_dir: "${BIN_FOLDER}"
   log_dir: "${LOGS_FOLDER}"
 REPORTING:
   default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
   default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
+DEPLOYMENT:
+  skip_download_client: True
 __EOF__
 
 
 set -x
 START_TIME=$(date "+%s")
 
-run-ci --color=yes tests/ -m 'acceptance and not ui' -k '' \
+run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
   --ocs-version "${OCS_VERSION}" \
@@ -78,4 +86,3 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
-

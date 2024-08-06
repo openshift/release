@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -23,6 +28,9 @@ declare dns_server
 declare vsphere_url
 source "${SHARED_DIR}/vsphere_context.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 openshift_install_path="/var/lib/openshift-install"
 
 start_master_num=4
@@ -31,7 +39,7 @@ end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
 start_worker_num=$((end_master_num + 1))
 end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
@@ -148,6 +156,9 @@ source "${SHARED_DIR}/vsphere_context.sh"
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 

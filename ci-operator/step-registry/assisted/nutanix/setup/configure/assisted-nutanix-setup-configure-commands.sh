@@ -45,6 +45,9 @@ echo "$(date -u --rfc-3339=seconds) - Subnet Name: ${subnet_name}"
 
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
+echo "Nutanix API_VIP = ${API_VIP}"
+echo "Nutanix INGRESS_VIP = ${INGRESS_VIP}"
+
 # Create variables file
 cat >> "${SHARED_DIR}"/platform-conf.sh << EOF
 export PLATFORM=nutanix

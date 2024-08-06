@@ -1,0 +1,23 @@
+workflow:
+  as: agent-e2e-appliance-dualstack
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    dependencies:
+      APPLIANCE_IMAGE: agent-preinstall-image-builder
+    env:
+      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4V6_DHCP
+        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
+        NETWORK_TYPE=OVNKubernetes
+        INSTALLER_PROXY=true
+      DEVSCRIPTS_TARGET: agent
+    pre:
+      - chain: agent-appliance-pre
+    test:
+      - chain: agent-test
+    post:
+      - chain: agent-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on an SNO cluster provisioned by running agent installer appliance.

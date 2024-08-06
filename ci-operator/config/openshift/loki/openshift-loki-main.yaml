@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: base-rhel9
   loki-tag:
-    name: v2.9.8
+    name: v3.1.0
     namespace: logging
     tag: loki
   lokistack-gateway:
@@ -31,6 +31,7 @@ images:
     ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  multi_arch: true
   to: loki
 - dockerfile_path: Dockerfile.promtail.ocp
   from: base
@@ -42,6 +43,7 @@ images:
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
+  multi_arch: true
   to: loki-operator
 operator:
   bundles:
@@ -51,7 +53,7 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v2.9.8
+  - pullspec: quay.io/openshift-logging/loki:v3.1.0
     with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
@@ -129,7 +131,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.15"

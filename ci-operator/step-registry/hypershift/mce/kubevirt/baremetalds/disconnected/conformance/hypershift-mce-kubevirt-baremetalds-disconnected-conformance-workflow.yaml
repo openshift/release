@@ -23,6 +23,7 @@ workflow:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - ref: hypershift-kubevirt-baremetalds-disconnected-highlightmissingimages
     - ref: hypershift-mce-dump
     - chain: gather-core-dump
     - chain: hypershift-mce-kubevirt-destroy
@@ -30,8 +31,11 @@ workflow:
     test:
     - chain: hypershift-conformance
     pre:
+    - ref: hypershift-kubevirt-baremetalds-conf-devscripts
     - chain: baremetalds-ipi-pre
-    - ref: hypershift-mce-install-disconnected
+    - ref: enable-qe-catalogsource-baremetalds-proxy-server
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: hypershift-mce-install
     - chain: hypershift-kubevirt-baremetalds-lvm
     - chain: hypershift-kubevirt-baremetalds-metallb
     - chain: hypershift-kubevirt-baremetalds-odf
@@ -49,6 +53,7 @@ workflow:
         Image policy should perform lookup when the Deployment gets the resolve-names annotation later\|
         Image policy should perform lookup when the object has the resolve-names annotation\|
         PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted.
+      MCE_QE_CATALOG: "true"
       METALLB_OPERATOR_SUB_SOURCE: mirror-catalog-for-olm
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: mirror-catalog-for-olm
       ODF_OPERATOR_SUB_SOURCE: cs-ccs-local-catalog
@@ -60,10 +65,10 @@ workflow:
       ETCD_STORAGE_CLASS: lvms-vg1
       DISCONNECTED: "true"
       ENABLE_ICSP: "true"
+      PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         MIRROR_IMAGES=true
-        INSTALLER_PROXY=true
         MIRROR_OLM="local-storage-operator,metallb-operator,lvms-operator"
         NETWORK_TYPE=OVNKubernetes
         NUM_WORKERS=0

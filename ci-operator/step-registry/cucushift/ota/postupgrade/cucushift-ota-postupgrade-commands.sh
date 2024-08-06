@@ -3,22 +3,10 @@
 set -o nounset
 set -o pipefail
 
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 
-    tmp_oc="/tmp/client"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc /tmp -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function get_tp_operator(){
@@ -31,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -74,6 +62,18 @@ function check_tp_operator_notfound(){
     fi
 }
 
+function verify_output(){
+    local out message="${1}" cmd="${2}" expected="${3}"
+    if ! out=$(eval "${cmd}" 2>&1); then
+        echo >&2 "Failed to execute \"${cmd}\" while verifying ${message}, received \"${out}\", exiting" && return 1
+    fi
+    if ! [[ "${out}" == *"${expected}"* ]]; then
+        echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
+    fi
+    echo "passed verifying ${message}"
+    return 0
+}
+
 # Define the checkpoints/steps needed for the specific case
 function post-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -90,7 +90,7 @@ function post-OCP-66839(){
     fi
     # New gained cap annotation should be in extracted creds 
     newCap=$(grep -rh "capability.openshift.io/name:" "${credsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${newCap}" != "${expectedCapCR}" ]]; then
         echo "CRs with cap annotation: ${newCap}, but expected: ${expectedCapCR}"
         return 1
@@ -260,6 +260,22 @@ function post-OCP-56083(){
     return 1
 }
 
+function post-OCP-60396(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
+}
+
+function post-OCP-60397(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
@@ -300,8 +316,9 @@ if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
 fi
 
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
-export PATH=/tmp:${PATH}
-extract_oc
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig

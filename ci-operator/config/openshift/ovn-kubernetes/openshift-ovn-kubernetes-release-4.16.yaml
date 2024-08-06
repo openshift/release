@@ -19,11 +19,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
@@ -50,8 +54,7 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -89,6 +92,15 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-ipi-ovn-ipv4
   cluster: build05
   optional: true
@@ -125,7 +137,7 @@ tests:
 - as: e2e-vsphere-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-azure-ovn
   optional: true
@@ -164,7 +176,7 @@ tests:
   as: e2e-vsphere-windows
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
@@ -178,11 +190,28 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 26 3 9,26 * *
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 3 1 14,24 * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 21 23 12,18 * *
   steps:
     cluster_profile: aws
     env:
@@ -340,7 +369,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
@@ -357,7 +385,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast

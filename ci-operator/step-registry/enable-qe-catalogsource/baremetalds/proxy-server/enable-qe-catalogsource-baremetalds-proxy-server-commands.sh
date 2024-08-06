@@ -57,7 +57,10 @@ podman run -d --name poc-registry-6002 --net host --log-opt max-size=10mb \
   -e REGISTRY_PROXY_PASSWORD="$(cat /home/registry_brew.json | jq -r '.password')" quay.io/openshifttest/registry:2
 
 echo "update firewall"
-sudo firewall-cmd --permanent --zone=libvirt --add-port=6001/tcp
-sudo firewall-cmd --permanent --zone=libvirt --add-port=6002/tcp
-sudo firewall-cmd --reload
+sudo firewall-cmd --zone=libvirt --add-port=6001/tcp
+sudo firewall-cmd --zone=libvirt --add-port=6002/tcp
 EOF
+
+if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
+  oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+fi

@@ -43,6 +43,22 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.16_etcd:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: etcd
+  ocp_4.16_hyperkube:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: hyperkube
+  ocp_4.16_installer-etcd-artifacts:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: installer-etcd-artifacts
+  ocp_4.16_installer-kube-apiserver-artifacts:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: installer-kube-apiserver-artifacts
   ocp_4.16_installer-terraform-providers:
     name: 4.16-priv
     namespace: ocp-private
@@ -61,6 +77,12 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    ocp_4.16_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -73,6 +95,12 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    ocp_4.16_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -85,6 +113,12 @@ images:
     ocp_4.16_cli:
       as:
       - registry.ci.openshift.org/ocp/4.16:cli
+    ocp_4.16_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:etcd
+    ocp_4.16_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:hyperkube
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -92,7 +126,26 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli
+    ocp_4.16_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    ocp_4.16_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
@@ -102,6 +155,12 @@ images:
     ocp_4.16_cli:
       as:
       - registry.ci.openshift.org/ocp/4.16:cli
+    ocp_4.16_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    ocp_4.16_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -114,6 +173,12 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:etcd
+    ocp_4.16_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:hyperkube
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -121,18 +186,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: baremetal-installer
-- dockerfile_path: images/installer/Dockerfile.ci
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: ovirt-installer
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
@@ -149,8 +202,7 @@ images:
   to: src-oc
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: 4.16-priv
     namespace: ocp-private
@@ -187,17 +239,13 @@ resources:
       memory: 5Gi
   installer-artifacts:
     requests:
-      cpu: "3"
+      cpu: "12"
       memory: 5Gi
   libvirt-installer:
     requests:
       cpu: "3"
       memory: 5Gi
   openstack-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  ovirt-installer:
     requests:
       cpu: "3"
       memory: 5Gi
@@ -280,12 +328,23 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
-- as: e2e-aws-ovn-shared-vpc
+- as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-sharednetwork
+    post:
+    - chain: ipi-aws-post
+    - ref: ipi-deprovision-aws-custom-security-groups
+    - ref: aws-deprovision-security-group
+    - ref: ipi-deprovision-aws-sharednetwork
+    pre:
+    - chain: ipi-conf-aws-sharednetwork
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-security-groups
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-edge-zones
@@ -332,12 +391,12 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
   timeout: 6h0m0s
-- as: e2e-gcp-ovn-shared-vpc
+- as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-sharednetwork
+    workflow: openshift-e2e-gcp-byo-vpc
   timeout: 6h0m0s
 - as: e2e-azure-ovn
   run_if_changed: azure
@@ -566,40 +625,40 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-upi
+- as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
-- as: e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-zones-techpreview
+- as: e2e-vsphere-ovn-zones-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-zones
@@ -624,13 +683,6 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-  timeout: 6h0m0s
-- as: e2e-aws-custom-security-groups
-  optional: true
-  run_if_changed: aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-custom-security-groups
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
   optional: true
@@ -715,36 +767,14 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-appliance
-  cluster: build05
-  optional: true
-  run_if_changed: ^(cmd|pkg|data).*/agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_USE_APPLIANCE_MODEL=true
-        NETWORK_TYPE=OVNKubernetes
-    workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-appliance-diskimage
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      APPLIANCE_IMAGE: agent-preinstall-image-builder
-    env:
-      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
-        NETWORK_TYPE=OVNKubernetes
-        INSTALLER_PROXY=true
-    workflow: agent-e2e-compact-ipv4
+    cluster_profile: packet-assisted
+    workflow: agent-e2e-appliance-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
@@ -817,6 +847,15 @@ tests:
     - ref: ovn-conf
     - chain: ipi-install
     - ref: ipi-azure-rbac
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-external-aws-ccm
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16

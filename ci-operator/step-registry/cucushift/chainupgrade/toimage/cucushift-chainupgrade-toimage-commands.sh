@@ -30,7 +30,7 @@ function debug() {
         echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "\n# Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
@@ -254,6 +254,35 @@ EOF
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
+# Do sdn migration to ovn since sdn is not supported from 4.17 version
+function sdn2ovn(){
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}' 
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}' 
+    oc patch Network.config.openshift.io cluster --type='merge' --patch '{"metadata":{"annotations":{"network.openshift.io/network-type-migration":""}},"spec":{"networkType":"OVNKubernetes"}}'
+    timeout 300s bash <<EOT
+    until 
+       oc get network -o yaml | grep NetworkTypeMigrationInProgress > /dev/null
+    do
+       echo "Migration is not started yet"
+       sleep 10
+    done
+EOT
+    echo "Start Live Migration process now"
+    # Wait for the live migration to fully complete
+    timeout 3600s bash <<EOT
+    until 
+       oc get network -o yaml | grep NetworkTypeMigrationCompleted > /dev/null && \
+       for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-transit-switch-port-ifaddr:" | grep "100.85";  done > /dev/null && \
+       for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-gateway-router-lrp-ifaddr:" | grep "100.65";  done > /dev/null && \
+       oc get network.config/cluster -o jsonpath='{.status.networkType}' | grep OVNKubernetes > /dev/null;
+    do
+       echo "Live migration is still in progress"
+       sleep 300
+    done
+EOT
+    echo "The Migration is completed"
+}
+
 # Upgrade RHEL node
 function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
@@ -262,6 +291,11 @@ function rhel_upgrade(){
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
+
+    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+        echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+        check_upgrade_status
+    fi
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -276,15 +310,18 @@ function rhel_upgrade(){
         echo "RHEL worker has incorrect K8s version" && exit 1
     fi
     echo -e "oc get node -owide\n$(oc get node -owide)"
-    echo "RHEL worker upgrade complete"
 }
 
 # Extract oc binary which is supposed to be identical with target release
+# Default oc on OCP 4.16 not support OpenSSL 1.x
 function extract_oc(){
     echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
+    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    if (( TARGET_MINOR_VERSION > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
+        binary='oc.rhel8'
+    fi
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -430,7 +467,7 @@ function check_mcp() {
     local updating_mcp unhealthy_mcp tmp_output
 
     tmp_output=$(mktemp)
-    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
     # using the size of output to determinate if oc command is executed successfully
     if [[ -s "${tmp_output}" ]]; then
         updating_mcp=$(cat "${tmp_output}" | grep -v "False")
@@ -440,12 +477,12 @@ function check_mcp() {
             return 1
         fi
     else
-        echo "Did not run "oc get mcp" successfully!"
+        echo "Did not run 'oc get machineconfigpools' successfully!"
         return 1
     fi
 
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
-    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
     # using the size of output to determinate if oc command is executed successfully
     if [[ -s "${tmp_output}" ]]; then
         unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
@@ -453,9 +490,9 @@ function check_mcp() {
             echo "Detected unhealthy mcp:"
             echo "${unhealthy_mcp}"
             echo "Real-time detected unhealthy mcp:"
-            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
             echo "Real-time full mcp output:"
-            oc get mcp
+            oc get machineconfigpools
             echo ""
             unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
             echo "Using oc describe to check status of unhealthy mcp ..."
@@ -466,7 +503,7 @@ function check_mcp() {
             return 2
         fi
     else
-        echo "Did not run "oc get mcp" successfully!"
+        echo "Did not run 'oc get machineconfigpools' successfully!"
         return 1
     fi
     return 0
@@ -505,7 +542,7 @@ function wait_mcp_continous_success() {
     if (( continous_successful_check != passed_criteria )); then
         echo >&2 "Some mcp does not get ready or not stable"
         echo "Debug: current mcp output is:"
-        oc get mcp
+        oc get machineconfigpools
         return 1
     else
         echo "All mcp status check PASSED"
@@ -567,7 +604,7 @@ function check_signed() {
     response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
@@ -625,16 +662,18 @@ function admin_ack() {
 # Upgrade the cluster to target release
 function upgrade() {
     set_channel $TARGET_VERSION
-    local retry=3 unrecommened_conditional_updates
+    local retry=5 unrecommended_conditional_updates
     while (( retry > 0 )); do
-        unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
-        if [[ -z "${unrecommened_conditional_updates}" ]]; then
+        unrecommended_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        echo "Not recommended conditions: "
+        echo "${unrecommended_conditional_updates}"
+        if [[ -z "${unrecommended_conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
             echo "No conditionalUpdates update available! Retry..."
         else
             #shellcheck disable=SC2076
-            if [[ " $unrecommened_conditional_updates " =~ " $TARGET_VERSION " ]]; then
+            if [[ " $unrecommended_conditional_updates " =~ " $TARGET_VERSION " ]]; then
                 echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
                 oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'
                 exit 1
@@ -647,28 +686,25 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
-# Log abnormal cluster status
-function dump_status_if_unexpected() {
-    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
-        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
-            # if upgrading, and not progressing well, dump status to log
-            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
-            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
-                echo "${out}"
-            fi
-        fi
-}
-
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
     echo "Starting the upgrade checking on $(date "+%F %T")"
+    # print once to log (including full messages)
+    oc adm upgrade || true
+    # log oc adm upgrade (excluding garbage messages)
+    stat_cmd="oc adm upgrade | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    # if available (version 4.16+) log "upgrade status" instead
+    if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    fi
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        wait_upgrade=$(( wait_upgrade - 5 ))
-        if ! ( run_command "oc get clusterversion" ); then
-            continue
+        sleep ${interval}m
+        wait_upgrade=$(( wait_upgrade - interval ))
+        # if output is different from previous (ignoring irrelevant time/percentage difference), write to log
+        if stat="$(eval "${stat_cmd}")" && [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+            echo -e "=== Upgrade Status $(date "+%T") ===\n${stat}\n\n\n\n"
+            oldstat=${stat}
         fi
         if ! out="$(oc get clusterversion --no-headers || false)"; then
             echo "Error occurred when getting clusterversion"
@@ -680,12 +716,11 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
-	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
-	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+        if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
-        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -719,7 +754,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            external|none|powervs)
+            external|kubevirt|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -833,25 +868,42 @@ function filter_tests() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    local failures=0 errors=0 skipped=0 tests=0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-e2e
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+cucushift-chainupgrade-toimage:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
-    if [ $((failures)) != 0 ] ; then
+
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
-        for (( i=0; i<failures; i++ )) ; do
+        for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi
@@ -885,7 +937,7 @@ function run_upgrade_e2e() {
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
 
-    pushd verification-tests
+    pushd /verification-tests
     # run normal tests
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal-${idx}"
     parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
@@ -942,14 +994,16 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 index=0
-for target in "${TARGET_RELEASES[@]}"
-do
-
+for target in "${TARGET_RELEASES[@]}"; do
+    run_command "oc get machineconfigpools"
     run_command "oc get machineconfig"
 
     (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+    export TARGET_VERSION
+    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -958,9 +1012,6 @@ do
     export SOURCE_MINOR_VERSION
     echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
     export FORCE_UPDATE="false"
@@ -981,17 +1032,29 @@ do
     check_upgrade_status
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo -e "oc get node -owide\n$(oc get node -owide)"
-        rhel_repo
-        rhel_upgrade
-	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
-	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-	    check_upgrade_status
+        echo "Found rhel worker..."
+        run_command "oc get node -owide"
+        if [[ $(oc get machineconfigpools worker -ojson | jq -r '.spec.paused') == "true" ]]; then
+            echo "worker mcp are paused, it sounds eus upgrade, skip rhel worker upgrade here, should upgrade them after worker mcp unpaused"
+        else
+            rhel_repo
+            rhel_upgrade
         fi
     fi
     check_history
     health_check
+    currentPlugin=$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')
+    if [[ ${TARGET_MINOR_VERSION} == "16" && ${currentPlugin} == "OpenShiftSDN" ]]; then
+	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
+	sdn2ovn
+	health_check
+    fi
+
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
-        run_upgrade_e2e "${index}"
+	echo "Start e2e test..."
+	test_log_dir="${ARTIFACT_DIR}/test-logs"
+        mkdir -p ${test_log_dir}
+        run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt"
+	echo "End e2e test..."
     fi
 done

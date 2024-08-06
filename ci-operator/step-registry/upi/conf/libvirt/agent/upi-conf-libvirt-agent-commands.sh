@@ -38,6 +38,7 @@ BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
+echo "Creating the agent-config.yaml file..."
 cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig

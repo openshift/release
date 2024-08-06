@@ -15,7 +15,7 @@ echo "Working on the cluster: $CLUSTER_ID"
 export CLUSTER_ID # maybe we should get cluster_id by TEST_PROFILE
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
 
 # Configure aws
@@ -45,23 +45,31 @@ fi
 
 # Variables
 if [[ -z "$TEST_PROFILE" ]]; then
-  log "ERROR: " "TEST_PROFILE is mandatory."
+  log "ERROR: TEST_PROFILE is mandatory."
   exit 1
 fi
 
 LABEL_FILTER_SWITCH=""
 if [[ ! -z "$TEST_LABEL_FILTERS" ]]; then
-  LABEL_FILTER_SWITCH="--ginkgo.label-filter ${TEST_LABEL_FILTERS}"
+  LABEL_FILTER_SWITCH="--ginkgo.label-filter '${TEST_LABEL_FILTERS}'"
 fi
 
-log "INFO: Start e2e testing ..."
-junit_xml="${TEST_PROFILE}-$(date +%m%d%s).xml"
-rosatest --ginkgo.v --ginkgo.no-color \
+junit_xml="${ARTIFACT_DIR}/rosa-e2e-${TEST_PROFILE}.xml"
+cmd="rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout ${TEST_TIMEOUT} \
-  --ginkgo.junit-report "${ARTIFACT_DIR}/$junit_xml" \
-  ${LABEL_FILTER_SWITCH}
+  --ginkgo.junit-report $junit_xml \
+  ${LABEL_FILTER_SWITCH}"
+log "INFO: Start e2e testing ...\n$cmd"
+eval "${cmd}" || true
 
-# echo "$junit_xml" > "${SHARED_DIR}/junit-report-list"
-
-# log "INFO: Generate report portal report ..."
-# rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filter "e2e-report"
+# Envelope Junit files
+junitTempDir=$(mktemp -d)
+mv $junit_xml $junitTempDir
+if [[ -f "${SHARED_DIR}/junit.tar.gz" ]]; then
+    tar -xvf "${SHARED_DIR}/junit.tar.gz" -C $junitTempDir
+fi
+cd $junitTempDir
+rm -rf ${SHARED_DIR}/junit.tar.gz
+tar -zcvf ${SHARED_DIR}/junit.tar.gz *.xml
+cp ${SHARED_DIR}/junit.tar.gz ${ARTIFACT_DIR}
+log "Testing is finished and uploaded."

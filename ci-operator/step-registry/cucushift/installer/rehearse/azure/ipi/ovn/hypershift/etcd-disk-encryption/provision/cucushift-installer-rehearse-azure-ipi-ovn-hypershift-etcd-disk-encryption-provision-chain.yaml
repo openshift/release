@@ -1,0 +1,31 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-ovn-hypershift-etcd-disk-encryption-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vault-key
+  - ref: azure-provision-disk-encryption-set
+  - chain: cucushift-installer-rehearse-azure-ipi-ovn-provision
+  - ref: hypershift-install
+  - chain: hypershift-azure-create
+  - ref: cucushift-hypershift-extended-etcd-encryption-health-check-azure
+  - ref: cucushift-hypershift-extended-disk-encryption-health-check-azure
+  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+  env:
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: ""
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+    default: "true"
+  - name: HYPERSHIFT_DISK_ENCRYPTION
+    default: "true"
+  - name: HYPERSHIFT_ETCD_ENCRYPTION
+    default: "true"
+  - name: ENABLE_DES_DEFAULT_MACHINE
+    default: "true"
+  - name: ENABLE_ICSP
+    default: "true"
+  - name: CLOUD_PROVIDER
+    default: "Azure"
+  documentation: |-
+    This chain provisions a public hypershift hosted cluster on Azure with ETCD and disk encryption. 

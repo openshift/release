@@ -3,22 +3,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.20-linux:
+  stolostron_builder_go1.21-linux:
     name: builder
     namespace: stolostron
-    tag: go1.20-linux
+    tag: go1.21-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.21-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    stolostron_builder_go1.20-linux:
+    stolostron_builder_go1.21-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
   to: prometheus-alertmanager
 promotion:
   to:
@@ -45,13 +45,37 @@ test_binary_build_commands: "true"
 tests:
 - as: test
   commands: |
+    nodejs_version=v20.12.2
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+    export npm_config_cache="/tmp/.npm"
     export SELF="make -f Makefile"
     make -f Makefile build
-    make -f Makefile common-test
+    make -f Makefile test
   container:
     from: src
 - as: sonar-pre-submit
   commands: |
+    nodejs_version=v20.12.2
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+    export npm_config_cache="/tmp/.npm"
     export SELF="make -f Makefile"
     make -f Makefile build
     export SELF="make -f /opt/build-harness/Makefile.prow"

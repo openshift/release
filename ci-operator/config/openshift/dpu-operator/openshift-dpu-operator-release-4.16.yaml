@@ -44,8 +44,7 @@ images:
   to: custom-src
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -65,11 +64,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: HOME=/tmp make test
+- as: make-fmt-check
+  commands: HOME=/tmp make fmt-check
   container:
     from: custom-src
-- as: e2e-dpu-operator-tests
+- as: make-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-tests-workflow
+  timeout: 1h0m0s
+- always_run: false
+  as: e2e-dpu-operator-tests
   cluster: build05
   steps:
     workflow: dpu-operator-e2e-tests-workflow

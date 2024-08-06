@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -ignore-os-checks -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -ignore-os-checks -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
@@ -179,11 +179,12 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
-  # Dev Note: the following two lines may be causing the redaction routine to remove the log
-  ./openshift-install-powervs output -ignore-os-checks bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-  ./openshift-install-powervs output -ignore-os-checks bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
+  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
+  cd automation/ || true
+  ../terraform output -raw -no-color bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+  ../terraform output -raw -no-color bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  cd .. || true
 
   BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
   echo "BASTION_PUBLIC_IP:- $BASTION_PUBLIC_IP"
@@ -196,7 +197,6 @@ function create_upi_powervs_cluster() {
   echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
   echo "Done copying the kubeconfig"
-  exit 0
 }
 
 function ic() {
@@ -357,37 +357,39 @@ function create_powervs_workspace() {
   RESOURCE_GROUP_ID=$(ic resource group "${RESOURCE_GROUP}" --id)
   export RESOURCE_GROUP_ID
   echo "${RESOURCE_GROUP_ID}" > "${SHARED_DIR}"/RESOURCE_GROUP_ID
+  SERVICE_NAME=power-iaas
+  SERVICE_PLAN_NAME=power-virtual-server-group
 
   ##Create a Workspace on a Power Edge Router enabled PowerVS zone
   # Dev Note: uses a custom loop since we want to redirect errors
-  for retry in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $retry/$NO_OF_RETRY"
-    ret_code=0
-    ic pi workspace create "${workspace_name}" --datacenter "${POWERVS_ZONE}" --group "${RESOURCE_GROUP_ID}" --plan public 2>&1 || ret_code=$?
-    if [ $ret_code = 0 ]; then
+  for i in {1..5}
+  do
+    echo "Attempt: $i/5"
+    echo "Creating powervs workspace"
+    ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_ZONE}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+    cat /tmp/instance.id
+    if [ $? = 0 ]; then
       break
-    elif [ "$retry" == "$NO_OF_RETRY" ]; then
-      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
+    elif [ "$i" == "5" ]; then
+      echo "All retry attempts failed! Please try running the script again after some time"
     else
       sleep 30
     fi
+    [ -f /tmp/instance.id ] && cat /tmp/instance.id && break
   done
 
-  echo "Waiting for the workspace to come active"
-  sleep 120
-  ic pi workspace list 2>&1 | grep "${workspace_name}" | tee /tmp/instance.id
-
   ##Get the CRN
-  CRN=$(cat /tmp/instance.id | grep crn | awk '{print $1}')
+  CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
   export CRN
   echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
 
   ##Get the ID
-  POWERVS_SERVICE_INSTANCE_ID=$(cat /tmp/instance.id | grep crn | awk '{print $2}')
+  POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
   export POWERVS_SERVICE_INSTANCE_ID
   echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
 
   ##Target the workspace
+  echo "Retry workspace target crn: ${CRN}"
   retry "ic pi workspace target ${CRN}"
 
   ##Check the status it should be active
@@ -395,22 +397,22 @@ function create_powervs_workspace() {
   WS_STATE=""
   while [ -z "${WS_STATE}" ]
   do
-  WS_COUNTER=$((WS_COUNTER+1)) 
-  TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
-  echo "pvs workspace state: ${TEMP_STATE}"
-  echo ""
-  if [ "${TEMP_STATE}" == "active" ]
-  then
-    WS_STATE="active"
-  elif [[ $WS_COUNTER -ge 20 ]]
-  then
-    WS_STATE="pending"
-    echo "Workspace has not come up in active state... login and verify"
-    exit 2
-  else
-    echo "Waiting for Workspace to become active... [30 seconds]"
-    sleep 30
-  fi
+    WS_COUNTER=$((WS_COUNTER+1))
+    TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
+    echo "pvs workspace state: ${TEMP_STATE}"
+    echo ""
+    if [ "${TEMP_STATE}" == "active" ]
+    then
+      WS_STATE="active"
+    elif [[ $WS_COUNTER -ge 20 ]]
+    then
+      WS_STATE="pending"
+      echo "Workspace has not come up in active state... login and verify"
+      exit 2
+    else
+      echo "Waiting for Workspace to become active... [30 seconds]"
+      sleep 30
+    fi
   done
 }
 
@@ -428,7 +430,7 @@ function create_powervs_private_network() {
 function import_centos_image() {
   local CRN="${1}"
 
-  # The CentOS-Stream-8 image is stock-image on PowerVS.
+  # The CentOS-Stream-9 image is stock-image on PowerVS.
   # This image is available across all PowerVS workspaces.
   # The VMs created using this image are used in support of ignition on PowerVS.
   echo "Creating the Centos Stream Image"
@@ -437,7 +439,7 @@ function import_centos_image() {
   retry "ic pi image list"
 
   ##Import the Centos8 image
-  retry "ic pi image create CentOS-Stream-8 --json"
+  retry "ic pi image create CentOS-Stream-9 --json"
   echo "Import image status is: $?"
 }
 
@@ -599,7 +601,7 @@ case "$CLUSTER_TYPE" in
 
   # Generates a workspace name like rdr-mac-upi-4-14-au-syd-n1
   # this keeps the workspace unique
-  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/')
+  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/' | tr '.' '-')
   WORKSPACE_NAME=rdr-mac-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
   VPC_NAME="${WORKSPACE_NAME}"-vpc
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
@@ -625,7 +627,7 @@ case "$CLUSTER_TYPE" in
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
-  exit 0
+  echo "Created UPI powervs cluster"
 ;;
 *)
   echo "Creating UPI based PowerVS cluster using ${CLUSTER_TYPE} is not implemented yet..."

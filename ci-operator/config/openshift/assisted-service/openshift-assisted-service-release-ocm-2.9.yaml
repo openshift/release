@@ -16,7 +16,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   cli:
-    name: "4.11"
+    name: "4.14"
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
@@ -96,13 +96,15 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - dockerfile_literal: |
+    FROM quay.io/multi-arch/yq:4.30.5 as yq4
     FROM coreos/centos
+    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
     COPY . .
   from: src
   to: assisted-service-scripts
 - dockerfile_literal: |
     FROM coreos/centos
-    RUN yum install -y skopeo
+    RUN yum install -y --skip-broken skopeo pip
   from: src
   to: assisted-service-publish-index
 operator:
@@ -264,7 +266,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
-  cron: 00 00 */1 * 0,3
+  cron: 00 06 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -335,7 +337,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
-  cron: 00 00 */1 * 0,3
+  cron: 00 07 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -374,7 +376,7 @@ tests:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 00 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -383,6 +385,7 @@ tests:
     env:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
@@ -396,8 +399,9 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 01 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -408,6 +412,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
@@ -421,7 +426,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 02 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -431,6 +436,7 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-compact-day2-workers
   optional: true
   steps:
@@ -472,7 +478,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 03 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -484,8 +490,9 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-node-labels-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 04 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -502,6 +509,7 @@ tests:
         TEST_TO_RUN='node-labels'
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-node-labels
   optional: true
   steps:
@@ -535,7 +543,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 05 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -548,6 +556,7 @@ tests:
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
   optional: true
   steps:
@@ -588,7 +597,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 06 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -597,6 +606,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-3masters
   optional: true
@@ -634,7 +644,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-hypershift
 - as: e2e-ai-operator-ztp-remove-node-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 07 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -649,6 +659,7 @@ tests:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-ocm-2.9
   org: openshift

@@ -26,8 +26,7 @@ images:
   to: machine-api-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -134,7 +133,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-metal-ipi-sdn
+- as: e2e-metal-ipi
   cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
@@ -143,7 +142,6 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-upgrade
   cluster: build05
@@ -152,13 +150,8 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
       RUN_UPGRADE_TEST: "true"
-      TEST_SUITE: ""
-      TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade-sdn
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
@@ -192,7 +185,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-nutanix
   cluster: build01
@@ -205,13 +198,13 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       cli: latest
@@ -226,12 +219,12 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
 - as: e2e-vsphere-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-openstack

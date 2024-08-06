@@ -8,8 +8,8 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT OFFLINE_TOKEN TOOLCHAIN_API_URL KEYLOAK_URL REL_IMAGE_CONTROLLER_QUAY_ORG REL_IMAGE_CONTROLLER_QUAY_TOKEN BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL SPI_GITHUB_CLIENT_ID SPI_GITHUB_CLIENT_SECRET \
-    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN MULTI_PLATFORM_AWS_ACCESS_KEY MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY MULTI_PLATFORM_AWS_SSH_KEY MULTI_PLATFORM_IBM_API_KEY
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT OFFLINE_TOKEN TOOLCHAIN_API_URL KEYLOAK_URL EXODUS_PROD_KEY EXODUS_PROD_CERT CGW_USERNAME CGW_TOKEN REL_IMAGE_CONTROLLER_QUAY_ORG REL_IMAGE_CONTROLLER_QUAY_TOKEN BYOC_KUBECONFIG GITHUB_TOKENS_LIST \
+    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN MULTI_PLATFORM_AWS_ACCESS_KEY MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY MULTI_PLATFORM_AWS_SSH_KEY MULTI_PLATFORM_IBM_API_KEY PAC_GITLAB_TOKEN PAC_GITLAB_URL PAC_PROJECT_ID
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/default-quay-org-token)
@@ -24,14 +24,15 @@ PYXIS_STAGE_CERT=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyx
 OFFLINE_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/stage_offline_token)
 TOOLCHAIN_API_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/stage_toolchain_api_url)
 KEYLOAK_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/stage_keyloak_url)
+EXODUS_PROD_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/exodus_prod_key)
+EXODUS_PROD_CERT=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/exodus_prod_cert)
+CGW_USERNAME=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cgw_username)
+CGW_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cgw_token)
 REL_IMAGE_CONTROLLER_QUAY_ORG=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release_image_controller_quay_org)
 REL_IMAGE_CONTROLLER_QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release_image_controller_quay_token)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
-OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/oauth-redirect-proxy-url)
-SPI_GITHUB_CLIENT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/spi-github-client-id)
-SPI_GITHUB_CLIENT_SECRET=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/spi-github-client-secret)
 QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-host)
 QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-token)
 E2E_PAC_GITHUB_APP_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-github-app-id)
@@ -42,6 +43,10 @@ MULTI_PLATFORM_AWS_ACCESS_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-app
 MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/multi-platform-aws-secret-access-key)
 MULTI_PLATFORM_AWS_SSH_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/multi-platform-aws-ssh-key)
 MULTI_PLATFORM_IBM_API_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/multi-platform-ibm-api-key)
+PAC_GITLAB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-token)
+PAC_GITLAB_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-url)
+PAC_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-project-id)
+
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
@@ -106,7 +111,7 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
 make ci/prepare/e2e-branch
 
 make ci/test/e2e

@@ -1,0 +1,27 @@
+chain:
+  as: openshift-e2e-azure-csi-smb-extended
+  steps:
+  - as: smb-e2e-extended
+    cli: latest
+    commands: |
+        export PATH=$PATH:$HOME
+        ln -s /cli/oc ${HOME}/kubectl
+        go test -v -timeout=0 ./test/e2e -ginkgo.v -ginkgo.timeout=1h --ginkgo.junit-report=${ARTIFACT_DIR}/junit/smb-e2e-extended-report.xml
+    env:
+      - default: openshift-cluster-csi-drivers
+        name: CSI_DRIVER_INSTALLED_NAMESPACE
+      - default: //samba-server.samba-server.svc.cluster.local/share
+        name: TEST_SMB_SOURCE
+      - default: smbcreds
+        name: TEST_SMB_SECRET_NAME
+      - default: samba-server
+        name: TEST_SMB_SECRET_NAMESPACE
+    from: csi-driver-smb-test
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 2h0m0s
+  documentation: |-
+    The Openshift E2E Samba extended chain executes the smb csi driver end-to-end tests.
+

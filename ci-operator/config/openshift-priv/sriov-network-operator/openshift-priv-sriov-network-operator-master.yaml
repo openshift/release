@@ -1,34 +1,38 @@
 base_images:
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   openstack-installer:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: openstack-installer
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
+  rdma-cni:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: rdma-cni
   sriov-cni:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: sriov-cni
   sriov-dp-admission-controller:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: sriov-dp-admission-controller
   sriov-infiniband-cni:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: sriov-infiniband-cni
   sriov-network-device-plugin:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: sriov-network-device-plugin
 build_root:
@@ -37,30 +41,30 @@ canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.rhel7
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: sriov-network-webhook
 operator:
   bundles:
@@ -83,19 +87,24 @@ operator:
     with: pipeline:sriov-network-webhook
   - pullspec: quay.io/openshift/origin-sriov-network-operator:.*
     with: pipeline:sriov-network-operator
+  - pullspec: quay.io/openshift/origin-rdma-cni:.*
+    with: pipeline:rdma-cni
 promotion:
   to:
-  - name: 4.16-priv
+  - disabled: true
+    name: sriov-4.17
+    namespace: origin
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':

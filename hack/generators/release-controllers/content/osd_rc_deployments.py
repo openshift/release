@@ -1,4 +1,4 @@
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes, get_oc_volume_mounts
 
 
 def _add_osd_rc_bootstrap(gendoc):
@@ -191,7 +191,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',
                      '-tls-key=/etc/tls/private/tls.key'],
-            'image': 'quay.io/openshift/origin-oauth-proxy:4.9',
+            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
             'imagePullPolicy': 'IfNotPresent',
             'name': 'oauth-proxy',
             'ports': [{
@@ -210,6 +210,59 @@ def _get_osd_rc_deployment_sidecars(context):
         })
     return sidecars
 
+def get_oc_env_vars():
+    return [
+        {
+            "name": "HOME",
+            "value": "/tmp/home"
+        },
+        {
+            "name": "XDG_RUNTIME_DIR",
+            "value": "/tmp/home/run"
+        }
+    ]
+
+def get_oc_prepare_container():
+    return [
+        {
+            "name": "oc-prepare",
+            "command": ["/bin/bash", "-c",
+            """#!/bin/bash
+set -euo pipefail
+trap 'kill $(jobs -p); exit 0' TERM
+
+SECONDS=0
+
+# ensure we are logged in to our registry
+mkdir -p ${XDG_RUNTIME_DIR}/containers
+cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true
+
+# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods
+git config --global credential.helper store
+git config --global user.name test
+git config --global user.email test@test.com
+oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json
+
+FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
+TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+
+if [[ -n "$FROM" && -n "$TO" ]]
+then
+    echo "Pre-populating the git cache..."
+    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64
+else
+    echo "Unable to Pre-populate the git cache!"
+fi
+
+DURATION=$SECONDS
+echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
+            """],
+            "image": "release-controller:latest",
+            "volumeMounts": get_oc_volume_mounts(),
+            "env": get_oc_env_vars(),
+        }
+    ]
+
 
 def _add_osd_rc_deployment(gendoc):
     context = gendoc.context
@@ -222,7 +275,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build02,build03,build04,build05')
+        extra_rc_args.append('--cluster-group=build01,build03,build05,build09')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -255,7 +308,7 @@ def _add_osd_rc_deployment(gendoc):
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
-                                "--branch=master",
+                                "--ref=master",
                                 "--root=/tmp/git-sync",
                                 "--one-time=true",
                                 "--depth=1"
@@ -266,25 +319,24 @@ def _add_osd_rc_deployment(gendoc):
                                     "value": "release"
                                 }
                             ],
-                            "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
                             "volumeMounts": [
                                 {
                                     "name": "release",
                                     "mountPath": "/tmp/git-sync"
                                 }
                             ]
-                        }
-                    ],
+                        }] + get_oc_prepare_container(),
                     "containers": [
                         {
                             "name": "git-sync",
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
-                                "--branch=master",
-                                "--wait=30",
+                                "--ref=master",
+                                "--period=30s",
                                 "--root=/tmp/git-sync",
-                                "--max-sync-failures=3"
+                                "--max-failures=3"
                             ],
                             "env": [
                                 {
@@ -292,7 +344,7 @@ def _add_osd_rc_deployment(gendoc):
                                     "value": "release"
                                 }
                             ],
-                            "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
                             "volumeMounts": [
                                 {
                                     "name": "release",
@@ -340,6 +392,7 @@ def _add_osd_rc_deployment(gendoc):
                             'image': 'release-controller:latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
+                            'env': get_oc_env_vars(),
                             'livenessProbe': {
                                 'httpGet': {
                                     'path': '/healthz',
@@ -389,6 +442,7 @@ def _add_osd_rc_deployment(gendoc):
                     }
                 },
                 'spec': {
+                    'initContainers': get_oc_prepare_container(),
                     'containers': [
                         *_get_osd_rc_deployment_sidecars(context),
                         {
@@ -415,6 +469,7 @@ def _add_osd_rc_deployment(gendoc):
                             'image': 'release-controller-api:latest',
                             'name': 'controller',
                             'volumeMounts': get_rcapi_volume_mounts(),
+                            'env': get_oc_env_vars(),
                             'livenessProbe': {
                                 'httpGet': {
                                     'path': '/healthz',

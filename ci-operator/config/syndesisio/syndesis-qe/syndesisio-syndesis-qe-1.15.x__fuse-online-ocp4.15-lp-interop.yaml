@@ -29,10 +29,12 @@ images:
   to: htpasswd-cli
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.15"
+      version_bounds:
+        lower: 4.15.0-0
+        stream: 4-stable
+        upper: 4.16.0-0
 resources:
   '*':
     requests:
@@ -49,15 +51,12 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "syndesisio-setup-syndesis-qe", "failure_type": "all", "classification": "Other", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "syndesisio-deploy-syndesis-qe", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "syndesisio-deploy-syndesis-qe", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTESB", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["Fuse Online", "QE"], "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","fuse-online-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       USER_TAGS: |
@@ -66,6 +65,28 @@ tests:
     - ref: syndesisio-setup-syndesis-qe
     - ref: syndesisio-deploy-syndesis-qe
     workflow: firewatch-ipi-aws
+- as: fuse-online-interop-ibmcloud
+  cron: 0 6 13 5 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "syndesisio-setup-syndesis-qe", "failure_type": "all", "classification": "Other", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "syndesisio-deploy-syndesis-qe", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "syndesisio-deploy-syndesis-qe", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTESB", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["Fuse Online", "QE"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","fuse-online-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+    test:
+    - ref: syndesisio-setup-syndesis-qe
+    - ref: syndesisio-deploy-syndesis-qe
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: 1.15.x
   org: syndesisio

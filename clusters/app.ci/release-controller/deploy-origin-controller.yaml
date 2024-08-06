@@ -78,16 +78,16 @@ spec:
       containers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
-        - --wait=30
+        - --ref=master
+        - --period=30s
         - --root=/tmp/git-sync
-        - --max-sync-failures=3
+        - --max-failures=3
         command:
         - /git-sync
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         name: git-sync
         resources:
           requests:
@@ -141,10 +141,19 @@ spec:
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       initContainers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
+        - --ref=master
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
@@ -153,7 +162,7 @@ spec:
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         name: git-sync-init
         volumeMounts:
         - mountPath: /tmp/git-sync
@@ -182,6 +191,21 @@ spec:
         secret:
           defaultMode: 420
           secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret
 ---
 #---------------------------------------------------------------------------------
 # origin_resources.py added the following resource
@@ -232,19 +256,43 @@ spec:
           periodSeconds: 3
           timeoutSeconds: 600
         volumeMounts:
-        - mountPath: /etc/kubeconfigs
-          name: release-controller-kubeconfigs
-          readOnly: true
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/kubeconfigs
+          name: release-controller-kubeconfigs
+          readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       serviceAccountName: release-controller
       volumes:
-      - name: release-controller-kubeconfigs
-        secret:
-          defaultMode: 420
-          secretName: release-controller-kubeconfigs
       - name: jira
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret
