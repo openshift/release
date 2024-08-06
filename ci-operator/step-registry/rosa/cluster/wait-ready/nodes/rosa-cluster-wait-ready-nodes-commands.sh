@@ -268,4 +268,5 @@ else
     exit 1
 fi
 cat "${SHARED_DIR}/cluster-config"
-sleep 14400
+sleep 3600
+cucushift-hypershift-extended-debug
