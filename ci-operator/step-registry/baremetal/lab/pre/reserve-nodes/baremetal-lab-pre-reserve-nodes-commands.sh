@@ -24,7 +24,7 @@ gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
 
-echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers, ${VENDOR} vendor ) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" \
   "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
