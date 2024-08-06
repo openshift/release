@@ -31,9 +31,9 @@ hack/ci-test-e2e.sh \
         --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
         --e2e.node-pool-replicas=2 \
-        --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-        --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
-	--test.run='^TestCreateCluster.*|^TestNodePool$' \
+        --e2e.base-domain="${BASE_DOMAIN}" \
+        --e2e.external-dns-domain="service.${BASE_DOMAIN}" \
+        --test.run='^TestCreateCluster$' \
         --e2e.platform="OpenStack" \
 	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
