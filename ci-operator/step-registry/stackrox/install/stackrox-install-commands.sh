@@ -63,8 +63,9 @@ function check_cli_tools {
 
 debug "(Logging oc commands for user to reproduce and confirm state)"
 function oc() {
-  # shellcheck disable=SC2145,SC2068
+  # shellcheck disable=SC2145
   info "+ oc $@" >&2
+  # shellcheck disable=SC2068
   command oc $@
 }
 check_cli_tools
