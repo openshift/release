@@ -41,19 +41,35 @@ function exit_handler() {
 trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
-
-function get_jq() {
-  local url
-  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-  echo "Downloading jq binary from ${url}"
-  curl -Ls -o ./jq "${url}"
-  chmod u+x ./jq
-  export PATH=${PATH}:${PWD}
+function check_cli_tools {
+  set +e
+  printf "OC "; oc version
+  kubectl version --client --output=yaml
+  python --version
+  python3 --version
+  set -x
+  which curl
+  which kubectl
+  which oc
+  which helm
+  which jq
+  which yq
+  which python
+  which python3
+  which base64
+  set +x
+  set -e
 }
-jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
-  || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+debug "(Logging oc commands for user to reproduce and confirm state)"
+function oc() {
+  info "+ oc $@" >&2
+  command oc $@
+}
+check_cli_tools
+
+
+ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
