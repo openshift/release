@@ -12,11 +12,12 @@ echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
 echo ""
 
+retry_interval=60  # 60 seconds = 1 minute
+
 if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 
   echo "# Test to make sure gangway api is up and running."
   max_retries=60
-  retry_interval=60  # 60 seconds = 1 minute
 
   for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
     response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)
