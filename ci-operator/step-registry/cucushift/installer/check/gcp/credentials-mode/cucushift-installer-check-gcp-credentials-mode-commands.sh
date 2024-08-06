@@ -74,6 +74,6 @@ if [[ "${curr_credentials_mode}" == "Passthrough" ]]; then
         ret=$(( $ret | 2 ))
     fi
 fi
-
+sleep 14400
 echo "Exit code '$ret'"
 exit $ret
