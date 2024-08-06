@@ -135,7 +135,7 @@ function generate_site_config {
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
 
     SPOKE_CLUSTER_NAME=${NAMESPACE}
-    SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/bastion_public_address)
+    SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
 
     cat << EOF > ${site_config_file}
 apiVersion: ran.openshift.io/v1
