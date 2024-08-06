@@ -87,7 +87,7 @@ resource "aws_security_group" "quaybuilder" {
 
 resource "aws_instance" "quaybuilder" {
   key_name = aws_key_pair.quaybuilder0710.key_name
-  ami      = "ami-0bfc536a37a52cfa2"
+  ami      = "ami-00e2844e267f04b4b"
   instance_type = "m4.xlarge"
 
   associate_public_ip_address = true
