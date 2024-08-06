@@ -178,7 +178,7 @@ spec:
         bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
         bmcCredentialsName:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${mac}"
+        bootMACAddress: "${provisioning_mac}"
         bootMode: "UEFI"
         rootDeviceHints:
           deviceName: ${root_device}
@@ -201,9 +201,9 @@ spec:
                   # dhcp: false
                   dhcp: true
                 ipv6:
-                  enabled: false
-                  # enabled: true
-                  # dhcp: true
+                  # enabled: false
+                  enabled: true
+                  dhcp: true
 
             # dns-resolver:
             #   config:
