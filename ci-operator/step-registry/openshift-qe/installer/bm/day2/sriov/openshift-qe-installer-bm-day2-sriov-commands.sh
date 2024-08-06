@@ -77,6 +77,8 @@ spec:
 EOF
 } || echo Failed to apply SriovOperatorConfig
 
+sleep 180
+
 # Create the SRIOV network policy
 cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
