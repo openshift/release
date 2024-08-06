@@ -36,16 +36,16 @@ function find_openshift_version() {
     versionList=$(eval $version_cmd)
     echo -e "Available cluster versions:\n${versionList}"
 
-    if [[ -z "$OPENSHIFT_VERSION" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-    elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    if [[ -z "$UPGRADED_TO_VERSION" ]]; then
+      UPGRADED_TO_VERSION=$(echo "$versionList" | head -1)
+    elif [[ $UPGRADED_TO_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+      UPGRADED_TO_VERSION=$(echo "$versionList" | grep -E "^${UPGRADED_TO_VERSION}" | head -1 || true)
     else
       # Match the whole line
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+      UPGRADED_TO_VERSION=$(echo "$versionList" | grep -x "${UPGRADED_TO_VERSION}" || true)
     fi
 
-    if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    if [[ -z "$UPGRADED_TO_VERSION" ]]; then
       echo "Requested cluster version not available!"
       exit 1
     fi
@@ -80,8 +80,8 @@ fi
 echo "upgrade rosacontrolplane"
 rosacontrolplane_name=$(oc get cluster "${CLUSTER_NAME}" -n "${namespace}" -ojsonpath='{.spec.controlPlaneRef.name}')
 version=$(oc get rosacontrolplane ${rosacontrolplane_name} -n ${namespace} -ojsonpath='{.spec.version}')
-echo "rosa controlplane version is $version now, begin to upgrade to $OPENSHIFT_VERSION"
-oc patch -n "${namespace}" --type=merge --patch='{"spec":{"version":"'"${OPENSHIFT_VERSION}"'"}}' rosacontrolplane/${rosacontrolplane_name}
+echo "rosa controlplane version is $version now, begin to upgrade to $UPGRADED_TO_VERSION"
+oc patch -n "${namespace}" --type=merge --patch='{"spec":{"version":"'"${UPGRADED_TO_VERSION}"'"}}' rosacontrolplane/${rosacontrolplane_name}
 new_version=$(oc get rosacontrolplane ${rosacontrolplane_name} -n ${namespace} -ojsonpath='{.spec.version}')
 echo "now rosacontrolplane version is ${new_version}"
 
