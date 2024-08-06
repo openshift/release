@@ -64,7 +64,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
      git fetch origin pull/$JETLAG_PR/head:dev
      git checkout dev
    else
-     git checkout main
+     git pull origin $JETLAG_BRANCH
    fi
    git branch
    source bootstrap.sh
