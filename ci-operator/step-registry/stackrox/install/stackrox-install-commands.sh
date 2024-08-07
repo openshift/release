@@ -39,7 +39,7 @@ function exit_handler() {
   fi
 }
 trap 'exit_handler' EXIT
-trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+trap 'echo "$(date +%H:%M:%S) + ${BASH_COMMAND}"' DEBUG
 
 function check_cli_tools {
   set +e
@@ -55,18 +55,16 @@ function check_cli_tools {
   which jq
   which yq
   which python
-  which python3
+  which python3 && python3 -c 'import yaml;'
   which base64
   set +x
   set -e
 }
 
-debug "(Logging oc commands for user to reproduce and confirm state)"
+echo "(Logging oc commands for user to reproduce and confirm state)"
 function oc() {
-  # shellcheck disable=SC2145
-  info "+ oc $@" >&2
-  # shellcheck disable=SC2068
-  command oc $@
+  echo "$(date +%H:%M:%S) + oc $*" >&2
+  command oc "$@"
 }
 check_cli_tools
 
@@ -203,13 +201,15 @@ function install_operator() {
 
 function create_cr() {
   local app
+  set +e
   app=${1:-central}
   echo ">>> Install ${app^}"
-  if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
-    && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
-    echo "INFO: Diff in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
-  fi
+  echo "INFO: Comparing upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
+  curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml"
+  diff "${app}-cr.yaml" "new.${app}-cr.yaml" \
+    | grep -v password
   oc apply -f "${app}-cr.yaml"
+  set -e
 }
 
 function retry() {
