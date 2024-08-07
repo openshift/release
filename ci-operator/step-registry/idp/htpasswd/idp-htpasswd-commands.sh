@@ -53,7 +53,9 @@ function set_common_variables () {
 function check_idp () {
     # Check if runtime_env exists and then check if $USERS is not empty
     if [ -f "${SHARED_DIR}/runtime_env" ]; then
+        set +x
         source "${SHARED_DIR}/runtime_env"
+        set -x
     else
         echo "runtime_env does not exist, continuing checking..."
         USERS=""
@@ -62,11 +64,12 @@ function check_idp () {
     # Fetch the detailed identityProviders configuration if any
     # Don't quote the $TARGET_RESOURCE variable because it may include spaces
     current_idp_config=$(oc get $TARGET_RESOURCE -o jsonpath='{range '$IDP_FIELD'[*]}{.name}{" "}{.type}{"\n"}{end}')
-
+    set +x
     if [ -n "$current_idp_config" ] && [ "$current_idp_config" != "null" ] && [ -n "$USERS" ]; then
         echo -e "Skipping addition of new htpasswd IDP because already configured IDP as below:\n$current_idp_config"
         exit 0
     fi
+    set -x
 }
 
 function set_proxy () {
