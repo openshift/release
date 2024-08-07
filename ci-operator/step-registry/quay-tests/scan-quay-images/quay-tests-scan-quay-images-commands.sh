@@ -17,8 +17,8 @@ quay_builder_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_IMAGE}"
 quay_builder_qemu_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_QEMU_IMAGE}"
       
 function scan_quay_images(){
-    ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder centos@$1 "sudo /usr/local/bin/grype $2 --scope all-layers > $3_image_vulnerability-report" || true
-    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder centos@$1:/home/centos/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
+    ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1 "sudo trivy image $2 > $3_image_vulnerability-report" || true
+    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/centos/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
 }
 
 echo "start to scan quay images:"
