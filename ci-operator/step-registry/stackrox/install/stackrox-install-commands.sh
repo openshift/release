@@ -206,7 +206,7 @@ function create_cr() {
   echo ">>> Install ${app^}"
   echo "INFO: Comparing upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
   curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml"
-  diff "${app}-cr.yaml" "new.${app}-cr.yaml" \
+  { diff "${app}-cr.yaml" "new.${app}-cr.yaml" || true; } \
     | grep -v password
   oc apply -f "${app}-cr.yaml"
   set -e
