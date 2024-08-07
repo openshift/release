@@ -6,6 +6,48 @@ set -o pipefail
 set -o nounset
 
 echo "Creating manifests for br-ex configuration on masters and workers"
+##### debug on
+MASTER_NM_CONF="${SHARED_DIR}/manifest_nm-conf-master.yaml"
+cat > "${MASTER_NM_CONF}" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 11-nm-conf-master
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,W2xvZ2dpbmddCmxldmVsPVRSQUNFCmRvbWFpbnM9QUxMCg==
+        mode: 0644
+        overwrite: true
+        path: /etc/NetworkManager/conf.d/debug.conf
+EOF
+WORKER_NM_CONF="${SHARED_DIR}/manifest_nm-conf-worker.yaml"
+cat > "${WORKER_NM_CONF}" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 11-nm-conf-worker
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,W2xvZ2dpbmddCmxldmVsPVRSQUNFCmRvbWFpbnM9QUxMCg==
+        mode: 0644
+        overwrite: true
+        path: /etc/NetworkManager/conf.d/debug.conf
+EOF
+##### debug off
 
 MASTER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-master.yaml"
 WORKER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-worker.yaml"
@@ -20,7 +62,7 @@ metadata:
 spec:
   config:
     ignition:
-      version: 3.2.0
+      version: 3.4.0
     storage:
       files:
 EOF
@@ -35,7 +77,7 @@ metadata:
 spec:
   config:
     ignition:
-      version: 3.2.0
+      version: 3.4.0
     storage:
       files:
 EOF
