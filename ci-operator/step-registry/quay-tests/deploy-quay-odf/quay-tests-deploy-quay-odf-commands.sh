@@ -165,6 +165,12 @@ SUPER_USERS:
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_AUTO_PRUNE: true
+TAG_EXPIRATION_OPTIONS:
+  - 1w
+  - 2w
+  - 4w
+  - 1d
+  - 1h
 EOF
 
 echo "Creating Quay Config Bundle Secret..." >&2

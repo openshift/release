@@ -52,4 +52,8 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
 
 fi
 
+if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
+  RUN_COMMAND+=" --must-gather-output-dir=${ARTIFACT_DIR} "
+fi
+
 ${RUN_COMMAND}
