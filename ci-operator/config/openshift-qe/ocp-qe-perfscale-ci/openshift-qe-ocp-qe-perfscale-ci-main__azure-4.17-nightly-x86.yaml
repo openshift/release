@@ -30,12 +30,14 @@ tests:
     env:
       BASE_DOMAIN: perfscale.hyp.azure.rhperfscale.org
       BASE_RESOURCE_GROUP: perfscale-prow
-      COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
       CUSTOM_AZURE_REGION: centralus
       PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "120"
     test:
+    - chain: workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 5h0m0s
@@ -63,12 +65,34 @@ tests:
     env:
       BASE_DOMAIN: perfscale.hyp.azure.rhperfscale.org
       BASE_RESOURCE_GROUP: perfscale-prow
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CUSTOM_AZURE_REGION: centralus
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      SET_ENV_BY_PLATFORM: custom
+      TOLERANCE: "99"
+      WORKER_REPLICA_COUNT: "9"
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-perfscale-azu-data-path-nsg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+  timeout: 7h0m0s
+- always_run: false
+  as: data-path-ipsec-9nodes-day1scale
+  steps:
+    cluster_profile: azure-perfscale
+    env:
+      BASE_DOMAIN: perfscale.hyp.azure.rhperfscale.org
+      BASE_RESOURCE_GROUP: perfscale-prow
       COMPUTE_NODE_REPLICAS: "9"
       COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CUSTOM_AZURE_REGION: centralus
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      SET_ENV_BY_PLATFORM: custom
+      TOLERANCE: "99"
     test:
-    - chain: openshift-qe-data-path-tests
     - ref: openshift-qe-perfscale-azu-data-path-nsg
+    - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 7h0m0s
 - always_run: false
@@ -81,6 +105,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D8s_v3
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
       SET_ENV_BY_PLATFORM: custom
+      TOLERANCE: "99"
       WORKER_REPLICA_COUNT: "9"
     post:
     - chain: ipi-azure-post

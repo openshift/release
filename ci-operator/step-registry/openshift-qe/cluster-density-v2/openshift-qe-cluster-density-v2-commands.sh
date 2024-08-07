@@ -6,6 +6,7 @@ set -x
 cat /etc/os-release
 oc config view
 oc projects
+oc version
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
