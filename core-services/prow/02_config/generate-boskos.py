@@ -238,7 +238,7 @@ CONFIG = {
         'default': 1,
     },
     'openstack-nfv-quota-slice': {
-        'default': 5,
+        'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
         'default': 4,
@@ -299,7 +299,7 @@ CONFIG = {
         'wdc06': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
-        'us-east': 10,
+        'us-east': 40,
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,

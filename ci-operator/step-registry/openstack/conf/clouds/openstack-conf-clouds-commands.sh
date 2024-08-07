@@ -40,8 +40,9 @@ new_application_credentials() {
 			"${*:---restricted}" \
 			--expiration "$(date -d "$APPLICATION_CREDENTIALS_EXPIRATION" +%Y-%m-%dT%H:%M:%S)" \
 			--description "PROW_CLUSTER_NAME=${CLUSTER_NAME} PROW_JOB_ID=${PROW_JOB_ID}" \
-			--format json --column id --column secret \
-			"prow-$(date +'%s%N')"
+			--format json \
+			"prow-$(date +'%s%N')" \
+		| jq 'with_entries( .key |= ascii_downcase )'
 	)"
 
 	yq --yml-output ".
