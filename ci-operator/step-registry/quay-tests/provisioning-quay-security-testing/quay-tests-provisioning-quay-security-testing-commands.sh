@@ -106,7 +106,8 @@ resource "aws_instance" "quaybuilder" {
     inline = [
       "sudo yum install -y podman",
       "sudo rpm -ivh https://github.com/aquasecurity/trivy/releases/download/v0.54.1/trivy_0.54.1_Linux-64bit.rpm",
-      "sudo podman login -u '${QUAY_BREW_USERNAME}' -p ${QUAY_BREW_PASSWORD} brew.registry.redhat.io && sudo trivy image brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.12.1-8"
+      "sudo podman login -u '${QUAY_BREW_USERNAME}' -p ${QUAY_BREW_PASSWORD} brew.registry.redhat.io",
+      "sudo trivy image brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.12.1-8 --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} || true"
     ]
   }
 
