@@ -17,6 +17,7 @@ function run_tests {
 
   oc get managedcluster || echo "No ready..."
 
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
   secret_kubeconfig=${SPOKE_CLUSTER_NAME}-admin-kubeconfig
   secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
 

@@ -51,65 +51,61 @@ EOF
   set +x
 }
 
-function generate_site_config_local {
+function generate_network_config_local {
 
-  echo "************ telcov10n Generate SiteConfig file from template ************"
+  baremetal_iface=$1 ; shift
+  [ $# -gt 0 ] && ipi_disabled_ifaces=$1 && shift
 
-  site_config_file=$(mktemp --dry-run)
+  network_config="interfaces:
+              - name: ${baremetal_iface}
+                type: ethernet
+                state: up
+                ipv4:
+                  enabled: true
+                  address:
+                  - ip: 10.1.153.100
+                    prefix-length: 24
+                  dhcp: false
+                ipv6:
+                  enabled: false"
 
-  cat << EOF > ${site_config_file}
-apiVersion: ran.openshift.io/v1
-kind: SiteConfig
-metadata:
-  name: "site-plan-${SPOKE_CLUSTER_NAME}"
-  namespace: ${SPOKE_CLUSTER_NAME}
-spec:
-  baseDomain: "${SPOKE_BASE_DOMAIN}"
-  pullSecretRef:
-    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
-  clusterImageSetNameRef: "${CLUSTER_IMG_SET_REF}"
-  sshPublicKey: "${SSH_PUB_KEY}"
-  clusters:
-  - clusterName: "${SPOKE_CLUSTER_NAME}"
-    networkType: "OVNKubernetes"
-    # installConfigOverrides: '${INSTALL_CONFIG_OVERRIDES}'
-    extraManifestPath: sno-extra-manifest/
-    clusterType: sno
-    clusterProfile: du
-    clusterLabels:
-      du-profile: "${DU_PROFILE}"
-      group-du-sno: ""
-      common: true
-      sites : "${SPOKE_CLUSTER_NAME}"
-    clusterNetwork:
-      - cidr: "10.128.0.0/14"
-        hostPrefix: 23
-    machineNetwork:
-      - cidr: 10.1.153.0/24
-    serviceNetwork:
-      - "172.30.0.0/16"
-    additionalNTPSources:
-      - ${NTP_SRC}
-    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
-    cpuPartitioningMode: AllNodes
-    nodes:
-      - hostName: "worker-a-00.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
-        bmcAddress: "redfish-virtualmedia://192.168.70.127/redfish/v1/Systems/System.Embedded.1"
-        bmcCredentialsName:
-          name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${BOOT_MAC}"
-        bootMode: "UEFI"
-        rootDeviceHints:
-          deviceName: /dev/sda
-        # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
-        nodeNetwork:
-          interfaces:
-            - name: "${NODE_NIC}"
-              macAddress: "${NODE_MAC}"
-          config:
-            interfaces:
-              - name: ${NODE_NIC}
+  # split the ipi_disabled_ifaces semi-comma separated list into an array
+  IFS=';' read -r -a disabled_ifaces <<< "${ipi_disabled_ifaces}"
+  for iface in "${disabled_ifaces[@]}"; do
+    # Take care of the indentation when adding the disabled interfaces to the above yaml
+    network_config+="
+              - name: ${iface}
+                type: ethernet
+                state: up
+                ipv4:
+                  enabled: false
+                  dhcp: false
+                ipv6:
+                  enabled: false
+                  dhcp: false"
+  done
+
+    network_config+="
+            dns-resolver:
+              config:
+                server:
+                  - 10.46.0.32
+            routes:
+              config:
+                - destination: 0.0.0.0/0
+                  next-hop-address: 10.1.153.254
+                  next-hop-interface: ${baremetal_iface}
+                  table-id: 254"
+
+}
+
+function generate_network_config {
+
+  baremetal_iface=$1 ; shift
+  [ $# -gt 0 ] && ipi_disabled_ifaces=$1 && shift
+
+  network_config="interfaces:
+              - name: ${baremetal_iface}
                 type: ethernet
                 state: up
                 ipv4:
@@ -117,25 +113,46 @@ spec:
                   dhcp: true
                 ipv6:
                   enabled: true
-                  dhcp: true
-EOF
+                  dhcp: true"
 
+  # split the ipi_disabled_ifaces semi-comma separated list into an array
+  IFS=';' read -r -a disabled_ifaces <<< "${ipi_disabled_ifaces}"
+  for iface in "${disabled_ifaces[@]}"; do
+    # Take care of the indentation when adding the disabled interfaces to the above yaml
+    network_config+="
+              - name: ${iface}
+                type: ethernet
+                state: up
+                ipv4:
+                  enabled: false
+                  dhcp: false
+                ipv6:
+                  enabled: false
+                  dhcp: false"
+    done
 }
 
 function generate_site_config {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
 
-  # site_config_file=$(mktemp --dry-run)
-  site_config_file=/tmp/site-config.yaml
+  site_config_file=$(mktemp --dry-run)
 
   # shellcheck disable=SC2154
-  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
 
+    if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ] || [ ${#ipv6} -eq 0 ]; then
+      echo "[ERROR] Unable to parse the Bare Metal Host metadata"
+      exit 1
+    fi
+
     SPOKE_CLUSTER_NAME=${NAMESPACE}
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
+
+    # generate_network_config_local ${baremetal_iface} ${ipi_disabled_ifaces}
+    generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     cat << EOF > ${site_config_file}
 apiVersion: ran.openshift.io/v1
@@ -176,12 +193,14 @@ spec:
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
         bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
+        disableCertificateVerification: true
         bmcCredentialsName:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${provisioning_mac}"
+        bootMACAddress: "${mac}"
         bootMode: "UEFI"
         rootDeviceHints:
-          deviceName: ${root_device}
+          ${root_device:+deviceName: ${root_device}}
+          ${root_dev_hctl:+hctl: ${root_dev_hctl}}
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
         ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
         nodeNetwork:
@@ -189,32 +208,7 @@ spec:
             - name: "${baremetal_iface}"
               macAddress: "${mac}"
           config:
-            interfaces:
-              - name: ${baremetal_iface}
-                type: ethernet
-                state: up
-                ipv4:
-                  enabled: true
-                  # address:
-                  # - ip: 10.1.153.100
-                  #   prefix-length: 24
-                  # dhcp: false
-                  dhcp: true
-                ipv6:
-                  # enabled: false
-                  enabled: true
-                  dhcp: true
-
-            # dns-resolver:
-            #   config:
-            #     server:
-            #       - 10.46.0.32
-            # routes:
-            #   config:
-            #     - destination: 0.0.0.0/0
-            #       next-hop-address: 10.1.153.254
-            #       next-hop-interface: "${NODE_NIC}"
-            #       table-id: 254
+            ${network_config}
 EOF
 
   cat $site_config_file
@@ -295,31 +289,6 @@ function extract_rhcos_images {
   iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
 
 }
-
-# function create_persistent_volumes_for_assisted_installer_service {
-
-#   echo "************ telcov10n Create PVs for the assisted install service to be deployed by AgentServiceConfig CR ************"
-#   cat << EOF | oc apply -f -
-# apiVersion: local.storage.openshift.io/v1
-# kind: LocalVolume
-# metadata:
-#   name: assisted-service
-#   namespace: openshift-local-storage
-# spec:
-#   logLevel: Normal
-#   managementState: Managed
-#   storageClassDevices:
-#     - devicePaths:
-#         - /dev/vdb
-#       storageClassName: assisted-service
-#       volumeMode: Filesystem
-# EOF
-
-#   set -x
-#   oc wait localvolume -n openshift-local-storage assisted-service --for condition=Available --timeout 10m
-#   oc get sc,pv
-#   set +x
-# }
 
 function generate_agent_service_config {
 
@@ -404,7 +373,6 @@ function main {
   check_hub_cluster_is_alive
   extract_rhcos_images
   generate_agent_service_config
-  # generate_site_config_local
   generate_site_config
   push_site_config
 }
