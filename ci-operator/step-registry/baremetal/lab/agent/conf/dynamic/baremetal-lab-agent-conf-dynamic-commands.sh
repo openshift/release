@@ -5,6 +5,8 @@ set -o pipefail
 
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
+echo "${RENDEZVOUS_IP}" >"${SHARED_DIR}"/node-zero-ip.txt
+
 # Create an agent-config file containing only the minimum required configuration
 
 cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
