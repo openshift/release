@@ -22,7 +22,7 @@ quay_builder_qemu_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_QEMU
       
 function scan_quay_images(){
     ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1 "sudo trivy image $2 --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} > $3_image_vulnerability-report" || true
-    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/centos/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
+    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/ec2-user/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
 }
 
 echo "start to scan quay images:"
