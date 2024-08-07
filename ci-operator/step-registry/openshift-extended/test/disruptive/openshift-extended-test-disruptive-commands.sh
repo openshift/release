@@ -576,4 +576,5 @@ function check_case_selected {
         echo "do not find case"
     fi
 }
+sleep 14400
 run
