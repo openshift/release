@@ -1032,7 +1032,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.14-e2e-aws-ovn-proxy
     optional: true
     rerun_command: /test e2e-aws-ovn-proxy
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -1425,7 +1424,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -1587,7 +1586,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -1830,7 +1829,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -1847,7 +1846,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.14-e2e-azure-ovn-resourcegroup
     optional: true
     rerun_command: /test e2e-azure-ovn-resourcegroup
-    run_if_changed: azure
     spec:
       containers:
       - args:
@@ -5056,7 +5054,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn-zones-techpreview,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -5299,7 +5297,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -5311,7 +5309,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.14-images
     rerun_command: /test images
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -5436,7 +5433,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -5452,7 +5449,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.14-okd-e2e-aws-ovn-upgrade
     optional: true
     rerun_command: /test okd-e2e-aws-ovn-upgrade
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -5688,87 +5684,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-gcp-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: vsphere02
-    context: ci/prow/okd-e2e-vsphere
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci-operator.openshift.io/variant: okd
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.14-okd-e2e-vsphere
-    optional: true
-    rerun_command: /test okd-e2e-vsphere
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
-        - --target=e2e-vsphere
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-vsphere,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.14$
@@ -5907,7 +5822,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -5923,7 +5838,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.14-okd-scos-e2e-aws-upgrade
     optional: true
     rerun_command: /test okd-scos-e2e-aws-upgrade
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -5989,7 +5903,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -6074,7 +5988,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
@@ -6158,87 +6072,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-gcp-ovn-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: vsphere02
-    context: ci/prow/okd-scos-e2e-vsphere
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci-operator.openshift.io/variant: okd-scos
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.14-okd-scos-e2e-vsphere
-    optional: true
-    rerun_command: /test okd-scos-e2e-vsphere
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
-        - --target=e2e-vsphere
-        - --variant=okd-scos
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-scos-e2e-vsphere,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -6603,94 +6436,6 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4.14$
-    - ^release-4.14-
-    cluster: build05
-    context: ci/prow/shellcheck
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-release-4.14-shellcheck
-    rerun_command: /test shellcheck
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-    spec:
-      containers:
-      - args:
-        - ./hack/shellcheck.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/shellcheck-alpine:v0.5.0
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test shellcheck
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4.14$
-    - ^release-4.14-
-    cluster: build05
-    context: ci/prow/tf-fmt
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-release-4.14-tf-fmt
-    optional: true
-    rerun_command: /test tf-fmt
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-    spec:
-      containers:
-      - args:
-        - ./hack/tf-fmt.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/terraform-alpine:v0.12.0-rc1
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4.14$
-    - ^release-4.14-
-    cluster: build05
-    context: ci/prow/tf-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-release-4.14-tf-lint
-    rerun_command: /test tf-lint
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-    spec:
-      containers:
-      - args:
-        - ./hack/tf-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/tflint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test tf-lint
-  - agent: kubernetes
-    always_run: false
-    branches:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build05
@@ -6849,32 +6594,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4.14$
-    - ^release-4.14-
-    cluster: build05
-    context: ci/prow/yaml-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-release-4.14-yaml-lint
-    rerun_command: /test yaml-lint
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test yaml-lint
