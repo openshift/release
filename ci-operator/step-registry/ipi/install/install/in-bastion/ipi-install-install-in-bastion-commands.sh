@@ -113,8 +113,8 @@ else
     exit 1
 fi
 
-REMOTE_DIR="/tmp/"
-REMOTE_INSTALL_DIR="/tmp/installer/"
+REMOTE_DIR="/home/${BASTION_SSH_USER}"
+REMOTE_INSTALL_DIR="${REMOTE_DIR}/installer/"
 REMOTE_ENV_FILE="/tmp/remote_env_file"
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -175,7 +175,7 @@ run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "
 
 # Create manifests
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create manifests" &
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_DIR}/$(basename $REMOTE_ENV_FILE); ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create manifests" &
 wait "$!"
 
 echo "Will include manifests:"
@@ -202,7 +202,7 @@ echo "export TF_LOG_PATH='${REMOTE_INSTALL_DIR}/terraform.txt'" >> ${REMOTE_ENV_
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${REMOTE_ENV_FILE}" "${REMOTE_DIR}"
 
 set +o errexit
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_DIR}/$(basename $REMOTE_ENV_FILE); ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"
