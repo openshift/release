@@ -131,15 +131,16 @@ cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
-
-curl https://raw.githubusercontent.com/bmanzari/installer/AGENT-912/docs/user/agent/add-node/node-joiner.sh --output "${DAY2_ASSETS_DIR}/node-joiner.sh"
-
 export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
 
-chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
+# Extract the latest oc client
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+   --command=oc --to=/tmp --insecure=true
 
 
-cd "${DAY2_ASSETS_DIR}/" ; sh "node-joiner.sh" "nodes-config.yaml"
+
+# Create node.iso for day2 worker nodes
+/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --insecure=true
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -211,7 +212,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 done
 
 
-sleep 600
+sleep 2400
 # To check if there are pending CSRs
 function wait_for_pending_csrs_and_approve() {
   for ((i = 0; i < 18; i++)); do
