@@ -100,10 +100,18 @@ echo "Gather the IP Address for the new interface"
 api_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
   /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
 if [ "${#api_ip}" -eq 0 ]; then
-  echo "No IP Address has been set for the external API VIP, failing"
+  echo "No IPv4 Address has been set for the external API VIP, failing"
   exit 1
 fi
-printf "ingress_vip: %s\napi_vip: %s" "$api_ip" "$api_ip" > "$BUILD_DIR/external_vips.yaml"
+
+api_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
+  /sbin/ip -o -6 a list eth1 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
+if [ "${#api_ip_v6}" -eq 0 ]; then
+  echo "No global IPv6 Address has been set for the external API VIP, failing"
+  exit 1
+fi
+
+printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" > "$BUILD_DIR/external_vips.yaml"
 # TODO[disconnected/BM/IPI]
 #if [ "$DISCONNECTED" == "true" ] && IPI; then
 #  cp "$BUILD_DIR/vips.yaml" "$BUILD_DIR/external_vips.yaml"
