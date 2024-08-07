@@ -299,7 +299,7 @@ CONFIG = {
         'wdc06': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
-        'us-east': 10,
+        'us-east': 40,
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
