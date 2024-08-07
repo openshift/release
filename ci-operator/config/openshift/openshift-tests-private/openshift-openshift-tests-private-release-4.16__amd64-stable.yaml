@@ -183,6 +183,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-aws
+- as: aws-rosa-hcp-capi-upgrade-f14
+  cron: 20 19 2,18 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OPENSHIFT_VERSION: "4.16"
+      REGION: us-west-2
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      UPGRADED_TO_VERSION: "4.16"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts-hcp-capi-upgrade
 - as: aws-rosa-hcp-byo-kms-oidc-auditlog-stage-critical-f14
   cron: 37 6 8,22 * *
   steps:
