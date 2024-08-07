@@ -236,3 +236,5 @@ platform:
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+echo 'fake change' >/dev/null
