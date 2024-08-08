@@ -221,7 +221,7 @@ done
 
 echo "Waiting 4 minutes"
 
-sleep 2400
+sleep 240
 
 echo "Deleting 1st node.iso"
 
