@@ -221,7 +221,7 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-update_image_registry &
+update_image_registry
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
