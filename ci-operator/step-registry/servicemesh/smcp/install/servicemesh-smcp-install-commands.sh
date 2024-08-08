@@ -29,9 +29,12 @@ if [[ "${GATEWAY_API_ENABLED}" = "true" ]]; then
   elif [ "${SMCP_VERSION}" == "v2.5" ]; then
     echo 'Installing Gateway API version v0.6.2'
     oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.6.2" | oc apply -f -
+  elif [ "${SMCP_VERSION}" == "v2.6" ]; then
+    echo 'Installing Gateway API version v0.1.0'
+    oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.0.0" | oc apply -f -
   else
-    echo '[WARNING] Gateway API version for this release is not known. Using the latest support one v0.6.2. Consider adding that SMCP version here and according to the Istio version, update the Gateway API version as well.'
-    oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.6.2" | oc apply -f -
+    echo '[WARNING] Gateway API version for this release is not known. Using the latest support one v1.0.0. Consider adding that SMCP version here and according to the Istio version, update the Gateway API version as well.'
+    oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.0.0" | oc apply -f -
   fi
 fi
 

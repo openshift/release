@@ -19,6 +19,8 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+# download the istio version with 1.19.1 bookinfo app
+hack/istio/download-istio.sh -iv 1.22.3
 hack/istio/install-bookinfo-demo.sh -c oc -n bookinfo -tg -in ${SMCP_NAMESPACE}
 sleep 120
 
