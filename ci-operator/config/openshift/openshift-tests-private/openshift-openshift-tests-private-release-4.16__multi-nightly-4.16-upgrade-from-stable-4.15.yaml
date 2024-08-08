@@ -254,29 +254,16 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
-- as: azure-ipi-des-mini-perm-fips-amd-f28
+- as: azure-ipi-des-mini-perm-arm-f28
   cron: 29 15 20 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
-      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
     test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
-- as: azure-ipi-des-mini-perm-amd-mixarch-f28
-  cron: 22 13 22 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    test:
-    - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
 - as: azure-ipi-fullyprivate-internal-registry-arm-f28
@@ -346,25 +333,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
-- as: azure-ipi-ovn-ipsec-arm-mixarch-f28
-  cron: 21 21 26 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      ENABLE_OTA_TEST: OCP-21588
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 - as: azure-ipi-ovn-ipsec-arm-mixarch-day2-f28
   cron: 33 9 12 * *
   steps:
@@ -383,6 +351,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
+  cron: 21 21 26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 - as: azure-ipi-ultrassd-disks-fips-amd-f28
   cron: 7 15 19 * *
   steps:
@@ -492,15 +471,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: gcp-ipi-ovn-ipsec-arm-f14
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
   cron: 6 23 2,18 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
       ENABLE_OTA_TEST: OCP-21588
       OCP_ARCH: arm64
     test:
+    - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: gcp-ipi-proxy-private-arm-f14
