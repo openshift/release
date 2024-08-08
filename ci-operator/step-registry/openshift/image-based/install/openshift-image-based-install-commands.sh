@@ -40,8 +40,8 @@ set -euo pipefail
 
 export SEED_IMAGE="${SEED_IMAGE}"
 export SEED_VERSION="${SEED_VERSION}"
-export LCA_IMAGE="${LCA_PULL_REF}"
 export IBI_VM_NAME="${TARGET_VM_NAME}"
+export OPENSHIFT_INSTALLER_BIN="/usr/bin/openshift-install"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -51,11 +51,16 @@ export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 
 sudo dnf -y install runc crun gcc-c++ zip
 
+mkdir tmp
+podman run -v ./tmp:/tmp:Z --user root:root --rm --entrypoint='["/bin/sh","-c"]' ${INSTALLER_PULL_REF} "cp /bin/openshift-install /tmp/openshift-install"
+sudo mv ./tmp/openshift-install /usr/bin/openshift-install
+rm -rf tmp
+
 echo "Starting the IBI cluster"
 make ibi-iso ibi-vm ibi-logs
 
 echo "Attaching and configuring the cluster"
-make build-openshift-install imagebasedconfig.iso ibi-attach-config.iso
+make imagebasedconfig.iso ibi-attach-config.iso
 
 echo "Rebooting the cluster"
 make ibi-reboot wait-for-ibi
