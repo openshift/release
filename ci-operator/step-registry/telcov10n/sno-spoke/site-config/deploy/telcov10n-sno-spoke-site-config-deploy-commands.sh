@@ -115,21 +115,21 @@ function generate_network_config {
                   enabled: true
                   dhcp: true"
 
-  # split the ipi_disabled_ifaces semi-comma separated list into an array
-  IFS=';' read -r -a disabled_ifaces <<< "${ipi_disabled_ifaces}"
-  for iface in "${disabled_ifaces[@]}"; do
-    # Take care of the indentation when adding the disabled interfaces to the above yaml
-    network_config+="
-              - name: ${iface}
-                type: ethernet
-                state: up
-                ipv4:
-                  enabled: false
-                  dhcp: false
-                ipv6:
-                  enabled: false
-                  dhcp: false"
-    done
+  # # split the ipi_disabled_ifaces semi-comma separated list into an array
+  # IFS=';' read -r -a disabled_ifaces <<< "${ipi_disabled_ifaces}"
+  # for iface in "${disabled_ifaces[@]}"; do
+  #   # Take care of the indentation when adding the disabled interfaces to the above yaml
+  #   network_config+="
+  #             - name: ${iface}
+  #               type: ethernet
+  #               state: up
+  #               ipv4:
+  #                 enabled: false
+  #                 dhcp: false
+  #               ipv6:
+  #                 enabled: false
+  #                 dhcp: false"
+  #   done
 }
 
 function generate_site_config {
@@ -193,7 +193,7 @@ spec:
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
         bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-        disableCertificateVerification: true
+        # disableCertificateVerification: true
         bmcCredentialsName:
           name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
         bootMACAddress: "${mac}"
@@ -202,7 +202,7 @@ spec:
           ${root_device:+deviceName: ${root_device}}
           ${root_dev_hctl:+hctl: ${root_dev_hctl}}
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
+        # ignitionConfigOverride: '${NODE_IGNITION_CONF_OVERRIDE}'
         nodeNetwork:
           interfaces:
             - name: "${baremetal_iface}"
