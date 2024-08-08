@@ -16,16 +16,37 @@ function gather_recert_logs {
   scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/"
 }
 
-if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+no_bastion=false
+
+if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}" >/dev/null 2>&1 ;then
   info "Found bastion host, setting up the respective env vars and the container's SSH configuration..."
 
-  SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
-  INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+  if [ -z "${SINGLE_NODE_IP:-}" ]; then
+      SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+  fi
+  if [ -z "${INGRESS_HOST:-}" ]; then
+      INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+  fi
+  bastion_user="core"
+elif [ -f $SHARED_DIR/bastion_public_address ]; then
+  info "No service ssh-bastion found, using AUX_HOST as bastion host for equinix metal..."
+  if [ -z "${SINGLE_NODE_IP:-}" ]; then
+      SINGLE_NODE_IP="$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')"
+  fi
+  if [ -z "${INGRESS_HOST:-}" ]; then
+      INGRESS_HOST=$(cat $SHARED_DIR/bastion_public_address)
+  fi
+  bastion_user="root"
+else
+  info "No any bastion host found, skip log collection..."
+  no_bastion=true
+fi
+export SINGLE_NODE_IP INGRESS_HOST KUBE_SSH_KEY_PATH
 
-  KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-  SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${INGRESS_HOST}")
-
-  export SINGLE_NODE_IP INGRESS_HOST KUBE_SSH_KEY_PATH SSH_OPTS
+if [[ "$no_bastion" = false && "X${SINGLE_NODE_IP}" != "X" && "X${INGRESS_HOST}" != "X" ]]; then
+  SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${INGRESS_HOST}")
+  export SSH_OPTS
 
   mkdir -p ~/.ssh
   cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
@@ -35,7 +56,6 @@ if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; t
           echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
       fi
   fi
-
   info "Ready to gather recert logs on EXIT and TERM..."
   trap gather_recert_logs EXIT TERM
 fi
@@ -126,7 +146,8 @@ function recert {
 
   wait_for_recert_etcd
 
-  podman run -it --network=host --privileged \
+  podman run --authfile=/var/lib/kubelet/config.json \
+      -it --network=host --privileged \
       -v /tmp/certs:/certs  \
       -v /tmp/keys:/keys \
       -v /etc/kubernetes:/kubernetes \
@@ -218,8 +239,8 @@ info "Created \"${machineconfig}\" MachineConfig"
 info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 2m
 
-# Make sure the ssh-bastion is there, otherwise skip waiting for recert completion logging
-if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+# Make sure there is a bastion there, otherwise skip waiting for recert completion logging
+if [[ "$no_bastion" = false && "X${SINGLE_NODE_IP}" != "X" && "X${INGRESS_HOST}" != "X" ]]; then
   info "Waiting for recert to be completed..."
   while true; do
     if ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then

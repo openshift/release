@@ -21,8 +21,7 @@ oc config view
 oc projects
 
 # Install the MetalLB operator
-if [ ${METALLB} == "true" ]; then
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -31,7 +30,7 @@ metadata:
     openshift.io/cluster-monitoring: "true"
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -39,7 +38,7 @@ metadata:
   namespace: metallb-system
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -53,21 +52,20 @@ spec:
 EOF
 
 # Wait for the operator to be ready
-  until [ "$(kubectl get csv -n metallb-system | grep metallb-operator > /dev/null; echo $?)" == 0 ];
-    do echo "Waiting for MetalLB operator"
-    sleep 5
-  done
-  kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n metallb-system "$(kubectl get csv -n metallb-system -oname)"
-  sleep 60
+until [ "$(kubectl get csv -n metallb-system | grep metallb-operator > /dev/null; echo $?)" == 0 ];
+  do echo "Waiting for MetalLB operator"
+  sleep 5
+done
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n metallb-system "$(kubectl get csv -n metallb-system -oname)"
+sleep 60
 
-  cat << EOF | oc apply -f -
+cat << EOF | oc apply -f -
 apiVersion: metallb.io/v1beta1
 kind: MetalLB
 metadata:
   name: metallb
   namespace: metallb-system
 EOF
-fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

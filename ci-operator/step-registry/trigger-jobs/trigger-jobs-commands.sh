@@ -8,26 +8,16 @@ GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 
-# Check if it is hypershift jobs
-if [[ $WEEKLY_JOBS == *"hypershift"* ]]; then
-  # Get the current ISO week number (1-53)
-  WEEK_NUM=$(date +%V)
-  # Check if the week number is odd
-  if [ $((WEEK_NUM % 2)) -ne 0 ]; then
-    echo "Not Running HyperShift testing due to it being an odd-numbered week"
-    exit 0
-  fi
-fi
-
 echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
 echo ""
+
+retry_interval=60  # 60 seconds = 1 minute
 
 if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 
   echo "# Test to make sure gangway api is up and running."
   max_retries=60
-  retry_interval=60  # 60 seconds = 1 minute
 
   for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
     response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)

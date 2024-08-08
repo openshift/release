@@ -1,0 +1,216 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: latest
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-operator
+  hypershift-tests:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-tests
+  test-bin:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.18"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-multi
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aks
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.16"
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aws-ovn
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-metrics
+- as: e2e-aws-ovn-conformance-serial
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: hypershift
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-proxy-conformance
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-proxy
+- as: e2e-powervs-ovn
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: hypershift-powervs
+    workflow: hypershift-powervs-e2e
+- as: e2e-ibmcloud-ovn-iks
+  cron: 0 4 * * *
+  steps:
+    env:
+      BOM_VERSION: 4.10.26_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-ibmcloud-ovn-roks
+  cron: 0 4 * * *
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-aws-ovn-mce-conformance
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-aws-conformance
+- as: e2e-agent-ovn-conformance
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
+    workflow: hypershift-agent-conformance
+- as: e2e-kubevirt-metal-ovn
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-ovn-disconnected
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CCS_OPERATOR_CHANNELS: stable-4.15,stable-4.15,stable-4.15,stable-4.15
+      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
+- as: e2e-kubevirt-aws-ovn-csi
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-csi-e2e
+- as: e2e-azure-ovn-conformance
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-azure-conformance
+- as: e2e-kubevirt-aws-ovn
+  cron: 0 0,6,12,18 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+    workflow: hypershift-kubevirt-e2e-aws
+- as: e2e-kubevirt-azure
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: azure4
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    workflow: hypershift-kubevirt-azure-conformance
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: hypershift
+  variant: periodics

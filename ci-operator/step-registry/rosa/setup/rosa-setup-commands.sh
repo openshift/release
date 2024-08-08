@@ -77,7 +77,7 @@ if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
 fi
 
 rosatest --ginkgo.v --ginkgo.no-color \
-  --ginkgo.timeout "30m" \
+  --ginkgo.timeout "60m" \
   --ginkgo.label-filter "day1" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 # CLUSER_ID=$(cat "${SHARED_DIR}/cluster-id")
 # CLUSER_NAME=$(rosa describe cluster -c ${CLUSER_ID} -o json | jq -r '.name')

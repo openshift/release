@@ -194,6 +194,8 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hostedbm_working_root_dir=/home/kni/hcp-jobs \
     -e tag=$T5CI_VERSION \
     -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
+    -e image_override=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
+    -e hostedbm_bm_cpo_override_image=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
     -e release=nightly || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.

@@ -123,7 +123,7 @@ function create_catalog_sources()
 {
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
-    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
     echo "Create QE catalogsource: $CATALOGSOURCE_NAME"

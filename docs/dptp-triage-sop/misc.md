@@ -38,7 +38,7 @@ The pod has the logs to show the details:
 Or on CloudWatch:
 
 ```txt
-fields @timestamp,msg, @message, @logStream, @log
+fields @timestamp,structured.component as component,structured.msg as msg,structured.args as args, @message, @logStream, @log
 | filter(component="ci-images-mirror" and msg="Running command failed." and (args like /image mirror.*/))
 | sort @timestamp desc 
 | limit 20
