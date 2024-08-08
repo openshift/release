@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-aws-417
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -22,6 +15,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: test
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      ENABLE_LOCAL_INDEX: "false"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      ITERATION_MULTIPLIER_ENV: "1"
+      JUNIT: "false"
+      RUN_ORION: "false"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-test
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 5h30m0s
 - as: payload-control-plane-6nodes
   cron: '@yearly'
   steps:
