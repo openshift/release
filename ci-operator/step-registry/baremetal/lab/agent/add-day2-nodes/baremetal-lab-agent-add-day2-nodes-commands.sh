@@ -92,22 +92,22 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         enabled: ${ipv6_enabled}
 "
 
-  # split the ipi_disabled_ifaces semi-comma separated list into an array
-  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
-  for iface in "${ipi_disabled_ifaces[@]}"; do
-    # Take care of the indentation when adding the disabled interfaces to the above yaml
-    ADAPTED_YAML+="
-    - name: ${iface}
-      type: ethernet
-      state: up
-      ipv4:
-        enabled: false
-        dhcp: false
-      ipv6:
-        enabled: false
-        dhcp: false
-    "
-  done
+  # # split the ipi_disabled_ifaces semi-comma separated list into an array
+  # IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
+  # for iface in "${ipi_disabled_ifaces[@]}"; do
+  #   # Take care of the indentation when adding the disabled interfaces to the above yaml
+  #   ADAPTED_YAML+="
+  #   - name: ${iface}
+  #     type: ethernet
+  #     state: up
+  #     ipv4:
+  #       enabled: false
+  #       dhcp: false
+  #     ipv6:
+  #       enabled: false
+  #       dhcp: false
+  #   "
+  # done
 
   # Take care of the indentation when adding the dns and routes to the above yaml
   ADAPTED_YAML+="
@@ -138,9 +138,17 @@ oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INST
    --command=oc --to=/tmp --insecure=true
 
 
+echo "Create 1st node.iso for day2 worker node"
 
-# Create node.iso for day2 worker nodes
+# Create node.iso for day2 1st worker node
 /tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --insecure=true
+
+
+# Dump agent-auth-token after day2 image creation
+
+echo "Dump 1st agent-auth-token after day2 image creation"
+
+/tmp/oc get secret agent-auth-token -o yaml -n openshift-config >"${ARTIFACT_DIR}"/first-agent-auth-token.yaml
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -163,7 +171,7 @@ case "${BOOT_MODE}" in
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    if [[ "${name}" == *-a-00 ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
       if [ "${transfer_protocol_type}" == "cifs" ]; then
         IP_ADDRESS="$(dig +short "${AUX_HOST}")"
         iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.iso"
@@ -205,52 +213,135 @@ esac
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+  if [[ "${name}" == *-a-00 ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     echo "Power on #${host} (${name})..."
     timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
   fi
 done
 
+echo "Waiting 4 minutes"
 
 sleep 2400
-# To check if there are pending CSRs
-function wait_for_pending_csrs_and_approve() {
-  for ((i = 0; i < 18; i++)); do
-    pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
-    if [ -n "$pending_csrs" ]; then
-      for csr in $pending_csrs; do
-        echo "Approving CSR: $csr"
-        oc adm certificate approve "$csr"
-      done
-      echo "All pending CSRs approved."
-      break
+
+echo "Deleting 1st node.iso"
+
+rm -f "${DAY2_ASSETS_DIR}/node.iso"
+
+echo "Create 2nd node.iso for day2 worker node"
+
+# Create node.iso for day2 2nd worker node
+/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --insecure=true
+
+
+# Dump agent-auth-token after day2 image creation
+
+echo "Dump 2nd agent-auth-token after 2nd day2 image creation"
+
+/tmp/oc get secret agent-auth-token -o yaml -n openshift-config >"${ARTIFACT_DIR}"/second-agent-auth-token.yaml
+
+
+
+case "${BOOT_MODE}" in
+"iso")
+  ### Create ISO image
+  #echo -e "\nCreating image..."
+  #oinst agent create image
+  ### Copy the image to the auxiliary host
+  echo -e "\nCopying the day2 node ISO image into the bastion host..."
+  scp "${SSHOPTS[@]}" "${DAY2_ASSETS_DIR}/node.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    if [[ "${name}" == *-a-01 ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+      if [ "${transfer_protocol_type}" == "cifs" ]; then
+        IP_ADDRESS="$(dig +short "${AUX_HOST}")"
+        iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.iso"
+      else
+        # Assuming HTTP or HTTPS
+        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.iso"
+      fi
+      mount_virtual_media "${host}" "${iso_path}"
     fi
-    echo "No pending CSRs found. Waiting..."
-    sleep 30
+
   done
-}
 
-node_count=$(($(oc get nodes --no-headers | wc -l | tr -d '[:space:]') + total_workers))
-wait_for_pending_csrs_and_approve
-
-for ((i = 0; i < 5; i++)); do
-  updated_node_count=$(oc get nodes --no-headers | wc -l | tr -d '[:space:]')
-  echo "Waiting for nodes to reach count $node_count. Current count: ${updated_node_count}"
-  if [ "${updated_node_count}" -eq "${node_count}" ]; then
-    break
+  wait
+  if [ -f /tmp/virtual_media_mount_failed ]; then
+    echo "Failed to mount the ISO image in one or more hosts"
+    exit 1
   fi
-  sleep 30
+;;
+"pxe")
+  ### Create pxe files
+  echo -e "\nCreating PXE files..."
+  oinst agent create pxe-files
+  ### Copy the image to the auxiliary host
+  echo -e "\nCopying the PXE files into the bastion host..."
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
+    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
+    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
+    "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
+;;
+*)
+  echo "Unknown install mode: ${BOOT_MODE}"
+  exit 1
+esac
+
+
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-01 ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    echo "Power on #${host} (${name})..."
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
+  fi
 done
 
-if [ "${updated_node_count}" -ne "${node_count}" ]; then
-  echo "Expected count ${node_count} does not match the actual count ${updated_node_count}. Exiting."
-  exit 1
-fi
+sleep 3600
 
-if oc wait --for=condition=Ready node --all --timeout=3m; then
-  echo "Successfully added all the worker nodes."
-else
-  echo "Timed out waiting for nodes to be Ready. Exiting."
-  oc get nodes
-  exit 1
-fi
+# # To check if there are pending CSRs
+# function wait_for_pending_csrs_and_approve() {
+#   for ((i = 0; i < 18; i++)); do
+#     pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
+#     if [ -n "$pending_csrs" ]; then
+#       for csr in $pending_csrs; do
+#         echo "Approving CSR: $csr"
+#         oc adm certificate approve "$csr"
+#       done
+#       echo "All pending CSRs approved."
+#       break
+#     fi
+#     echo "No pending CSRs found. Waiting..."
+#     sleep 30
+#   done
+# }
+
+# node_count=$(($(oc get nodes --no-headers | wc -l | tr -d '[:space:]') + total_workers))
+# wait_for_pending_csrs_and_approve
+
+# for ((i = 0; i < 5; i++)); do
+#   updated_node_count=$(oc get nodes --no-headers | wc -l | tr -d '[:space:]')
+#   echo "Waiting for nodes to reach count $node_count. Current count: ${updated_node_count}"
+#   if [ "${updated_node_count}" -eq "${node_count}" ]; then
+#     break
+#   fi
+#   sleep 30
+# done
+
+# if [ "${updated_node_count}" -ne "${node_count}" ]; then
+#   echo "Expected count ${node_count} does not match the actual count ${updated_node_count}. Exiting."
+#   exit 1
+# fi
+
+# if oc wait --for=condition=Ready node --all --timeout=3m; then
+#   echo "Successfully added all the worker nodes."
+# else
+#   echo "Timed out waiting for nodes to be Ready. Exiting."
+#   oc get nodes
+#   exit 1
+# fi
