@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/crds-sync
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-operator
     decorate: true
     labels:
@@ -137,7 +137,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -216,7 +216,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-etcd-scaling
     decorate: true
     labels:
@@ -295,7 +295,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -374,7 +374,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -453,7 +453,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-periodic-pre
     decorate: true
     labels:
@@ -533,7 +533,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-azure-operator
     decorate: true
     labels:
@@ -613,7 +613,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
     labels:
@@ -942,7 +942,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-openstack-operator
     decorate: true
     labels:
@@ -1022,7 +1022,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-operator-zone
     decorate: true
     labels:
@@ -1342,7 +1342,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/fmt
     decorate: true
     labels:
@@ -1395,7 +1395,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/generate
     decorate: true
     labels:
@@ -1448,7 +1448,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -1502,7 +1502,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     labels:
@@ -1555,7 +1555,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/periodics-images
     decorate: true
     labels:
@@ -1611,7 +1611,88 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build01
+    context: ci/prow/regression-clusterinfra-aws-ipi-cpms-allcases
+    decorate: true
+    decoration_config:
+      timeout: 7h30m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-control-plane-machine-set-operator-release-4.15-regression-clusterinfra-aws-ipi-cpms-allcases
+    optional: true
+    rerun_command: /test regression-clusterinfra-aws-ipi-cpms-allcases
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/regression-clusterinfra-aws-ipi-cpms-allcases-cluster-profile
+        - --target=regression-clusterinfra-aws-ipi-cpms-allcases
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/regression-clusterinfra-aws-ipi-cpms-allcases-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )regression-clusterinfra-aws-ipi-cpms-allcases,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1664,7 +1745,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -1717,7 +1798,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build02
+    cluster: build05
     context: ci/prow/vet
     decorate: true
     labels:
