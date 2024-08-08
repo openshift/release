@@ -19,6 +19,11 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 releases:
   initial:
     candidate:
@@ -28,6 +33,13 @@ releases:
       version: "4.16"
   latest:
     candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  multi-latest:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.16"
@@ -40,16 +52,15 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: aws-qe
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 3h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
