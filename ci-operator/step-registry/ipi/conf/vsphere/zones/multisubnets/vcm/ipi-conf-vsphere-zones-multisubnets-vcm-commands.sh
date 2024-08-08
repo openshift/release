@@ -1,0 +1,69 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
+  echo "using legacy sibling of this step"
+  exit 0
+fi
+
+# ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_extra_leased_context"
+# shellcheck source=/dev/null
+declare vsphere_extra_portgroup_1
+declare vsphere_extra_portgroup_2
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_extra_leased_context.sh"
+
+declare -a vips
+mapfile -t vips < "${SHARED_DIR}"/vips.txt
+
+# if loadbalancer is UserManaged, it's mean using external LB,
+# then keepalived and haproxy will not deployed, but coredns still keep
+if [[ ${LB_TYPE} == "UserManaged" ]]; then
+    APIVIPS_DEF="apiVIPs:
+      - ${vips[0]}"
+    INGRESSVIPS_DEF="ingressVIPs:
+      - ${vips[1]}"
+    LB_TYPE_DEF="loadBalancer:
+      type: UserManaged"
+else
+    APIVIPS_DEF=""
+    INGRESSVIPS_DEF=""
+    LB_TYPE_DEF=""
+fi
+
+CONFIG="${SHARED_DIR}/install-config.yaml"
+
+if [[ -z "${vsphere_extra_portgroup_1}" ]] || [[ -z "${vsphere_extra_portgroup_2}" ]]; then
+   echo "The required extra leases is 2 at leaset, exit"
+   exit 1
+fi
+
+
+CONFIG="${SHARED_DIR}/install-config.yaml"
+PATCH="${SHARED_DIR}/multisubnets.yaml.patch"
+
+cat >"${PATCH}" <<EOF
+platform:
+  vsphere:
+    ${LB_TYPE_DEF}
+    ${APIVIPS_DEF}
+    ${INGRESSVIPS_DEF}
+    failureDomains:
+    - topology:
+        networks:
+          - $vsphere_extra_portgroup_1
+    - topology:
+        networks:
+          - $vsphere_extra_portgroup_2
+EOF
+
+yq-go m -x -i "${CONFIG}" "${PATCH}"
