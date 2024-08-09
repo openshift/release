@@ -26,6 +26,7 @@ OCP_UPGRADE_GRAPH_URL="${OCP_UPGRADE_GRAPH_URL:-https://amd64.ocp.releases.ci.op
 # 4-stable runs against all 4.x releases
 # We need to fast exit successfully for all runs that are not what we support
 SUPPORTED_VERSIONS=(
+    "4.16"
     "4.15"
     "4.14"
 )
