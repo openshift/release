@@ -94,8 +94,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64
-      MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "64k-pages", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'
       MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
       MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
       OCP_ARCH: arm64
@@ -181,6 +181,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: aws-upi-basecap-none-arm-f28
+  cron: 31 17 18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      BOOTSTRAP_INSTANCE_TYPE: m6g.large
+      MASTER_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      WORKER_INSTANCE_TYPE: m6g.xlarge
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f28-day2-64k-pagesize
   cron: 15 16 11 * *
   steps:
@@ -191,8 +207,8 @@ tests:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64
-      MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "64k-pages", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'
       MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
       MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
       OCP_ARCH: arm64
@@ -201,29 +217,29 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-des-mini-perm-fips-amd-f28
+- as: azure-ipi-basecap-vset-arm-f28
+  cron: 31 9 10 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
+- as: azure-ipi-des-mini-perm-arm-f28
   cron: 34 12 25 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
-      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
     test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
-- as: azure-ipi-des-mini-perm-amd-mixarch-f28
-  cron: 41 12 12 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    test:
-    - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
 - as: azure-ipi-fullyprivate-internal-registry-arm-f28
@@ -298,6 +314,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
+- as: baremetal-ipi-ovn-ipv4-basecap-none-f28
+  cron: 31 12 14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BASELINE_CAPABILITY_SET: None
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-ipi
 - as: baremetal-upi-ovn-dual-stack-arm-f28
   cluster: build05
   cron: 45 13 14 * *
@@ -322,18 +354,16 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: gcp-ipi-xpn-private-filestore-csi-arm-f28
-  cron: 9 15 5 * *
+- as: gcp-ipi-xpn-private-arm-f28
+  cron: 41 23 21 * *
   steps:
     cluster_profile: gcp-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-private-filestore-csi
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-private
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

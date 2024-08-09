@@ -1,0 +1,30 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  name: openshift-psap-topsail-cluster-pool # name is not relevant but of course must be unique
+  namespace: psap-rhoai-cluster-pool
+  labels: # architecture, cloud, owner, product, version are used to filter out a pool when a job claims a cluster
+    architecture: amd64
+    cloud: aws
+    product: ocp
+    owner: openshift-psap
+    version: "4.16"
+    flavor: sno
+spec:
+  baseDomain: psap.aws.rhperfscale.org
+  imageSetRef:
+    # the name of the imageSet which determines the image to install the cluster; will be automatically updated if `version_*` labels are set
+    # See https://github.com/openshift/release/tree/master/clusters/hive/pools
+    name: ocp-release-4.16.0-rc.6-x86-64-for-4.16.0-0-to-4.17.0-0
+  installConfigSecretTemplateRef:
+    name: install-config-sno-4-15-amd64-aws-us-east-1 # the name of the secret with an installation config for the installer
+  skipMachinePools: true
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: aws-credentials # the name of the secret with the credentials of the cloud account
+      region: us-east-1
+  pullSecretRef:
+    name: pull-secret
+  size: 2 # the number of clusters that Hive should keep provisioned and waiting for use.
+  maxSize: 10 # the maximum number of clusters that can exist at the same time.

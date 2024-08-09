@@ -18,7 +18,10 @@ chain:
       else
         export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       fi
-      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
+      mkdir -p "${ARTIFACT_DIR}/output"
+      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
+      tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
+      rm -rf "${ARTIFACT_DIR}/output"
     credentials:
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2

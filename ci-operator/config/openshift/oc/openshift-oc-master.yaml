@@ -15,18 +15,14 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: rhel-8-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.17
   tests-base:
     name: "4.17"
     namespace: ocp
@@ -40,47 +36,32 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cli
 - dockerfile_path: images/tools/Dockerfile
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -89,12 +70,12 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -213,6 +194,22 @@ tests:
   optional: true
   steps:
     workflow: openshift-ci-security
+- as: e2e-agent-compact-ipv4-add-nodes
+  cluster: build05
+  optional: true
+  run_if_changed: ^(pkg/cli/admin/nodeimage/|go.mod)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_DISK=100
+      DEVSCRIPTS_TARGET: agent_plus_add_node
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

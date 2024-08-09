@@ -4,6 +4,7 @@ export PS4='+ $(date "+%T.%N") \011'
 
 IP_ADDRESS="$(cat "${SHARED_DIR}/public_address")"
 HOST_USER="$(cat "${SHARED_DIR}/ssh_user")"
+CACHE_REGION="$(cat ${SHARED_DIR}/cache_region)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
@@ -52,7 +53,7 @@ if [ -e /tmp/aws_access_key_id ] && [ -e /tmp/aws_secret_access_key ] ; then
     cat <<EOF2 >>\${HOME}/.aws/config
 
 [microshift-ci]
-region = ${EC2_REGION}
+region = ${CACHE_REGION}
 output = json
 EOF2
 
@@ -67,7 +68,7 @@ EOF2
     # Permissions and environment settings
     chmod -R go-rwx \${HOME}/.aws/
     export AWS_PROFILE=microshift-ci
-    export AWS_BUCKET_NAME="microshift-build-cache-${EC2_REGION}"
+    export AWS_BUCKET_NAME="microshift-build-cache-${CACHE_REGION}"
 fi
 
 cd ~/microshift

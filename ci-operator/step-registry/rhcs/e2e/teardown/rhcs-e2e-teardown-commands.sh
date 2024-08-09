@@ -87,3 +87,6 @@ ginkgo run \
     --timeout 2h \
     -r \
     --focus-file tests/e2e/.*
+
+# clean files before leaving
+rm -rf ${SHARED_DIR}/tf-manifests

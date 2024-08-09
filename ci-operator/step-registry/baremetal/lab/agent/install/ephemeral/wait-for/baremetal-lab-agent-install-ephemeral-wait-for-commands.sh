@@ -5,6 +5,14 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
@@ -31,6 +39,17 @@ function get_ready_nodes_count() {
 
 
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
@@ -55,6 +74,7 @@ cp "${SHARED_DIR}/kubeconfig" "${KUBECONFIG_DIR}/"
 cp "${SHARED_DIR}/kubeadmin-password" "${KUBECONFIG_DIR}/"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 

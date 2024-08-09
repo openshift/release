@@ -16,7 +16,7 @@ function set_cluster_access() {
     fi
 }
 function preparation_for_test() {
-    if ! which kubectl > /dev/null ; then
+    if ! which kubectl &> /dev/null ; then
         mkdir --parents /tmp/bin
         export PATH=$PATH:/tmp/bin
         ln --symbolic "$(which oc)" /tmp/bin/kubectl
@@ -35,7 +35,7 @@ function test_execution_cucumber() {
     set +x
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
     test_execution_cucumber 'logging1' 'not @console'
     test_execution_cucumber 'logging2' '@console'
@@ -53,8 +53,7 @@ function summarize_test_results() {
     done < /tmp/zzz-tmp.log
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-logging
+cucushift-logging:
   total: $tests
   failures: $failures
   errors: $errors

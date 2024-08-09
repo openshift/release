@@ -75,6 +75,7 @@ INTERVAL=10
 COUNTER=0
 while :;
 do
+    echo "Checking if clusteroperator ingress rollout finished for the #${COUNTER}-th time ..."
     NEW_PROGRESSING="$(oc get co ingress '-o=jsonpath={.status.conditions[?(@.type=="Progressing")]}')"
     if [[ "$NEW_PROGRESSING" =~ '"status":"False"' ]] && [[ ! "$NEW_PROGRESSING" =~ lastTransitionTime\":\"$OLD_PROGRESSING_TIME ]]; then
         echo "The ingress pods finished rollout." && break
@@ -82,24 +83,69 @@ do
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
         echo "The ingress pods still do not finish rollout after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get co ingress -o=jsonpath='{.status}'
         oc get po -n openshift-ingress
         exit 1
     fi
     sleep $INTERVAL
 done
 
+echo "Creating a namespace from test usage."
+TEST_NAMESPACE=test-ingress-cert
+oc create ns $TEST_NAMESPACE
+
+echo "Creating the hello-openshift app and exposing a route from it."
+oc new-app -n $TEST_NAMESPACE quay.io/openshifttest/hello-openshift@sha256:4200f438cf2e9446f6bcff9d67ceea1f69ed07a2f83363b7fb52529f7ddd8a83
+# Wait for the hello-openshift pod to be running
+MAX_RETRY=12
+INTERVAL=10
+COUNTER=0
+while :;
+do
+    echo "Checking the hello-openshift pod status for the #${COUNTER}-th time ..."
+    if [ "$(oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift' -o=jsonpath='{.items[*].status.phase}')" == "Running" ]; then
+        echo "The hello-openshift pod is up and running."
+        break
+    fi
+    ((++COUNTER))
+    if [[ $COUNTER -eq $MAX_RETRY ]]; then
+        echo "The hello-openshift pod is not running after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift'
+        exit 1
+    fi
+    sleep $INTERVAL
+done
+oc create route edge -n $TEST_NAMESPACE --service hello-openshift
+TEST_ROUTE=$(oc get route -n $TEST_NAMESPACE hello-openshift -o=jsonpath='{.status.ingress[?(@.routerName=="default")].host}')
+echo "The exposed route's hostname is $TEST_ROUTE"
+
 echo "Validating the cert-manager customized default ingress certificate"
+# The CA_FILE will be used later to update KUBECONFIG
 oc extract secret/cert-manager-managed-ingress-cert-tls -n openshift-ingress
 CA_FILE=ca.crt
 if [ ! -f ca.crt ]; then
     CA_FILE=tls.crt
 fi
-CANARY_ROUTE=$(oc get route canary -n openshift-ingress-canary -o=jsonpath='{.status.ingress[?(@.routerName=="default")].host}')
-CURL_OUTPUT=$(curl -IsS --cacert $CA_FILE --connect-timeout 30 "https://$CANARY_ROUTE" 2>&1 || true)
-if [[ ! "$CURL_OUTPUT" =~ HTTP/1.1\ 200\ OK ]]; then
-    echo -e "Fails to validate the cert-manager customized default ingress certificate. Dumping the curl output:\n${CURL_OUTPUT}."
-    exit 1
-fi
+
+MAX_RETRY=12
+INTERVAL=10
+COUNTER=0
+while :;
+do
+    CURL_OUTPUT=$(curl -IsS -v --cacert $CA_FILE --connect-timeout 30 "https://$TEST_ROUTE" 2>&1 || true)
+    if [[ "$CURL_OUTPUT" =~ HTTP/1.1\ 200\ OK ]]; then
+        echo "The customized certificate is serving as expected." && break
+    fi
+    ((++COUNTER))
+    if [[ $COUNTER -eq $MAX_RETRY ]]; then
+        echo -e "Timeout after $((MAX_RETRY * INTERVAL)) seconds waiting for curl validation succeeded. Dumping the curl output:\n${CURL_OUTPUT}."
+        exit 1
+    fi
+    sleep $INTERVAL
+done
+
+echo "Deleting the namespace as curl validation finished."
+oc delete ns $TEST_NAMESPACE
 
 # Update KUBECONFIG WRT CA of ingress certificate otherwise oc login command will fail
 cp "$KUBECONFIG" "$KUBECONFIG".before-custom-ingress.bak

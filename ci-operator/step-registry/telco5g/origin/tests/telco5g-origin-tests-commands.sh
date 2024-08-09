@@ -10,8 +10,12 @@ source "$SHARED_DIR/main.env"
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
-else
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
@@ -30,7 +34,7 @@ SSH_PKEY=~/key
 cp "$SSH_PKEY_PATH" "$SSH_PKEY"
 chmod 600 "$SSH_PKEY"
 
-if [[ "$T5CI_VERSION" == "4.16" ]]; then
+if [[ "$T5CI_VERSION" == "4.17" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"

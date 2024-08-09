@@ -88,27 +88,29 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-outpost-day2
-- as: aws-ipi-ovn-hypershift-inplace-f7
-  cron: 12 8 3,10,17,26 * *
+- as: aws-ipi-ovn-hypershift-mce-inplace-f28
+  cron: 5 17 28 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --node-upgrade-type=InPlace
+      MCE_VERSION: "2.5"
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
     - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-replace-f7
-  cron: 39 22 3,12,19,26 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-replace-f28
+  cron: 5 17 2 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
     - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-wavelength-fips-f14
   cron: 37 17 9,25 * *
   steps:
@@ -142,8 +144,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
-- as: baremetalds-ipi-ovn-ipv6-fips-f14
-  cron: 17 4 14,28 * *
+- as: baremetalds-kubevirt-hypershift-mce-replace-f14
+  cron: 7 5 16,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.5"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: baremetalds-ipi-ovn-ipv6-fips-f360
+  cron: 17 4 14 1 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -156,8 +170,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f14
-  cron: 35 7 1,17 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f360
+  cron: 35 7 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -193,7 +207,7 @@ tests:
 - as: vsphere-ipi-ovn-dualstack-f28
   cron: 33 14 16 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack

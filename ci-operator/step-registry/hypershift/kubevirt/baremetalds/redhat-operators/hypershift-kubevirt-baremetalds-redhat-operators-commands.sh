@@ -136,6 +136,37 @@ END
 
     echo "7: Waiting for the new ImageContentSourcePolicy to be updated on machines"
     oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
+
+    # TODO: why do we need this? do we have a bug?
+    echo "8: explicitly fix IDMS for CSI sidecar images"
+
+    oc apply -f - <<END
+    apiVersion: config.openshift.io/v1
+    kind: ImageDigestMirrorSet
+    metadata:
+      name: cs-ccs-local-fixes
+    spec:
+      imageDigestMirrors:
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-provisioner
+        source: registry.redhat.io/openshift4/ose-csi-external-provisioner
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-resizer
+        source: registry.redhat.io/openshift4/ose-csi-external-resizer
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-snapshotter-rhel9
+        source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel9
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-snapshotter-rhel8
+        source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-node-driver-registrar
+        source: registry.redhat.io/openshift4/ose-csi-node-driver-registrar
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/openshift4/ose-kube-rbac-proxy
+        source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
+END
+
 EOF
 }
 

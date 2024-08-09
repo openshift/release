@@ -24,7 +24,10 @@ export ref_machineset_name winworker_machineset_name
 # and pass it to `oc` to create a new machineset
 oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
   jq --arg winworker_machineset_name "${winworker_machineset_name}" \
-     --arg win_os_id "${WINDOWS_OS_ID}" \
+     --arg win_offer "WindowsServer" \
+     --arg win_publisher "MicrosoftWindowsServer" \
+     --arg win_sku "${WIN_SKU}" \
+     --arg win_version "latest" \
      --arg user_data_secret "${WINDOWS_USER_DATA_SECRET}" \
      '
       .metadata.name = $winworker_machineset_name |
@@ -34,9 +37,13 @@ oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
       .spec.template.metadata.labels."machine.openshift.io/exclude-node-draining" = "" |
       .spec.template.metadata.labels."machine.openshift.io/os-id" = "Windows" |
       .spec.template.spec.metadata.labels."node-role.kubernetes.io/worker" = "" |
-      .spec.template.spec.providerSpec.value.disks[0].image = $win_os_id |
-      .spec.template.spec.providerSpec.value.machineType = $instance_type |
+      .spec.template.spec.providerSpec.value.osDisk.osType = "Windows" |
+      .spec.template.spec.providerSpec.value.image.offer = $win_offer |
+      .spec.template.spec.providerSpec.value.image.publisher = $win_publisher |
+      .spec.template.spec.providerSpec.value.image.sku = $win_sku |
+      .spec.template.spec.providerSpec.value.image.version = $win_version |
       .spec.template.spec.providerSpec.value.userDataSecret.name = $user_data_secret |
+      del(.spec.template.spec.providerSpec.value.image.resourceID) |
       del(.status) |
       del(.metadata.selfLink) |
       del(.metadata.uid)

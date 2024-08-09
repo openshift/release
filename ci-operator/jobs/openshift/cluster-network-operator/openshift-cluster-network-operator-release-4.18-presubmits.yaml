@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-hypershift-ovn-kubevirt
     decorate: true
     labels:
@@ -84,7 +84,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/e2e-aws-ovn-hypershift-conformance
     decorate: true
     labels:
@@ -162,7 +162,88 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-ipsec-serial
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.18-e2e-aws-ovn-ipsec-serial
+    optional: true
+    rerun_command: /test e2e-aws-ovn-ipsec-serial
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-ipsec-serial-cluster-profile
+        - --target=e2e-aws-ovn-ipsec-serial
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-ipsec-serial-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-ipsec-serial,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.18$
+    - ^release-4\.18-
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-ipsec-upgrade
     decorate: true
     labels:
@@ -241,7 +322,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     labels:
@@ -320,7 +401,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -399,7 +480,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     labels:
@@ -478,7 +559,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     labels:
@@ -557,7 +638,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-techpreview-serial
     decorate: true
     labels:
@@ -636,7 +717,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -714,7 +795,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     labels:
@@ -792,7 +873,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -871,7 +952,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-dualstack
     decorate: true
     labels:
@@ -950,7 +1031,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-manual-oidc
     decorate: true
     labels:
@@ -1029,7 +1110,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     labels:
@@ -1107,7 +1188,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -1189,7 +1270,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -1272,7 +1353,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     labels:
@@ -1513,7 +1594,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv4
     decorate: true
     decoration_config:
@@ -1680,7 +1761,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
@@ -1759,7 +1840,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     labels:
@@ -1838,7 +1919,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-ovn-ipsec-step-registry
     decorate: true
     labels:
@@ -1917,7 +1998,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     labels:
@@ -2001,7 +2082,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.18-e2e-vsphere-ovn
@@ -2080,7 +2161,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.18-e2e-vsphere-ovn-dualstack
@@ -2159,7 +2240,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.18-e2e-vsphere-ovn-dualstack-primaryv6
@@ -2238,7 +2319,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.18-e2e-vsphere-ovn-windows
@@ -2312,7 +2393,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -2366,7 +2447,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     labels:
@@ -2419,7 +2500,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
     decorate: true
     decoration_config:
@@ -2500,7 +2581,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
     decorate: true
     decoration_config:
@@ -2581,7 +2662,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
     decorate: true
     decoration_config:
@@ -2662,7 +2743,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
@@ -2743,7 +2824,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/security
     decorate: true
     labels:
@@ -2804,7 +2885,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
@@ -2857,7 +2938,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build03
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     labels:

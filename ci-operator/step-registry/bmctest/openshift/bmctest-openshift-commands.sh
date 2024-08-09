@@ -19,6 +19,6 @@ SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
     cd bmctest;
     ./ocpbmctest.sh -s /tmp/pull-secret -c /tmp/bmctest-openshift.yaml -r ${RELEASEV}"
 
-scp "${SSHOPTS[@]}"  /var/run/bmctest-openshift/config  "centos@${SERVER_IP}:/tmp/bmctest-openshift"
-scp "${SSHOPTS[@]}"  "${CLUSTER_PROFILE_DIR}/pull-secret"  "centos@${SERVER_IP}:/tmp/pull-secret"
-ssh "${SSHOPTS[@]}" "centos@${SERVER_IP}" "${SSHCMD}"
+scp "${SSHOPTS[@]}"  /var/run/bmctest-openshift/config  "cloud-user@${SERVER_IP}:/tmp/bmctest-openshift"
+scp "${SSHOPTS[@]}"  "${CLUSTER_PROFILE_DIR}/pull-secret"  "cloud-user@${SERVER_IP}:/tmp/pull-secret"
+ssh "${SSHOPTS[@]}" "cloud-user@${SERVER_IP}" "${SSHCMD}"

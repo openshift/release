@@ -15,10 +15,51 @@ chain:
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
-      documentation: "The Azure location of the cluster."
+      documentation: |-
+        Specifies the Azure location of the cluster. If intentionally left as an empty string, 
+        it defaults to that of the management cluster.
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
     - name: ENABLE_ICSP
       default: "false"
-      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+      documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
+      default: ""
+      documentation: "The Azure Marketplace image offer."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+      default: ""
+      documentation: "The Azure Marketplace image publisher."
+    - name: HYPERSHIFT_ETCD_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable ETCD encryption by specifying --encryption-key-id="$(cat "${SHARED_DIR}/azure_active_key_url")".
+    - name: HYPERSHIFT_DISK_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable OS disk encryption by specifying --disk-encryption-set-id="$(cat "${SHARED_DIR}/azure_des_id")".
+    - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+      default: "false"
+      documentation: |-
+        If true, create hosted cluster infrastructure in the resource group specified in "${SHARED_DIR}/resourcegroup".
+    - name: HYPERSHIFT_CUSTOM_VNET
+      default: "false"
+      documentation: "If true, use BYO VNET specified in ${SHARED_DIR}/azure_vnet_id"
+    - name: HYPERSHIFT_CUSTOM_SUBNET
+      default: "false"
+      documentation: "If true, use BYO SUBNET specified in ${SHARED_DIR}/azure_subnet_id"
+    - name: HYPERSHIFT_CUSTOM_NSG
+      default: "false"
+      documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
+    - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
+      default: ""
+      documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra arguments to pass to the hypershift create cluster azure command."
     commands: |-
       set -exuo pipefail
 
@@ -27,23 +68,83 @@ chain:
       
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
       
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+        AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+      fi
+      HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
+      
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
       ICSP_COMMAND=""
       if [[ $ENABLE_ICSP == "true" ]]; then
         ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
-        echo "extract secret/pull-secret"
-        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-        PULL_SECRET_PATH="/tmp/.dockerconfigjson"
       fi
       
-      /usr/bin/hypershift create cluster azure ${ICSP_COMMAND} \
+      ENCRYPTION_KEY_ID=""
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+        ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
+      fi
+      
+      DISK_ENCRYPTION_SET_ID=""
+      if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
+        DISK_ENCRYPTION_SET_ID="$(cat "${SHARED_DIR}/azure_des_id")"
+      fi
+      
+      RESOURCE_GROUP_NAME=""
+      if [[ $HYPERSHIFT_CUSTOM_RESOURCE_GROUP == "true" ]]; then
+        RESOURCE_GROUP_NAME="$(cat "${SHARED_DIR}/resourcegroup")"
+      fi
+      
+      VNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_VNET == "true" ]]; then
+        VNET_ID="$(cat "${SHARED_DIR}/azure_vnet_id")"
+      fi
+      
+      SUBNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_SUBNET == "true" ]]; then
+        SUBNET_ID="$(cat "${SHARED_DIR}/azure_subnet_id")"
+      fi
+      
+      NSG_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_NSG == "true" ]]; then
+        NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
+      fi
+      
+      HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
+      if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
+        while read -r line; do
+          if [[ -n "$line" ]]; then
+            EXTRA_ARGS+=" --annotations=${line}"
+          fi
+        done < "$HC_ANNOTATIONS_FILE"
+      fi
+      
+      if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
+        EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+        EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+        EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+        EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}"/azure-marketplace-image-sku)"
+        EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}"/azure-marketplace-image-version)"
+      fi
+      
+      /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
         --pull-secret ${PULL_SECRET_PATH} \
-        --azure-creds ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json \
-        --location ${HYPERSHIFT_AZURE_LOCATION} \
-        --release-image ${RELEASE_IMAGE}
+        --azure-creds ${AZURE_CREDS} \
+        --location ${HC_LOCATION} \
+        --release-image ${RELEASE_IMAGE} \
+        --encryption-key-id=${ENCRYPTION_KEY_ID} \
+        --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
+        --resource-group-name=${RESOURCE_GROUP_NAME} \
+        --vnet-id=${VNET_ID} \
+        --subnet-id=${SUBNET_ID} \
+        --network-security-group-id=${NSG_ID}
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
@@ -68,6 +169,9 @@ chain:
     credentials:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
       namespace: test-credentials
     dependencies:
     - name: "release:latest"

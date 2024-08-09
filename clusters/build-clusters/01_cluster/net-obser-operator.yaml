@@ -78,6 +78,10 @@ metadata:
   name: loki
   namespace: netobserv
 spec:
+  limits:
+    global:
+      retention:
+        days: 30
   size: 1x.extra-small
   replication:
     factor: 1
@@ -95,6 +99,17 @@ spec:
       adminGroups:
       - cluster-admin
       - test-platform-ci-admins
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: network-flows
+  namespace: netobserv
+  labels:
+    strimzi.io/cluster: "kafka-cluster"
+spec:
+  partitions: 24
+  replicas: 1
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
@@ -127,12 +142,26 @@ metadata:
 spec:
   agent:
     ebpf:
-      sampling: 500
+      sampling: 1
       privileged: true
       features:
         - PacketDrop
         - DNSTracking
-  deploymentModel: Kafka
+      flowFilter:
+        enable: true
+        action: Accept
+        cidr: 0.0.0.0/0
+        ports: 53
+        protocol: UDP
+  processor:
+    kafkaConsumerReplicas: 6
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+      limits:
+        memory: 2Gi
+  deploymentModel: Direct
   kafka:
     address: kafka-cluster-kafka-bootstrap.netobserv
     topic: network-flows

@@ -11,7 +11,7 @@ images:
     FROM registry.access.redhat.com/ubi9/ubi:latest
 
     RUN cat /etc/os-release
-    ARG OPERATOR_SDK_VERSION=1.32.0
+    ARG OPERATOR_SDK_VERSION=1.35.0
     ARG ARCH=amd64
 
     ADD openshift-preflight /src
@@ -58,6 +58,16 @@ tests:
     timeout: 1h0m0s
     version: "4.12"
   steps:
+    env:
+      CHANGE_CHANNEL_BASE: candidate
+      CINCINNATI_URL: https://api.integration.openshift.com/api/upgrades_info/graph
+    post:
+    - chain: gather
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-configure-cincinnati
+    - ref: operator-pipelines-preflight-prod-approve-csrs
+    - ref: operator-pipelines-preflight-prod-operator-registry-cache-fix
     test:
     - as: e2e
       commands: |
@@ -69,8 +79,6 @@ tests:
         echo ${PULL_PULL_SHA} | tee ${ARTIFACT_DIR}/pull-request-sha.txt
         echo "== preflight version - this includes the merge pr for this commit =="
         ./preflight --version | tee ${ARTIFACT_DIR}/preflight-version.txt
-        echo "== oc version =="
-        oc version | tee ${ARTIFACT_DIR}/oc-version.txt
         echo "== operator-sdk version =="
         operator-sdk version | tee ${ARTIFACT_DIR}/operator-sdk-version.txt
         git log --oneline | head > ${ARTIFACT_DIR}/git-log-last-ten.txt
@@ -81,7 +89,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem

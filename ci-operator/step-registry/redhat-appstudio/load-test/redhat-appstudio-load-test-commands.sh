@@ -89,11 +89,11 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" >"${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    # if this is executed as PR check of github.com/redhat-appstudio/e2e-tests.git repo, switch to PR branch.
+    # if this is executed as PR check of github.com/konflux-ci/e2e-tests.git repo, switch to PR branch.
     git fetch upstream "pull/${PULL_NUMBER}/head"
     git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
     git pull --rebase upstream main

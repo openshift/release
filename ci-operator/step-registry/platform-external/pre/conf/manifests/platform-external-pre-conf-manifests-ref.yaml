@@ -1,0 +1,31 @@
+ref:
+  as: platform-external-pre-conf-manifests
+  from: installer
+  commands: platform-external-pre-conf-manifests-commands.sh
+  grace_period: 30m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Step to customize installer manifests required by Platform External for each platform.
+    The step creates manifests (openshift-install create manifests) and generate the ignition
+    config files (create ignition-configs), saving in a the shared storage.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:initial"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: PROVIDER_NAME
+    default: ""
+    documentation: |-
+      The Provider Name the cluster will be provisioned.
+  - name: PLATFORM_EXTERNAL_CCM_ENABLED
+    default: ""
+    documentation: |-
+      When set to "yes" the CCM parameters will be set in the install-config.yaml.
+  - name: PLATFORM_EXTERNAL_OVERRIDE_RELEASE
+    default: ""
+    documentation: |-
+      Override release image.

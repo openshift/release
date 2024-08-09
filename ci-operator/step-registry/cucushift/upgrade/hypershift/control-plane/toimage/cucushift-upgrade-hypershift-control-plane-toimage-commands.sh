@@ -103,8 +103,16 @@ TARGET_MAIN_VERSION="$(echo "$TARGET_VERSION" | cut -d '.' -f 1-2)"
 SOURCE_MAIN_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
 echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION , SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
 oc annotate hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" "hypershift.openshift.io/force-upgrade-to=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --overwrite
-set +x
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
+
+if [[ "${HYPERSHIFT_ENABLE_MULTIARCH}" == "true" ]]; then
+  echo "target hc multiArch is true"
+  platform=$(oc get hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --ignore-not-found -o=jsonpath='{.spec.platform.type}')
+  if [[ "${platform}" == "AWS" ]] ; then
+    oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"platform":{"aws":{"multiArch": true}}}}'
+  fi
+fi
+set +x
 
 _upgradeReady=1
 for ((i=1; i<=120; i++)); do
@@ -117,6 +125,9 @@ for ((i=1; i<=120; i++)); do
     echo "Try ${i}/120: HyperShift HostedCluster(CP) is not updated yet. Checking again in 30 seconds"
     sleep 30
 done
+
+# dump hc
+oc get hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" -oyaml > "${ARTIFACT_DIR}/hostedcluster.yaml"
 
 if [ $_upgradeReady -ne 0 ]; then
     echo "HyperShift HostedCluster(CP) upgrade failed"

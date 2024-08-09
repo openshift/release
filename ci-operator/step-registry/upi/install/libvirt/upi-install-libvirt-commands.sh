@@ -11,6 +11,9 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+trap 'prepare_next_steps' EXIT TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
@@ -30,7 +33,28 @@ function save_credentials () {
   cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
 }
 
+function prepare_next_steps () {
+  EXIT_CODE=$?
+  echo ${EXIT_CODE} > "${SHARED_DIR}/install-status.txt"
+  if [[ ${EXIT_CODE} != 0 ]]; then
+    exit ${EXIT_CODE}
+  fi
+  set +e
+  echo "Setup phase finished, prepare env for next steps"
+  # Password for the cluster gets leaked in the installer logs and hence removing them.
+  sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
+  cp /tmp/.openshift_install.log "${ARTIFACT_DIR}"/.openshift_install.log
+  save_credentials
+  set -e
+}
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+  echo "Ignoring host encryption validation for FIPS testing..."
+  export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 # download the correct openshift-install from the payload
+echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to=/tmp
 
@@ -38,17 +62,17 @@ CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 OCPINSTALL='/tmp/openshift-install'
 RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
 QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-VOLUME_NAME="rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
-# TODO: Update this to specify a different storage pool for each openshift version (4.16, 4.15, etc)
 # Only create the storage pool if there isn't one already...
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
 else
+  echo "Creating storage pool..."
   ${VIRSH} pool-define-as \
     --name ${POOL_NAME} \
     --type dir \
@@ -58,39 +82,69 @@ else
 fi
 
 # Check if we need to update the source volume
-CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)
-
+CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
 if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
   # Delete the old source volume
   if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
-    echo "Deleting old source volume..."
-    ${VIRSH} vol-delete \
-      --vol ${CURRENT_SOURCE_VOLUME} \
-      --pool ${POOL_NAME}
+    echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
   fi
 
-  # Download the new qcow image
+  # Download the new rhcos image
+  echo "Downloading new rhcos image..."
   curl -L "${QCOW_URL}" | gunzip -c > /tmp/${VOLUME_NAME} || true
 
-  # Resize the qemu to match the volume capacity
+  # Resize the rhcos image to match the volume capacity
+  echo "Resizing rhcos image to match volume capacity..."
   qemu-img resize /tmp/${VOLUME_NAME} ${VOLUME_CAPACITY}
 
   # Create the new source volume
+  echo "Creating source volume..."
   ${VIRSH} vol-create-as \
     --name ${VOLUME_NAME} \
     --pool ${POOL_NAME} \
     --format qcow2 \
     --capacity ${VOLUME_CAPACITY}
 
-  # Upload the qcow image to the source volume
+  # Upload the rhcos image to the source volume
+  echo "Uploading rhcos image to source volume..."
   ${VIRSH} vol-upload \
     --vol ${VOLUME_NAME} \
     --pool ${POOL_NAME} \
     /tmp/${VOLUME_NAME}
 fi
 
-# Generating ignition configs
+# Move the install config to the install directory
+echo "Move the install config to the install directory..."
 cp ${SHARED_DIR}/install-config.yaml /tmp
+
+# Generate manifests for cluster modifications
+echo "Generating manifests..."
+${OCPINSTALL} create manifests --dir /tmp
+
+# Check for the node tuning yaml config, and save it in the installation directory
+NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
+if [ -f "${NODE_TUNING_YAML}" ]; then
+  echo "Saving ${NODE_TUNING_YAML} to the install directory..."
+  cp ${NODE_TUNING_YAML} /tmp/manifests
+fi
+
+# Check for the etcd on ramdisk yaml config, and save it in the installation directory
+ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
+if [ -f "${ETCD_RAMDISK_YAML}" ]; then
+  echo "Saving ${ETCD_RAMDISK_YAML} to the install directory..."
+  cp ${ETCD_RAMDISK_YAML} /tmp/manifests
+fi
+
+# Check for static pod controller degraded yaml config, and save it in the installation directory
+STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
+if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
+  echo "Saving ${STATIC_POD_DEGRADED_YAML} to the install directory..."
+  cp ${STATIC_POD_DEGRADED_YAML} /tmp/manifests
+fi
+
+# Generating ignition configs
+echo "Generating ignition configs..."
 ${OCPINSTALL} create ignition-configs --dir /tmp
 
 save_credentials
@@ -99,12 +153,14 @@ save_credentials
 for IGNITION_TYPE in bootstrap master worker; do
   NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
+  echo "Creating ${IGNITION_TYPE} ignition volume..."
   ${VIRSH} vol-create-as \
     --name ${NAME} \
     --pool ${POOL_NAME} \
     --format raw \
     --capacity 1M
 
+  echo "Uploading ${IGNITION_TYPE}.ign to ${NAME} volume..."
   ${VIRSH} vol-upload \
     --vol ${NAME} \
     --pool ${POOL_NAME} \
@@ -117,6 +173,7 @@ clone_volume () {
     exit 1
   fi
 
+  echo "Cloning ${VOLUME_NAME} volume as ${1} volume..."
   ${VIRSH} vol-clone \
     --pool ${POOL_NAME} \
     --vol ${VOLUME_NAME} \
@@ -137,6 +194,7 @@ create_vm () {
   MAC_ADDRESS=${2}
   IGNITION_VOLUME=${LEASED_RESOURCE}-${3}-ignition-volume
 
+  echo "Creating ${NAME} vm..."
   virt-install \
     --connect ${LIBVIRT_CONNECTION} \
     --name ${NAME} \
@@ -153,6 +211,7 @@ create_vm () {
 
 # Create the bootstrap node.
 NODE="${LEASED_RESOURCE}-bootstrap"
+echo "Creating ${NODE} node..."
 MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
 clone_volume ${NODE}-volume
 create_vm ${NODE} ${MAC_ADDRESS} bootstrap
@@ -160,6 +219,7 @@ create_vm ${NODE} ${MAC_ADDRESS} bootstrap
 # Create the control plane nodes.
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-control-${i}"
+  echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
   clone_volume ${NODE}-volume
   create_vm ${NODE} ${MAC_ADDRESS} master
@@ -168,6 +228,7 @@ done
 # Create the compute nodes.
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-compute-${i}"
+  echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
   clone_volume ${NODE}-volume
   create_vm ${NODE} ${MAC_ADDRESS} worker
@@ -176,15 +237,15 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 ${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
-# TODO: collect logs in case of failure
 wait "$!"
 
 # Sleep between destroy and undefine to allow for a slight destroy lag
+echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
 ${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
 sleep 1s
 ${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
 
-echo "Approving pending CSRs"
+echo "Approving pending CSRs..."
 approve_csrs () {
   oc version --client
   while true; do
@@ -204,7 +265,7 @@ approve_csrs &
 sleep 5m
 
 set +x
-echo "Completing UPI setup"
+echo "Completing UPI setup..."
 ${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
 wait "$!"
 
@@ -233,12 +294,5 @@ for i in {1..30}; do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
-
-# Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
-cp /tmp/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
-
-# Save the kubeconfig again to make sure any changes during install are captured in future steps
-save_credentials
 
 touch /tmp/install-complete

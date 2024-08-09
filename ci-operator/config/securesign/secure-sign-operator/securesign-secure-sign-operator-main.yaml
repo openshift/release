@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  operator-sdk:
-    name: "4.14"
-    namespace: origin
-    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
@@ -15,18 +11,18 @@ build_root:
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
+  from: src
   to: securesign-operator
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
   from: src
   inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-  to: src-oc
+  to: src-cli
 operator:
   bundles:
   - as: securesign-bundle
@@ -34,8 +30,6 @@ operator:
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.redhat.io/rhtas/rhtas-rhel9-operator.*
-    with: pipeline:securesign-operator
-  - pullspec: quay.io/redhat-user-workloads/rhtas-tenant/operator/rhtas-operator.*
     with: pipeline:securesign-operator
 releases:
   latest:
@@ -63,14 +57,77 @@ tests:
       cli: latest
       commands: |
         set -x
+        cd /go/src/github.com/securesign/secure-sign-operator
+        make dev-images
+        cat > /tmp/image_config.patch <<EOF
+        {"spec": {"config":{"env": [
+        {"name": "TRILLIAN_LOG_SIGNER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianLogSignerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TRILLIAN_LOG_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TRILLIAN_DB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianDbImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "FULCIO_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "FulcioServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorRedisImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_SEARCH_UI_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorSearchUiImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "BACKFILL_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "BackfillRedisImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TUF_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TufImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "CTLOG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CTLogImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "CLIENT_SERVER_CG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage_cg" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "CLIENT_SERVER_RE_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage_re" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "SEGMENT_BACKUP_JOB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "SegmentBackupImage" | grep -o '[^[:space:]]*@sha.*')}
+        ]}}}
+        EOF
+        cat /tmp/image_config.patch
         oc create ns openshift-rhtas-operator
-        operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
+        make operator-sdk
+        ./bin/operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
+        oc get subscription -n openshift-rhtas-operator -o name | xargs oc patch --type=merge -n openshift-rhtas-operator --patch-file /tmp/image_config.patch
+        sleep 5
         oc get deployments -n openshift-rhtas-operator -o yaml
         oc wait --for condition=Available -n openshift-rhtas-operator deployment rhtas-operator-controller-manager
+
+         # install RH SSO
+        oc create -k ci/keycloak/operator/base
+        until [ ! -z "$(oc get pod -l name=rhsso-operator -n keycloak-system 2>/dev/null)" ]
+        do
+          echo "Waiting for rhsso-operator operator. Pods in keycloak-system namespace:"
+          oc get pods -n keycloak-system
+          sleep 10
+        done
+        oc create --kustomize ci/keycloak/resources/base
+        until [[ $( oc get keycloak keycloak -o jsonpath='{.status.ready}' -n keycloak-system 2>/dev/null) == "true" ]]
+        do
+          printf "Waiting for keycloak deployment. \n Keycloak ready: %s\n" $(oc get keycloak keycloak -o jsonpath='{.status.ready}' -n keycloak-system)
+          sleep 10
+        done
+
+        # push test image
+        oc create -n default -f - << EOF
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: test-image-push
+        spec:
+          template:
+            spec:
+              containers:
+              - name: buildah
+                image: quay.io/buildah/stable
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                    buildah pull alpine:latest
+                    buildah tag alpine:latest ttl.sh/$PROW_JOB_ID:1h
+                    buildah push ttl.sh/$PROW_JOB_ID:1h
+                securityContext:
+                    privileged: true
+              restartPolicy: Never
+          backoffLimit: 4 # Defines the number of retries before considering the Job failed.
+        EOF
+        oc wait -n default --for=condition=complete job/test-image-push --timeout=5m
       dependencies:
       - env: OO_BUNDLE
         name: securesign-bundle
-      from: operator-sdk
+      from: src-cli
       resources:
         requests:
           cpu: 100m
@@ -78,12 +135,14 @@ tests:
     - as: test
       cli: latest
       commands: |
-        ./ci/openshift/tas-keycloak-install.sh
         set -x
+        openssl s_client -connect $(oc get route -n keycloak-system keycloak -o jsonpath='{.status.ingress[0].host}'):443 -showcerts </dev/null 2>/dev/null|openssl x509 -outform PEM > cert.crt
+        export  SSL_CERT_FILE=$(pwd)/cert.crt
+        export OIDC_ISSUER_URL=https://$(oc get route -n keycloak-system keycloak -o jsonpath='{.status.ingress[0].host}')/auth/realms/trusted-artifact-signer
+        export TEST_IMAGE=ttl.sh/$PROW_JOB_ID:1h
         go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.2
-        ./ci/openshift/sign-test.sh
-        oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
-      from: src-oc
+        make test-e2e
+      from: src
       resources:
         requests:
           cpu: 100m
