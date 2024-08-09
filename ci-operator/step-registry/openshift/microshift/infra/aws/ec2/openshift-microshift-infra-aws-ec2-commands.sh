@@ -89,10 +89,10 @@ Mappings:
      Throughput: 750
      Iops: 6000
    VirtualMachine:
-     PrimaryVolumeSize: "200"
-     SecondaryVolumeSize: "10"
-     Throughput: 125
-     Iops: 3000
+     PrimaryVolumeSize: "100"
+     SecondaryVolumeSize: "20"
+     Throughput: 500
+     Iops: 6000
 Parameters:
   EC2Type:
     Default: 'VirtualMachine'
