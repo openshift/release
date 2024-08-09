@@ -1,0 +1,76 @@
+base_images:
+  ci-artifacts:
+    name: master
+    namespace: psap
+    tag: ci-artifacts
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: nfd-e2e-master-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "nfd-tests-e2e", "failure_type": "pod_failure", "classification": "Test failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "nfd-tests-e2e", "failure_type": "test_failure", "classification": "PQE Test failure", "jira_project": "OCPBUGS", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","rosa-classic-lp","nfd-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ggordani@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      OPERATORS: |
+        [
+            {"name": "nfd", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-nfd", "target_namespaces": "openshift-nfd", "operator_group":"openshift-nfd"}
+        ]
+    test:
+    - chain: install-operators
+    - ref: nfd-tests-e2e
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: cluster-nfd-operator
+  variant: nfd-ocp4.15-lp-rosa-classic
