@@ -44,6 +44,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-credentials-file=/etc/hypershift-ci-jobs-azurecreds/credentials.json \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
   --e2e.base-domain=hypershift.azure.devcluster.openshift.com \
+  --e2e.azure-location=${HYPERSHIFT_AZURE_LOCATION} \
     ${EXTERNAL_DNS_ARGS:-} \
     ${AKS_ANNOTATIONS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
