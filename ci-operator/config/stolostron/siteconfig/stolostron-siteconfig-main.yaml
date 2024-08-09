@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.21-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.21-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -16,10 +12,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    stolostron_builder_go1.21-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
   to: siteconfig-operator
 promotion:
   to:
@@ -47,8 +39,8 @@ tests:
     from: src
 - as: sonar-pre-submit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
@@ -56,8 +48,8 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
