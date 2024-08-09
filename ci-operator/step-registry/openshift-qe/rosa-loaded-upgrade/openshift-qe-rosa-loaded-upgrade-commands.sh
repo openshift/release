@@ -215,4 +215,5 @@ else
   exit 1
 fi
 rosa_login $CLOUD_PROVIDER_REGION
+sleep 28800
 rosa_upgrade $CLOUD_PROVIDER_REGION
