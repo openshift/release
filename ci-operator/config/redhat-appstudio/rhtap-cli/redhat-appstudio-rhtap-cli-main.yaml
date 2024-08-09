@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
   rhtap-installer:
     name: redhat-appstudio
     namespace: ci
@@ -10,6 +14,16 @@ images:
 - dockerfile_path: ci/Dockerfile
   from: src
   to: rhtap-cli
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
 releases:
   latest:
     release:
@@ -41,6 +55,26 @@ tests:
     test:
     - ref: redhat-appstudio-rhtap-installer-e2e-test
     workflow: redhat-appstudio-rhtap-cli
+- as: rhtap-cli-gitops-prerelease
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 0 30 7 *
+  steps:
+    env:
+      NEW_OPERATOR_CHANNEL: latest
+      NEW_SOURCE: gitops-iib
+      PRODUCT: gitops
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-cli-gitops-prerelease
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
