@@ -38,8 +38,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
             enabled: true
             dhcp: true
           ipv6:
-            enabled: true
-            dhcp: true
+            enabled: false
+            dhcp: false
 EOF
 
   # Append configurations for disabled interfaces
