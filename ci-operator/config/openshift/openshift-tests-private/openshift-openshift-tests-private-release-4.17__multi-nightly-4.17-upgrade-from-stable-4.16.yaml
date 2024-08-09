@@ -301,6 +301,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-upi
+- as: aws-upi-basecap-none-canary-f28
+  cron: 2 1 15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      BOOTSTRAP_INSTANCE_TYPE: m6g.large
+      MASTER_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      WORKER_INSTANCE_TYPE: m6g.xlarge
+    test:
+    - chain: openshift-upgrade-qe-test-canary
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-basecap-vset-additionalcap-arm-f28
   cron: 26 12 15 * *
   steps:
@@ -362,7 +378,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-ingress-controller-arm-mixarch-f28
-  cron: 26 9 20 * *
+  cron: 49 22 7 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -725,6 +741,19 @@ tests:
       workers: "2"
     test:
     - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-upi
+- as: baremetal-upi-ovn-ipv4-canary-f28
+  cluster: build05
+  cron: 9 18 25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test-canary
     workflow: baremetal-lab-upi
 - as: gcp-ipi-basecap-none-additionalcaps-arm-f28
   cron: 41 21 15 * *
