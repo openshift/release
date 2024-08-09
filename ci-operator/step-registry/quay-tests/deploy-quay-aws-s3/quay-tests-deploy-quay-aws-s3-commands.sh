@@ -146,6 +146,17 @@ DISTRIBUTED_STORAGE_CONFIG:
       s3_secret_key: $QUAY_AWS_SECRET_KEY
       host: s3.us-east-2.amazonaws.com
       s3_region: us-east-2
+FEATURE_ANONYMOUS_ACCESS: true
+BROWSER_API_CALLS_XHR_ONLY: false
+FEATURE_USERNAME_CONFIRMATION: false
+AUTHENTICATION_TYPE: Database
+FEATURE_LISTEN_IP_VERSION: IPv4
+REPO_MIRROR_ROLLBACK: false
+AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+DEFAULT_TAG_EXPIRATION: 2w
+TAG_EXPIRATION_OPTIONS:
+  - 2w
+  - 1d
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
