@@ -88,6 +88,5 @@ while : ; do
 done
 
 echo "Retrieve test results..."
-oc exec testpod -- cat /home/testuser/reports/upgrade_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_upgrade_suite_test.xml
 oc exec testpod -- cat /home/testuser/reports/nfd_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_nfd_suite_test.xml
 oc exec testpod -- cat /home/testuser/reports/report_testrun.xml > ${ARTIFACT_DIR}/junit_report_testrun.xml
