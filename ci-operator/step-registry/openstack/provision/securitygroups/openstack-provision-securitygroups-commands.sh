@@ -21,7 +21,7 @@ CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
 # Getting the machine network CIDR for minimal, dual-stack-upi, proxy and dualstack config types. 
 export MACHINES_NETWORK_V4_CIDR
-export MACHINES_NETWORK_v6_CIDR
+export MACHINES_NETWORK_V6_CIDR
 
 case "$CONFIG_TYPE" in
 	minimal|dual-stack-upi)
@@ -31,11 +31,11 @@ case "$CONFIG_TYPE" in
 		fi
 		;;
 	proxy*)
-		MACHINES_NETWORK_v4_CIDR="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
+		MACHINES_NETWORK_V4_CIDR="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
 		;;
 	dualstack*)
-		MACHINES_NETWORK_v4_CIDR="${MACHINES_SUBNET_v4_RANGE}"
-		MACHINES_NETWORK_v6_CIDR="${MACHINES_SUBNET_v6_RANGE}"
+		MACHINES_NETWORK_V4_CIDR="${MACHINES_SUBNET_v4_RANGE}"
+		MACHINES_NETWORK_V6_CIDR="${MACHINES_SUBNET_v6_RANGE}"
 		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"
