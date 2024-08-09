@@ -6,7 +6,7 @@ finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
   set +x
-  STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
+  STEP_NAME="${HOSTNAME}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
   if [ "${JOB_TYPE}" == "presubmit" ]; then
