@@ -27,6 +27,12 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
+      default: ""
+      documentation: "The Azure Marketplace image offer."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+      default: ""
+      documentation: "The Azure Marketplace image publisher."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -115,6 +121,13 @@ chain:
       
       if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
         EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+        EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+        EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+        EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}"/azure-marketplace-image-sku)"
+        EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}"/azure-marketplace-image-version)"
       fi
       
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
