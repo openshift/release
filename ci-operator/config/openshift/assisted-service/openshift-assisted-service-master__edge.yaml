@@ -23,10 +23,6 @@ base_images:
     name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
-  cli:
-    name: "4.17"
-    namespace: ocp
-    tag: cli
   cluster-api-provider-agent:
     name: ocm-2.12
     namespace: edge-infrastructure
@@ -35,18 +31,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  edge_infrastructure_swagger_codegen_cli:
-    name: edge-infrastructure-swagger-codegen-cli
-    namespace: ci
-    tag: 2.4.18
   hypershift-operator:
     name: "4.17"
     namespace: ocp
     tag: hypershift-operator
   postgresql-12-c8s:
-    name: postgresql-12-centos7
-    namespace: edge-infrastructure
-    tag: latest
+    name: postgresql
+    namespace: ci
+    tag: postgresql-12-c8s
   tests:
     name: "4.17"
     namespace: ocp
@@ -88,19 +80,11 @@ images:
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
-  inputs:
-    cli:
-      as:
-      - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
   to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service-build
-  inputs:
-    edge_infrastructure_swagger_codegen_cli:
-      as:
-      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -117,22 +101,22 @@ images:
 - dockerfile_path: Dockerfile.assisted-service
   to: assisted-service
 - build_args:
-  - name: BASE_TAG
-    value: stream8
   - name: RHEL_VERSION
     value: "8"
   dockerfile_path: Dockerfile.assisted-service
   to: assisted-service-el8
+- dockerfile_path: Dockerfile.assisted-service-debug
+  to: assisted-service-debug
 - dockerfile_literal: |
     FROM quay.io/multi-arch/yq:4.30.5 as yq4
-    FROM coreos/centos
+    FROM coreos/stream9:9
     COPY --from=yq4 /usr/bin/yq /usr/bin/yq
     COPY . .
   from: src
   to: assisted-service-scripts
 - dockerfile_literal: |
-    FROM coreos/centos
-    RUN yum install -y --skip-broken skopeo pip
+    FROM coreos/stream9:9
+    RUN dnf install -y --skip-broken skopeo pip
   from: src
   to: assisted-service-publish-index
 operator:
