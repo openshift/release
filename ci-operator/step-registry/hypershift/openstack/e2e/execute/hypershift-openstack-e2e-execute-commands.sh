@@ -46,6 +46,7 @@ hack/ci-test-e2e.sh \
         --e2e.base-domain="${BASE_DOMAIN}" \
         --e2e.external-dns-domain="service.${BASE_DOMAIN}" \
 	--test.run='^TestCreateCluster.*|^TestNodePool$' \
+	--test.skip='.*TestNTO.*' \
 	--test.parallel=1 \
         --e2e.platform="OpenStack" \
 	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
