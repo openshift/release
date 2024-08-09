@@ -4,97 +4,124 @@ set -e
 set -u
 set -o pipefail
 
+timestamp() {
+    date -u --rfc-3339=seconds
+}
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
     echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
 fi
 
-CATSRC=qe-app-registry
-if [[ ! "$(oc get catalogsource qe-app-registry -n openshift-marketplace -o yaml)" =~ "lastObservedState: READY" ]]; then
-    echo "The catalogsource qe-app-registry is either not existing or not ready. Will use redhat-operators to install cert-manager Operator."
-    CATSRC=redhat-operators
+# Check if the catalogsource is ready to use
+if [[ ! "$(oc get catalogsource $INSTALL_CATSRC -n openshift-marketplace -o=jsonpath='{.status.connectionState.lastObservedState}')" == "READY" ]]; then
+    echo "The CatalogSource '$INSTALL_CATSRC' status is not ready"
+    exit 1
 fi
 
-oc create -f - << EOF
+# Define common variables
+SUB="openshift-cert-manager-operator"
+OPERATOR_NAMESPACE="cert-manager-operator"
+OPERAND_NAMESPACE="cert-manager"
+INTERVAL=10
+
+# Prepare the operator installation manifests
+
+echo "# Creating the Namespace, OperatorGroup and Subscription for the operator installation."
+MANIFEST=$(cat <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: cert-manager-operator
+  name: $OPERATOR_NAMESPACE
 ---
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: cert-manager-operator-og
-  namespace: cert-manager-operator
+  namespace: $OPERATOR_NAMESPACE
 spec:
   targetNamespaces:
-  - cert-manager-operator
+  - $OPERATOR_NAMESPACE
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: openshift-cert-manager-operator
-  namespace: cert-manager-operator
+  name: $SUB
+  namespace: $OPERATOR_NAMESPACE
 spec:
-  channel: stable-v1
-  installPlanApproval: Automatic
-  name: openshift-cert-manager-operator
-  source: "$CATSRC"
+  source: $INSTALL_CATSRC
   sourceNamespace: openshift-marketplace
+  name: openshift-cert-manager-operator
+  channel: "$INSTALL_CHANNEL"
+  installPlanApproval: Manual
 EOF
+)
 
-MAX_RETRY=20
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking openshift-cert-manager-operator subscription status for the #${COUNTER}-th time ..."
-    if [ "$(oc get subscription openshift-cert-manager-operator -n cert-manager-operator -o=jsonpath='{.status.state}')" == AtLatestKnown ]; then
-        echo "The openshift-cert-manager-operator subscription status becomes ready" && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The openshift-cert-manager-operator subscription status is not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get subscription openshift-cert-manager-operator -n cert-manager-operator -o=jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+# Set the startingCSV to the 'INSTALL_CSV' if 'INSTALL_CSV' is not empty
+if [ -n "${INSTALL_CSV}" ]; then
+    MANIFEST="${MANIFEST}"$'\n'"  startingCSV: ${INSTALL_CSV}"
+fi
 
-MAX_RETRY=20
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking cert-manager-operator CSV status for the #${COUNTER}-th time ..."
-    if [[ "$(oc get --no-headers csv -n cert-manager-operator)" == *cert-manager-operator.*Succeeded ]]; then
-        echo "The cert-manager-operator CSV status becomes ready" && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The cert-manager-operator CSV status is not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        CSV_NAME=$(oc get csv -n cert-manager-operator | grep -E -o '^cert-manager-operator[^ ]*')
-        oc get csv "$CSV_NAME" -n cert-manager-operator -o=jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+oc create -f - <<< "${MANIFEST}"
 
+echo "# Waiting for the installPlan to show up, then approving it."
 MAX_RETRY=30
-INTERVAL=10
 COUNTER=0
 while :;
 do
-    echo "Checking cert-manager pods status for the #${COUNTER}-th time ..."
-    if [ "$(oc get pods -n cert-manager -o=jsonpath='{.items[*].status.phase}')" == "Running Running Running" ]; then
-        echo "[$(date -u --rfc-3339=seconds)] Finished cert-manager Operator installation. The cert-manager pods are all ready."
-        oc get po -n cert-manager
+    INSTALL_PLAN=$(oc get subscription $SUB -n $OPERATOR_NAMESPACE -o=jsonpath='{.status.installplan.name}' || true)
+    echo "Checking installPlan for subscription $SUB the #${COUNTER}-th time ..."
+    if [[ -n "$INSTALL_PLAN" ]]; then
+        oc patch installplan "${INSTALL_PLAN}" -n $OPERATOR_NAMESPACE --type merge --patch '{"spec":{"approved":true}}'
+        echo "[$(timestamp)] The installPlan $INSTALL_PLAN is approved"
         break
     fi
     ((++COUNTER))
     if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The cert-manager pods are not all ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get pods -n cert-manager
+        echo "[$(timestamp)] The installPlan for subscription $SUB didn't show up after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get subscription $SUB -n $OPERATOR_NAMESPACE -o=jsonpath='{.status}'
+        exit 1
+    fi
+    sleep $INTERVAL
+done
+
+echo "# Waiting for the CSV status to be ready."
+MAX_RETRY=30
+COUNTER=0
+while :;
+do
+    CSV=$(oc get installplan $INSTALL_PLAN -n $OPERATOR_NAMESPACE -o=jsonpath='{.spec.clusterServiceVersionNames[0]}' || true)
+    echo "Checking CSV $CSV status for the #${COUNTER}-th time ..."
+    if [[ "$(oc get csv "$CSV" -n $OPERATOR_NAMESPACE -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+        echo "[$(timestamp)] The CSV $CSV status becomes ready"
+        break
+    fi
+    ((++COUNTER))
+    if [[ $COUNTER -eq $MAX_RETRY ]]; then
+        echo "[$(timestamp)] The CSV $CSV status is not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get csv "$CSV" -n $OPERATOR_NAMESPACE -o=jsonpath='{.status}'
+        oc get subscription $SUB -n $OPERATOR_NAMESPACE -o=jsonpath='{.status}'
+        exit 1
+    fi
+    sleep $INTERVAL
+done
+
+echo "# Waiting for the operand pods status to be ready."
+MAX_RETRY=30
+COUNTER=0
+while :;
+do
+    echo "Checking cert-manager pods status for the #${COUNTER}-th time ..."
+    if [ "$(oc get pod -n $OPERAND_NAMESPACE -o=jsonpath='{.items[*].status.phase}')" == "Running Running Running" ]; then
+        echo "[$(timestamp)] Finished the cert-manager operator installation. The operand are all ready."
+        oc get pod -n $OPERAND_NAMESPACE
+        break
+
+    fi
+    ((++COUNTER))
+    if [[ $COUNTER -eq $MAX_RETRY ]]; then
+        echo "[$(timestamp)] The cert-manager pods are not all ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
+        oc get pod -n $OPERAND_NAMESPACE
         exit 1
     fi
     sleep $INTERVAL
