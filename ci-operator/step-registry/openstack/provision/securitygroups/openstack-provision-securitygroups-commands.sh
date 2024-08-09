@@ -20,19 +20,22 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
 # Getting the machine network CIDR for minimal, dual-stack-upi, proxy and dualstack config types. 
+export MACHINES_NETWORK_V4_CIDR
+export MACHINES_NETWORK_v6_CIDR
+
 case "$CONFIG_TYPE" in
 	minimal|dual-stack-upi)
-		machine_network_v4_cidr="10.0.0.0/16"
+		MACHINES_NETWORK_V4_CIDR="10.0.0.0/16"
 		if [[ "${CONFIG_TYPE}" == "dual-stack-upi" ]]; then
-			machine_network_v6_cidr="${OS_SUBNET_V6_RANGE}"
+			MACHINES_NETWORK_V6_CIDR="${OS_SUBNET_V6_RANGE}"
 		fi
 		;;
 	proxy*)
-		machine_network_v4_cidr="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
+		MACHINES_NETWORK_v4_CIDR="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
 		;;
 	dualstack*)
-		machine_network_v4_cidr="${MACHINES_SUBNET_v4_RANGE}"
-		machine_network_v6_cidr="${MACHINES_SUBNET_v6_RANGE}"
+		MACHINES_NETWORK_v4_CIDR="${MACHINES_SUBNET_v4_RANGE}"
+		MACHINES_NETWORK_v6_CIDR="${MACHINES_SUBNET_v6_RANGE}"
 		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"
@@ -53,8 +56,8 @@ if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
 					openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0 --description netperf
 					openstack security group rule create "$sg_id" --protocol tcp --dst-port 22865:22865 --remote-ip 0.0.0.0/0 --description iperf3
 					openstack security group rule create "$sg_id" --protocol tcp --dst-port 30000:30000 --remote-ip 0.0.0.0/0 --description uperf
-					openstack security group rule create "$sg_id" --protocol tcp --dst-port 32000:47000 --remote-ip $machine_network_v4_cidr --description netserver-tcp
-					openstack security group rule create "$sg_id" --protocol udp --dst-port 32000:62000 --remote-ip $machine_network_v4_cidr --description netserver-udp
+					openstack security group rule create "$sg_id" --protocol tcp --dst-port 32000:47000 --remote-ip $MACHINES_NETWORK_V4_CIDR --description netserver-tcp
+					openstack security group rule create "$sg_id" --protocol udp --dst-port 32000:62000 --remote-ip $MACHINES_NETWORK_V4_CIDR --description netserver-udp
 					;;
 				*)
 					echo "No known security group rule matches service '$service'. Exiting."
