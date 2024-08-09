@@ -1,0 +1,81 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: ci/Dockerfile
+images:
+- dockerfile_path: ci/Dockerfile
+  from: src
+  to: rhtap-installer
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+    RUN yum install -y skopeo
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
+  from: src
+  to: rhdh-prerelease-install
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pre-gitops-rhtap-installer-e2e-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 0 30 6 *
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-installer-gitops-prerelease
+- as: pre-rhdh-rhtap-installer-e2e-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 0 * * 1
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-installer-rhdh-prerelease
+zz_generated_metadata:
+  branch: release-1.0
+  org: redhat-appstudio
+  repo: rhtap-installer
