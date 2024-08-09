@@ -20,6 +20,8 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
 # Getting the machine network CIDR for minimal, dual-stack-upi, proxy and dualstack config types. 
+declare machineNetwork_v4_cidr
+declare machineNetwork_v6_cidr
 case "$CONFIG_TYPE" in
 	minimal|dual-stack-upi)
 		machineNetwork_v4_cidr="10.0.0.0/16"
