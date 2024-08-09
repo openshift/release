@@ -73,3 +73,4 @@ rm -rf ${SHARED_DIR}/junit.tar.gz
 tar -zcvf ${SHARED_DIR}/junit.tar.gz *.xml
 cp ${SHARED_DIR}/junit.tar.gz ${ARTIFACT_DIR}
 log "Testing is finished and uploaded."
+#
