@@ -1,0 +1,127 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.1
+  ocp_4.17_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+binary_build_commands: make build
+test_binary_build_commands: go mod vendor
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+  build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+  to: vertical-pod-autoscaler-operator
+- dockerfile_path: bundle.Dockerfile
+  to: vertical-pod-autoscaler-operator-bundle
+promotion:
+  to:
+  - name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: test-bin
+- as: manifest-diff
+  commands: make manifest-diff
+  container:
+    from: src
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: vertical-pod-autoscaler-operator
+    workflow: openshift-ci-security
+# - as: e2e-aws-operator
+#   steps:
+#     cluster_profile: aws
+#     test:
+#     - as: test
+#       cli: latest
+#       commands: make e2e-ci
+#       dependencies:
+#       - env: CI_OPERATOR_IMAGE
+#         name: vertical-pod-autoscaler-operator
+#       - env: CI_OPERAND_IMAGE
+#         name: vertical-pod-autoscaler
+#       - env: CI_REGISTRY_IMAGE
+#         name: vpa-operator-registry
+#       from: src
+#       resources:
+#         requests:
+#           cpu: 100m
+#     workflow: ipi-aws
+# - as: e2e-aws-olm
+#   steps:
+#     cluster_profile: aws
+#     test:
+#     - as: test
+#       cli: latest
+#       commands: make e2e-olm-ci
+#       dependencies:
+#       - env: CI_OPERATOR_IMAGE
+#         name: vertical-pod-autoscaler-operator
+#       - env: CI_OPERAND_IMAGE
+#         name: vertical-pod-autoscaler
+#       - env: CI_REGISTRY_IMAGE
+#         name: vpa-operator-registry
+#       from: src
+#       resources:
+#         requests:
+#           cpu: 100m
+#     workflow: ipi-aws
+zz_generated_metadata:
+  branch: operator-sdk-upgrade-v2.1
+  org: maxcao13
+  repo: vertical-pod-autoscaler-operator
