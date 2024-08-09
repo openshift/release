@@ -244,7 +244,7 @@ CONFIG = {
         'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 2,
+        'default': 4,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
