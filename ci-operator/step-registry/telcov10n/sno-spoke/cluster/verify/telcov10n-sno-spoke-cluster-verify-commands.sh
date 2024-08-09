@@ -28,6 +28,9 @@ function run_tests {
   if [ -n "${PULL_NUMBER:-}" ]; then
     echo
     echo "------------------------ Spoke Details --------------------------------------------------------"
+    echo "OCP Installed Version:"
+    oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml get clusterversions.config.openshift.io
+    echo
     echo "kubeconfig: export KUBECONFIG=${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
     echo "Console: $(oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml whoami --show-console)"
     cat ${ARTIFACT_DIR}/admin-pass-${SPOKE_CLUSTER_NAME}.yaml
