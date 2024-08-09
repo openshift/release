@@ -32,6 +32,17 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.12"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
   intermediate413:
     candidate:
       architecture: arm64
@@ -58,12 +69,12 @@ releases:
       version: "4.16"
   latest:
     release:
-      architecture: arm64
+      architecture: amd64
       channel: fast
       version: "4.12"
   target:
     candidate:
-      architecture: arm64
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.17"
@@ -77,6 +88,9 @@ tests:
   cron: 16 3 8 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
@@ -96,7 +110,7 @@ tests:
       - env: RELEASE_IMAGE_INTERMEDIATE413
         name: release:intermediate413
       - env: RELEASE_IMAGE_TARGET
-        name: release:target
+        name: release:arm64-target
       from: cli
       resources:
         requests:
