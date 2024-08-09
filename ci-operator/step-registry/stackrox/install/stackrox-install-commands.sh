@@ -39,21 +39,37 @@ function exit_handler() {
   fi
 }
 trap 'exit_handler' EXIT
-trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+trap 'echo "$(date +%H:%M:%S) + ${BASH_COMMAND}"' DEBUG
 
-
-function get_jq() {
-  local url
-  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-  echo "Downloading jq binary from ${url}"
-  curl -Ls -o ./jq "${url}"
-  chmod u+x ./jq
-  export PATH=${PATH}:${PWD}
+function check_cli_tools {
+  set +e
+  printf "OC "; oc version
+  kubectl version --client --output=yaml
+  python --version
+  python3 --version
+  set -x
+  which curl
+  which kubectl
+  which oc
+  which helm
+  which jq
+  which yq
+  which python
+  which python3 && python3 -c 'import yaml;'
+  which base64
+  set +x
+  set -e
 }
-jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
-  || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+echo "(Logging oc commands for user to reproduce and confirm state)"
+function oc() {
+  echo "$(date +%H:%M:%S) + oc $*" >&2
+  command oc "$@"
+}
+check_cli_tools
+
+
+ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
@@ -185,13 +201,15 @@ function install_operator() {
 
 function create_cr() {
   local app
+  set +e
   app=${1:-central}
   echo ">>> Install ${app^}"
-  if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
-    && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
-    echo "INFO: Diff in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
-  fi
+  echo "INFO: Comparing upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
+  curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml"
+  { diff "${app}-cr.yaml" "new.${app}-cr.yaml" || true; } \
+    | grep -v password
   oc apply -f "${app}-cr.yaml"
+  set -e
 }
 
 function retry() {
