@@ -29,7 +29,7 @@ echo "$HYPERSHIFT_HOSTED_CLUSTER_NAME" > "$SHARED_DIR"/hostedcluster_name
 
 [ "${HYPERSHIFT}" == "true" ] && touch "$SHARED_DIR/deploy_hypershift_hosted"
 
-echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers, ${VENDOR} vendor ) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" \
   "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
