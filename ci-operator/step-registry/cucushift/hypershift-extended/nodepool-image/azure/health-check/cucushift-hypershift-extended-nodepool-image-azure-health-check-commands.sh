@@ -31,6 +31,7 @@ function check_vm_image() {
         return 1
     fi
 
+    local np_name=""
     local vm_name="$1"
     local vm_image_file="/tmp/vm-${vm_name}.json"
     local vm_image_version=""
@@ -38,22 +39,32 @@ function check_vm_image() {
     local vm_image_publisher=""
     local vm_image_sku=""
 
-    az vm get-instance-view -g "$HC_RG" --name "$1" --query "storageProfile.imageReference" > "/tmp/vm-${vm_name}.json"
-
+    az vm get-instance-view -g "$HC_RG" --name "$1" --query "storageProfile.imageReference" > "$vm_image_file"
     vm_image_version="$(jq -r .version "$vm_image_file")"
     vm_image_offer="$(jq -r .offer "$vm_image_file")"
     vm_image_publisher="$(jq -r .publisher "$vm_image_file")"
     vm_image_sku="$(jq -r .sku "$vm_image_file")"
-    assert_equal vm_image_version IMAGE_VERSION
-    assert_equal vm_image_sku IMAGE_SKU
-    assert_equal vm_image_offer HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
-    assert_equal vm_image_publisher HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+
+    np_name=$(KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc get node "$vm_name" -o jsonpath='{.metadata.labels.hypershift\.openshift\.io/nodePool}')
+    if [[ $np_name == "$EXTRA_NODEPOOL_NAME" ]]; then
+        echo "Checking VM $vm_name of extra NodePool $EXTRA_NODEPOOL_NAME"
+        assert_equal vm_image_version IMAGE_VERSION_EXTRA
+        assert_equal vm_image_offer IMAGE_OFFER_EXTRA
+        assert_equal vm_image_publisher IMAGE_PUBLISHER_EXTRA
+        assert_equal vm_image_sku IMAGE_SKU_EXTRA
+    else
+        echo "Checking VM $vm_name of NodePool $np_name"
+        assert_equal vm_image_version IMAGE_VERSION
+        assert_equal vm_image_offer IMAGE_OFFER
+        assert_equal vm_image_publisher IMAGE_PUBLISHER
+        assert_equal vm_image_sku IMAGE_SKU
+    fi
 }
 
 ##### Main #####
 
-if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
-    echo "\$HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER is empty, skip"
+if [[ ! -f "${SHARED_DIR}/azure-marketplace-image-publisher" ]]; then
+    echo "${SHARED_DIR}/azure-marketplace-image-publisher not found, skipping the step"
     exit 0
 fi
 
@@ -63,15 +74,26 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_LOCATION="$LEASED_RESOURCE"
 
-IMAGE_SKU=$(<"${SHARED_DIR}"/azure-marketplace-image-sku)
-IMAGE_VERSION=$(<"${SHARED_DIR}"/azure-marketplace-image-version)
-
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
 set -x
 
-echo "Checking vm image"
+IMAGE_OFFER=$(<"${SHARED_DIR}"/azure-marketplace-image-offer)
+IMAGE_OFFER_EXTRA=$(<"${SHARED_DIR}"/azure-marketplace-image-offer-extra)
+IMAGE_PUBLISHER=$(<"${SHARED_DIR}"/azure-marketplace-image-publisher)
+IMAGE_PUBLISHER_EXTRA=$(<"${SHARED_DIR}"/azure-marketplace-image-publisher-extra)
+IMAGE_SKU=$(<"${SHARED_DIR}"/azure-marketplace-image-sku)
+IMAGE_SKU_EXTRA=$(<"${SHARED_DIR}"/azure-marketplace-image-sku-extra)
+IMAGE_VERSION=$(<"${SHARED_DIR}"/azure-marketplace-image-version)
+IMAGE_VERSION_EXTRA=$(<"${SHARED_DIR}"/azure-marketplace-image-version-extra)
+
+EXTRA_NODEPOOL_NAME=""
+if [[ -f "$SHARED_DIR"/hypershift_extra_nodepool_name ]]; then
+    EXTRA_NODEPOOL_NAME=$(<"$SHARED_DIR"/hypershift_extra_nodepool_name)
+fi
+
+echo "Checking VM image"
 HC_NODES="$(KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc get node -o jsonpath='{.items[*].metadata.name}')"
 HC_RG="$(oc get hc -A -o jsonpath='{.items[0].spec.platform.azure.resourceGroup}')"
 for HC_NODE in $HC_NODES; do
