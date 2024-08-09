@@ -140,7 +140,7 @@ sleep 5
 
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
 echo "wait for mce to Available"
-oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
+oc wait --timeout=60m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
 oc apply -f - <<EOF
 apiVersion: cluster.open-cluster-management.io/v1
