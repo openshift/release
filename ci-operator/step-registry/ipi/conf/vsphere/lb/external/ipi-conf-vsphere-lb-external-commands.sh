@@ -34,6 +34,8 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
     SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 fi
 
+sleep 3600
+
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
