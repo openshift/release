@@ -50,7 +50,7 @@ function validate_user_labels() {
 set +e
 ret=0
 
-echo "$(date -u --rfc-3339=seconds) - Checking userLabels of machines..."
+echo "$(date -u --rfc-3339=seconds) - Checking userLabels of compute instances..."
 readarray -t items < <(gcloud compute instances list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
 for line in "${items[@]}"; do
   name="${line%% *}"
@@ -58,14 +58,14 @@ for line in "${items[@]}"; do
   current_labels="$(gcloud compute instances describe ${name} --zone ${zone} --format json | jq -r -c .labels)"
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for instance '${name}'."
     ret=1
   else
-    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for instance '${name}'."
   fi
 done
 
-echo "$(date -u --rfc-3339=seconds) - Checking userLabels of disks..."
+echo "$(date -u --rfc-3339=seconds) - Checking userLabels of compute disks..."
 readarray -t items < <(gcloud compute disks list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
 for line in "${items[@]}"; do
   name="${line%% *}"
@@ -73,10 +73,10 @@ for line in "${items[@]}"; do
   current_labels="$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .labels)"
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for disk '${name}'."
     ret=1
   else
-    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for disk '${name}'."
   fi
 done
 
@@ -85,13 +85,17 @@ readarray -t items < <(gcloud compute forwarding-rules list --filter="name~${CLU
 for line in "${items[@]}"; do
   name="${line%% *}"
   region="${line##* }"
-  current_labels="$(gcloud compute forwarding-rules describe ${name} --region ${region} --format json | jq -r -c .labels)"
+  if [[ "${region}" == "${name}" ]]; then
+    current_labels="$(gcloud compute forwarding-rules describe ${name} --global --format json | jq -r -c .labels)"
+  else
+    current_labels="$(gcloud compute forwarding-rules describe ${name} --region ${region} --format json | jq -r -c .labels)"
+  fi
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for forwarding-rule '${name}'."
     ret=1
   else
-    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for forwarding-rule '${name}'."
   fi
 done
 
@@ -102,10 +106,10 @@ for line in "${items[@]}"; do
   current_labels="$(gcloud dns managed-zones describe ${name} --format json | jq -r -c .labels)"
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for dns private zone '${name}'."
     ret=1
   else
-    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for dns private zone '${name}'."
   fi
 done
 
@@ -116,10 +120,10 @@ for line in "${items[@]}"; do
   current_labels="$(gsutil label get ${name} | jq -r -c .)"
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for image-registry bucket '${name}'."
     ret=1
   else
-    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+    echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for image-registry bucket '${name}'."
   fi
 done
 
