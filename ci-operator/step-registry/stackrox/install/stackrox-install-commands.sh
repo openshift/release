@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
 set -eou pipefail
+set -x
 
 OPERATOR_VERSION=${OPERATOR_VERSION:-}
 OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-stable}
+
+SMALL_INSTALL=${SMALL_INSTALL:-false}
+
 
 cat <<EOF
 >>> Install ACS into a single cluster [$(date -u)].
@@ -42,12 +46,10 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S) + ${BASH_COMMAND}"' DEBUG
 
 function check_cli_tools {
-  set +e
-  printf "OC "; oc version
+  printf "OC $(oc version)"
   kubectl version --client --output=yaml
   python --version
   python3 --version
-  set -x
   which curl
   which kubectl
   which oc
@@ -55,22 +57,63 @@ function check_cli_tools {
   which jq
   which yq
   which python
-  which python3 && python3 -c 'import yaml;'
+  which python3
   which base64
-  set +x
-  set -e
 }
 
-echo "(Logging oc commands for user to reproduce and confirm state)"
-function oc() {
-  echo "$(date +%H:%M:%S) + oc $*" >&2
-  command oc "$@"
-}
-check_cli_tools
+# echo "(Logging oc commands for user to reproduce and confirm state)"
+# function oc() {
+#   echo "$(date +%H:%M:%S) + oc $*" >&2
+#   command oc "$@"
+# }
+#check_cli_tools
 
 
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+
+
+central_resources="resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 1"
+
+central_db_resources="db:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 4Gi
+          cpu: 1"
+
+scanner_resources="resources:
+        requests:
+          memory: 500Mi
+          cpu: 500m
+        limits:
+          memory: 2500Mi
+          cpu: 2000m"
+
+scanner_db_resources="db:
+      resources:
+        requests:
+          cpu: 400m
+          memory: 512Mi
+        limits:
+          cpu: 2000m
+          memory: 4Gi"
+
+if [[ "$SMALL_INSTALL" != "true" ]]; then
+  central_resources=""
+  central_db_resources=""
+  scanner_resources=""
+  scanner_db_resources=""
+fi
+
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
@@ -83,26 +126,13 @@ spec:
   central:
     adminPasswordSecret:
       name: admin-pass
-    resources:
-      requests:
-        memory: 1Gi
-        cpu: 500m
-      limits:
-        memory: 4Gi
-        cpu: 1
+    ${central_resources}
     exposure:
       loadBalancer:
         enabled: false
       route:
         enabled: false
-    db:
-      resources:
-        requests:
-          memory: 1Gi
-          cpu: 500m
-        limits:
-          memory: 4Gi
-          cpu: 1
+    ${central_db_resources}
     telemetry:
       enabled: false
   scanner:
@@ -110,21 +140,8 @@ spec:
       scaling:
         autoScaling: Disabled
         replicas: 1
-      resources:
-        requests:
-          memory: 500Mi
-          cpu: 500m
-        limits:
-          memory: 2500Mi
-          cpu: 2000m
-    db:
-      resources:
-        requests:
-          cpu: 400m
-          memory: 512Mi
-        limits:
-          cpu: 2000m
-          memory: 4Gi
+      ${scanner_resources}
+    ${scanner_db_resources}
 ---
 apiVersion: v1
 kind: Secret
@@ -133,6 +150,7 @@ metadata:
 data:
   password: ${centralAdminPasswordBase64}
 EOF
+cat central-cr.yaml
 
 cat <<EOF > secured-cluster-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
