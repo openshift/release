@@ -49,8 +49,7 @@ EOF
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory root@${bastion}:~/jetlag/ansible/inventory/telco.inv
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory_sno root@${bastion}:~/jetlag/ansible/inventory/telco_sno.inv
+sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory_${TYPE} root@${bastion}:~/jetlag/ansible/inventory/telco_${TYPE}.inv
 
 # Clean up previous attempts
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
@@ -70,11 +69,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    fi
    git branch
    source bootstrap.sh
-   if [ ${TYPE} == "sno" ]; then
-     ansible-playbook -i ansible/inventory/telco_sno.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   else
-     ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   fi"
+   ansible-playbook -i ansible/inventory/telco_${TYPE}.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
@@ -83,8 +78,4 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    cd jetlag
    git branch
    source bootstrap.sh
-   if [ ${TYPE} == "sno" ]; then
-     ansible-playbook -i ansible/inventory/telco_sno.inv ansible/sno-deploy.yml -v | tee /tmp/ansible-sno-deploy-$(date +%s)
-   else
-     ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-bm-deploy-$(date +%s)
-   fi"
+   ansible-playbook -i ansible/inventory/telco_${TYPE}.inv ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
