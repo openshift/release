@@ -24,7 +24,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cli:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
@@ -40,19 +40,15 @@ base_images:
     namespace: ci
     tag: 2.4.18
   hypershift-operator:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
   postgresql-12-c8s:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
     tag: latest
   tests:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: tests
   tests-4.12:
@@ -71,18 +67,18 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: tests
+  tests-4.16:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
   upi-installer:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ci-images/Dockerfile.base
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
@@ -105,9 +101,6 @@ images:
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -122,10 +115,6 @@ images:
         source_path: /go/src/github.com/openshift/assisted-service/.
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - build_args:
   - name: BASE_TAG
@@ -133,10 +122,6 @@ images:
   - name: RHEL_VERSION
     value: "8"
   dockerfile_path: Dockerfile.assisted-service
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-el8
 - dockerfile_literal: |
     FROM quay.io/multi-arch/yq:4.30.5 as yq4
@@ -177,13 +162,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -766,6 +751,24 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-ai-operator-ztp-remove-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        REMOVE_SPOKE_NODE=true
+      DEVSCRIPTS_CONFIG: |
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
+      NUM_EXTRA_WORKERS: "5"
+    workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-metal-assisted-tpmv2
   optional: true
   steps:
@@ -945,10 +948,24 @@ tests:
         OPENSHIFT_VERSION=4.15
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
+- always_run: false
+  as: e2e-metal-assisted-4-16
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.16
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv-4-16
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -972,12 +989,12 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf
+- as: e2e-metal-assisted-odf-4-16
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -986,17 +1003,17 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-mce
+  as: e2e-metal-assisted-mce-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=mce
         NUM_WORKERS=3
-        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_VERSION=4.16
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
@@ -1012,18 +1029,18 @@ tests:
         METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-mce-sno
+  as: e2e-metal-assisted-mce-sno-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=mce
         NUM_MASTERS=1
         NUM_WORKERS=0
-        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_VERSION=4.16
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
@@ -1130,34 +1147,6 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
-  as: e2e-vsphere-assisted-4-12
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.12
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-13
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.13
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
   as: e2e-vsphere-assisted-4-14
   optional: true
   steps:
@@ -1169,6 +1158,34 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.15
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-16
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.16
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false

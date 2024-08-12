@@ -32,6 +32,17 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.11"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
   intermediate412:
     candidate:
       architecture: arm64
@@ -64,12 +75,12 @@ releases:
       version: "4.16"
   latest:
     release:
-      architecture: arm64
+      architecture: amd64
       channel: fast
       version: "4.11"
   target:
     candidate:
-      architecture: arm64
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.17"
@@ -83,6 +94,9 @@ tests:
   cron: 35 11 5 * *
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
@@ -105,7 +119,7 @@ tests:
       - env: RELEASE_IMAGE_INTERMEDIATE412
         name: release:intermediate412
       - env: RELEASE_IMAGE_TARGET
-        name: release:target
+        name: release:arm64-target
       from: cli
       resources:
         requests:
