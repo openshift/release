@@ -8,13 +8,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.22
 releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
   latest:
     release:
       architecture: amd64
-      channel: candidate
-      version: "4.15"
+      channel: fast
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -28,24 +32,24 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-none-vsphere
-  cron: 0 0 * * 3
+  cron: 0 0 * * 6
   steps:
     cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
+      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:stable
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
 - as: platform-external-vsphere
-  cron: 0 0 * * 3
+  cron: 0 0 * * 6
   steps:
     cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
+      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:stable
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
 - as: platform-none-vsphere-upgrade
-  cron: 0 0 * * 3
+  cron: '@monthly'
   steps:
     cluster_profile: vsphere-elastic
     env:
