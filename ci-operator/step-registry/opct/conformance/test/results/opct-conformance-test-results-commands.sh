@@ -10,11 +10,11 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-pushd /tmp
-
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
 extract_opct
+
+trap 'dump_opct_namespace' EXIT TERM INT
 
 # Retrieve after successful execution
 show_msg "Retrieving Results..."

@@ -32,7 +32,6 @@ export WORKDIR="${WORKDIR}"
 
 # OPCT mirroed from image repository
 export OPCT_CLI="${OPCT_CLI}"
-export WORKDIR=${WORKDIR}
 
 # AWS Credentials ref to store the results (baseline)
 export AWS_DEFAULT_REGION=us-east-1
@@ -46,7 +45,7 @@ function show_msg() {
 
 # Extract OPCT from ImageStream
 function extract_opct() {
-  pushd \${WORKDIR}
+  pushd ${WORKDIR}
   show_msg "Extracting OPCT binary from image stream ${OPCT_CLI_IMAGE}"
   oc image extract ${OPCT_CLI_IMAGE} ${IMAGE_EXTRACT_OPTS-} \
     --registry-config=${CI_CREDENTIALS} \
@@ -55,8 +54,20 @@ function extract_opct() {
   
   show_msg "Running ${OPCT_CLI} version"
   ${OPCT_CLI} version
-  popd
+  #popd
 }
+
+function dump_opct_namespace() {
+  rc=\$?
+  if [[ \$rc -ne 0 ]]; then
+    show_msg "Dumping namespace"
+    oc adm inspect ns/opct --dest-dir=${WORKDIR}/opct-inspect || true
+    tar cfz \${ARTIFACT_DIR}/oc-inspect-opct.tar.gz ${WORKDIR}/opct-inspect || true
+  fi
+  show_msg "Done with code=\$rc"
+  exit \$rc
+}
+export -f dump_opct_namespace
 EOF
 
 # shellcheck source=/dev/null

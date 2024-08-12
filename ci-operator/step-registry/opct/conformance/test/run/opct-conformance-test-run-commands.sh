@@ -12,6 +12,8 @@ set -o pipefail
 source "${SHARED_DIR}/env"
 extract_opct
 
+trap 'dump_opct_namespace' EXIT TERM INT
+
 if [ -n "${OPCT_DEV_EXTRA_CMD:-}" ]; then
     echo "Running OPCT with regular mode with custom image"
     ${OPCT_CLI} run --watch ${OPCT_DEV_EXTRA_CMD:-}

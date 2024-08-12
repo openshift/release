@@ -10,5 +10,5 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 source "${SHARED_DIR}/env"
 extract_opct
 
-# Run destroy command
+show_msg "Run destroy command"
 ${OPCT_CLI} destroy
