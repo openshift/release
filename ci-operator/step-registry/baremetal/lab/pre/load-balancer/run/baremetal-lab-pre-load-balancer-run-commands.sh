@@ -100,7 +100,7 @@ echo "Gather the IP Address for the new interface"
 api_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
   /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
 if [ "${#api_ip}" -eq 0 ]; then
-  echo "No IP Address has been set for the external API VIP, failing"
+  echo "No IPv4 Address has been set for the external API VIP, failing"
   exit 1
 fi
 
