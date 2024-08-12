@@ -16,7 +16,7 @@ lab: scalelab
 lab_cloud:
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-sno_node_count:
+sno_node_count: $NUM_SNO_NODES
 public_vlan: false
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
