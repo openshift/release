@@ -62,5 +62,4 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "'${DHCP_CONF}'" "'${DHCP_CONF_OPTS}'" "'${CLUSTER_NAME}'" <<'EOF'
   echo -e "${1}" > /opt/dnsmasq/hosts/hostsdir/"${3}"
   echo -e "${2}" > /opt/dnsmasq/hosts/optsdir/"${3}"
-  echo -e "dhcp-option=option6:router,[fd99:2222:3456::1]" >> /opt/dnsmasq/hosts/optsdir/"${3}"
 EOF
