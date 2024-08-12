@@ -127,16 +127,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
-- as: azure-ipi-custom-nsg-f28
-  cron: 20 20 23 * *
+- as: azure-ipi-disc-fullypriv-amd-mixarch-f9-longduration-cloud
+  cron: 16 7 20 * *
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      AZURE_CUSTOM_NSG: "true"
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
     test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+    - ref: wait
+    - ref: ipi-install-heterogeneous
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-disc-fullyprivate-firewall-idms-f28
   cron: 56 8 7 * *
   steps:
