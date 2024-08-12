@@ -41,7 +41,7 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 releases:
-  latest:
+  arm64-latest:
     prerelease:
       architecture: arm64
       product: ocp
@@ -49,9 +49,23 @@ releases:
         lower: 4.17.0-0
         stream: 4-dev-preview
         upper: 4.18.0-0
-  target:
+  arm64-target:
     candidate:
       architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.17.0-0
+        stream: 4-dev-preview
+        upper: 4.18.0-0
+  target:
+    candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.17"
@@ -65,6 +79,9 @@ tests:
   cron: 33 22 26 * *
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
         Ingress
@@ -82,6 +99,9 @@ tests:
   cron: 6 14 15 * *
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     dependency_overrides:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
     env:
@@ -97,6 +117,9 @@ tests:
   cron: 4 8 24 * *
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -110,6 +133,9 @@ tests:
   cron: 34 12 3 * *
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
@@ -123,6 +149,9 @@ tests:
   cron: 34 16 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       architecture: arm64
@@ -135,6 +164,9 @@ tests:
   cron: 34 2 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
@@ -143,6 +175,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: gcp-ipi-disc-priv-oidc-f28
+  cron: 52 10 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
