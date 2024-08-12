@@ -54,9 +54,10 @@ function wait_for_nodes_readiness()
   done
 }
 
+EDGE_ZONES_COUNT=$(yq-v4 -r '.compute[] | select(.name == "edge") | .platform.aws.zones | length // 0' "${SHARED_DIR}/install-config.yaml")
 expected_nodes=$(( $(yq-v4 -r '.controlPlane.replicas // '"${CONTROL_PLANE_REPLICAS:-3}" "${SHARED_DIR}/install-config.yaml") +
   $(yq-v4 -r '.compute[] | select(.name == "worker") | .replicas // '"${COMPUTE_NODE_REPLICAS:-3}" "${SHARED_DIR}/install-config.yaml") +
-  $(yq-v4 -r '.compute[] | select(.name == "edge") | .replicas // '"${EDGE_WORKER_NUMBER:-0}" "${SHARED_DIR}/install-config.yaml")
+  $(yq-v4 -r '.compute[] | select(.name == "edge") | .replicas // '"${EDGE_ZONES_COUNT}" "${SHARED_DIR}/install-config.yaml")
 ))
 
 wait_for_nodes_readiness "${expected_nodes}"
