@@ -9,7 +9,6 @@ oc projects
 python3 --version
 
 function cluster_monitoring_config(){
-echo "Storage Class $DEFAULT_STORAGE_CLASS"
 oc apply -f- <<EOF
 apiVersion: v1
 kind: ConfigMap
