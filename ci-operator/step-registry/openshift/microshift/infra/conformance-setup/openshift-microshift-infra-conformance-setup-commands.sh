@@ -25,6 +25,7 @@ cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 ssh "${INSTANCE_PREFIX}" "sudo sed -i 's/resources/#&/g' /etc/crio/crio.conf.d/11-microshift-ovn.conf"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl daemon-reload"
 # Just for safety, restart everything from scratch.
-ssh "${INSTANCE_PREFIX}" "echo 1 | sudo microshift-cleanup-data --all"
+ssh "${INSTANCE_PREFIX}" "echo 1 | sudo microshift-cleanup-data --all --keep-images"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl restart crio"
+# Do not enable microshift to force failures should a microshift restart happen
 ssh "${INSTANCE_PREFIX}" "sudo systemctl start microshift"
