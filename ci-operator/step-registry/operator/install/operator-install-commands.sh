@@ -56,4 +56,6 @@ if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
   RUN_COMMAND+=" --must-gather-output-dir=${ARTIFACT_DIR} "
 fi
 
-${RUN_COMMAND}
+${RUN_COMMAND} || sleep 7200
+
+sleep 7200 
