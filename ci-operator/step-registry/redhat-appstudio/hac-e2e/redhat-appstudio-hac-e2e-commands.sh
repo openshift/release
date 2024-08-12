@@ -82,6 +82,18 @@ CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$H
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
 CYPRESS_SSO_URL="$(oc get feenv env-$HAC_NAMESPACE --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.sso}")"
 
+# Patch clowder env for dev-sso
+oc --kubeconfig=$HAC_KUBECONFIG get clowdenvironment env-$HAC_NAMESPACE -o json | jq '.spec.disabled=true' | oc --kubeconfig=$HAC_KUBECONFIG apply -f -
+oc --kubeconfig=$HAC_KUBECONFIG get deployment env-$HAC_NAMESPACE-mbop -o json | \
+  jq --arg url 'https://'"$(oc get route keycloak -n dev-sso -o json | jq -r .spec.host)" --arg user $KEYCLOAK_USERNAME --arg pass $KEYCLOAK_PASSWORD \
+    '(.spec.template.spec.containers[].env=[
+     {"name": "KEYCLOAK_SERVER", "value": $url},
+     {"name": "KEYCLOAK_USERNAME", "value": $user},
+     {"name": "KEYCLOAK_PASSWORD", "value": $pass},
+     {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc --kubeconfig=$HAC_KUBECONFIG replace -f -
+oc --kubeconfig="$HAC_KUBECONFIG" rollout status deployment env-$HAC_NAMESPACE-mbop
+oc --kubeconfig="$HAC_KUBECONFIG" rollout restart deployment chrome-service-api -n $HAC_NAMESPACE
+
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
 apiVersion: toolchain.dev.openshift.com/v1alpha1
