@@ -48,6 +48,11 @@ elif $INTERNAL; then
     CL_SEARCH="any"
 fi
 
+# We run SRIOV jobs only on internal network
+if [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+    CL_SEARCH="internalbos"
+fi
+
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
@@ -85,8 +90,10 @@ if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
 elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
-elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then
+elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
+elif [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
