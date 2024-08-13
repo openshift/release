@@ -9,7 +9,7 @@ set -o errexit
 set -o pipefail
 
 if [[ "$CONFIG_TYPE" != *"dualstack"* ]]; then
-    echo "Setting the Machine Network CIDR for CONFIG_TYPE $CONFIG_TYPE"
+    echo "Setting the Machine Network CIDR for $CONFIG_TYPE CONFIG_TYPE"
     echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
 fi
 
