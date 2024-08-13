@@ -59,6 +59,7 @@ case "$CONFIG_TYPE" in
 		yq --yaml-output --in-place ".
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
+			| .networking.machineNetwork[0].cidr = \"$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)\"
 			| .platform.openstack.ingressFloatingIP = \"${INGRESS_IP}\"
 			| .platform.openstack.apiFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
