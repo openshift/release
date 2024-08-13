@@ -92,7 +92,6 @@ oc --kubeconfig=$HAC_KUBECONFIG get deployment env-$HAC_NAMESPACE-mbop -o json |
      {"name": "KEYCLOAK_PASSWORD", "value": $pass},
      {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc --kubeconfig=$HAC_KUBECONFIG replace -f -
 oc --kubeconfig="$HAC_KUBECONFIG" rollout status deployment env-$HAC_NAMESPACE-mbop
-oc --kubeconfig="$HAC_KUBECONFIG" rollout restart deployment chrome-service-api -n $HAC_NAMESPACE
 
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
@@ -141,8 +140,9 @@ BONFIRE_NAMESPACE=$(oc get --kubeconfig=$HAC_KUBECONFIG NamespaceReservations -o
 oc patch --kubeconfig=$HAC_KUBECONFIG NamespaceReservations/"$BONFIRE_NAMESPACE" --type=merge --patch-file=/dev/stdin <<-EOF
 {
     "spec": {
-        "duration": "0s"
+        "duration": "4h"
     }
 }
 EOF
+sleep 4h
 exit $TEST_RUN
