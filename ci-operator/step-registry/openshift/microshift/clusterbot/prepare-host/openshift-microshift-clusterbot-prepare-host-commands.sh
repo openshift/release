@@ -34,6 +34,18 @@ cat <<'EOF' >/tmp/install.sh
 set -xeuo pipefail
 export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
 
+enable_mirror_repo() {
+	local -r url="${1}"
+        sudo tee "/etc/yum.repos.d/microshift-mirror.repo" >/dev/null <<2EOF2
+[microshift-mirror]
+name=MicroShift mirror repository
+baseurl=${url}
+enabled=1
+gpgcheck=0
+skip_if_unavailable=0
+2EOF2
+}
+
 DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
 curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"
 chmod 755 "${DNF_RETRY}"
@@ -90,46 +102,23 @@ else
     : Install oc, set up firewall, etc.
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
-    : Fetch get_rel_version_repo.sh from o/microshift main so it is up to date - some release-4.Y might not have it
-    curl https://raw.githubusercontent.com/openshift/microshift/06e9ae203c157f33d6570153152e2fb360bf8eae/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh
-    source /tmp/get_rel_version_repo.sh
-    export UNAME_M=$(uname -m)
-    ver_repo=$(get_rel_version_repo $(echo $OCP_VERSION | cut -d. -f2))
-    version=$(echo "${ver_repo}" | cut -d, -f1)
-    repo=$(echo "${ver_repo}" | cut -d, -f2)
+	rhocp="rhocp-${OCP_VERSION}-for-rhel-9-$(uname -m)-rpms"
+	rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/el9/os"
+	ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/el9/os"
 
-    if [[ -z "${version+x}" ]] || [[ "${version}" == "" ]]; then
-        : version is empty - no RPMs for the release yet - build from source
+	if sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}"; then
+		sudo subscription-manager repos --enable "${rhocp}"
+	elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-rc,${rc}"; then
+		enable_mirror_repo "${rc}"
+	elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-ec,${ec}"; then
+		enable_mirror_repo "${ec}"
+	else
+		: Build and install MicroShift from source
         bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
         exit 0
-    fi
-
-    if [[ -n "${repo}" ]]; then
-        : Repo with EC or RC was found - enable
-        sudo tee "/etc/yum.repos.d/microshift-mirror.repo" >/dev/null <<2EOF2
-[microshift-mirror]
-name=MicroShift mirror repository
-baseurl=${repo}
-enabled=1
-gpgcheck=0
-skip_if_unavailable=0
-2EOF2
-    fi
-
-	"${DNF_RETRY}" "install" "microshift*-${version}"
-
-	if [[ ! -f /etc/crio/crio.conf.d/00-crio-crun.conf ]]; then
-        sudo tee /etc/crio/crio.conf.d/00-crio-crun.conf >/dev/null <<2EOF2
-[crio.runtime.runtimes.crun]
-runtime_path = ""
-runtime_type = "oci"
-runtime_root = "/run/crun"
-runtime_config_path = ""
-monitor_path = ""
-2EOF2
-		sudo systemctl restart crio.service
 	fi
 
+	"${DNF_RETRY}" "install" "microshift*"
 	sudo systemctl enable --now microshift
 fi
 EOF
