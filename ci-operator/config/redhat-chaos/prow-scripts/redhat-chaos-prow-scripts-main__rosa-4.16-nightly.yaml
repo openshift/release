@@ -42,12 +42,19 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.16"
       REPLICAS: "3"
-      TELEMETRY_GROUP: prow-rosa-hcp-4.16
+      TELEMETRY_GROUP: prow-rosa-4.16
+      CHURN: "False"
+      GC: "4"
+      PROFILE_TYPE: 'reporting'
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
-    - chain: redhat-chaos-krkn-hub-tests
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-ovn-disruption
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     workflow: rosa-aws-sts
 - as: krkn-tests-rosa-node
   cron: 0 4 5,19 * *
@@ -90,9 +97,10 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-ovn-disruption
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
-    - ref: redhat-chaos-pod-scenarios-random-system-pods
-    - ref: redhat-chaos-service-disruption-regex
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
 - as: krkn-rosa-hcp-node
