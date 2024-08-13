@@ -105,9 +105,11 @@ if [[ -n "$PULL_NUMBER" ]] && [[ "$REPO_NAME" == "sriov-network-operator" ]] ; t
     git fetch upstream "pull/${PULL_NUMBER}/head"
     git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
     git pull --rebase upstream $sriov_branch
+    BRANCH=$sriov_branch PR=$PULL_NUMBER hack/deploy-sriov-in-telco-ci.sh || status=$?
+else
+    BRANCH=$sriov_branch hack/deploy-sriov-in-telco-ci.sh || status=$?
 fi
 
-hack/deploy-sriov-in-telco-ci.sh || status=$?
 if [[ "$status" == "0" ]]; then
     hack/deploy-wait.sh || status=$?
     if [[ "$status" == "0" ]]; then
