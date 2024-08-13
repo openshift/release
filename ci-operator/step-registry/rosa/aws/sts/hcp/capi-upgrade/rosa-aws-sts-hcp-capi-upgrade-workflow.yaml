@@ -1,0 +1,31 @@
+workflow:
+  as: rosa-aws-sts-hcp-capi-upgrade
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      AVAILABLE_UPGRADE: "yes"
+      MACHINEPOOL_REPLICAS: 4
+    pre:
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+      - chain: rosa-sts-oidc-config-create
+      - ref: cucushift-hypershift-extended-capi-init
+      - ref: cucushift-hypershift-extended-capi-provision
+      - ref: cucushift-hypershift-extended-capi-upgrade-cp
+      - ref: cucushift-hypershift-extended-capi-upgrade-np
+      - ref: cucushift-hypershift-extended-capi-enable-hc
+      - ref: rosa-cluster-wait-ready-operators
+      - ref: aws-provision-tags-for-byo-vpc
+      - ref: rosa-cluster-wait-ready-nodes
+      - ref: cucushift-hypershift-extended-capi-health-check
+    post:
+      - ref: cucushift-hypershift-extended-capi-dump
+      - ref: cucushift-hypershift-extended-capi-deprovision
+      - ref: cucushift-hypershift-extended-capi-clear
+      - ref: aws-deprovision-stacks
+      - ref: ipi-deprovision-deprovision
+  documentation: |-
+    This workflow installs a rosa private hcp cluster by capi, and then upgrade the controlplane and worker nodes to the latest version.
+    After finish testing, the cluster will be deprovsioned.

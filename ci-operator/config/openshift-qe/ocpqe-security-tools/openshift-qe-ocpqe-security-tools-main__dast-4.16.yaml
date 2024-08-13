@@ -1,0 +1,77 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: dast/Dockerfile
+  to: ocp-qe-ci-dast
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: security-first-half
+  cron: 0 16 1 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      API_URL_LIST: admissionregistration.k8s.io/v1 apiextensions.k8s.io/v1 apiregistration.k8s.io/v1
+        apiserver.openshift.io/v1 apps.openshift.io/v1 apps/v1 authentication.k8s.io/v1
+        authorization.k8s.io/v1 authorization.openshift.io/v1 autoscaling.openshift.io/v1
+        autoscaling.openshift.io/v1beta1 autoscaling/v1 autoscaling/v2 batch/v1 build.openshift.io/v1
+        certificates.k8s.io/v1 cloud.network.openshift.io/v1 cloudcredential.openshift.io/v1
+        config.openshift.io/v1 console.openshift.io/v1 console.openshift.io/v1alpha1
+        controlplane.operator.openshift.io/v1alpha1 coordination.k8s.io/v1 discovery.k8s.io/v1
+        events.k8s.io/v1 flowcontrol.apiserver.k8s.io/v1 flowcontrol.apiserver.k8s.io/v1beta3
+        helm.openshift.io/v1beta1 image.openshift.io/v1 imageregistry.operator.openshift.io/v1
+        infrastructure.cluster.x-k8s.io/v1alpha5 infrastructure.cluster.x-k8s.io/v1beta1
+        ingress.operator.openshift.io/v1 ipam.cluster.x-k8s.io/v1alpha1 ipam.cluster.x-k8s.io/v1beta1
+        k8s.cni.cncf.io/v1 k8s.ovn.org/v1 machine.openshift.io/v1 machine.openshift.io/v1beta1
+        machineconfiguration.openshift.io/v1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-qe-ocpqe-security-tools-dast
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
+- as: security-second-half
+  cron: 0 16 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      API_URL_LIST: metal3.io/v1alpha1 metrics.k8s.io/v1beta1 migration.k8s.io/v1alpha1
+        monitoring.coreos.com/v1 monitoring.coreos.com/v1alpha1 monitoring.coreos.com/v1beta1
+        monitoring.openshift.io/v1 network.operator.openshift.io/v1 networking.k8s.io/v1
+        node.k8s.io/v1 oauth.openshift.io/v1 operator.openshift.io/v1 operator.openshift.io/v1alpha1
+        operators.coreos.com/v1 operators.coreos.com/v1alpha1 operators.coreos.com/v1alpha2
+        operators.coreos.com/v2 packages.operators.coreos.com/v1 performance.openshift.io/v1
+        performance.openshift.io/v1alpha1 performance.openshift.io/v2 policy.networking.k8s.io/v1alpha1
+        policy/v1 project.openshift.io/v1 quota.openshift.io/v1 rbac.authorization.k8s.io/v1
+        route.openshift.io/v1 samples.operator.openshift.io/v1 scheduling.k8s.io/v1
+        security.internal.openshift.io/v1 security.openshift.io/v1 snapshot.storage.k8s.io/v1
+        storage.k8s.io/v1 template.openshift.io/v1 tuned.openshift.io/v1 user.openshift.io/v1
+        v1 whereabouts.cni.cncf.io/v1alpha1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-qe-ocpqe-security-tools-dast
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocpqe-security-tools
+  variant: dast-4.16

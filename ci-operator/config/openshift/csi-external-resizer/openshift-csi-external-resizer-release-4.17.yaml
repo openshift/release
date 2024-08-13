@@ -26,8 +26,7 @@ images:
   to: csi-external-resizer
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -66,6 +65,20 @@ tests:
     commitchecker --start ${PULL_BASE_SHA:-master}
   container:
     from: commitchecker
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

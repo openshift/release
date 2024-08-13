@@ -82,7 +82,7 @@ spec:
     global:
       retention:
         days: 30
-  size: 1x.extra-small
+  size: 1x.small
   replication:
     factor: 1
   storage:
@@ -142,12 +142,26 @@ metadata:
 spec:
   agent:
     ebpf:
-      sampling: 500
+      sampling: 1
       privileged: true
       features:
         - PacketDrop
         - DNSTracking
-  deploymentModel: Kafka
+      flowFilter:
+        enable: true
+        action: Accept
+        cidr: 0.0.0.0/0
+        ports: 53
+        protocol: UDP
+  processor:
+    kafkaConsumerReplicas: 6
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+      limits:
+        memory: 2Gi
+  deploymentModel: Direct
   kafka:
     address: kafka-cluster-kafka-bootstrap.netobserv
     topic: network-flows
