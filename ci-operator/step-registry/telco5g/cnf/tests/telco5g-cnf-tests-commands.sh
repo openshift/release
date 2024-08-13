@@ -368,30 +368,30 @@ else
     export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
 fi
 
-CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
+# CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
 
-# Check if cnf-features-deploy repository exists
-# If not, clone it
-if [[ ! -d "${CNF_REPO_DIR}" ]]; then
-    echo "cnf-features-deploy repository not found, cloning it to ${CNF_REPO_DIR}"
-    mkdir -p "$CNF_REPO_DIR"
-    echo "running on branch ${CNF_BRANCH}"
-    git clone -b "${CNF_BRANCH}" "${CNF_REPO}" $CNF_REPO_DIR
-fi
+# # Check if cnf-features-deploy repository exists
+# # If not, clone it
+# if [[ ! -d "${CNF_REPO_DIR}" ]]; then
+#     echo "cnf-features-deploy repository not found, cloning it to ${CNF_REPO_DIR}"
+#     mkdir -p "$CNF_REPO_DIR"
+#     echo "running on branch ${CNF_BRANCH}"
+#     git clone -b "${CNF_BRANCH}" "${CNF_REPO}" $CNF_REPO_DIR
+# fi
 
-pushd $CNF_REPO_DIR
-echo "******** Checking out pull request for repository cnf-features-deploy if exists"
-check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]] || [[ "$T5CI_VERSION" == "4.17" ]]; then
-    echo "Updating all submodules for >=4.15 versions"
-    # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
-    sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
-    make init-git-submodules
-    export -f checkout_submodules check_for_pr checkout_pr_branch
-    git submodule foreach --recursive "checkout_submodules"
-    git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
-fi
-popd
+# pushd $CNF_REPO_DIR
+# echo "******** Checking out pull request for repository cnf-features-deploy if exists"
+# check_for_pr "openshift-kni" "cnf-features-deploy"
+# if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]] || [[ "$T5CI_VERSION" == "4.17" ]]; then
+#     echo "Updating all submodules for >=4.15 versions"
+#     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
+#     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
+#     make init-git-submodules
+#     export -f checkout_submodules check_for_pr checkout_pr_branch
+#     git submodule foreach --recursive "checkout_submodules"
+#     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
+# fi
+# popd
 
 echo "******** Patching OperatorHub to disable all default sources"
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
@@ -399,37 +399,37 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 # Skiplist common for all releases
 create_tests_skip_list_file
 
-# Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
-if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
-    create_tests_temp_skip_list_11
-    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
+# # Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
+# if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
+#     create_tests_temp_skip_list_11
+#     export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
-fi
-if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
-    create_tests_temp_skip_list_12
-    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
+# fi
+# if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
+#     create_tests_temp_skip_list_12
+#     export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
-fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
-    create_tests_temp_skip_list_13
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.14"* ]]; then
-    create_tests_temp_skip_list_14
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.15"* ]]; then
-    create_tests_temp_skip_list_15
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.16"* ]]; then
-    create_tests_temp_skip_list_16
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.17"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
-    create_tests_temp_skip_list_17
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
+# fi
+# if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+#     create_tests_temp_skip_list_13
+#     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+# fi
+# if [[ "$CNF_BRANCH" == *"4.14"* ]]; then
+#     create_tests_temp_skip_list_14
+#     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+# fi
+# if [[ "$CNF_BRANCH" == *"4.15"* ]]; then
+#     create_tests_temp_skip_list_15
+#     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+# fi
+# if [[ "$CNF_BRANCH" == *"4.16"* ]]; then
+#     create_tests_temp_skip_list_16
+#     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+# fi
+# if [[ "$CNF_BRANCH" == *"4.17"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+#     create_tests_temp_skip_list_17
+#     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+# fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
 export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
@@ -468,23 +468,23 @@ if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
 fi
 export CNF_NODES="${test_nodes}"
 
-pushd $CNF_REPO_DIR
-status=0
-val_status=0
+# pushd $CNF_REPO_DIR
+# status=0
+# val_status=0
 
-if [[ -n "$skip_tests" ]]; then
-    export SKIP_TESTS="${skip_tests}"
-fi
-# if RUN_VALIDATIONS set, run validations
-if $RUN_VALIDATIONS; then
-    echo "************ Running validations ************"
-    PULL_URL="${PULL_URL-}" PR_URLS="${PR_URLS-}" FEATURES=$VALIDATIONS_FEATURES stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
-fi
-# set overall status to fail if validations failed
-if [[ ${val_status} -ne 0 ]]; then
-    echo "Validations failed with status code $val_status"
-    status=${val_status}
-fi
+# if [[ -n "$skip_tests" ]]; then
+#     export SKIP_TESTS="${skip_tests}"
+# fi
+# # if RUN_VALIDATIONS set, run validations
+# if $RUN_VALIDATIONS; then
+#     echo "************ Running validations ************"
+#     PULL_URL="${PULL_URL-}" PR_URLS="${PR_URLS-}" FEATURES=$VALIDATIONS_FEATURES stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
+# fi
+# # set overall status to fail if validations failed
+# if [[ ${val_status} -ne 0 ]]; then
+#     echo "Validations failed with status code $val_status"
+#     status=${val_status}
+# fi
 
 if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
     echo "Wait until number of nodes matches number of machines"
@@ -513,11 +513,29 @@ echo "Wait for cluster operators to be deployed and ready"
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
 # if validations passed and RUN_TESTS set, run the tests
-if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
-    echo "************ Running e2e tests ************"
-    FEATURES=$TEST_RUN_FEATURES stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
-fi
+# if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
+#     echo "************ Running e2e tests ************"
+#     FEATURES=$TEST_RUN_FEATURES stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
+# fi
+# popd
+status=0
+
+git clone https://github.com/openshift/sriov-network-operator ${SHARED_DIR}/sriov-network-operator
+pushd ${SHARED_DIR}/sriov-network-operator
+
+pr_number=976
+git fetch --force origin --update-head-ok "pull/$pr_number/head:pr/$pr_number"
+# Check out the pull request branch
+git checkout "pr/$pr_number"
+git reset --hard HEAD
+
+export JUNIT_OUTPUT=$ARTIFACT_DIR
+PR=976 hack/deploy-sriov-in-telco-ci.sh
+hack/deploy-wait.sh
+SUITE=./test/conformance hack/run-e2e-conformance.sh || status=$?
+
 popd
+
 
 set +e
 set -x
@@ -532,18 +550,10 @@ popd
 
 pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 # Create HTML reports for humans/aliens
-[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.html
-ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
-[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.html
-# Run validation parser
-[[ -f ${SHARED_DIR}/cnf-validations-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-validations-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
-[[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
-# Create JSON reports for robots
-[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.json
-[[ -f ${ARTIFACT_DIR}/validation_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit.xml -o ${ARTIFACT_DIR}/validation_results.json
-[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.json
+[[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/unit_report.xml -o ${ARTIFACT_DIR}/test_results.html
+[[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/unit_report.xml -o ${ARTIFACT_DIR}/test_results.json
 
-junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
+[[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && cp ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
 set +x
