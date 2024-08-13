@@ -16,8 +16,8 @@ function set_proxy () {
         # cat "${SHARED_DIR}/proxy-conf.sh"
         echo "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
-	export no_proxy=$no_proxy,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
-	export NO_PROXY=$NO_PROXY,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
+	export no_proxy=brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
+	export NO_PROXY=brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
     else
         echo "no proxy setting."
     fi
@@ -64,7 +64,7 @@ function check_mcp_status() {
 function set_cluster_auth () {
     # get the registry configures of the cluster
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
-    if [[ $ret -eq 0 ]]; then 
+    if [[ $ret -eq 0 ]]; then
         # reminder: there is no brew pull secret here
         # add the custom registry auth to the .dockerconfigjson of the cluster
 
@@ -161,7 +161,7 @@ EOF
     #OPERTORS_TO_MIRROR: comma-separated values. for example: elasticsearch-operator,cincinnati-operator,file-integrity-operator
     if [[ $OPERTORS_TO_MIRROR == "" ]]; then
         echo "mirror all operators"
-    else 
+    else
 
         #only mirror images defined in Env OPERTORS_TO_MIRROR
         echo "    packages:">>${work_dir}/imageset-config.yaml
@@ -196,7 +196,7 @@ EOF
 }
 
 # Slove: x509: certificate signed by unknown authority
-# upload customzied registry ca_bundle into workers. 
+# upload customzied registry ca_bundle into workers.
 # In linux: the system ca-trust directory is /etc/pki/ca-trust/source/anchors
 #           openshift ca-truest file is /etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt
 function set_CA_for_nodes () {
@@ -232,7 +232,7 @@ function set_CA_for_nodes () {
 function create_settled_icsp () {
     echo "create ICSP or IDMS for proxy registry"
     icsp_num=$(oc get ImageContentSourcePolicy  -o name  2>/dev/null  |wc -l)
-    #we registry level proxy as below.In rosa cluster, registry level proxy may be rejected. 
+    #we registry level proxy as below.In rosa cluster, registry level proxy may be rejected.
     #as this ICSP/IDMS is used for QE Test images quay.io/openshifttest too. We don't use oc-mirror generated ICSP or IDMS
     if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
         cat <<EOF | oc create -f -
@@ -297,7 +297,7 @@ EOF
     fi
 
     if [ $? == 0 ]; then
-        echo "create the ICSP/IDMS successfully" 
+        echo "create the ICSP/IDMS successfully"
 	return 0
     else
         echo "!!! fail to create the ICSP/IDMS"
@@ -306,13 +306,13 @@ EOF
 }
 
 function create_catalog_sources()
-{    
+{
     echo "create QE catalogsource: $CATALOGSOURCE_NAME"
     # get cluster Major.Minor version
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
-        echo "the index image as the initContainer cache image)" 
+        echo "the index image as the initContainer cache image)"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -334,7 +334,7 @@ spec:
       interval: 15m
 EOF
     else
-        echo "the index image as the server image" 
+        echo "the index image as the server image"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -366,7 +366,7 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets 
+        # ImagePullBackOff nothing with the imagePullSecrets
         # run_command "oc get operatorgroup -n openshift-marketplace"
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
@@ -424,7 +424,7 @@ function check_marketplace () {
         echo "openshift-marketplace project AlreadyExists, skip creating."
         return 0
     fi
-    
+
     cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Namespace
@@ -446,7 +446,7 @@ EOF
 
 # from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
 function check_olm_capability(){
-    # check if OLM capability is added 
+    # check if OLM capability is added
     knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
     if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
         echo "knownCapabilities contains OperatorLifecycleManager"
@@ -524,5 +524,5 @@ fi
 if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
-fi 
+fi
 create_catalog_sources

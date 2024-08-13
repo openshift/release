@@ -287,3 +287,7 @@ if ! wait "$!"; then
   # TODO: gather logs??
   exit 1
 fi
+
+echo -e "\nRetrieving user-ca-bundle....."
+
+oc get cm -n openshift-config user-ca-bundle -o yaml > "${ARTIFACT_DIR}/user-ca-bundle.yaml"
