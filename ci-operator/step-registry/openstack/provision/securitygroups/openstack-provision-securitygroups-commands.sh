@@ -19,7 +19,7 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
-# Getting the machine network CIDR for minimal, dual-stack-upi, proxy and dualstack config types. 
+# Getting the machine network CIDR for all CONFIG_TYPEs. 
 MACHINES_NETWORK_V4_CIDR="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
 
 if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
