@@ -3,25 +3,30 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
+
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: odh-dashboard-image
+
 promotion:
   to:
   - namespace: opendatahub-io
     tag: latest
+
 releases:
   latest:
     release:
       architecture: multi
       channel: fast
       version: "4.10"
+
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
+
 tests:
 - as: odh-dashboard-image-mirror
   postsubmit: true
@@ -31,15 +36,22 @@ tests:
     env:
       IMAGE_REPO: odh-dashboard
       RELEASE_VERSION: main
+    commands:
+      - ./build-multi-arch.sh
     workflow: opendatahub-io-ci-image-mirror
+
 - as: odh-dashboard-pr-image-mirror
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-dashboard-image
     env:
       IMAGE_REPO: odh-dashboard
+    commands:
+      - ./build-multi-arch.sh
     workflow: opendatahub-io-ci-image-mirror
+
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
   repo: odh-dashboard
+
