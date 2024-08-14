@@ -137,7 +137,23 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-managed-cspi-qe
     env:
-      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.17;channel-group=nightly;compute-machine-type=m5.4xlarge;timeout=2h;replicas=2;fips=true;ocm-env=stage
+      CLUSTER1_CONFIG: name-prefix=ci-rosa;platform=rosa;region=us-east-2;version=4.17;channel-group=nightly;compute-machine-type=m5.4xlarge;timeout=2h;replicas=2;fips=true;ocm-env=stage
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+          [
+            {"step": "mesh-e2e-install", "failure_type": "test_failure", "classification": "mesh-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
+            {"step": "mesh-e2e-install", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
+          ],
+          "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","rosa-classic-p2p","serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-1165
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
       SLEEP_DURATION: 4h
     test:
     - as: mesh-e2e-install
@@ -178,7 +194,7 @@ tests:
           cpu: 100m
       timeout: 2h0m0s
     - ref: wait
-    workflow: cluster
+    workflow: firewatch-cluster
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
