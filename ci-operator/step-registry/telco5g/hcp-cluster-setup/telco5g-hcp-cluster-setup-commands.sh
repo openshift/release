@@ -20,11 +20,6 @@ cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
-HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"  # 10.1.104.3
-HYPERV_HOST=cnfdu0  #cnfdr3
-SNO_NAME=sno1
-SNO_IP="192.168.17.249"
-SNO_CLUSTER_API_PORT=64489
 
 # 4.17 management cluster is not ready for HCP yet
 if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
@@ -70,6 +65,7 @@ EOF
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
+# Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -96,15 +92,12 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     delegate_to: localhost
 EOF
 
-# Check connectivity
-ping ${BASTION_IP} -c 10 || true
-echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
-
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
+SNO_NAME=sno-${CLUSTER_NAME}
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -121,19 +114,114 @@ if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
     BASTION_ENV=false
 fi
 
+# Copy automation repo to local SHARED_DIR
+echo "Copy automation repo to local $SHARED_DIR"
+mkdir $SHARED_DIR/repos
+ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
+    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
+
+cd $SHARED_DIR/repos/ansible-automation
+
+# Change the host to hypervisor
+echo "Change the host from localhost to hypervisor"
+sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/hosted_bm_cluster.yaml
+
+# shellcheck disable=SC1083
+HYPERV_HOST="$(grep "${CLUSTER_HV_IP} " inventory/allhosts | awk {'print $1'})"
+# In BOS2 we use a regular dnsmasq, not the NetworkManager based
+# Use ProxyJump if using BOS2
 if $BASTION_ENV; then
-# Run on upstream lab with bastion
     cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_HOST} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
+${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
+    dnsmasq_params="vsno_dnsmasq_dir: /etc/dnsmasq.d"
+    dnsmasq_params2="dnsmasq_restart: true"
+    dnsmasq_params3="netmanager_restart: false"
 else
-# Run on downstream HV without bastion
     cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_HOST} ansible_host=${HYPERV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
+    dnsmasq_params=""
+    dnsmasq_params2=""
+    dnsmasq_params3=""
 fi
+
+# Create a playbook to remove existing SNO
+cat << EOF > $SHARED_DIR/delete-sno.yml
+---
+- name: Delete existing SNO
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+    - name: Remove existing SNO
+      include_role:
+        name: virtual_sno
+        tasks_from: deletion.yml
+      vars:
+        vsno_name: $SNO_NAME
+        $dnsmasq_params
+        $dnsmasq_params2
+        $dnsmasq_params3
+
+EOF
+
+cat << EOF > ~/fetch-information.yml
+---
+- name: Fetch information about HCP cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Get cluster version
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get clusterversion
+
+  - name: Get cluster operators objects
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get co
+
+  - name: Get nodes
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get node
+
+EOF
+
+cat << EOF > ~/freeip.yml
+---
+- name: Allocate free ip
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+    - name: Get IP
+      include_role:
+        name: freeip
+      vars:
+        get_by_range: ${CLUSTER_HV_IP%.*}
+
+EOF
+
+# TODO: add this to image build
+pip3 install dnspython netaddr
+
+cp $SHARED_DIR/inventory inventory/billerica_inventory
+
+# Run the playbook to remove SNO
+echo "Run the playbook to remove SNO management cluster"
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    $SHARED_DIR/delete-sno.yml
+
+# shellcheck disable=SC1083
+SNO_IP=$(ansible-playbook -vv ~/freeip.yml 2>/dev/null | grep '"free_ip": ' | tail -1  | awk {'print $2'} | tr -d '"')
+
+if $BASTION_ENV; then
+    PLAYBOOK_ARGS=" -e vsno_dnsmasq_dir=/etc/dnsmasq.d -e dnsmasq_configure_interface=false -e netmanager_restart=false -e dnsmasq_restart=true "
+    SNO_CLUSTER_API_PORT="64${SNO_IP##*.}"  # "64" and last octet of SNO_IP address
+else
+    PLAYBOOK_ARGS=""
+    SNO_CLUSTER_API_PORT="6443"
+fi
+
 
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
@@ -196,104 +284,22 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
 EOF
 
-cat << EOF > ~/fetch-information.yml
----
-- name: Fetch information about HCP cluster
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
-
-  - name: Get cluster version
-    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get clusterversion
-
-  - name: Get cluster operators objects
-    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get co
-
-  - name: Get nodes
-    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get node
-
-EOF
-
-# Copy automation repo to local SHARED_DIR
-echo "Copy automation repo to local $SHARED_DIR"
-mkdir $SHARED_DIR/repos
-ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
-    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
-
-cd $SHARED_DIR/repos/ansible-automation
-
-# Change the host to hypervisor
-echo "Change the host from localhost to hypervisor"
-sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/hosted_bm_cluster.yaml
-sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/remove_bm_cluster.yaml
-
-# Run playbook to remove existing SNO
-cat << EOF > ~/delete-sno.yml
----
-- name: Delete existing SNO
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
-
-    - name: Remove existing SNO
-      include_role:
-        name: virtual_sno
-        tasks_from: deletion.yml
-      vars:
-        vsno_name: $SNO_NAME
-
-EOF
-
-pip3 install dnspython netaddr
-
-cp $SHARED_DIR/inventory inventory/billerica_inventory
-
-echo "Run the playbook to remove any cluster that exists now"
-ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-    playbooks/remove_bm_cluster.yaml \
-    -e kubeconfig=/home/kni/${SNO_NAME}-kubeconfig \
-    -e cluster_name=$CLUSTER_NAME \
-    -e virtual_cluster_deletion=true || true
-
-# -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
-
-# Run the playbook to remove SNO
-echo "Run the playbook to remove SNO management cluster"
-ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-    ~/delete-sno.yml || true
-
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
-# ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-#     playbooks/hosted_bm_cluster.yaml \
-#     -e kubeconfig=/home/kni/${MGMT_CLUSTER}-kubeconfig \
-#     -e pre_step_mgmt_cluster=false \
-#     -e hcphost=$CLUSTER_NAME \
-#     -e virtual_worker_count=2 \
-#     -e hide_sensitive_log=true \
-#     -e hostedbm_working_root_dir=/home/kni/hcp-jobs \
-#     -e tag=$T5CI_VERSION \
-#     -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
-#     -e image_override=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
-#     -e hostedbm_bm_cpo_override_image=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
-#     -e release=nightly || status=$?
-
-#     -e hyperv_host=hypervisor \
 
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     playbooks/sno_hcp_e2e.yml \
     -e hcphost=$CLUSTER_NAME \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
-    -e hostedbm_inject_dns=false \
+    -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_release=nightly \
     -e hostedbm_bm_cpo_override_image=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
     -e image_override=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
     -e hcp_tag=$T5CI_VERSION \
-    -e hcp_release=nightly || status=$?
-
+    -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
@@ -311,8 +317,9 @@ if [[ "$status" == "0" ]]; then
     echo "Run fetching information for clusters"
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
+
+# Save the repo for next steps
+tar -cvf $SHARED_DIR/repos.tar -C $SHARED_DIR repos
+
 echo "Exiting with status ${status}"
-# enable for debug, copy raw logs to HV
-# scp -i $SSH_PKEY $COMMON_SSH_ARGS $ARTIFACT_DIR/ansible.log kni@${HYPERV_IP}:/tmp/ansible_job-"$(date +%Y-%m-%d-%H-%M)".log
-# scp -i $SSH_PKEY $COMMON_SSH_ARGS ${ARTIFACT_DIR}/_job.log kni@${HYPERV_IP}:/tmp/build_job-"$(date +%Y-%m-%d-%H-%M)".log
 exit ${status}
