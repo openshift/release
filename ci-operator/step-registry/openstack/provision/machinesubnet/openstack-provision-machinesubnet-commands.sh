@@ -8,10 +8,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != *"dualstack"* ]]; then
-    echo "Setting the Machine Network CIDR for $CONFIG_TYPE CONFIG_TYPE"
-    echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
-fi
+echo "Setting the Machine Network CIDR for $CONFIG_TYPE CONFIG_TYPE"
+echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
 
 if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
     echo "Skipping step due to CONFIG_TYPE not being proxy."
