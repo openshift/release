@@ -1,5 +1,15 @@
 build_root:
   from_repository: true
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -10,12 +20,10 @@ tests:
   commands: make test
   container:
     from: src
-
 - as: lint
   commands: make lint
   container:
     from: src
-
 - as: e2e-aws-commatrix-run
   steps:
     cluster_profile: aws-telco
@@ -28,16 +36,15 @@ tests:
         ci-job-type e2e-aws-commatrix-run
         ci-repo-name commatrix
         ci-org-name openshift-kni
-  test:
-  - as: e2e-aws-commatrix-run
-    commands: make e2e-test
-    from: src
-    resources:
-      requests:
-        cpu: 100m
-        memory: 200Mi
-  workflow: openshift-e2e-aws-ovn
-
+    test:
+    - as: e2e-aws-commatrix-run
+      commands: make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
 - as: security
   optional: true
   steps:
@@ -45,7 +52,6 @@ tests:
       PROJECT_NAME: commatrix
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
-
 zz_generated_metadata:
   branch: main
   org: openshift-kni
