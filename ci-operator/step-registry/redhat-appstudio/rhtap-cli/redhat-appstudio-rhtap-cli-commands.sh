@@ -152,9 +152,9 @@ show_installed_versions(){
       containerImage: .metadata.annotations.containerImage
     } |
     "Operator: \(.name)\nVersion: \(.version)\nImage: \(.containerImage)\n-----------------------------------------"
-  '| tee /tmp/installed_versions.txt
+  '| tee -a $SHARED_DIR/installed_versions.txt
 
-  cp /tmp/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
+  cp $SHARED_DIR/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
 }
 
 configure_rhtap

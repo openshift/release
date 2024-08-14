@@ -17,22 +17,24 @@ images:
   to: oc-bin-image
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: redhat-openshift-gitops-interop-aws
+- as: redhat-openshift-gitops-interop-ibmcloud
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -48,14 +50,12 @@ tests:
         [
             {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "global-operators"}
         ]
-      USER_TAGS: |
-        scenario gitops
     test:
     - ref: install-operators
     - ref: gitops-operator-tests
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
-  branch: v1.12
+  branch: v1.13
   org: redhat-developer
   repo: gitops-operator
   variant: gitops-ocp4.16-lp-interop

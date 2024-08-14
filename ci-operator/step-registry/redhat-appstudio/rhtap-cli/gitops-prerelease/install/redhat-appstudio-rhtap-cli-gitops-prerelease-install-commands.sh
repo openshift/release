@@ -86,6 +86,7 @@ setup_catalog_source(){
       source: registry.redhat.io/openshift-gitops-1/argo-rollouts-rhel8
 EOF
   
+  echo "The GITOPS_IIB_IMAGE for the pre-release catalogsource is: $GITOPS_IIB_IMAGE" | tee "$SHARED_DIR/installed_versions.txt"
 
   cat <<EOF | oc apply -f -
   apiVersion: operators.coreos.com/v1alpha1
