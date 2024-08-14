@@ -73,6 +73,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfda2": {"port": 6443, "ip": "10.6.105.12", "hvip": "10.6.105.10"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -83,7 +86,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -317,9 +320,6 @@ if [[ "$status" == "0" ]]; then
     echo "Run fetching information for clusters"
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
-
-# Save the repo for next steps
-tar -cvf $SHARED_DIR/repos.tar -C $SHARED_DIR repos
 
 echo "Exiting with status ${status}"
 exit ${status}
