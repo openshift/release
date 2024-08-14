@@ -3,10 +3,6 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   openshift_eventing-istio-src_knative-v1.14:
     name: eventing-istio-src
     namespace: openshift
@@ -23,10 +19,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.14
-  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.16
+    tag: rhel-8-release-golang-1.22-openshift-4.17
   origin_4.15_operator-registry:
     name: "4.15"
     namespace: origin
@@ -37,12 +33,9 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
@@ -54,12 +47,9 @@ images:
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -82,21 +72,11 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -122,21 +102,14 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","serverless-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"

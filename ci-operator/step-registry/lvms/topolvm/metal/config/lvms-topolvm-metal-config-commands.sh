@@ -34,10 +34,28 @@ set -euo pipefail
 cd ${remote_workdir}
 
 curl -LO https://go.dev/dl/${GO_VERSION}.tar.gz
-rm -rf ${remote_workdir}/go
-tar -C ${remote_workdir} -xzf ${GO_VERSION}.tar.gz
-rm ${GO_VERSION}.tar.gz
-echo 'export PATH=$PATH:${remote_workdir}/go/bin' >> ~/.profile && source ~/.profile
+
+# Verify the checksum
+if echo "${GO_CHECKSUM} ${GO_VERSION}.tar.gz" | sha256sum -c -; then
+    echo "Checksum verification succeeded."
+
+    # Remove any existing Go installation in the remote working directory
+    rm -rf ${remote_workdir}/go
+
+    # Extract the Go tarball
+    tar -C ${remote_workdir} -xzf ${GO_VERSION}.tar.gz
+
+    # Clean up the tarball
+    rm ${GO_VERSION}.tar.gz
+
+    # Add Go binary to PATH
+    echo 'export PATH=$PATH:${remote_workdir}/go/bin' >> ~/.profile && source ~/.profile
+else
+    echo "Go Checksum verification failed (${GO_VERSION} was expected to match ${GO_CHECKSUM})!"
+    # Clean up the downloaded file
+    rm ${GO_VERSION}.tar.gz
+    exit 1
+fi
 
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc

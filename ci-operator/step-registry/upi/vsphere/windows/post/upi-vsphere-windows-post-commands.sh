@@ -9,6 +9,9 @@ echo "$(date -u --rfc-3339=seconds) - configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 # look for files ending with "_vsphere_e2e_vm.txt" in the shared dir
 for f in "${SHARED_DIR}"/*_e2e_vsphere_vm.txt;
 do

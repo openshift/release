@@ -67,7 +67,7 @@ COUNTER=0
 while :;
 do
     echo "Checking cert-manager-operator CSV status for the #${COUNTER}-th time ..."
-    if [[ "$(oc get --no-headers csv -n cert-manager-operator)" == cert-manager-operator.*Succeeded ]]; then
+    if [[ "$(oc get --no-headers csv -n cert-manager-operator)" == *cert-manager-operator.*Succeeded ]]; then
         echo "The cert-manager-operator CSV status becomes ready" && break
     fi
     ((++COUNTER))

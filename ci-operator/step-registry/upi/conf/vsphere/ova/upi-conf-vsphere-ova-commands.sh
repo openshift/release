@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 HOME=/tmp
@@ -23,7 +28,11 @@ source "${SHARED_DIR}/govc.sh"
 
 declare vsphere_cluster
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 DATACENTERS=("$GOVC_DATACENTER")
 DATASTORES=("$GOVC_DATASTORE")

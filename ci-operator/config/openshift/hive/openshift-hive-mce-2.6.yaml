@@ -1,15 +1,17 @@
+base_images:
+  ocp_4.16_base-rhel9:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  from: ocp_4.16_base-rhel9
   to: hive
 promotion:
   to:
@@ -18,10 +20,10 @@ promotion:
     namespace: openshift
 releases:
   latest:
-    integration:
-      include_built_images: true
-      name: "4.16"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:

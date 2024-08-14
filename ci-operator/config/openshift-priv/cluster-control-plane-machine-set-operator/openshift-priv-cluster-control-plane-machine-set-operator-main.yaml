@@ -1,12 +1,16 @@
 base_images:
   ocp_4.17_base-rhel9:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
@@ -22,7 +26,7 @@ images:
   to: cluster-control-plane-machine-set-operator
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   arm64-latest:
@@ -33,12 +37,12 @@ releases:
       version: "4.13"
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -177,7 +181,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -191,7 +195,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -253,7 +257,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-nutanix-ovn
   cluster: build01
@@ -270,6 +274,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: regression-clusterinfra-aws-ipi-cpms-allcases
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h30m0s
 zz_generated_metadata:
   branch: main
   org: openshift-priv

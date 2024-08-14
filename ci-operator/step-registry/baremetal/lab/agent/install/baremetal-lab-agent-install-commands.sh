@@ -45,6 +45,17 @@ function get_ready_nodes_count() {
 }
 
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
@@ -72,8 +83,8 @@ oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
+# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
@@ -234,6 +245,7 @@ export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154

@@ -76,7 +76,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-disc-priv-sts-ep-f28
-  cron: 20 7 4 * *
+  cron: 2 11 26 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -110,7 +110,7 @@ tests:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-disc-fullyprivate-f28
-  cron: 20 3 12 * *
+  cron: 12 12 4 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -139,6 +139,33 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: gcp-ipi-disc-priv-oidc-f28
+  cron: 54 1 12 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+- as: gcp-ipi-proxy-etcd-encryption-f28
+  cron: 11 10 28 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

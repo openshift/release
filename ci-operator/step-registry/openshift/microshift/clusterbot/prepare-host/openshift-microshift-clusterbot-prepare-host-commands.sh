@@ -91,7 +91,7 @@ else
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
     : Fetch get_rel_version_repo.sh from o/microshift main so it is up to date - some release-4.Y might not have it
-    curl https://raw.githubusercontent.com/openshift/microshift/main/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh
+    curl https://raw.githubusercontent.com/openshift/microshift/06e9ae203c157f33d6570153152e2fb360bf8eae/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh
     source /tmp/get_rel_version_repo.sh
     export UNAME_M=$(uname -m)
     ver_repo=$(get_rel_version_repo $(echo $OCP_VERSION | cut -d. -f2))
@@ -117,6 +117,19 @@ skip_if_unavailable=0
     fi
 
 	"${DNF_RETRY}" "install" "microshift*-${version}"
+
+	if [[ ! -f /etc/crio/crio.conf.d/00-crio-crun.conf ]]; then
+        sudo tee /etc/crio/crio.conf.d/00-crio-crun.conf >/dev/null <<2EOF2
+[crio.runtime.runtimes.crun]
+runtime_path = ""
+runtime_type = "oci"
+runtime_root = "/run/crun"
+runtime_config_path = ""
+monitor_path = ""
+2EOF2
+		sudo systemctl restart crio.service
+	fi
+
 	sudo systemctl enable --now microshift
 fi
 EOF

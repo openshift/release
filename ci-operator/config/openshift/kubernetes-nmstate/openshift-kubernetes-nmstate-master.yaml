@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -53,17 +53,17 @@ promotion:
     - kubernetes-nmstate-handler
     - kubernetes-nmstate-operator
     - src-with-oc-and-kubectl
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   nightly:
     candidate:
@@ -106,8 +106,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
   cluster: build05
@@ -118,9 +116,14 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator
+- always_run: false
+  as: e2e-handler-azure
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: kubernetes-nmstate-e2e-azure
 - as: e2e-handler-ovn-ipv4-nightly-periodic
   cluster: build05
   cron: '@daily'
@@ -133,8 +136,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
 zz_generated_metadata:
   branch: master

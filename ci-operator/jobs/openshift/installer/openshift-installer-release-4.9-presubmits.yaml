@@ -1123,7 +1123,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-crc
     decorate: true
     labels:
@@ -1207,7 +1207,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -1290,7 +1290,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-byo-vpc
     decorate: true
     labels:
@@ -1373,7 +1373,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     labels:
@@ -1456,7 +1456,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upi
     decorate: true
     labels:
@@ -1539,7 +1539,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     labels:
@@ -1622,7 +1622,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-libvirt
     decorate: true
     labels:
@@ -2754,7 +2754,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.9-e2e-vsphere
@@ -2834,7 +2834,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.9-e2e-vsphere-upi
@@ -3288,7 +3288,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/okd-e2e-gcp
     decorate: true
     labels:
@@ -3373,7 +3373,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build04
+    cluster: build02
     context: ci/prow/okd-e2e-gcp-upgrade
     decorate: true
     labels:
@@ -3453,88 +3453,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-gcp-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.9$
-    - ^release-4\.9-
-    cluster: vsphere02
-    context: ci/prow/okd-e2e-vsphere
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
-      ci-operator.openshift.io/variant: okd
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.9-okd-e2e-vsphere
-    optional: true
-    rerun_command: /test okd-e2e-vsphere
-    run_if_changed: (^(data/.*|pkg.*)/vsphere)|(^vendor/github.com/vmware/)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
-        - --target=e2e-vsphere
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-vsphere,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

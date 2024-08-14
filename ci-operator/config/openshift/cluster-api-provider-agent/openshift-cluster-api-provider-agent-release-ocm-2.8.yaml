@@ -28,9 +28,9 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -98,6 +98,17 @@ tests:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-ai-operator-ztp-capi
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 00 22 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:

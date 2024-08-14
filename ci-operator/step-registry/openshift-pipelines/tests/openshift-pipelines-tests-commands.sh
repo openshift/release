@@ -28,7 +28,7 @@ else #login for ROSA & Hypershift platforms
 fi
 
 echo "Running gauge specs"
-declare -a specs=("specs/clustertasks/clustertask-s2i.spec" "specs/clustertasks/clustertask.spec" "specs/pipelines/" "specs/triggers/" "specs/metrics/" "-p specs/operator/addon.spec specs/operator/auto-prune.spec")
+IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do
   gauge run --log-level=debug --verbose --tags 'sanity & !tls' ${spec} || true
 done

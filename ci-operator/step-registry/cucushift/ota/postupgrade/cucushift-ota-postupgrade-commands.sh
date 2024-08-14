@@ -19,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -62,6 +62,18 @@ function check_tp_operator_notfound(){
     fi
 }
 
+function verify_output(){
+    local out message="${1}" cmd="${2}" expected="${3}"
+    if ! out=$(eval "${cmd}" 2>&1); then
+        echo >&2 "Failed to execute \"${cmd}\" while verifying ${message}, received \"${out}\", exiting" && return 1
+    fi
+    if ! [[ "${out}" == *"${expected}"* ]]; then
+        echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
+    fi
+    echo "passed verifying ${message}"
+    return 0
+}
+
 # Define the checkpoints/steps needed for the specific case
 function post-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -78,7 +90,7 @@ function post-OCP-66839(){
     fi
     # New gained cap annotation should be in extracted creds 
     newCap=$(grep -rh "capability.openshift.io/name:" "${credsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${newCap}" != "${expectedCapCR}" ]]; then
         echo "CRs with cap annotation: ${newCap}, but expected: ${expectedCapCR}"
         return 1
@@ -248,18 +260,20 @@ function post-OCP-56083(){
     return 1
 }
 
-function post-OCP-23799(){
-        export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true" #OCPBUGS-33905, rollback is protected by env feature gate now
-        SOURCE_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[1].version}')"
-        TARGET_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[0].version}')"
-        out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
-        expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
-        if [[ ${out} != "${expected}" ]]; then
-            echo -e "to-latest rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
-            return 1
-        else
-            echo "to-latest rollback reject step passed."
-        fi
+function post-OCP-60396(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
+}
+
+function post-OCP-60397(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    verify_output \
+    "cvo image is manifest.list" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.list.v2+json"
 }
 
 # This func run all test cases with with checkpoints which will not break other cases,

@@ -1,8 +1,8 @@
 base_images:
-  installer:
+  openstack-installer:
     name: "4.17"
     namespace: ocp
-    tag: installer
+    tag: openstack-installer
 build_root:
   image_stream_tag:
     name: shellcheck
@@ -16,11 +16,17 @@ images:
     RUN python -m pip install yq
   from: src
   inputs:
-    installer:
+    openstack-installer:
       paths:
       - destination_dir: .
         source_path: /bin/openshift-install
-  to: openstack-installer
+  to: shiftstack-scripts-image
+promotion:
+  to:
+  - additional_images:
+      scripts: shiftstack-scripts-image
+    name: tooling
+    namespace: shiftstack
 resources:
   '*':
     limits:
@@ -32,54 +38,7 @@ tests:
 - as: shellcheck
   commands: find . -type f -name "*.sh" | xargs --verbose --no-run-if-empty shellcheck
   container:
-    from: src
-- as: quotas-vexxhost
-  interval: 1h
-  steps:
-    env:
-      CLOUD_NAME: VEXXHOST managed
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-    workflow: shiftstack-quotas
-- as: quotas-openstack-nfv
-  interval: 1h
-  steps:
-    env:
-      CLOUD_NAME: OpenStack NFV
-      CLUSTER_TYPE_OVERRIDE: openstack-nfv
-    workflow: shiftstack-quotas
-- as: quotas-openstack-hwoffload
-  interval: 1h
-  steps:
-    env:
-      CLOUD_NAME: OpenStack HW offload
-      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
-    workflow: shiftstack-quotas
-- as: quotas-vh-mecha-central
-  interval: 1h
-  steps:
-    env:
-      CLOUD_NAME: mecha central
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-    workflow: shiftstack-quotas
-- as: quotas-vh-mecha-az0
-  interval: 1h
-  steps:
-    env:
-      CLOUD_NAME: mecha az0
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
-    workflow: shiftstack-quotas
-- as: liveliness-mecha-central
-  interval: 1h
-  steps:
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-    workflow: shiftstack-liveliness
-- as: liveliness-mecha-az0
-  interval: 1h
-  steps:
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
-    workflow: shiftstack-liveliness
+    from: shiftstack-scripts-image
 zz_generated_metadata:
   branch: main
   org: shiftstack

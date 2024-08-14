@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base
   base-machine:
@@ -8,19 +8,19 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
   cloud-provider-aws-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-aws-rpms
   cloud-provider-azure-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-azure-rpms
   cloud-provider-gcp-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-gcp-rpms
   commitchecker:
@@ -32,15 +32,15 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   oc-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: oc-rpms
-  ocp_4.16_base-rhel9:
-    name: "4.17"
+  ocp_4.17_base-rhel9:
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_4.16_tools:
-    name: "4.17"
+  ocp_4.17_tools:
+    name: "4.18"
     namespace: ocp
     tag: tools
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -48,11 +48,11 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
   rhel-coreos-base:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: rhel-coreos
   tools:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -62,18 +62,18 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   inputs:
-    ocp_4.16_tools:
+    ocp_4.17_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.16:tools
+      - registry.ci.openshift.org/ocp/4.17:tools
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -107,18 +107,18 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -129,8 +129,18 @@ promotion:
       artifacts: artifacts
     excluded_images:
     - rhel-coreos
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - rhel-coreos
+    - hyperkube
+    - kubernetes-tests
+    - pod
+    - installer-kube-apiserver-artifacts
+    name: scos-4.17
+    namespace: origin
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -180,12 +190,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -362,7 +372,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
@@ -460,6 +470,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-ovn-runc
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-runc
 - as: e2e-aws-crun-wasm
   steps:
     cluster_profile: aws

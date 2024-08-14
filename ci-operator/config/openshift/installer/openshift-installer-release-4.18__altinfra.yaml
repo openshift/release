@@ -58,6 +58,7 @@ promotion:
   to:
   - additional_images:
       installer-altinfra: installer
+    disabled: true
     excluded_images:
     - installer
     - src-oc
@@ -95,7 +96,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
@@ -107,7 +107,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_TAGS: |
@@ -122,7 +121,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
@@ -141,7 +139,6 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
@@ -179,7 +176,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
@@ -190,7 +186,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
@@ -201,7 +196,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -213,7 +207,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -225,7 +218,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -237,7 +229,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -252,6 +243,16 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-capi-ovn
@@ -463,7 +464,7 @@ tests:
   as: e2e-vsphere-capi-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -473,7 +474,7 @@ tests:
   as: e2e-vsphere-capi-zones
   optional: true
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -483,7 +484,7 @@ tests:
   as: e2e-vsphere-capi-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -493,10 +494,12 @@ tests:
   as: e2e-vsphere-capi-multi-vcenter-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-multi-vcenter
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereMultiVCenters=true"]'
       FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 zz_generated_metadata:

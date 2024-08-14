@@ -162,7 +162,9 @@ oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeo
 
 EOF
 
-oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
+  oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+fi
 
 oc apply -f - <<EOF
 apiVersion: v1

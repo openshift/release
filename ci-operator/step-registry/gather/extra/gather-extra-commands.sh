@@ -362,6 +362,8 @@ ${t_all}     cluster:usage:cpu:total:seconds:quantile      label_replace(quantil
 ${t_install} cluster:usage:cpu:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
 ${t_test}    cluster:usage:cpu:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
 
+${t_test}    cluster:outage:kubelet:metrics:total:seconds      sum(sum_over_time((1 - up{job="kubelet",metrics_path="/metrics"})[8h:1s])) by (metrics_path)
+
 ${t_all}     cluster:usage:cpu:kubelet:total:seconds:quantile      label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
 ${t_install} cluster:usage:cpu:kubelet:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
 ${t_test}    cluster:usage:cpu:kubelet:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
