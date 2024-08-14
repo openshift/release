@@ -12,7 +12,7 @@ echo "Setting the Machine Network CIDR for $CONFIG_TYPE CONFIG_TYPE"
 if [[ "$CONFIG_TYPE" != *"dualstack"* ]]; then
     echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
 else
-    echo ${MACHINES_SUBNET_v4_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
+    echo ${MACHINES_SUBNET_v4_RANGE:?}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
 fi
 
 if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
