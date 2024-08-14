@@ -139,11 +139,7 @@ tests:
           "failure_rules":
           [
             {"step": "mesh-e2e-tests", "failure_type": "test_failure", "classification": "mesh-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
-            {"step": "ui-e2e-tests", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "jira_project": "SRVCOM", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
             {"step": "mesh-e2e-tests", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
-            {"step": "ui-e2e-tests", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_epic": "!default"},
-            {"step": "odc-tests", "failure_type": "test_failure", "classification": "ODC Test Failure", "jira_project": "OCPBUGS", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_component": ["Dev Console", "!default"], "jira_epic": "!default"},
-            {"step": "odc-tests", "failure_type": "pod_failure", "classification": "ODC Test Execution", "group": {"name": "p2p-tests", "priority": 1}, "jira_additional_labels": ["!default","p2p-tests"], "jira_component": ["Dev Console", "!default"], "jira_epic": "!default"},
           ],
           "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
         }
@@ -183,41 +179,6 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    - as: ui-e2e-tests
-      best_effort: true
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make ui-e2e
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    - as: odc-tests
-      cli: latest
-      commands: |
-        status=0
-        ./test-prow-e2e.sh knative || status="$?" || true
-        cp -r /go/src/github.com/openshift/console/frontend/gui_test_screenshots/* ${ARTIFACT_DIR} 2>/dev/null || true
-        exit $status
-      from: console-tests
-      resources:
-        requests:
-          cpu: 100m
     workflow: firewatch-rosa-aws-sts
   timeout: 6h0m0s
 zz_generated_metadata:
