@@ -79,7 +79,10 @@ tests:
     #!/bin/bash
     set -euxo pipefail
     # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="release-4.16"
+    dnf install -y jq
+    env
+    export CHECK_RELEASE=$(echo "$CLONEREFS_OPTIONS" | jq -r '.refs.[-1].base_ref')
+    #export CHECK_RELEASE="master"
     make check-reqs
   container:
     from: src
