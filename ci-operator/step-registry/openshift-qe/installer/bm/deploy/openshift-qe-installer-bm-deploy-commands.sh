@@ -12,7 +12,7 @@ CRUCIBLE_URL=$(cat "/secret/crucible_url")
 
 cat <<EOF >>/tmp/all.yml
 ---
-lab: $LAB performancelab
+lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
