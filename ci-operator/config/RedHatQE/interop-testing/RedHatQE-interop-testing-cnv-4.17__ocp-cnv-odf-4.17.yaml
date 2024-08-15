@@ -48,23 +48,53 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*"                 , "failure_type": "all"          , "classification": "Infrastructure Provisioning - Cluster" , "group": { "name" : "cluster" , "priority" : 1}, "jira_additional_labels": ["!default"]                                           },
-              {"step": "gather-*"              , "failure_type": "pod_failure"  , "classification": "Other"                                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
-              {"step": "gather-*"              , "failure_type": "test_failure" , "classification": "NONE"                                  ,                                                                                         "ignore": "true", "jira_project": "NONE"  },
-              {"step": "openshift-*"           , "failure_type": "all"          , "classification": "Other"                                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "cucushift-*"           , "failure_type": "all"          , "classification": "Cluster Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "*deploy-odf"           , "failure_type": "all"          , "classification": "Operator Setup"                        , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
               {"step": "*ocs-tests"            , "failure_type": "pod_failure"  , "classification": "ODF Storage Tests Execution"           , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
               {"step": "*ocs-tests"            , "failure_type": "test_failure" , "classification": "ODF Storage Tests Failure"             , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "RHSTOR"},
               {"step": "*cnv-tests-e2e-deploy" , "failure_type": "pod_failure"  , "classification": "CNV Tests Execution"                   , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"]                          },
               {"step": "*cnv-tests-e2e-deploy" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"                     , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV"   }
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp", "self-managed-lp", "cnv-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.17"
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      ODF_VERSION_MAJOR_MINOR: "4.16"
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario cnv
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: interop-tests-openshift-virtualization-tests
+    workflow: firewatch-ipi-aws
+- as: cnv-odf-tests-aws-upi-ocp417-fips
+  cron: 04 09 * * 6
+  steps:
+    cluster_profile: aws-interop-qe
+    env:
+      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      COMPUTE_NODE_TYPE: c5n.metal
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*"           , "failure_type": "all"          , "classification": "Cluster Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "*deploy-odf"           , "failure_type": "all"          , "classification": "Operator Setup"                        , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "pod_failure"  , "classification": "ODF Storage Tests Execution"           , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "test_failure" , "classification": "ODF Storage Tests Failure"             , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "RHSTOR"},
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "pod_failure"  , "classification": "CNV Tests Execution"                   , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"                     , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV"   }
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp", "self-managed-lp", "cnv-lp","fips"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCP_VERSION: "4.17"
