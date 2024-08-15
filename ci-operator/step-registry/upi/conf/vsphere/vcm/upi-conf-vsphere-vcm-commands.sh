@@ -116,7 +116,7 @@ function getFailureDomainsWithDSwitchForVCenter() {
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
       
-      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
     done
     echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
     echo "]" >> "${FAILURE_DOMAIN_PATH}"

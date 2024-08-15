@@ -1,0 +1,63 @@
+base_images:
+  ocp_builder_rhel-9-base-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/secondary-scheduler-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: secondary-scheduler-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.19-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: make verify-gofmt
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: secondary-scheduler-operator
