@@ -15,6 +15,17 @@ function debug() {
         echo -e "oc -n $NAMESPACE get deployments -owide\n$(oc -n $NAMESPACE get deployments -owide)"
         echo -e "Getting pod info....\n"
         echo -e "oc -n $NAMESPACE get pods -owide\n$(oc -n $NAMESPACE get pods -owide)"
+        echo -e "Getting namespace events...\n"
+        echo -e "oc -n $NAMESPACE get events\n$(oc -n $NAMESPACE get events)"
+        echo -e "Getting unhealthy pod logs...\n"
+        oc get pod -n $NAMESPACE --no-headers | awk '{print $1" "$3}' | while read line; do
+          name=$(echo $line | awk '{print $1}')
+          status=$(echo $line | awk '{print $2}')
+          if [[ $status != "Completed" && $status != "Running" ]]; then
+            echo "Getting pod log of $name, status is $status"
+            oc logs -n $NAMESPACE $name
+          fi
+        done
         echo -e "Getting nodes info...\n"
         echo -e "oc get node -owide\n$(oc get node -owide)"
     fi
