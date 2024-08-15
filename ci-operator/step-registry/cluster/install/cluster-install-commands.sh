@@ -32,6 +32,10 @@ for cluster_value in $(env | grep -E '^CLUSTER[0-9]+_CONFIG' | sort  --version-s
       CLUSTERS_CMD+=" --cluster ${cluster_value} "
       NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
     fi
+
+    if echo "${cluster_value}" | grep -q 'fips=true'; then
+      export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION='true'
+    fi
 done
 
 if [ $NUM_CLUSTERS -eq 1 ]; then
