@@ -27,6 +27,9 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+      default: ""
+      documentation: "Specifies the type of storage account for storing diagnostics data."
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
       default: ""
       documentation: "The Azure Marketplace image offer."
@@ -135,6 +138,13 @@ chain:
       
       if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
         EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+      fi
+
+      if [[ -n $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE ]]; then
+        EXTRA_ARGS+=" --diagnostics-storage-account-type=${HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE}"
+        if [[ $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE == "UserManaged" ]]; then
+          EXTRA_ARGS+=" --diagnostics-storage-account-uri=$(cat "${SHARED_DIR}"/azure_storage_account_blob_endpoint)"
+        fi
       fi
       
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
