@@ -45,6 +45,7 @@ rg_files=(
     "${SHARED_DIR}/resourcegroup_vnet"
     "${SHARED_DIR}/resourcegroup_nsg"
     "${SHARED_DIR}/resourcegroup_aks"
+    "${SHARED_DIR}/resourcegroup_sa"
     "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 )
 for rg_file in "${rg_files[@]}"; do
