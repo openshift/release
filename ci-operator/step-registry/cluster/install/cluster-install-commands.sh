@@ -17,6 +17,7 @@ export AWS_SECRET_ACCESS_KEY
 export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
+export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION='true'
 
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --action create \
