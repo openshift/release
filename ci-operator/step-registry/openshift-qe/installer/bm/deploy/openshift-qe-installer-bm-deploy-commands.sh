@@ -63,7 +63,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
      git branch -D dev || echo 'No dev branch exists'
      git fetch origin pull/$JETLAG_PR/head:dev
      git checkout dev
-   else if [[ ${JETLAG_LATEST} == 'true' ]]
+   elif [[ ${JETLAG_LATEST} == 'true' ]]; then
      git checkout main
      git pull
    else
