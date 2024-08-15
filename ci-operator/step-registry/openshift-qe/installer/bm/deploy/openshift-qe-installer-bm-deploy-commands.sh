@@ -72,7 +72,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    git branch
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/cloud31.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
@@ -81,4 +81,4 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    cd jetlag
    git branch
    source bootstrap.sh
-   ansible-playbook -i ansible/inventory/cloud31.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
