@@ -3,6 +3,7 @@
 set -euo pipefail
 set -x
 
+# foo
 function cleanup() {
 for child in $( jobs -p ); do
   kill "${child}"
