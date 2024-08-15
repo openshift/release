@@ -16,8 +16,8 @@ function set_proxy () {
         # cat "${SHARED_DIR}/proxy-conf.sh"
         echo "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
-	export no_proxy=$no_proxy,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
-	export NO_PROXY=$NO_PROXY,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io
+	export no_proxy=$no_proxy,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+	export NO_PROXY=$NO_PROXY,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
     else
         echo "no proxy setting."
     fi
@@ -145,8 +145,30 @@ function mirror_optional_images () {
     skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
     skopeo login quay.io/openshift-qe-optional-operators -u ${optional_auth_user} -p ${optional_auth_password}
 
-    echo "skopeo copy docker://${origin_index_image} oci://${work_dir}oci-local-catalog --remove-signatures"
-    skopeo copy --all docker://${origin_index_image} "oci://${work_dir}/oci-local-catalog" --remove-signatures --src-tls-verify=false || { echo "Error! skopeo copy catalog failed, abort !"; return 1; }
+    echo "skopeo copy docker://${origin_index_image} oci://${work_dir}**/**oci-local-catalog --remove-signatures"
+
+    RETRY_COUNT=0
+    MAX_RETRIES=3
+
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        set +e
+        skopeo copy --all docker://${origin_index_image} "oci://${work_dir}/oci-local-catalog" --remove-signatures --src-tls-verify=false
+        COPY_STATUS=$?
+        set -e
+        if [ $COPY_STATUS -eq 0 ]; then
+            echo "Copy succeeded"
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Retry $RETRY_COUNT/$MAX_RETRIES..."
+            sleep 30
+        fi
+    done
+
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "Failed after $MAX_RETRIES retries"
+        exit 1
+    fi
 
     echo "create ImageSetConfiguration"
     cat <<EOF >${work_dir}/imageset-config.yaml
