@@ -1,0 +1,112 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-417-up
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: prow-scripts.prow
+  to: prow-scripts-417-up
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.16.0-0
+        upper: 4.17.0-0
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: chaos-aws-loaded-upgrade-416to417
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+- as: chaos-gcp-loaded-upgrade-416to417
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp
+  timeout: 8h0m0s
+- as: chaos-azure-loaded-upgrade-416to417
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.17-nightly-upgrade
