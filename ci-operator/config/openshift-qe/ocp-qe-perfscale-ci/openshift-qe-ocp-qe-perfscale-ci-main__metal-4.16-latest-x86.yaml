@@ -24,7 +24,7 @@ resources:
 tests:
 - as: weekly-6nodes
   cluster: build05
-  cron: 0 8 * * 0
+  cron: 0 0 * * 0
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -37,7 +37,8 @@ tests:
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
     - chain: openshift-qe-data-path-tests
     - chain: openshift-qe-web-burner
     - chain: openshift-qe-node-density-heavy
@@ -56,31 +57,52 @@ tests:
     - chain: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
+  as: deploy-sno
+  cluster: build05
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      OCP_VERSION: latest-4.16
+      TYPE: sno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
   as: node-density-heavy-6nodes
   cluster: build05
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
+      NUM_WORKER_NODES: "6"
+      OCP_VERSION: latest-4.16
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-node-density-heavy
   timeout: 7h0m0s
 - always_run: false
-  as: data-path
+  as: data-path-6nodes
   cluster: build05
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CRUCIBLE: "false"
       INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_VERSION: latest-4.16
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
   timeout: 8h0m0s
 - always_run: false
@@ -90,10 +112,15 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
+      NUM_WORKER_NODES: "6"
+      OCP_VERSION: latest-4.16
     test:
     - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
@@ -102,21 +129,18 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
+      NUM_WORKER_NODES: "6"
+      OCP_VERSION: latest-4.16
       WORKLOAD: web-burner-cluster-density
     test:
     - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
     - chain: openshift-qe-web-burner
-- always_run: false
-  as: day2-metallb
-  cluster: build05
-  steps:
-    cluster_profile: metal-perscale-cpt
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2-metallb
 zz_generated_metadata:
   branch: main
   org: openshift-qe

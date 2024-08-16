@@ -74,6 +74,14 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
+    'aws-edge-zones-quota-slice': {
+        'us-east-1': 5,
+        'us-west-2': 5
+    },
+    'aws-splat-quota-slice': {
+        'us-east-1': 5,
+        'us-west-2': 5
+    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
@@ -222,7 +230,7 @@ CONFIG = {
     'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 9,
+        'default': 18,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -234,13 +242,13 @@ CONFIG = {
         'default': 1,
     },
     'openstack-nfv-quota-slice': {
-        'default': 5,
+        'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
         'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 2,
+        'default': 4,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -257,7 +265,6 @@ CONFIG = {
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
-    'vsphere-multi-vcenter-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
@@ -296,7 +303,7 @@ CONFIG = {
         'wdc06': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
-        'us-east': 10,
+        'us-east': 40,
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -463,9 +470,6 @@ for i in [1287,1289,1296,1298,1300,1302]:
 
 for i in range(0,100):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
-
-for i in [1148]:
-    CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1

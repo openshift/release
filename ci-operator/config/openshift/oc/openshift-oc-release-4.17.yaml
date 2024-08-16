@@ -85,7 +85,6 @@ promotion:
   to:
   - additional_images:
       oc-rpms: rpms
-    disabled: true
     excluded_images:
     - tests
     - must-gather
@@ -195,6 +194,22 @@ tests:
   optional: true
   steps:
     workflow: openshift-ci-security
+- as: e2e-agent-compact-ipv4-add-nodes
+  cluster: build05
+  optional: true
+  run_if_changed: ^(pkg/cli/admin/nodeimage/|go.mod)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_DISK=100
+      DEVSCRIPTS_TARGET: agent_plus_add_node
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

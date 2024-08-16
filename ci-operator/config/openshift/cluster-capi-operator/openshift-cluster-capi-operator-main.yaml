@@ -1,6 +1,6 @@
 base_images:
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -26,17 +26,17 @@ images:
   to: cluster-capi-operator
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -45,6 +45,12 @@ resources:
     requests:
       cpu: 200m
       memory: 400Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "1"
+      memory: 3Gi
 tests:
 - as: lint
   commands: make lint
@@ -134,6 +140,20 @@ tests:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: e2e-azure-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-e2e-azure
 - as: e2e-vsphere-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
