@@ -60,7 +60,7 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
