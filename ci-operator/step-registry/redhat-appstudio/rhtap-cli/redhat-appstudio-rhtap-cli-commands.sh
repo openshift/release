@@ -62,11 +62,6 @@ configure_rhtap(){
 
   # Turn ci to true
   sed -i 's/ci: false/ci: true/' $tpl_file
-  
-  config_file="config.yaml"
-  sed -i '/redHatAdvancedClusterSecurity:/,/namespace: rhtap-acs/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
-  sed -i '/redHatQuay:/,/namespace: rhtap-quay/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
-  sed -i 's|/release/|/main/|' $config_file
 
   cat <<EOF >> $tpl_file
 integrations:
@@ -80,6 +75,45 @@ $(echo "${GITHUB__APP__PRIVATE_KEY}" | sed 's/^/      /')
     webhookSecret: "${GITHUB__APP__WEBHOOK__SECRET}"
 EOF
 
+  # Edit config.yaml
+  config_file="config.yaml"
+  sed -i '/redHatAdvancedClusterSecurity:/,/namespace: rhtap-acs/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
+  sed -i '/redHatQuay:/,/namespace: rhtap-quay/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
+  sed -i 's|/release/|/main/|' $config_file
+
+}
+
+configure_rhtap_for_prerelease_versions(){
+  # Prepare for pre-release install capabilities
+  # Define the file path
+  subscription_values_file="charts/rhtap-subscriptions/values.yaml"
+
+  # Function to update the values
+  update_values() {
+    local section=$1
+    local channel=$2
+    local source=$3
+
+    sed -i "/$section:/,/sourceNamespace:/ {
+      /^ *channel:/ s/: .*/: $channel/
+      /^ *source:/ s/: .*/: $source/
+    }" $subscription_values_file
+  }
+
+  echo "Check the PRODUCT variable and update the corresponding section"
+  if [ "$PRODUCT" == "gitops" ]; then
+    update_values "openshiftGitOps" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  elif [ "$PRODUCT" == "rhdh" ]; then
+    update_values "redHatDeveloperHub" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  elif [ "$PRODUCT" == "pipelines" ]; then
+    update_values "openshiftPipelines" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  else
+    echo "No prerelease product specified nothing needs doing."
+  fi
+  
+  echo "Show subscription values"
+  cat $subscription_values_file
+
 }
 
 install_rhtap(){
@@ -87,6 +121,7 @@ install_rhtap(){
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" quay --url="https://quay.io" --dockerconfigjson="${QUAY__DOCKERCONFIGJSON}" --token="${QUAY__API_TOKEN}"
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" acs --endpoint="${ACS__CENTRAL_ENDPOINT}" --token="${ACS__API_TOKEN}"
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" gitlab --app-id "${GITLAB__APP__CLIENT__ID}" --app-secret "${GITLAB__APP__CLIENT__SECRET}" --token "${GITLAB__TOKEN}"
+  
   ./bin/rhtap-cli deploy --config ./config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
 
   # Check if "Deployment complete" is in the output
@@ -117,11 +152,12 @@ show_installed_versions(){
       containerImage: .metadata.annotations.containerImage
     } |
     "Operator: \(.name)\nVersion: \(.version)\nImage: \(.containerImage)\n-----------------------------------------"
-  '| tee /tmp/installed_versions.txt
+  '| tee -a $SHARED_DIR/installed_versions.txt
 
-  cp /tmp/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
+  cp $SHARED_DIR/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
 }
 
 configure_rhtap
+configure_rhtap_for_prerelease_versions
 install_rhtap
 show_installed_versions

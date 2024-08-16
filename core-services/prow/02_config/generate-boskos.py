@@ -74,6 +74,10 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
+    'aws-edge-zones-quota-slice': {
+        'us-east-1': 5,
+        'us-west-2': 5
+    },
     'aws-splat-quota-slice': {
         'us-east-1': 5,
         'us-west-2': 5
@@ -226,7 +230,7 @@ CONFIG = {
     'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 9,
+        'default': 18,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -244,7 +248,7 @@ CONFIG = {
         'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 2,
+        'default': 4,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},

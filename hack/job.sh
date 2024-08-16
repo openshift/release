@@ -10,10 +10,11 @@ if [[ -n "${GITHUB_TOKEN_PATH:-}" ]]; then
 fi
 
 CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64}
 if [ -z ${VOLUME_MOUNT_FLAGS+x} ]; then VOLUME_MOUNT_FLAGS=':z'; else echo "VOLUME_MOUNT_FLAGS is set to '$VOLUME_MOUNT_FLAGS'"; fi
 
 
-$CONTAINER_ENGINE run \
+$CONTAINER_ENGINE run $CONTAINER_ENGINE_OPTS \
     --rm \
     --volume "$PWD:/tmp/release${VOLUME_MOUNT_FLAGS}" \
     ${volume:-} \

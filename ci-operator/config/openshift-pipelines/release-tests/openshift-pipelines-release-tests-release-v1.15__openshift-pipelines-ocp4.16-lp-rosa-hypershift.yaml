@@ -1,0 +1,72 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: openshift-pipelines-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: openshift-pipelines-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+              [
+                {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 1},"jira_additional_labels": ["!default"]},
+                {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "SRVKP", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]}
+              ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","rosa-hypershift-lp","pipelines-lp"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.16"
+      REGION: us-west-2
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-tests
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: release-v1.15
+  org: openshift-pipelines
+  repo: release-tests
+  variant: openshift-pipelines-ocp4.16-lp-rosa-hypershift
