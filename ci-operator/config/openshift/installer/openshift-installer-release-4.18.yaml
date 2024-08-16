@@ -216,6 +216,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -807,6 +813,22 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-powervs-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.18"
+      CLUSTER_NAME_MODIFIER: capi-418
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
   timeout: 6h0m0s
 - as: integration-tests
   run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
