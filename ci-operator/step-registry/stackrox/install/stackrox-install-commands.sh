@@ -61,6 +61,15 @@ function check_cli_tools {
   which base64
 }
 
+function get_roxctl() {
+  version=${1:-latest}
+  os=${2:-linux}
+  arch=${3:+-}${3:-}
+  # https://mirror.openshift.com/pub/rhacs/assets/latest/bin/linux/
+  curl "https://mirror.openshift.com/pub/rhacs/assets/${release}/bin/${os}/roxctl${arch}" --output roxctl
+  chmod +x roxctl
+}
+
 # echo "(Logging oc commands for user to reproduce and confirm state)"
 # function oc() {
 #   echo "$(date +%H:%M:%S) + oc $*" >&2
