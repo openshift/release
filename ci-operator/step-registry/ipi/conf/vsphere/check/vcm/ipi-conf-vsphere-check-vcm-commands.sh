@@ -320,7 +320,7 @@ for LEASE in $LEASES; do
   log "portgroup ${portgroup_name}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
-  extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+  extra_leased_resource=$(jq -r .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
   NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
 
