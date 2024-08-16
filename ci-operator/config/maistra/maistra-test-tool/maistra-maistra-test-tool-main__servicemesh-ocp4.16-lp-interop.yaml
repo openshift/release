@@ -22,10 +22,12 @@ images:
   to: maistra-runner
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     limits:
@@ -34,12 +36,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: servicemesh-interop-aws
+- as: servicemesh-interop-ibmcloud
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -53,7 +55,7 @@ tests:
               {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","servicemesh-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
@@ -70,15 +72,13 @@ tests:
       SMCP_OPERATOR_VERSION: 2.6.0
       SMCP_VERSION: "2.6"
       TEST_GROUP: interop
-      USER_TAGS: |
-        scenario servicemesh
     test:
     - ref: install-operators
     - ref: servicemesh-maistra-test-tool-execute
     - ref: servicemesh-smcp-install
     - ref: servicemesh-kiali-int-tests-execute
     - ref: servicemesh-kiali-cypress-tests-execute
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: maistra
