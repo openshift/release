@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.17
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -20,18 +16,14 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile
+  dockerfile_path: ./Dockerfile
   from: origin_scos-4.17_base-stream9
   inputs:
-    ocp_builder_rhel-9-base-nodejs-openshift-4.17:
-      as:
-      - web-builder
-      - registry.redhat.io/ubi9/nodejs-18:1-118
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - go-builder
-      - quay.io/redhat-cne/openshift-origin-release:rhel-9-golang-1.22-openshift-4.17
-  to: monitoring-plugin
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: operator-marketplace
 promotion:
   to:
   - name: scos-4.17
@@ -48,6 +40,6 @@ resources:
       memory: 200Mi
 zz_generated_metadata:
   branch: release-4.17
-  org: openshift
-  repo: monitoring-plugin
+  org: operator-framework
+  repo: operator-marketplace
   variant: okd-scos
