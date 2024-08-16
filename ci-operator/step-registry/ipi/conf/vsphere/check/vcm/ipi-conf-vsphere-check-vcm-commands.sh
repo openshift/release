@@ -60,7 +60,7 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
@@ -320,7 +320,7 @@ for LEASE in $LEASES; do
   log "portgroup ${portgroup_name}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
-  extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+  extra_leased_resource=$(jq -r .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
   NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
 
@@ -411,7 +411,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
     platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
-  fi  
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
