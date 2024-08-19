@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -14,7 +18,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -23,20 +27,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-oci-conformance-test-quay311
+- as: quay-oci-conformance-test-quay312
   cron: 0 12 1 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.8xlarge
-      ODF_OPERATOR_CHANNEL: stable-4.15
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:713080
-      QUAY_OPERATOR_CHANNEL: stable-3.11
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:786463
+      QUAY_OPERATOR_CHANNEL: stable-3.12
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
     test:
     - ref: quay-tests-enable-quay-catalogsource
-    - ref: quay-tests-deploy-quay-odf
+    - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-quay-oci-conformance-test
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:

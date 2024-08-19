@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    tag: rhel-9-release-golang-1.22-openshift-4.18
 images:
 - dockerfile_literal: |
     FROM src
@@ -18,7 +18,8 @@ images:
   to: microshift-test-rpm
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - microshift-test-rpm
     name: "4.18"
     namespace: ocp
@@ -27,13 +28,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -106,7 +107,7 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: metal-periodic-test
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -114,7 +115,7 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -122,7 +123,7 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-bootc-test
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -130,7 +131,23 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-bootc-test-arm
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-periodic-test
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-periodic-test-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -159,6 +176,14 @@ tests:
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-origin-conformance
+- as: footprint-and-performance
+  run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-footprint-and-performance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

@@ -10,8 +10,12 @@ source "$SHARED_DIR/main.env"
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
-else
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
@@ -30,7 +34,7 @@ SSH_PKEY=~/key
 cp "$SSH_PKEY_PATH" "$SSH_PKEY"
 chmod 600 "$SSH_PKEY"
 
-if [[ "$T5CI_VERSION" == "4.17" ]]; then
+if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
@@ -46,7 +50,7 @@ if [[ "$T5CI_VERSION" != "4.11" ]] && [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
-    git submodule update --init --force --recursive --remote
+    git submodule update --init --force --recursive
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
