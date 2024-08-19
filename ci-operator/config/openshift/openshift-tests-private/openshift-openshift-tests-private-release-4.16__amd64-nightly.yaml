@@ -1534,6 +1534,7 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
@@ -1545,6 +1546,7 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
       TEST_TIMEOUT: "30"
@@ -1556,17 +1558,29 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
       TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-hypershift-qe-longduration
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-aks-hypershift-cilium-guest-f7
+  cron: 32 17 5,12,19,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-cilium-guest
 - as: azure-aks-hypershift-etcd-disk-encryption-guest-f7
   cron: 57 11 1,8,15,24 * *
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE: ""
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -1577,12 +1591,25 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE: ""
       TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption
+- as: azure-aks-hypershift-install-f28-longduration
+  cron: 12 7 4 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftAKSINSTALL&
+      TEST_SCENARIOS: Hypershift
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
 - as: azure-ipi-ovn-hypershift-install-f28-longduration
   cron: 12 12 15 * *
   steps:

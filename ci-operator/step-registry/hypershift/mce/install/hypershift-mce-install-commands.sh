@@ -219,3 +219,18 @@ oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgm
 echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
+if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
+  oc apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hypershift-override-images
+  namespace: local-cluster
+data:
+  hypershift-operator: ${OVERRIDE_HO_IMAGE}
+EOF
+  while ! [ "$(oc get deployment operator -n hypershift -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}')" == NewReplicaSetAvailable ]; do
+      echo "wait override hypershift operator IMAGE..."
+      sleep 10
+  done
+fi
