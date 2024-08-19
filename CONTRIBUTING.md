@@ -1,3 +1,4 @@
+# Just for test
 # Contributing to `openshift/release`
 
 Contributing documentation is served (together
