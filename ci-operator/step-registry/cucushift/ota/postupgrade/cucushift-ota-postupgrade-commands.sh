@@ -274,6 +274,7 @@ function post-OCP-60397(){
     "cvo image is manifest.list" \
     "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
     "application/vnd.docker.distribution.manifest.list.v2+json"
+}
 
 function post-OCP-23799(){
         export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true" #OCPBUGS-33905, rollback is protected by env feature gate now
