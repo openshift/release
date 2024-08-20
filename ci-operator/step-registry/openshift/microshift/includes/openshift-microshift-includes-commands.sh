@@ -125,7 +125,7 @@ function download_microshift_scripts() {
 # Unconditionally enable tracing after loading the functions
 #
 if [ -n "${BASH_SOURCE[0]-}" ] && [ -n "${HOME-}" ] && [ -n "${LINENO-}" ] ; then
-    export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
+    export PS4='+ $(date "+%T.%N") ${BASH_SOURCE[0]#${HOME}/}:${LINENO} \011'
 else
     export PS4='+ $(date "+%T.%N") \011'
 fi
