@@ -1,0 +1,64 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-base-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/whereabouts-cni
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-base-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: multus-whereabouts-ipam-cni
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: whereabouts-cni
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: whereabouts-cni

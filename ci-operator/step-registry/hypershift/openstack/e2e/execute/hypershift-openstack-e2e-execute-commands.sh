@@ -44,7 +44,6 @@ hack/ci-test-e2e.sh \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
         --e2e.node-pool-replicas=2 \
         --e2e.base-domain="${BASE_DOMAIN}" \
-        --e2e.external-dns-domain="service.${BASE_DOMAIN}" \
         --test.run='^TestCreateCluster$' \
 	--test.parallel=1 \
         --e2e.platform="OpenStack" \
