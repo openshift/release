@@ -22,6 +22,10 @@ if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
     exit 1
 fi
 
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+INFRA_PLATFORM_TYPE=$(oc --kubeconfig /tmp/secret/kubeconfig get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+echo "Management platform: ${INFRA_PLATFORM_TYPE}"
+
 # run the test
 hack/ci-test-e2e.sh \
         --test.v \
@@ -39,4 +43,5 @@ hack/ci-test-e2e.sh \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
         --e2e.openstack-external-network-id="${OPENSTACK_EXTERNAL_NETWORK_ID}" \
         --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}" \
-	--e2e.openstack-node-image-name="rhcos-4.17-hcp-nodepool"
+	--e2e.openstack-node-image-name="rhcos-4.17-hcp-nodepool" \
+	--e2e.annotations=hypershift.openshift.io/management-platform=${INFRA_PLATFORM_TYPE}
