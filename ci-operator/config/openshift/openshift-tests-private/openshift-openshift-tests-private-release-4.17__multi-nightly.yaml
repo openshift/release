@@ -372,7 +372,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
-- as: aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-api-ingress
+- as: aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-cert
   cron: 1 8 13,27 * *
   steps:
     cluster_profile: aws-qe
@@ -653,6 +653,35 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-upi
+- as: azure-aks-hypershift-guest-f14
+  cron: 29 15 3,17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-heterogeneous-guest
+- as: azure-aks-hypershift-guest-reversed-f14
+  cron: 4 9 14,30 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: Standard_D4s_v3
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
+      EXTRA_ARGS: --arch=arm64 --fips
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_ARCH: Arm64
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_ARCH_EXTRA: x64
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-heterogeneous-guest
 - as: azure-ipi-amd-f7-netobserv
   cron: 42 1 7,16,23,30 * *
   steps:
@@ -662,8 +691,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_B8ms
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -749,8 +776,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -764,8 +789,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
@@ -780,8 +803,6 @@ tests:
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -796,8 +817,6 @@ tests:
       ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
@@ -812,8 +831,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -826,8 +843,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -842,8 +857,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -858,12 +871,30 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_DES_COMPUTE: "true"
       ENABLE_DES_CONTROL_PLANE: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
+- as: azure-ipi-disc-fullypriv-arm-mixarch-f2
+  cron: 1 22 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@disconnected'
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-disc-fullypriv-amd-mixarch-f28-destructive
   cron: 35 4 28 * *
   steps:
@@ -899,26 +930,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disc-fullypriv-arm-mixarch-f2
-  cron: 1 22 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@disconnected'
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-fullyprivate-internal-registry-amd-f28-destructive
   cron: 58 7 26 * *
   steps:
@@ -927,8 +938,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-internal-registry
@@ -941,8 +950,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -955,8 +962,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
@@ -969,8 +974,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -999,8 +1002,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1068,36 +1069,10 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - ref: mto-deploy
+    - chain: multiarch-tuning-operator
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-nat-gateway-tp-amd-f28-destructive
-  cron: 21 11 27 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
-- as: azure-ipi-nat-gateway-tp-arm-f2
-  cron: 49 5 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_SET: TechPreviewNoUpgrade
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
 - as: azure-ipi-oidc-amd-f28-destructive
   cron: 0 1 2 * *
   steps:
@@ -1107,8 +1082,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
@@ -1122,8 +1095,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1136,8 +1107,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1151,8 +1120,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
     test:
@@ -1195,8 +1162,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
@@ -1209,8 +1174,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1225,8 +1188,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D8s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission
@@ -1242,8 +1203,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1282,8 +1241,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1297,8 +1254,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       SINGLE_NODE_AZURE_INSTANCE_TYPE: Standard_D32ps_v5
     test:
@@ -1337,8 +1292,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1351,8 +1304,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1365,8 +1316,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
@@ -1379,8 +1328,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1473,23 +1420,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-amd-vmedia-f7
-  cluster: build05
-  cron: 24 15 7,14,23,30 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      MULTI_RELEASE_IMAGE: release:multi-latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-ipv4-arm-f7
   cluster: build05
   cron: 38 21 4,11,20,27 * *
@@ -1508,7 +1438,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-basecap-none-f28
+- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f7
+  cluster: build05
+  cron: 24 15 7,14,23,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f28
   cluster: build05
   cron: 15 16 3 * *
   steps:
@@ -1528,7 +1475,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-external-lb-f7
+- as: baremetal-ipi-ovn-ipv4-external-lb-arm-f7
   cluster: build05
   cron: 1 13 4,11,18,27 * *
   steps:
@@ -1609,8 +1556,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
-- as: gcp-ipi-basecap-none-additionalcaps-capi-arm-f7
-  cron: 26 8 4,13,20,27 * *
+- as: gcp-ipi-basecap-none-additionalcaps-arm-f7
+  cron: 36 16 7,14,23,30 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1618,8 +1565,6 @@ tests:
     env:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: t2a-standard-4
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
@@ -1639,8 +1584,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-compact-filestore-csi-capi-arm-f14
-  cron: 16 15 13,27 * *
+- as: gcp-ipi-compact-filestore-csi-arm-f14
+  cron: 30 13 3,19 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1650,14 +1595,28 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       E2E_RUN_TAGS: not @storage
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-disc-priv-capi-amd-arm-day0-f28-destructive
+- as: gcp-ipi-disc-priv-arm-amd-day0-f28
+  cron: 6 9 28 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      E2E_RUN_TAGS: '@disconnected'
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
+- as: gcp-ipi-disc-priv-amd-arm-day0-f28-destructive
   cron: 15 10 4 * *
   steps:
     cluster_profile: gcp-qe
@@ -1667,7 +1626,7 @@ tests:
       COMPUTE_ARCH: arm64
       CONTROL_ARCH: amd64
       E2E_RUN_TAGS: '@disconnected'
-      FEATURE_GATES: '["ClusterAPIInstall=true", "MultiArchInstallGCP=true"]'
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
       FEATURE_SET: CustomNoUpgrade
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -1690,26 +1649,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-disc-priv-oidc-arm-mixarch-f14
-  cron: 26 2 2,18 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
-      ADDITIONAL_WORKERS: "1"
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-disk-encryption-amd-f28-destructive
   cron: 21 13 23 * *
   steps:
@@ -1717,18 +1656,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
-- as: gcp-ipi-disk-encryption-capi-arm-f14
-  cron: 40 19 14,28 * *
+- as: gcp-ipi-disk-encryption-arm-f14-cert-manager-custom-cert
+  cron: 14 13 1,17 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
+    - chain: cert-manager-custom-api-ingress-cert
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
 - as: gcp-ipi-oidc-rt-fips-amd-regen-cert-f14
@@ -1773,8 +1711,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-ovn-ipsec-capi-arm-mixarch-f14
-  cron: 38 5 10,26 * *
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f14
+  cron: 23 17 10,26 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1785,22 +1723,17 @@ tests:
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-ovn-mtu-migrate-capi-amd-f28
-  cron: 1 11 23 * *
+- as: gcp-ipi-ovn-mtu-migrate-amd-f28
+  cron: 35 21 5 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-mtu-migrate
@@ -1816,15 +1749,12 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-mtu-migrate
-- as: gcp-ipi-proxy-etcd-encryption-capi-amd-f28-destructive
-  cron: 44 6 16 * *
+- as: gcp-ipi-proxy-etcd-encryption-amd-f28-destructive
+  cron: 5 1 24 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
@@ -1840,16 +1770,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-proxy-oidc-capi-amd-f28-destructive
-  cron: 4 13 2 * *
+- as: gcp-ipi-proxy-oidc-amd-f28-destructive
+  cron: 44 11 4 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
@@ -1866,15 +1794,12 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-capi-amd-f28-destructive
-  cron: 0 20 16 * *
+- as: gcp-ipi-proxy-private-amd-f28-destructive
+  cron: 15 14 18 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
@@ -1890,15 +1815,12 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-sno-etcd-encryption-capi-amd-f28-destructive
-  cron: 23 10 24 * *
+- as: gcp-ipi-sno-etcd-encryption-amd-f28-destructive
+  cron: 31 18 18 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
@@ -1968,6 +1890,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+- as: gcp-ipi-xpn-mini-perm-fips-amd-f28-destructive
+  cron: 15 3 2 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
 - as: gcp-ipi-xpn-mini-perm-arm-f28
   cron: 37 7 6 * *
   steps:
@@ -2001,17 +1934,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
-- as: gcp-ipi-xpn-mini-perm-fips-amd-f28-destructive
-  cron: 15 3 2 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
 - as: gcp-ipi-xpn-oidc-amd-f28-destructive
   cron: 54 3 2 * *
   steps:
