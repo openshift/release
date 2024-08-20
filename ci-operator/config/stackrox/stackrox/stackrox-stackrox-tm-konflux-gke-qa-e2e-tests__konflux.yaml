@@ -1,0 +1,67 @@
+base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.9.1
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.9.1
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.9.1
+  ibmcloudz:
+    name: automation-flavors
+    namespace: stackrox
+    tag: ibmcloudz-0.10.16
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.9.1
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.9.1
+  rosa-hcp:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.9.18
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.69
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: konflux-gke-qa-e2e-tests
+  optional: true
+  skip_if_only_changed: ^ui/
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      COLLECTOR_TAG_SUFFIX: -fast
+      MAIN_TAG_SUFFIX: -fast
+      SCANNER_TAG_SUFFIX: -fast
+      TEST_SUITE: gke-qa-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: tm-konflux-gke-qa-e2e-tests
+  org: stackrox
+  repo: stackrox
+  variant: konflux
