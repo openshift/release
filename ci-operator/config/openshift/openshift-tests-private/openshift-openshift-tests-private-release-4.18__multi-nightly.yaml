@@ -1,0 +1,87 @@
+base_images:
+  aws-efs-csi-operator-create-efs:
+    name: "4.18"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-operator
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.18"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: baremetal-ipi-ovn-dualstack-amd-vmedia-f7
+  cluster: build05
+  cron: 41 14 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media-dualstack
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-nightly

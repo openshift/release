@@ -76,7 +76,7 @@ timeout http-keep-alive 10s
 timeout check           10s
 maxconn                 3000
 frontend stats
-bind *:1936
+bind :::1936
 mode            http
 log             global
 maxconn 10
@@ -88,29 +88,29 @@ stats show-desc Stats for $CLUSTER_NAME cluster
 stats auth admin:$CLUSTER_NAME
 stats uri /stats
 listen api-server-$KUBE_API_PORT
-    bind *:$KUBE_API_PORT
+    bind :::$KUBE_API_PORT
     mode tcp
 $APISRV
 listen machine-config-server-${IGNITION_PORT}
-    bind *:${IGNITION_PORT}
+    bind :::${IGNITION_PORT}
     mode tcp
 $MC
 listen ingress-router-80
-    bind *:80
+    bind :::80
     mode tcp
     balance source
 $INGRESS80
 listen ingress-router-443
-    bind *:443
+    bind :::443
     mode tcp
     balance source
 $INGRESS443
 listen oauth-${OAUTH_PORT}
-    bind *:${OAUTH_PORT}
+    bind :::${OAUTH_PORT}
     mode tcp
 ${OAUTH_SERVER}
 listen konnectivity-${KONNECTIVITY_PORT}
-    bind *:${KONNECTIVITY_PORT}
+    bind :::${KONNECTIVITY_PORT}
     mode tcp
 ${KONNECTIVITY}
 EOF

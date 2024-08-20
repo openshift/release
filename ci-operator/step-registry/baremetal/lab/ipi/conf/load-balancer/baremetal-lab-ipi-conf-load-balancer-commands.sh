@@ -9,6 +9,8 @@ set -o pipefail
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
 INGRESS_VIP="$(yq .ingress_vip "$SHARED_DIR/vips.yaml")"
+API_VIP_V6="$(yq .api_vip_v6 "$SHARED_DIR/vips.yaml")"
+INGRESS_VIP_V6="$(yq .ingress_vip_v6 "$SHARED_DIR/vips.yaml")"
 echo "Generating the template..."
 cat > "${SHARED_DIR}/haproxy.cfg" <<EOF
 global
@@ -32,7 +34,7 @@ timeout http-keep-alive 10s
 timeout check           10s
 maxconn                 3000
 frontend stats
-bind *:1936
+bind :::1936
 mode            http
 log             global
 maxconn 10
@@ -44,24 +46,27 @@ stats show-desc Stats for $CLUSTER_NAME cluster
 stats auth admin:$CLUSTER_NAME
 stats uri /stats
 listen api-server-6443
-    bind *:6443
+    bind :::6443
     mode tcp
     server api_vip $API_VIP:6443 check inter 1s
+    server api_vip_v6 [$API_VIP_V6]:6443 check inter 1s
 listen machine-config-server-22623
-    bind *:22623
+    bind :::22623
     mode tcp
     server api_vip $API_VIP:22623 check inter 1s
-
+    server api_vip_v6 [$API_VIP_V6]:22623 check inter 1s
 listen ingress-router-80
-    bind *:80
+    bind :::80
     mode tcp
     balance source
     server api_vip $INGRESS_VIP:80 check inter 1s
+    server api_vip_v6 [$INGRESS_VIP_V6]:80 check inter 1s
 listen ingress-router-443
-    bind *:443
+    bind :::443
     mode tcp
     balance source
     server api_vip $INGRESS_VIP:443 check inter 1s
+    server api_vip_v6 [$INGRESS_VIP_V6]:443 check inter 1s
 EOF
 
 echo "Templating for HAProxy done..."

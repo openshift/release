@@ -2082,6 +2082,84 @@ tests:
       WORKFLOW_TYPE: cucushift
       YQ_VERSION: 4.30.5
     workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
+- as: baremetal-ipi-ovn-ipv4-amd-vmedia-f7
+  cluster: build05
+  cron: 37 20 7,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-ipi-ovn-ipv4-fips-amd-vmedia-f7
+  cluster: build05
+  cron: 45 4 8,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-ipi-ovn-dualstack-amd-vmedia-f7
+  cluster: build05
+  cron: 41 14 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FILTERS_ADDITIONAL: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SCENARIOS: INSTALLER_DEDICATED
+      TEST_TIMEOUT: "60"
+      architecture: amd64
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-extended-test
+    workflow: baremetal-lab-ipi-virtual-media-dualstack
+- as: baremetal-ipi-ovn-ipv6-amd-vmedia-f7
+  cluster: build05
+  cron: 41 14 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CLUSTER_WIDE_PROXY: "true"
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "false"
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media-dualstack
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

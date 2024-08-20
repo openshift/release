@@ -73,8 +73,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -98,9 +96,6 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -138,12 +133,6 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
 "
   fi
 fi
