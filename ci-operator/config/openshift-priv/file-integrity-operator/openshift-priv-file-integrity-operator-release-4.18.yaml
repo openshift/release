@@ -1,8 +1,16 @@
 base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
 build_root:
   image_stream_tag:
     name: release
@@ -26,7 +34,8 @@ operator:
     with: pipeline:file-integrity-operator
 promotion:
   to:
-  - name: 4.18-priv
+  - disabled: true
+    name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -71,6 +80,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-rosa
+  optional: true
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-2
+    test:
+    - ref: ipi-install-rbac
+    - as: test-rosa
+      cli: latest
+      commands: oc adm wait-for-stable-cluster --minimum-stable-period 5m --timeout
+        30m; make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
 - as: e2e-bundle-aws
   steps:
     cluster_profile: aws

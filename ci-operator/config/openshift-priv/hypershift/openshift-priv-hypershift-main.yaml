@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: cli
   dev-scripts:
@@ -43,7 +43,7 @@ promotion:
   to:
   - additional_images:
       hypershift-tests: test-bin
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
   - additional_images:
       hypershift-operator: hypershift-operator
@@ -61,7 +61,7 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -88,16 +88,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-- as: e2e-azure
-  optional: true
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    cluster_profile: hypershift
-    env:
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-e2e-nested
 - as: e2e-aks
-  optional: true
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
@@ -186,9 +177,7 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-openstack-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-priv

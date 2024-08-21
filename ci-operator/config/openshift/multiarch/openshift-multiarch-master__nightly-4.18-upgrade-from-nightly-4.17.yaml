@@ -52,18 +52,6 @@ base_images:
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
 releases:
-  arm64-initial:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.17"
-  arm64-latest:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.18"
   initial:
     candidate:
       product: ocp
@@ -86,37 +74,13 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
-  ppc64le-initial:
-    candidate:
-      architecture: ppc64le
-      product: ocp
-      stream: nightly
-      version: "4.17"
-  ppc64le-latest:
-    candidate:
-      architecture: ppc64le
-      product: ocp
-      stream: nightly
-      version: "4.18"
-  s390x-initial:
-    candidate:
-      architecture: s390x
-      product: ocp
-      stream: nightly
-      version: "4.17"
-  s390x-latest:
-    candidate:
-      architecture: s390x
-      product: ocp
-      stream: nightly
-      version: "4.18"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-e2e-aws-ovn-heterogeneous-upgrade
+- as: ocp-e2e-aws-ovn-upgrade-multi-x-ax
   interval: 72h
   steps:
     cluster_profile: aws-2
@@ -126,7 +90,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-upgrade-aws-heterogeneous
-- as: ocp-e2e-upgrade-azure-ovn-heterogeneous
+- as: ocp-e2e-upgrade-azure-ovn-multi-x-ax
   interval: 72h
   steps:
     cluster_profile: azure-arm64
@@ -140,19 +104,19 @@ tests:
       OCP_ARCH: amd64
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-azure-heterogeneous
-- as: ocp-e2e-upgrade-gcp-ovn-arm64
+- as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   interval: 72h
   steps:
     cluster_profile: gcp-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp
-- as: ocp-e2e-upgrade-gcp-ovn-heterogeneous
+- as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   interval: 72h
   steps:
     cluster_profile: gcp-arm64
@@ -165,46 +129,46 @@ tests:
       OCP_ARCH: amd64
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-gcp-heterogeneous
-- as: ocp-e2e-upgrade-azure-ovn-arm64
+- as: ocp-e2e-upgrade-azure-ovn-multi-a-a
   interval: 72h
   steps:
     cluster_profile: azure-arm64
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: ci.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
-- as: ocp-ovn-remote-libvirt-s390x
+- as: ocp-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 22 * * 1-5
+  cron: 0 22 * * 2,5
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       NODE_TUNING: "true"
       TEST_TYPE: upgrade
-    workflow: openshift-e2e-libvirt
-- as: ocp-ovn-remote-libvirt-ppc64le
+    workflow: openshift-e2e-libvirt-upi
+- as: ocp-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 22 * * 1-5
+  cron: 0 22 * * 2,5
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
       TEST_TYPE: upgrade
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 zz_generated_metadata:
   branch: master
   org: openshift

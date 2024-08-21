@@ -31,7 +31,7 @@ images:
     COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
   from: src
   multi_arch: true
-  to: operator-sdk-src
+  to: operator-sdk-mto
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
@@ -41,9 +41,7 @@ operator:
     with: pipeline:multiarch-tuning-operator
 promotion:
   to:
-  - excluded_images:
-    - operator-sdk-src
-    namespace: origin
+  - namespace: origin
     tag: main
 releases:
   initial:
@@ -160,7 +158,7 @@ tests:
         name: pipeline:multiarch-tuning-operator
       - env: OO_BUNDLE
         name: pipeline:multiarch-tuning-operator-bundle
-      from: operator-sdk-src
+      from: operator-sdk-mto
       resources:
         requests:
           cpu: 100m
@@ -196,6 +194,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-ovn-mto-heterogeneous-origin
+  cluster: build10
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      MTO_OPERATOR_INSTALL_METHOD: catalog
+      OCP_ARCH: arm64
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\|APIs for openshift.io must have stable
+        versions
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: multiarch-tuning-operator
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-aws-post-multi-operator-olm
   cluster: build10
   postsubmit: true
@@ -222,7 +253,7 @@ tests:
         name: pipeline:multiarch-tuning-operator
       - env: OO_BUNDLE
         name: pipeline:multiarch-tuning-operator-bundle
-      from: operator-sdk-src
+      from: operator-sdk-mto
       resources:
         requests:
           cpu: 100m
@@ -240,7 +271,7 @@ tests:
   cluster: build10
   commands: unset VERSION; NO_DOCKER=1 make bundle-verify
   container:
-    from: operator-sdk-src
+    from: operator-sdk-mto
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
 zz_generated_metadata:
   branch: main
