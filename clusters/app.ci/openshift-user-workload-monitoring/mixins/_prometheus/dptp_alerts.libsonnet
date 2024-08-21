@@ -174,7 +174,20 @@
             annotations: {
               message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
             },
-          }
+          },
+          {
+            alert: 'ProbeFailing-Lenient',
+            expr: |||
+              up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
+            |||,
+            'for': '5m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Probing the instance {{ $labels.instance }} has been failing for the past five minutes.',
+            },
+          },
         ],
       },
       {

@@ -65,6 +65,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-disc-priv-tp-pin-mco-f28
+  cron: 35 3 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      MCO_CONF_DAY2_PINTARGETRELEASE: "true"
+      MCO_CONF_DAY2_PINTARGETRELEASE_REMOVE_PULLSECRET: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-localzone-byo-subnet-ovn-f28
   cron: 19 0 4 * *
   steps:
@@ -97,7 +110,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
-- as: aws-ipi-shared-vpc-phz-sts-openldap-fips-f28
+- as: aws-ipi-shared-vpc-phz-sts-fips-openldap-f28
   cron: 30 3 4 * *
   steps:
     cluster_profile: aws-qe
@@ -118,26 +131,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-outpost-day2
-- as: aws-ipi-wavelength-byo-subnet-ovn-day2-f28
-  cron: 4 14 10 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EDGE_ZONE_TYPES: wavelength-zone
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-day2
-- as: aws-ipi-wavelength-byo-subnet-ovn-mtu-day2-f28
-  cron: 57 13 22 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EDGE_ZONE_TYPES: wavelength-zone
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-mtu-day2
 - as: aws-ipi-wavelength-byo-subnet-ovn-f28
   cron: 34 1 12 * *
   steps:
@@ -180,7 +173,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: baremetalds-agent-hypershift-mce-inplace-f7
   cluster: build05
-  cron: 52 15 3,10,17,24 * *
+  cron: 41 16 7,19 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -211,6 +204,7 @@ tests:
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
       ipv4_enabled: "true"
       ipv6_enabled: "false"
       masters: "3"
@@ -237,7 +231,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetalds-ipi-ovn-ipv6-fips-f360
-  cron: 10 21 6 1 *
+  cron: 34 21 16 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -263,7 +257,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f360
-  cron: 13 13 2 1 *
+  cron: 22 16 16 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -292,6 +286,19 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
+- as: gcp-ipi-disc-priv-oidc-fips-f28
+  cron: 24 22 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: ibmcloud-ipi-disc-priv-f28
   cron: 2 2 2 * *
   steps:
@@ -324,7 +331,7 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
-  cron: 6 15 5 * *
+  cron: 2 0 26 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -392,7 +399,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec-minimal-permission
 - as: vsphere-ipi-static-ip-f28
-  cron: 52 21 2 * *
+  cron: 32 7 15 * *
   steps:
     cluster_profile: vsphere-connected-2
     test:

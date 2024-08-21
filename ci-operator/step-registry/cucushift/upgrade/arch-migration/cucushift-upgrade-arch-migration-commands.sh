@@ -337,6 +337,9 @@ function switch_channel() {
 function migrate() {
     echo "Arch migrating"
     cmd="oc adm upgrade --to-multi-arch"
+    if [[ "${ENABLE_OTA_TEST}" == "OCP-60396" ]]; then
+        cmd+=" --allow-upgrade-with-warnings"
+    fi
     echo "Migrating cluster: ${cmd}"
     if ! eval "${cmd}"; then
         echo >&2 "Failed to request arch migration, exiting" && return 1

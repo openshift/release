@@ -17,6 +17,8 @@ oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 #Set parameters for running the test cases on OpenShift
 unset NAMESPACE
 oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
+#Set the Opamp bridge server image with the CI pipeline built image
+find . -type f -exec sed -i "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:ve2e|${OPAMP_BRIDGE_SERVER}|g" {} \;
 
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"

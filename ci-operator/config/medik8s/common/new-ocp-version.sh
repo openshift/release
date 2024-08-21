@@ -44,4 +44,3 @@ for repo in */ ; do
 done
 
 echo "Done, please check the new configs, and run 'make update' for creating jobs"
-echo "HEADS UP: update branch protection in core-services/prow/02_config/medik8s/${REPO}/_prowconfig.yaml !"

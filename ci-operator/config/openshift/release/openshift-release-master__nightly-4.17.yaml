@@ -322,6 +322,49 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-kube-apiserver-rollout
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-metal-ipi-ovn-kube-apiserver-rollout
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-vsphere-ovn-kube-apiserver-rollout
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-ovn
+- as: e2e-azure-ovn-kube-apiserver-rollout
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    workflow: openshift-e2e-azure
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
@@ -385,7 +428,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -396,7 +439,7 @@ tests:
 - as: e2e-vsphere-ovn-upi-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -423,7 +466,7 @@ tests:
 - as: e2e-vsphere-ovn-upi-zones
   interval: 168h
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
@@ -453,21 +496,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-libvirt-cert-rotation
-- as: e2e-azure-sdn-fips
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    pre:
-    - chain: ipi-azure-pre
-    - ref: fips-check
-    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -482,16 +510,6 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
-- as: e2e-gcp-sdn
-  interval: 168h
-  steps:
-    cluster_profile: gcp-3
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -502,17 +520,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
-- as: e2e-gcp-sdn-upgrade
-  interval: 168h
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp-sdn
 - as: e2e-gcp-ovn-fips
   interval: 168h
   steps:
@@ -534,22 +541,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-csi
-- as: e2e-azure-sdn-fips-serial
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    pre:
-    - chain: ipi-azure-pre
-    - ref: fips-check
-    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-ovn-fips-serial
   interval: 168h
   steps:
@@ -565,21 +556,6 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
-- as: e2e-gcp-sdn-fips-serial
-  interval: 168h
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      FIPS_ENABLED: "true"
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: fips-check
-    workflow: openshift-e2e-gcp-sdn
 - as: console-aws
   interval: 168h
   steps:
@@ -618,40 +594,6 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
-- as: e2e-aws-sdn-upgrade
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-sdn
-- as: e2e-aws-sdn
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-serial
 - as: e2e-aws-ovn-serial
   interval: 168h
   steps:
@@ -672,17 +614,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-csi
-- as: e2e-azure-sdn
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-azure-sdn
 - as: e2e-azure-csi
   interval: 168h
   steps:
@@ -713,17 +644,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-cgroupsv2
-- as: e2e-aws-sdn-crun
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-crun
 - as: e2e-aws-driver-toolkit
   cron: 0 */8 * * *
   steps:
@@ -787,7 +707,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 4 */1 * *
+  cron: 0 9 */1 * *
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -1028,6 +948,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "365"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -1036,6 +957,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "730"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1155,6 +1077,44 @@ tests:
       SKEW: 30d
     workflow: openshift-e2e-aws-cert-rotation
   timeout: 4h0m0s
+- as: e2e-metal-ipi-ovn-techpreview
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6-techpreview
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack-techpreview
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-ovn-edge-zones
   cron: '@weekly'
   steps:
@@ -1170,7 +1130,7 @@ tests:
 - as: e2e-aws-ovn-edge-zones-manifest-validation
   cron: '@daily'
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 1h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
@@ -1203,8 +1163,10 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      FIPS_ENABLED: "true"
       MAJOR_MINOR: "4.17"
     test:
+    - ref: fips-check-node-scan
     - ref: fips-check-art-fips
     workflow: ipi-aws
 - as: e2e-external-aws

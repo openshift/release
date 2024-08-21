@@ -39,6 +39,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error when parsing the Bare Metal Host metadata"
     exit 1
   fi
+
   DNS_FORWARD="${DNS_FORWARD}
 ${name}.${CLUSTER_NAME} IN A ${ip}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}

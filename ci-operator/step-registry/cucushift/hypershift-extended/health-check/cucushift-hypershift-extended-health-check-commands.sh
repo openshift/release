@@ -142,3 +142,4 @@ print_clusterversion
 check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
+oc get pod -A > "${ARTIFACT_DIR}/guest-pods"

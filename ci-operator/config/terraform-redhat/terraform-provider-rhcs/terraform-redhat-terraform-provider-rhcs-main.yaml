@@ -1,9 +1,9 @@
 binary_build_commands: make install
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: build/ci-tf-e2e.Dockerfile
   to: rhcs-tf-e2e
@@ -15,7 +15,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.14"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -37,7 +37,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-critical-high-f3
@@ -53,7 +53,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-critical-high-f3
@@ -86,7 +86,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-medium-low-f7
@@ -102,7 +102,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-medium-low-f7
@@ -118,7 +118,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-day1-negative-f7
@@ -133,7 +133,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-day1-negative-f7
@@ -148,7 +148,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: upgrade&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: upgrade&&!Exclude
       CHANNEL_GROUP: stable
       CLUSTER_PROFILE: rosa-up-y
       QE_USAGE: rosa-sts-upgrade-y-f7
@@ -165,7 +165,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: upgrade&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: upgrade&&!Exclude
       CHANNEL_GROUP: stable
       CLUSTER_PROFILE: rosa-up-z
       QE_USAGE: rosa-sts-upgrade-z-f7
@@ -177,12 +177,46 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
+- as: rosa-classic-full-resource-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-classic-full
+      QE_USAGE: rosa-classic-full-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_URL: https://api.stage.openshift.com
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-full-resource-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-hcp-full
+      QE_USAGE: rosa-hcp-full-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_URL: https://api.stage.openshift.com
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
 - as: rosa-hcp-advanced-critical-high-f3
   cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-ad
       QE_USAGE: rosa-hcp-advanced-critical-high-f3
@@ -198,7 +232,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-ad
       QE_USAGE: rosa-hcp-advanced-medium-low-f7
@@ -214,7 +248,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-pl
       QE_USAGE: rosa-hcp-private-critical-high-f3
@@ -230,10 +264,59 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-pl
       QE_USAGE: rosa-hcp-private-medium-low-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-arm-f7
+  cron: 38 17 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      QE_USAGE: rosa-hcp-arm-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-network-f7
+  cron: 38 2 3,10,17,20,31 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-network
+      QE_USAGE: rosa-hcp-network-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-encryption-f7
+  cron: 38 2 3,10,17,20,31 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-encryption
+      QE_USAGE: rosa-hcp-encryption-f7
       REGION: us-west-2
       RHCS_CLUSTER_NAME_SUFFIX: f7
       RHCS_URL: https://api.stage.openshift.com
@@ -246,7 +329,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: upgrade&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: upgrade&&!Exclude
       CHANNEL_GROUP: stable
       CLUSTER_PROFILE: rosa-hcp-up-y
       QE_USAGE: rosa-hcp-upgrade-y-f7
@@ -262,7 +345,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: upgrade&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: upgrade&&!Exclude
       CHANNEL_GROUP: stable
       CLUSTER_PROFILE: rosa-hcp-up-z
       QE_USAGE: rosa-hcp-upgrade-z-f7
@@ -273,12 +356,27 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
+- as: rosa-day1-supplemental-f3
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-supplemental&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: ""
+      QE_USAGE: rosa-day1-supplemental-f3
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-general-tests
 - as: rosa-sts-advanced-critical-high-presubmit
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-critical-high-presubmit
@@ -294,7 +392,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-critical-high-presubmit
@@ -307,10 +405,11 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-sts-advanced-optional-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-optional-presubmit
@@ -323,10 +422,11 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-sts-private-optional-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-optional-presubmit
@@ -339,10 +439,11 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-sts-advanced-day1-negative-optional-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-day1-negative-optional-presubmit
@@ -354,10 +455,11 @@ tests:
     - ref: rhcs-e2e-general-tests
 - always_run: false
   as: rosa-sts-private-day1-negative-optional-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-day1-negative-optional-presubmit
@@ -373,7 +475,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-ad
       QE_USAGE: rosa-hcp-advanced-critical-high-presubmit
@@ -389,7 +491,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-pl
       QE_USAGE: rosa-hcp-private-critical-high-presubmit
@@ -400,11 +502,28 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - always_run: false
-  as: rosa-hcp-advanced-optional-presubmit
+  as: rosa-hcp-arm-critical-high-presubmit
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      QE_USAGE: rosa-hcp-arm-critical-high-presubmit
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-hcp-advanced-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-ad
       QE_USAGE: rosa-hcp-advanced-optional-presubmit
@@ -416,10 +535,11 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-hcp-private-optional-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!NonHCPCluster&&!Exclude
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-pl
       QE_USAGE: rosa-hcp-private-optional-presubmit
@@ -429,6 +549,71 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-hcp-arm-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      QE_USAGE: rosa-hcp-arm-optional-presubmit
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-hcp-network-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-network
+      QE_USAGE: rosa-hcp-network-optional-presubmit
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-hcp-encryption-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-encryption
+      QE_USAGE: rosa-hcp-encryption-optional-presubmit
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-day1-supplemental-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-supplemental&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: ""
+      QE_USAGE: rosa-day1-supplemental-optional-presubmit
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-general-tests
 zz_generated_metadata:
   branch: main
   org: terraform-redhat

@@ -5,8 +5,14 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 
 check_result=0
@@ -14,7 +20,7 @@ readarray -t zones_name_from_config < <(yq-go r ${INSTALL_CONFIG} "platform.vsph
 infra_id=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 
 function check_label_vmcluster() {
-    
+
     local node_type=$1 node_fd_list=$2
     local check_result=0 nodes_list node_region node_zone fd_region fd_name fd_folder fd_computeCluster fd_datacenter vm_host_info
 
@@ -41,7 +47,7 @@ function check_label_vmcluster() {
 	if [[ -n "$(govc ls ${fd_folder}/${node})" ]];then
             echo "INFO: ${node} is created under correct path: ${fd_folder}"
 
-	else 
+	else
             check_result=1
 	    echo "ERROR: not found ${node} under path:${fd_folder}"
         fi
@@ -51,7 +57,7 @@ function check_label_vmcluster() {
 	    check_result=1
 	    echo "ERROR: ${node} is created under incorrect host"
 	fi
-	
+
         # shellcheck disable=SC2076
         if [[ "${fd_region}" == "${node_region}" ]] && [[ " ${node_fd_list} " =~ " ${fd_name} " ]]; then
             echo "INFO: node reside in failureDomain ${fd_name}, with region ${node_region}, zone ${node_zone}"
@@ -70,7 +76,7 @@ master_fd_list=$(yq-go r ${INSTALL_CONFIG} 'controlPlane.platform.vsphere.zones[
 if [[ -z "${master_fd_list}" ]]; then
     echo "No zone setting on controlPlane node in install-config, node will be created in any failureDomain"
     master_fd_list="${zones_name_from_config[*]}"
-fi    
+fi
 echo "the zones setting for controlPlane node : ${master_fd_list}"
 
 worker_fd_list=$(yq-go r ${INSTALL_CONFIG} 'compute[*].platform.vsphere.zones[*]' | xargs)
@@ -78,7 +84,7 @@ worker_fd_list=$(yq-go r ${INSTALL_CONFIG} 'compute[*].platform.vsphere.zones[*]
 if [[ -z "${worker_fd_list}" ]]; then
     echo "No failureDomain setting on compute node in install-config, node will be created in any failureDomain"
     worker_fd_list="${zones_name_from_config[*]}"
-fi    
+fi
 echo "the zones setting for compute node :${worker_fd_list}"
 
 echo -e "\nChecking labels on each node..."

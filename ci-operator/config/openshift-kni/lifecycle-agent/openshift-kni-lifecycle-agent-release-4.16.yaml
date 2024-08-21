@@ -1,13 +1,13 @@
 base_images:
-  base:
-    name: "4.16"
+  ubi9-minimal:
+    name: ubi-minimal
     namespace: ocp
-    tag: base
+    tag: "9"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  from: ubi9-minimal
   to: lifecycle-agent-operator
 - dockerfile_path: bundle.Dockerfile
   to: lifecycle-agent-operator-bundle
@@ -92,8 +92,10 @@ tests:
     dependencies:
       LCA_PULL_REF: pipeline:lifecycle-agent-operator
     env:
+      OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.16"
-      OCP_IMAGE_SOURCE: ci
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.15"
       SEED_IMAGE_TAG_FORMAT: release
     workflow: openshift-image-based-upgrade-presubmit
   timeout: 4h0m0s

@@ -8,7 +8,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 source "${SHARED_DIR}/govc.sh"
-
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 

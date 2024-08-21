@@ -9,7 +9,6 @@ oc projects
 python3 --version
 
 function cluster_monitoring_config(){
-
 oc apply -f- <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -21,17 +20,22 @@ data:
     prometheusK8s:
       volumeClaimTemplate:
         spec:
-          storageClassName: gp3-csi
+          storageClassName: $DEFAULT_STORAGE_CLASS
           resources:
             requests:
               storage: 2Gi
 EOF
 }
 
-ls -la /root/kraken
-
+#Check Storage Class
+echo "Checking Storage Class"
+DEFAULT_STORAGE_CLASS=$(oc get storageclass -o json | jq -r '.items[] | select(.metadata.annotations."storageclass.kubernetes.io/is-default-class" == "true") | .metadata.name')
+echo "Default Storage Class is $DEFAULT_STORAGE_CLASS"
 #Create PV and PVC for prometheus
-cluster_monitoring_config
+echo "Creating PV and PVC"
+cluster_monitoring_config $DEFAULT_STORAGE_CLASS
+echo "Sleeping for 60 seconds for the PV and PVC to be bound"
+sleep 60
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -54,6 +58,33 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
+#Check if PVC is created
+PVC_CHECK=$(oc get pvc $PVC_NAME -n $NAMESPACE --no-headers --ignore-not-found)
+
+if [ -z "$PVC_CHECK" ]; then
+  echo "PVC '$PVC_NAME' does not exist in namespace '$NAMESPACE'."
+  echo "Creating PV and PVC"
+  cluster_monitoring_config
+  echo "Waiting for the PV and PVC to be bound"
+  TIMEOUT=120
+  INTERVAL=1
+  ELAPSED=0
+  while [ $ELAPSED -lt $TIMEOUT ]; do
+    PVC_CHECK=$(oc get pvc $PVC_NAME -n $NAMESPACE --no-headers --ignore-not-found)
+    if [ -n "$PVC_CHECK" ]; then
+      echo "PVC '$PVC_NAME' successfully created in namespace '$NAMESPACE'."
+      break
+    fi
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+  done
+  if [ -z "$PVC_CHECK" ]; then
+    echo "PVC '$PVC_NAME' did not appear in namespace '$NAMESPACE' within the timeout period of $TIMEOUT seconds. Exiting"
+    exit 1
+  fi
+else
+  echo "PVC '$PVC_NAME' exists in namespace '$NAMESPACE'."
+fi
 
 ./pvc-scenario/prow_run.sh
 rc=$?

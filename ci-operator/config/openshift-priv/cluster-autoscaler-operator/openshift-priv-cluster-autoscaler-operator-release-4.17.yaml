@@ -23,8 +23,7 @@ images:
   to: cluster-autoscaler-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -100,6 +99,76 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: e2e-aws-periodic-pre
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-gcp-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-azure-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- always_run: false
+  as: e2e-vsphere-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: e2e-openstack-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

@@ -11,8 +11,14 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-ES_PASSWORD=$(cat "/secret/password")
-ES_USERNAME=$(cat "/secret/username")
+ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+
+ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+if [ -e "${ES_SECRETS_PATH}/host" ]; then
+    ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
+fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
@@ -27,9 +33,9 @@ ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 # The measurable run
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
-if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 
@@ -42,33 +48,7 @@ rm -f ${SHARED_DIR}/index.json
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
-if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
-    
-    WEBHOOK_USER=$(cat "/horreum-secret/horreum-webhook-user")
-    
-    export artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs"
-    export artifacts_pr_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release"
-    job_id=$JOB_NAME
-    task_id=$BUILD_ID
-    
-    if [[ "${JOB_TYPE}" == "presubmit" ]]; then
-        artifacts_url="${artifacts_pr_base_url}/${PULL_NUMBER}/${job_id}/${task_id}/artifacts"
-    else
-        artifacts_url="${artifacts_base_url}/${job_id}/${task_id}/artifacts"
-    fi
-    
-    benchmark_name="openshift-qe-node-density"
-    
-    WEBHOOK_URL="https://snake-curious-easily.ngrok-free.app"
-    JSON_DATA='{"jobName":"kube-burner-poc","parameters":{"ARTIFACTS_URL":"'"$artifacts_url"'", "BENCHMARK_NAME":"'"$benchmark_name"'", "BUCKET_NAME":"test-platform-results", "TYPE":"report"}}'
-    
-    curl -X POST \
-         -u "user:$WEBHOOK_USER"  \
-         --header "Content-Type: application/json" \
-         --retry 5 \
-         "$WEBHOOK_URL" \
-         -d "$JSON_DATA"
-
 fi

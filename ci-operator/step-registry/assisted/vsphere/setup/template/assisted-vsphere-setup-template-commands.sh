@@ -8,6 +8,15 @@ echo "************ vsphere assisted test-infra setup template command **********
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+declare vsphere_cluster
+declare vsphere_portgroup
+
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 echo "Data center is ${GOVC_DATACENTER}"
 if govc object.collect "/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"; then
     printf 'Assisted service ci template already exist - skipping \n'
@@ -16,11 +25,7 @@ fi
 
 printf 'Assisted service ci template does not exist - creating using packer\n'
 
-declare vsphere_cluster
-declare vsphere_portgroup
 
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/vsphere_context.sh"
 SSH_PUBLIC_KEY="$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)"
 
 echo "Creating packer build path"

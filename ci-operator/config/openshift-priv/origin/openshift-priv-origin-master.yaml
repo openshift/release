@@ -8,11 +8,11 @@ base_images:
     namespace: ci
     tag: v1.54.2
   hypershift-operator:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: hypershift-operator
   ocp_4.16_base-rhel9:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -20,7 +20,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
   tools:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: make build
@@ -46,17 +46,17 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -125,6 +125,15 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-kube-apiserver-rollout
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
     workflow: openshift-e2e-aws-ovn
 - as: e2e-azure
   optional: true
@@ -257,7 +266,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
@@ -281,6 +290,16 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-kube-apiserver-rollout
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
@@ -343,6 +362,25 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node-techpreview-serial
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-upgrade

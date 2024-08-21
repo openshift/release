@@ -1,24 +1,16 @@
 base_images:
-  cli:
-    name: "4.8"
+  base:
+    name: ubi-minimal
     namespace: ocp
-    tag: cli
-  ocp_4.7_cli:
-    name: "4.7"
-    namespace: ocp
-    tag: cli
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.16-linux
+    tag: go1.21-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  from: cli
-  inputs:
-    ocp_4.7_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.7:cli
+- dockerfile_path: Dockerfile
+  from: base
   to: backplane-must-gather
 promotion:
   to:
@@ -30,10 +22,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: test-unit
-  commands: make -f Makefile.prow unit-test
-  container:
-    from: src
 - as: publish
   postsubmit: true
   steps:

@@ -1,0 +1,106 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.15"
+  tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: cluster-logging-operator-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLO_SUB_CHANNEL: stable-5.9
+      CLO_SUB_SOURCE: redhat-operators
+      E2E_RUN_TAGS: '@rosa|@level0'
+      EO_SUB_CHANNEL: stable
+      EO_SUB_SOURCE: redhat-operators
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-install-*", "failure_type": "pod_failure", "classification": "IPI Install RBAC", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "ipi-install-*", "failure_type": "test_failure", "classification": "IPI Install RBAC", "jira_project": "Openshift Logging", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"], "jira_assignee":"anli@redhat.com"},
+              {"step": "openshift-extended-*", "failure_type": "pod_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "openshift-extended-*", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "Openshift Logging", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"], "jira_assignee":"anli@redhat.com"}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","rosa-classic-lp","cluster-logging-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FORCE_SUCCESS_EXIT: "yes"
+      LO_SUB_CHANNEL: stable-5.9
+      LO_SUB_SOURCE: redhat-operators
+      MODULE_FILTERS: ""
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: LEVEL0
+      TEST_IMPORTANCE: ""
+      TEST_PARALLEL: "1"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: install-operators
+    - ref: openshift-extended-logging-test
+    - ref: openshift-extended-logging-test-web-tests
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: openshift-logging
+  repo: extended-logging-tests-interop
+  variant: cluster-logging-ocp4.15-lp-rosa-classic

@@ -30,6 +30,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       server $name $ip:6443 check inter 1s
       server $name-v6 [$ipv6]:6443 check inter 1s"
   fi
+  if [[ "$name" =~ worker-a-* ]] && [ -e "$SHARED_DIR/deploy_hypershift_hosted" ]; then
+    echo "Skipping the worker-a-* as they are meant to belong to an hypershift hosted cluster"
+    continue
+  fi
   # if number of worker hosts less then 2, then master hosts might get the worker role
   if [ "$num_workers" -lt 2 ] || [[ "$name" =~ worker* ]]; then
     INGRESS80="$INGRESS80

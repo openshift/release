@@ -50,17 +50,19 @@ fi
 # Old behavior; Uncomment the following line to always remove the source volume regardless of its naming format.
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
-echo "Removing the now obsolete source volume..."
-${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)"
+echo "Removing obsolete source volume..."
+SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)
+if [[ ! -z "${SOURCE_VOLUME}" ]]; then
+  ${VIRSH} vol-delete --pool ${POOL_NAME} "${SOURCE_VOLUME}"
+fi
 
-# Old behavior; Uncomment the following lines if for some reason a pool is created with the lease in the name
-# echo "Removing stale pools..."
-# for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
-# do
-#   ${VIRSH} pool-destroy "${POOL}"
-#   ${VIRSH} pool-delete "${POOL}"
-#   ${VIRSH} pool-undefine "${POOL}"
-# done
+echo "Removing obsolete pools..."
+for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+do
+  ${VIRSH} pool-destroy "${POOL}"
+  ${VIRSH} pool-delete "${POOL}"
+  ${VIRSH} pool-undefine "${POOL}"
+done
 
 # Remove conflicting networks
 echo "Removing stale networks..."

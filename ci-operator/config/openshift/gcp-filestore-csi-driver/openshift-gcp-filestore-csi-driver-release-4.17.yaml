@@ -7,10 +7,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -20,14 +20,13 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: gcp-filestore-csi-driver
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -49,7 +48,7 @@ resources:
 test_binary_build_commands: test/run_unit.sh
 tests:
 - as: unit
-  commands: test/run_unit.sh
+  commands: GOFLAGS="-mod=readonly" test/run_unit.sh
   container:
     from: src
 - as: verify-deps
