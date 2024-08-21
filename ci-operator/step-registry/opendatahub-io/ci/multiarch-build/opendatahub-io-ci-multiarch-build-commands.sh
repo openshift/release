@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Install Docker and related components using yum
-yum update -y
-yum install -y \
+# Install Docker and related components using sudo
+sudo yum update -y
+sudo yum install -y \
     docker \
     containerd \
     docker-buildx-plugin
