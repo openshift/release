@@ -7,6 +7,41 @@ SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
 GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
+#Get the day of the week
+week_day=$(date +%A)
+
+# additional checks for self-managed fips and non-fips testing
+self_managed_string='self-managed-lp-interop-jobs'
+zstream_string='zstream'
+fips_string='fips'
+test_day="Monday"
+
+# only run self-managed fips and non-fips scenarios on Mondays
+echo "Checking to see if it is test day (${test_day}) for ${JSON_TRIGGER_LIST}"
+
+if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
+        $JSON_TRIGGER_LIST != *"$fips_string"* &&
+        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+  if [ $week_day == "${test_day}" ]; then
+    echo "We are running jobs becuase it's $week_day"
+    echo "Continue..."
+  else
+    echo "We do not run self-managed scenarios on $week_day"
+    exit 1
+  fi
+fi
+
+if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
+        $JSON_TRIGGER_LIST == *"$fips_string"* &&
+        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+  if [ $week_day == "test_day" ]; then
+    echo "We are running jobs becuase it's $week_day"
+    echo "Continue..."
+  else
+    echo "We do not run self-managed fips scenarios on $week_day"
+    exit 1
+  fi
+fi
 
 echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
