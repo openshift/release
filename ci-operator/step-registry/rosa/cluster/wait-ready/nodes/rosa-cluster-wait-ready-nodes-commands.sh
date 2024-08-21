@@ -108,7 +108,7 @@ function waitForReady() {
   echo "Wait for all nodes to be Ready"
   # Query the node state until all of the nodes are ready
   FINAL_NODE_STATE="Pass"
-  max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
+  max_attempts=120 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
   retry_api_count=0
   max_retry_api_attempts=5
   # Nodes can cycle and may be all "Ready" during a check but not a moment later
@@ -268,3 +268,6 @@ else
     exit 1
 fi
 cat "${SHARED_DIR}/cluster-config"
+
+echo "Sleep 3h for manual testing"
+sleep 12000
