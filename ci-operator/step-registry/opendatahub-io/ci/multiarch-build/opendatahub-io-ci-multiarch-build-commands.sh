@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
 
-# Install Docker and related components
-apt-get update
-apt-get install -y \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
+# Install Docker and related components using yum
+yum update -y
+yum install -y \
+    docker \
+    containerd \
     docker-buildx-plugin
 
 # Create and use a new Buildx builder instance
