@@ -94,6 +94,8 @@ save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
 
+sleep 1800
+
 # clean files before leaving
 rm -rf ${SHARED_DIR}/tf-manifests
 rm -rf ${SHARED_DIR}/rhcs_preparation.log
