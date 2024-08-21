@@ -302,10 +302,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
-sleep 3600
-
-TZ=UTC date --iso-8601=seconds -d "+72h" > /var/builds/${CLUSTER_NAME}/preserve
-
 # # To check if there are pending CSRs
 # function wait_for_pending_csrs_and_approve() {
 #   for ((i = 0; i < 18; i++)); do
