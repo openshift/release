@@ -24,7 +24,6 @@ VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
 POOL_NAME="multiarch-ci-pool"
 
-sleep 3000s
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 

@@ -9,7 +9,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
   exit 1
 fi
-
+sleep 3000s
 # ensure leases file is present
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   echo "Couldn't find lease config file"
