@@ -8,6 +8,12 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 subnet_ids_file="${SHARED_DIR}/subnet_ids"
+
+if [[ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY}" == "true" ]]; then
+  echo "Cluster will be created with public subnets only"
+  subnet_ids_file="${SHARED_DIR}/public_subnet_ids"
+fi
+
 az_file="${SHARED_DIR}/availability_zones"
 
 if [ ! -f "${subnet_ids_file}" ] || [ ! -f "${az_file}" ]; then
