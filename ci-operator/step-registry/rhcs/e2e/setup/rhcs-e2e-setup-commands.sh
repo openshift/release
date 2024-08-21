@@ -94,6 +94,13 @@ save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
 
+echo ">>> Checking the main.tf of account-roles main.tf"
+cat ${SHARED_DIR}/tf-manifests/aws/account-roles/rosa-classic/main.tf
+cp ${SHARED_DIR}/tf-manifests/aws/account-roles/rosa-classic/main.tf ${SHARED_DIR}/acc_role_main.tf
+
+echo ">>> Check the hcl lock file"
+cat ${SHARED_DIR}/tf-manifests/aws/account-roles/rosa-classic/.terraform.lock.hcl
+
 sleep 1800
 
 # clean files before leaving
