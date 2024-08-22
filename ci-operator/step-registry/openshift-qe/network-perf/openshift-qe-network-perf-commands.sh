@@ -22,6 +22,7 @@ if [ ${BAREMETAL} == "true" ]; then
   export http_proxy=socks5://localhost:12345
   oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
   cd /tmp
+  ssh-keygen -q -t rsa -N '' -f ~/.ssh/id_rsa <<<y >/dev/null 2>&1
 elif test -f "${SHARED_DIR}/proxy-conf.sh"; then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
@@ -54,7 +55,14 @@ rm -f ${SHARED_DIR}/index.json
 WORKLOAD=full-run.yaml ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
+
+if [ ${VM} == "true" ]; then
+  VM=true WORKLOAD=full-run.yaml ./run.sh
+
+  folder_name=$(ls -t -d /tmp/*/ | head -1)
+  cp $folder_name/index_data.json ${SHARED_DIR}/index_data-vm.json
+fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
