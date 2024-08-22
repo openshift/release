@@ -125,12 +125,12 @@ PUBLISH=$(yq-go r "${CONFIG}" "publish")
 echo "publish: ${PUBLISH}"
 echo "is Old Version: ${isOldVersion}"
 if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
-  echo "Write the 'baseDomainResourceGroupName: ${BASE_RESOURCE_GROUP}' to install-config"
+  echo "Write the 'baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}' to install-config"
   PATCH="${SHARED_DIR}/install-config-baseDomainRG.yaml.patch"
     cat > "${PATCH}" << EOF
 platform:
   azure:
-    baseDomainResourceGroupName: "${BASE_RESOURCE_GROUP}"
+    baseDomainResourceGroupName: "${BASE_DOMAIN_RESOURCE_GROUP}"
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
