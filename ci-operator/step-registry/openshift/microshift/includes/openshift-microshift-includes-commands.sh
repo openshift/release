@@ -122,6 +122,15 @@ function download_microshift_scripts() {
 }
 
 #
-# Unconditionally enable tracing after loading the functions
+# Enable tracing with the following format after loading the functions:
+# - Time in hh:mm:ss.ns
+# - Script file name with $HOME prefix stripped ($0 is used if BASH_SOURCE is undefined)
+# - Script line number
 #
-export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
+function format_ps4() {
+    local -r date=$(date "+%T.%N")
+    local -r file=$1
+    local -r line=$2
+    echo -en "+ ${date} ${file#"${HOME}/"}:${line} \011"
+}
+export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
