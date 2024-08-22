@@ -1055,6 +1055,7 @@ for target in "${TARGET_RELEASES[@]}"; do
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
 	health_check
+	sleep 6h
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
