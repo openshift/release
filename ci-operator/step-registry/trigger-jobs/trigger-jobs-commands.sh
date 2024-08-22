@@ -8,7 +8,7 @@ GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 #Get the day of the month
-month_day=$(date -d "$D" '+%d')
+month_day=$(date +%d)
 
 # additional checks for self-managed fips and non-fips testing
 self_managed_string='self-managed-lp-interop-jobs'
