@@ -153,11 +153,14 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- as: e2e-azure-ovn-conformance
+- always_run: false
+  as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-azure-conformance
+    env:
+      HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.17"
+    workflow: hypershift-azure-aks-conformance
 - always_run: false
   as: e2e-openstack
   optional: true
@@ -169,7 +172,9 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-e2e
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-nested
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
