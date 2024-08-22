@@ -15,7 +15,7 @@ self_managed_string='self-managed-lp-interop-jobs'
 zstream_string='zstream'
 fips_string='fips'
 
-# only run self-managed fips if date > 7 and non-fips scenarios if date <= 7.
+# only run self-managed fips if date <= 7 and non-fips scenarios if date > 7 .
 echo "Checking to see if it is a test day for ${JSON_TRIGGER_LIST}"
 if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST != *"$fips_string"* &&
