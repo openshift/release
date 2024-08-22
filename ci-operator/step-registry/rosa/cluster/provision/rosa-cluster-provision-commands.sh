@@ -175,13 +175,13 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
     OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -v ec | head -1 || true)
   fi
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
     OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
   else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -v ec | head -1 || true)
   fi
 else
   # Match the whole line
