@@ -6,7 +6,7 @@ set -x
 HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HOSTED_CLUSTER_NAME
 
-LB_NAME="${HOSTED_CLUSTER_NAME}-lb"
+LB_NAME="lb-${HOSTED_CLUSTER_NAME}"
 
 # VPC VSI(Virtual Server Instance) configs
 VSI_NAME="x86-${HOSTED_CLUSTER_NAME}-worker"
