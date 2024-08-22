@@ -91,7 +91,7 @@ until run-on-all-nodes "timedatectl status"; do sleep 30; done
 wait-for-nodes-to-be-ready
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
-run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
+run-on-first-master-silent "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
 
 # Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
