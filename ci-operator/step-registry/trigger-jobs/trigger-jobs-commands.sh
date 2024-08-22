@@ -7,39 +7,37 @@ SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
 GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
-#Get the day of the week
-week_day=$(date +%A)
+#Get the day of the month
+month_day=$(date -d "$D" '+%d')
 
 # additional checks for self-managed fips and non-fips testing
 self_managed_string='self-managed-lp-interop-jobs'
 zstream_string='zstream'
 fips_string='fips'
-test_day="Monday"
 
-# only run self-managed fips and non-fips scenarios on Mondays
-echo "Checking to see if it is test day (${test_day}) for ${JSON_TRIGGER_LIST}"
-
+# only run self-managed fips if date > 7 and non-fips scenarios if date <= 7.
+echo "Checking to see if it is a test day for ${JSON_TRIGGER_LIST}"
 if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST != *"$fips_string"* &&
         $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
-  if [ $week_day == "${test_day}" ]; then
-    echo "We are running jobs becuase it's $week_day"
+        if (( $month_day > 7 )); then
+    echo "Running jobs becuase it's a Monday thats not the first week."
     echo "Continue..."
   else
-    echo "We do not run self-managed scenarios on $week_day"
-    exit 1
+    echo "We do not run self-managed scenarios on first week of the month"
+    exit 0
   fi
 fi
 
 if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST == *"$fips_string"* &&
         $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
-  if [ $week_day == "test_day" ]; then
-    echo "We are running jobs becuase it's $week_day"
+  if (( $month_day <= 7 )); then
+    echo "Running jobs becuase it's the first Monday of the month."
     echo "Continue..."
   else
-    echo "We do not run self-managed fips scenarios on $week_day"
-    exit 1
+    echo "We do not run self-managed fips scenarios past the first Monday of the month"
+    exit 0
   fi
 fi
 
