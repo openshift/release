@@ -7,7 +7,7 @@ HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HOSTED_CLUSTER_NAME
 
 # LoadBalancer configs
-LB_NAME="${HOSTED_CLUSTER_NAME}-lb"
+LB_NAME="lb-${HOSTED_CLUSTER_NAME}"
 LB_ID=""
 
 # Other resource configs
