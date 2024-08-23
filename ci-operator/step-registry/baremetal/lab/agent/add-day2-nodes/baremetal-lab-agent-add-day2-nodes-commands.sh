@@ -129,6 +129,7 @@ done
 
 cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
+cp "$SHARED_DIR/kubeconfig" "${ARTIFACT_DIR}/"
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
