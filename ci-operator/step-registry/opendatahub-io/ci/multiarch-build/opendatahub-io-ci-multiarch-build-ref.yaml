@@ -1,20 +1,45 @@
 ref:
   as: opendatahub-io-ci-multiarch-build
-  commands: opendatahub-io-ci-multiarch-build-commands.sh
+  commands: |
+    #!/bin/bash
+
+    # Start Docker daemon in the background
+    dockerd-entrypoint.sh &
+
+    # Wait for Docker daemon to fully start
+    sleep 10
+
+    # Enable Buildx for multi-platform builds
+    docker buildx create --use
+
+    # Log in to the registry
+    docker login -u $(cat ${SECRETS_PATH}/${REGISTRY_SECRET_FILE} | jq -r .auths["${REGISTRY_HOST}"].auth | base64 -d | cut -d':' -f1) \
+                 -p $(cat ${SECRETS_PATH}/${REGISTRY_SECRET_FILE} | jq -r .auths["${REGISTRY_HOST}"].auth | base64 -d | cut -d':' -f2) \
+                 ${REGISTRY_HOST}
+
+    # Build and push the multi-architecture image
+    docker buildx build --platform ${PLATFORMS} \
+                        -t ${REGISTRY_HOST}/${REGISTRY_ORG}/${IMAGE_REPO}:${IMAGE_TAG} \
+                        --push .
+
   credentials:
     - mount_path: /secrets/opendatahub-io-push-secret
       name: opendatahub-io-push-secret
       namespace: test-credentials
+
   dependencies:
     - env: SOURCE_IMAGE_REF
       name: src
+
   documentation: |-
     This workflow builds and pushes a multi-architecture image for the specified platforms.
+
   env:
     - name: IMAGE_REPO
       default: ""
       documentation: |-
         The repository name of the destination image reference.
+
     - name: IMAGE_TAG
       default: ""
       documentation: |-
@@ -22,42 +47,55 @@ ref:
         a presubmit will be <version>-PR<pull_num>-<commit_sha> and for a
         postsubmit will be <version>-<commit_sha>. If equals to YearIndex assigns
         on IMAGE_TAG the date as full current date YYYYMMDD.
+
     - name: REGISTRY_HOST
       default: quay.io
       documentation: |-
         The hostname (and port) of the destination registry.
+
     - name: REGISTRY_ORG
       default: opendatahub
       documentation: |-
         The organization of the destination image reference.
+
     - name: REGISTRY_SECRET
       default: opendatahub-io-push-secret
       documentation: |-
         The name of the kube secret that contains the registry token file.
+
     - name: REGISTRY_SECRET_FILE
       default: config.json
       documentation: |-
         The name of the file in REGISTRY_SECRET with the contents of
         the .docker/config.json file encoded in base64.
+
     - name: RELEASE_VERSION
       default: ""
       documentation: |-
         The current release version for the product.
+
     - name: SECRETS_PATH
       default: /secrets
       documentation: |-
         The directory where credentials will be mounted.
+
     - name: PLATFORMS
-      default: "linux/ppc64le"
+      default: "linux/ppc64le,linux/s390x,linux/amd64,linux/arm64"
       documentation: |-
         The platforms for which the multi-architecture image will be built.
+
   from_image:
-    name: "4.10"
-    namespace: ocp
-    tag: cli
+    name: "docker"
+    namespace: library
+    tag: "dind"
+
   resources:
     requests:
       cpu: 200m
       memory: 400Mi
+
   timeout: 2h0m0s
+
+  securityContext:
+    privileged: true
 
