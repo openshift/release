@@ -34,8 +34,15 @@ if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; 
   # for OCP
   echo "Reading infra id from file metadata.json"
   infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
-  echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
-  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
+  vpc_name="${infra_id}-vpc"
+  public_subnet_name="${infra_id}-subnet-public-${REGION}a"
+  echo "Looking up IDs for VPC ${vpc_name} and subnet ${public_subnet_name}"
+  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${vpc_name} --query 'Vpcs[0].VpcId' --output text)
+  ### This finds any public subnet, as
+  ### * we can't guess which azs are picked (public_subnet_name guesses its a)
+  ### * pre-4.16 its ${infra_id}-subnet-public-${REGION}[abc...] and later 
+  ### its ${infra_id}-public-${REGION}[abc...]
+  ### any public subnet would work here
   PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
 else
   VpcId=$(cat "${SHARED_DIR}/vpc_id")
