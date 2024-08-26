@@ -20,6 +20,7 @@ SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'Stri
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
+LONG_COMMAND_TIMEOUT=30m
 
 mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
@@ -44,6 +45,11 @@ function run-on-first-master {
 function run-on-first-master-silent {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
+
+function run-on-first-master-silent-long {
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
+}
+
 
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
@@ -86,7 +92,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   until oc get nodes; do sleep 10; done
   mapfile -d ' ' -t nodes < <( oc get nodes -o name )
   for nodename in ${nodes[@]}; do
-    echo -n "Waiting for ${nodename} to become Ready"
+    echo "Waiting for ${nodename} to send heartbeat"
     while true; do
       STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
       TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
@@ -104,7 +110,7 @@ timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-silent "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master-silent-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
 }
 
 function pod-restart-workarounds {
