@@ -239,6 +239,14 @@ case $CLUSTER_TYPE in
   infra_id=$(yq-v4 '.infraID' < "${SHARED_DIR}"/metadata.json)
   rg_name="${infra_id}-rg"
   sa_name=$(az storage account list -g "${rg_name}" | yq-v4 '.[] | select(.name == "cluster*").name')
+  # Starting from 4.17, the default install method is CAPI-based,
+  # the format of storage account name is changed to ${infraId}sa instead of "clusterxxxxx",
+  # and the name could not be more than 24 characters.
+  if [[ -z "${sa_name}" ]]; then
+    sa_prefix=${infra_id//-}
+    sa_prefix=${sa_prefix::22}
+    sa_name=$(az storage account list -g "${rg_name}" | yq-v4 ".[] | select(.name == \"${sa_prefix}sa\").name")
+  fi
   AZURE_STORAGE_KEY=$(az storage account keys list -g "${rg_name}" --account-name "${sa_name}" --query "[0].value" -o tsv)
   export AZURE_STORAGE_KEY
   az storage blob copy start --account-name "${sa_name}" \

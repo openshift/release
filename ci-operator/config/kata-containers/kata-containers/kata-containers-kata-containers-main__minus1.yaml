@@ -15,7 +15,7 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM bin
-    RUN dnf install -y --nobest gettext
+    RUN dnf install -y --nobest gettext jq
   from: bin
   to: with-deps
 - dockerfile_literal: |
@@ -78,6 +78,12 @@ tests:
         # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+
+        # Get the current latest kata-containers image
+        TAGS="$(curl https://quay.io/api/v1/repository/kata-containers/kata-deploy-ci/tag/?onlyActiveTags=true)"
+        DIGEST=$(echo "$TAGS" | jq -r '.tags[] | select(.name | contains("kata-containers-latest-amd64")) | .manifest_digest')
+        export KATA_DEPLOY_IMAGE="quay.io/kata-containers/kata-deploy-ci:$(echo "$TAGS" | jq -r '.tags[] | select(.manifest_digest | contains("'"$DIGEST"'")) | .name' | grep -v "kata-containers-latest-amd64")"
+        echo "KATA_DEPLOY_IMAGE=$KATA_DEPLOY_IMAGE"
 
         # The installer is instructed to configure kata containers to use
         # QEMU from the RHCOS extension and host's kernel.

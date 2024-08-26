@@ -601,6 +601,20 @@ else # for workflow before internal load balancers
   gcloud compute target-pools remove-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools remove-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
 fi
+# remove from the backend service of random id
+backend_service_random_id=$(gcloud compute backend-services list --format=json --filter="backends[].group~${INFRA_ID}" | jq -r .[].name | grep -v "${INFRA_ID}" || echo "")
+echo "[DEBUG] the backend service of random id: '${backend_service_random_id}'"
+if [[ -n "${backend_service_random_id}" ]]; then
+  echo "[DEBUG] Running Command: 'gcloud compute backend-services describe ${backend_service_random_id} --region ${REGION} --format json | jq -r .backends | grep \"${BOOTSTRAP_INSTANCE_GROUP}\"'"
+  if gcloud compute backend-services describe ${backend_service_random_id} --region ${REGION} --format json | jq -r .backends | grep "${BOOTSTRAP_INSTANCE_GROUP}"; then
+    cmd="gcloud compute backend-services remove-backend ${backend_service_random_id} --region=${REGION} --instance-group=${BOOTSTRAP_INSTANCE_GROUP} --instance-group-zone=${ZONE_0}"
+    echo "[DEBUG] Running Command: '${cmd}'"
+    eval "${cmd}"
+  else
+    echo "[DEBUG] ${BOOTSTRAP_INSTANCE_GROUP} is not in ${backend_service_random_id} backends."
+  fi
+fi
+
 gsutil rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
 gsutil rb "gs://${INFRA_ID}-bootstrap-ignition"
 gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
