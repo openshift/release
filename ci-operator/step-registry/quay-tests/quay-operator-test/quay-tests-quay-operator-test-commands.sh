@@ -124,10 +124,11 @@ export quayregistry_aws_secretkey=${QUAY_AWS_SECRET_KEY}
 export quayregistry_redis_hostname=${QUAY_REDIS_IP_ADDRESS}
 export quayregistry_redis_password=${quayregistry_postgresql_db_password} 
 
-
+export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
+export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 
  
-echo "Run extended-platform-tests"
+echo "Run extended-platform-tests" ${QUAY_OPERATOR_CHANNEL}
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
 # extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
