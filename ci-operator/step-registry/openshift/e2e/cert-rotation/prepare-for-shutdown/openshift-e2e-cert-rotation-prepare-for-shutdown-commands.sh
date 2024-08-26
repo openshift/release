@@ -91,6 +91,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   echo "Waiting for API server to come up"
   until oc get nodes; do sleep 10; done
   mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+  RAN_CSR_APPROVAL=""
   for nodename in ${nodes[@]}; do
     echo "Waiting for ${nodename} to send heartbeat"
     while true; do
@@ -99,10 +100,17 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
       if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
         break
       fi
-      bash /usr/local/bin/approve-csrs-with-timeout.sh
+      if [[ -z ${RAN_CSR_APPROVAL} ]]; then
+        bash /usr/local/bin/approve-csrs-with-timeout.sh
+        RAN_CSR_APPROVAL=1
+      else
+        echo -n "."
+        sleep 10
+      fi
     done
     echo
   done
+  echo "All nodes are ready"
   oc get nodes
 EOZ
 chmod a+x /tmp/ensure-nodes-are-ready.sh
