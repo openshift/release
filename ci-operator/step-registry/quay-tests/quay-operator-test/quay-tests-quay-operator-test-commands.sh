@@ -19,7 +19,7 @@ CLAIR_ROUTE_NAME=$(cat ${SHARED_DIR}/CLAIR_ROUTE_NAME)
 
 echo "working dir..."
 pwd
-echo "Quay upgrade test..."
+echo "Quay upgrade test..." $QUAY_AWS_S3_BUCKET
 oc version
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
