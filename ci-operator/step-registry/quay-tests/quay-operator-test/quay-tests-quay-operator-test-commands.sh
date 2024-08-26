@@ -118,8 +118,8 @@ export quayregistry_postgresql_db_password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}
 export quayregistry_clair_scanner_endpoint=${CLAIR_ROUTE_NAME}
 
 export quayregistry_aws_bucket_name=${QUAY_AWS_S3_BUCKET}
-export quayregistry_aws_accesskey=${QUAY_AWS_ACCESS_KEY}
-export quayregistry_aws_secretkey=${QUAY_AWS_SECRET_KEY}
+export quayregistry_aws_access_key=${QUAY_AWS_ACCESS_KEY}
+export quayregistry_aws_secret_key=${QUAY_AWS_SECRET_KEY}
 
 export quayregistry_redis_hostname=${QUAY_REDIS_IP_ADDRESS}
 export quayregistry_redis_password=${quayregistry_postgresql_db_password} 
