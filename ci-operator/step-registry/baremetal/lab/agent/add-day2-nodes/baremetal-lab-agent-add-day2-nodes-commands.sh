@@ -152,7 +152,7 @@ if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.
   #oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
 fi
 
-cp "${day2_pull_secret}" > "${ARTIFACT_DIR}/"
+cp "${day2_pull_secret}" "${ARTIFACT_DIR}/"
 
 
 echo "Create 1st node.iso for day2 worker node"
