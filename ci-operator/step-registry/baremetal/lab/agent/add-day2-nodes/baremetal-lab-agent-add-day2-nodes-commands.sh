@@ -129,6 +129,9 @@ done
 
 cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
+cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${SHARED_DIR}/"
+
+
 cp "$SHARED_DIR/kubeconfig" "${ARTIFACT_DIR}/"
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
