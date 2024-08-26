@@ -46,11 +46,11 @@ function get_ready_nodes_count() {
 
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -101,41 +101,12 @@ controlPlane:
    hyperthreading: Enabled
    name: master
    replicas: ${masters}
-"
-
-if [ "${masters}" -eq 1 ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-platform:
-  none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-"
-fi
-
-if [ "${masters}" -gt 1 ]; then
-  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  none: {}
-"
-  else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
 "
-  fi
-fi
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
 
@@ -145,7 +116,7 @@ do
   if test -f "${f}"
   then
       echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
   fi
 done
 
