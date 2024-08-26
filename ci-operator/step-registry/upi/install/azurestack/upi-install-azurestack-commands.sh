@@ -47,9 +47,7 @@ echo $APP_ID >> ${SHARED_DIR}/APP_ID
 
 # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
-source ${SHARED_DIR}/azurestack-login-script.sh || true
-echo "sleep here to debug"
-sleep 7200
+source ${SHARED_DIR}/azurestack-login-script.sh
 
 #Avoid x509 error thown out from installer when get azurestack wwt endpoint
 if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
