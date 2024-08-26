@@ -19,8 +19,12 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+# download the istio version with 1.19.1 bookinfo app
+hack/istio/download-istio.sh -iv 1.22.3
 hack/istio/install-testing-demos.sh -c oc -in ${SMCP_NAMESPACE}
 sleep 120
+oc wait --for condition=Successful kiali/kiali -n ${SMCP_NAMESPACE} --timeout=250s
+oc wait --for condition=available deployment/kiali -n ${SMCP_NAMESPACE} --timeout=250s
 
 KIALI_ROUTE=$(oc get route kiali -n ${SMCP_NAMESPACE} -o=jsonpath='{.spec.host}')
 export CYPRESS_BASE_URL="https://${KIALI_ROUTE}"
