@@ -60,6 +60,7 @@ DAY2_ASSETS_DIR="${DAY2_ASSETS_DIR:-/tmp/installer/assets}"
 
 mkdir -p "${INSTALL_DIR}"
 mkdir -p "${DAY2_ASSETS_DIR}"
+day2_pull_secret="${INSTALL_DIR}/day2_pull_secret"
 
 
 cat > "${DAY2_ASSETS_DIR}/nodes-config.yaml" <<EOF
@@ -137,15 +138,27 @@ cp "$SHARED_DIR/kubeconfig" "${ARTIFACT_DIR}/"
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
 
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
+
+
 # Extract the latest oc client
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=oc --to=/tmp --insecure=true
+
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
+  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+  # use registry credential for disconnected auth
+  grep "auths" "${SHARED_DIR}/install-config.yaml" > "${day2_pull_secret}"
+  #oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
+fi
+
+cp "${day2_pull_secret}" > "${ARTIFACT_DIR}/"
 
 
 echo "Create 1st node.iso for day2 worker node"
 
 # Create node.iso for day2 1st worker node
-/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --insecure=true
+/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${day2_pull_secret}" --insecure=true
 
 
 # Dump agent-auth-token after day2 image creation
@@ -234,7 +247,7 @@ rm -f "${DAY2_ASSETS_DIR}/node.iso"
 echo "Create 2nd node.iso for day2 worker node"
 
 # Create node.iso for day2 2nd worker node
-/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --insecure=true
+/tmp/oc adm node-image create --dir="${DAY2_ASSETS_DIR}" -a "${day2_pull_secret}" --insecure=true
 
 
 # Dump agent-auth-token after day2 image creation
