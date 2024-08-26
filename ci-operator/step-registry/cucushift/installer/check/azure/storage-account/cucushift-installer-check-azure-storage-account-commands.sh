@@ -83,4 +83,8 @@ if [[ ${no_critical_check_result} == 1 ]]; then
     [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
 fi 
 
+
+ACCOUNT_NAME="aaastorage"
+az storage account create -g i${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
+
 exit 0

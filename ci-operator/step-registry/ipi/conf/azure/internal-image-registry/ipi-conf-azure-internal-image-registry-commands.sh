@@ -29,10 +29,3 @@ spec:
         type: Internal
 EOF
 
-
-# Add a new storage account to avoid using the image registry one for permission issue 
-echo "Creating storage account"
-INFRA_ID="$(jq -r .infraID ${ARTIFACT_DIR}/installer/metadata.json)"
-RESOURCE_GROUP="${INFRA_ID}-rg"
-ACCOUNT_NAME="aaastorage"
-az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
