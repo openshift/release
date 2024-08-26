@@ -84,13 +84,14 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.17"
   steps:
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
         operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
