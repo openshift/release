@@ -85,6 +85,6 @@ fi
 
 
 ACCOUNT_NAME="aaastorage"
-az storage account create -g i${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
+az storage account create -g ${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
 
 exit 0
