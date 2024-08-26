@@ -7,8 +7,8 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -32,9 +32,9 @@ images:
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -145,8 +145,7 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
-- always_run: false
-  as: e2e-kubevirt-metal-conformance
+- as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -154,16 +153,14 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- always_run: false
-  as: e2e-azure-aks-ovn-conformance
+- as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
     cluster_profile: hypershift
     env:
       HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.17"
     workflow: hypershift-azure-aks-conformance
-- always_run: false
-  as: e2e-openstack
+- as: e2e-openstack
   optional: true
   steps:
     cluster_profile: hypershift
