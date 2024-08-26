@@ -28,4 +28,3 @@ spec:
           vnetName: ${vnet_name}
         type: Internal
 EOF
-
