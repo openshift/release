@@ -84,7 +84,7 @@ if [[ ${no_critical_check_result} == 1 ]]; then
 fi 
 
 
-ACCOUNT_NAME="aaastorage"
+ACCOUNT_NAME="aaastoragetest01"
 az storage account create -g ${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
 
 exit 0
