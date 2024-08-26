@@ -81,7 +81,6 @@ timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${cont
 run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
-  set -x
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   echo "Waiting for API server to come up"
   until oc get nodes; do sleep 10; done
@@ -99,10 +98,9 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     echo
   done
   oc get nodes
-  bash /usr/local/bin/approve-csrs-with-timeout.sh
 EOZ
 chmod a+x /tmp/ensure-nodes-are-ready.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
