@@ -2824,7 +2824,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.18-aro-unit
     rerun_command: /test aro-unit
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^pkg/asset/agent/)
     spec:
       containers:
       - args:
@@ -3625,7 +3625,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.18-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^terraform/providers)|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
     spec:
       containers:
       - args:
@@ -7975,7 +7975,7 @@ presubmits:
     - ^release-4\.18$
     - ^release-4\.18-
     cluster: build01
-    context: ci/prow/e2e-powervs-ovn
+    context: ci/prow/e2e-powervs-capi-ovn
     decorate: true
     decoration_config:
       timeout: 6h0m0s
@@ -7985,9 +7985,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.18-e2e-powervs-ovn
+    name: pull-ci-openshift-installer-release-4.18-e2e-powervs-capi-ovn
     optional: true
-    rerun_command: /test e2e-powervs-ovn
+    rerun_command: /test e2e-powervs-capi-ovn
     spec:
       containers:
       - args:
@@ -7996,8 +7996,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-powervs-ovn-cluster-profile
-        - --target=e2e-powervs-ovn
+        - --secret-dir=/usr/local/e2e-powervs-capi-ovn-cluster-profile
+        - --target=e2e-powervs-capi-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -8013,7 +8013,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-powervs-ovn-cluster-profile
+        - mountPath: /usr/local/e2e-powervs-capi-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -8050,7 +8050,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-powervs-ovn,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-powervs-capi-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

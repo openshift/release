@@ -3,10 +3,10 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-8-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ansible-operator-plugins
@@ -16,10 +16,13 @@ images:
     base:
       as:
       - registry.ci.openshift.org/ocp/4.17:base
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
   to: openshift-ansible-operator-plugins
+- dockerfile_path: openshift/ci/dockerfiles/ansible-e2e.Dockerfile
+  from: openshift-ansible-operator-plugins
+  to: ansible-operator-e2e
 promotion:
   to:
   - name: 4.17-priv
@@ -52,6 +55,21 @@ tests:
     HOME=/tmp make test-sanity
   container:
     from: src
+- as: e2e-ansible
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make -f openshift/Makefile test-e2e-ansible
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv
