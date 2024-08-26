@@ -11,5 +11,5 @@ job-run-aggregator analyze-job-runs \
   --payload-tag=${PAYLOAD_TAG} \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \
-  --timeout=5h40m \
+  --timeout=7h \
   --query-source=cluster

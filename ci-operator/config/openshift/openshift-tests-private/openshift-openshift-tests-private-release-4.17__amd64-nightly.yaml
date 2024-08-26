@@ -1252,8 +1252,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1266,8 +1264,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
@@ -1278,8 +1274,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "100"
     test:
@@ -1291,8 +1285,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OS_IMAGE_VERSION: 4.15.2024072409
     test:
     - chain: openshift-e2e-test-qe
@@ -1303,8 +1295,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OS_IMAGE_PLAN: NoPurchasePlan
       OS_IMAGE_URN: azureopenshift:aro4:413_v2:413.92.20230614
     test:
@@ -1340,6 +1330,28 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-longduration
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-aks-hypershift-byo-vnet-fips-mgmt-f14
+  cron: 30 12 9,23 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet
+- as: azure-aks-hypershift-cilium-guest-f7
+  cron: 0 9 3,10,17,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-cilium-guest
 - as: azure-aks-hypershift-etcd-disk-encryption-guest-f7
   cron: 16 2 5,12,19,26 * *
   steps:
@@ -1350,17 +1362,18 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
-- as: azure-aks-hypershift-etcd-disk-encryption-mgmt-f14
-  cron: 30 12 9,23 * *
+- as: azure-aks-hypershift-install-f28-longduration
+  cron: 55 9 10 * *
   steps:
     cluster_profile: azure-qe
     env:
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
+      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftAKSINSTALL&
+      TEST_SCENARIOS: Hypershift
+      TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
 - as: azure-ipi-ovn-hypershift-install-f28-longduration
   cron: 54 0 17 * *
   steps:
@@ -1380,8 +1393,6 @@ tests:
     env:
       AZURE_VNET_TAGS: qekey=qevalue
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
@@ -1392,8 +1403,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
@@ -1403,8 +1412,6 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
@@ -1417,8 +1424,6 @@ tests:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
@@ -1433,8 +1438,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-generation
