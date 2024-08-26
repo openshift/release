@@ -56,13 +56,15 @@ run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/defau
 
 # Shutdown nodes
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
+set +x
 for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
+  echo "Shutting down ${vm}"
   virsh shutdown ${vm}
   until virsh domstate ${vm} | grep "shut off"; do
-    echo "${vm} still running"
+    echo -n "."
     sleep 10
   done
 done
@@ -77,12 +79,14 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
+  echo "Starting ${vm}"
   virsh start ${vm}
   until virsh domstate ${vm} | grep "running"; do
-    echo "${vm} still not yet running"
+    echo -n "."
     sleep 10
   done
 done
+set -x
 
 # Check that time on nodes has been updated
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
