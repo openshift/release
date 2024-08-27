@@ -342,13 +342,14 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
         cluster_version="${TARGET_VERSION}"
     fi
-    echo "Starting the upgrade checking on $(date "+%F %T")"
+    echo -e "Upgrade checking start at $(date "+%F %T")\n"
+    start_time=$(date "+%s")
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -372,7 +373,9 @@ function check_upgrade_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
-            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
+            end_time=$(date "+%s")
+            echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
@@ -382,7 +385,10 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
+        end_time=$(date "+%s")
+        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        return 1
     fi
 }
 
