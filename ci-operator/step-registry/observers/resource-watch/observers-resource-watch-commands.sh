@@ -15,6 +15,10 @@ function cleanup() {
     kill ${CHILDREN} && wait
   fi
 
+  if [ -f "${STORE_PATH}/e2e-events.json" ]; then
+    cp "${STORE_PATH}/e2e-events.json" "${ARTIFACT_DIR}/e2e-events-observer.json"
+  fi
+
   tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
   rm -rf $STORE_PATH
 
