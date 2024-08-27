@@ -161,7 +161,7 @@ function is_bm_node {
 
     if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
         # Define thresholds
-        CPU_THRESHOLD=80
+        CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
 
         echo "Checking if node $node is baremetal or virtual"
