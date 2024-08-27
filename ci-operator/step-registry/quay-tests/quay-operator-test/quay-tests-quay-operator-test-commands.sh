@@ -126,7 +126,6 @@ export quayregistry_redis_password=${quayregistry_postgresql_db_password}
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 
- 
 echo "Run extended-platform-tests" 
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
