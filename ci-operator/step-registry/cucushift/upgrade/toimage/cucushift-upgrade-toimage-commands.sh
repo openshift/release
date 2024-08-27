@@ -433,11 +433,11 @@ run_command "oc version --client"
 run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
+export TARGET_MINOR_VERSION=""
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
-export TARGET_MINOR_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
