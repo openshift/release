@@ -90,4 +90,41 @@ while true ; do
     sleep 30
 done
 
-ssh "${INSTANCE_PREFIX}" 'bash -x $HOME/microshift//scripts/ci-footprint-and-performance/3-test.sh'
+# Example of $CLONEREFS_OPTIONS:
+# {
+#     "src_root": "/go",
+#     "log": "/dev/null",
+#     "git_user_name": "ci-robot",
+#     "git_user_email": "ci-robot@openshift.io",
+#     "refs": [
+#         {
+#             "org": "openshift",
+#             "repo": "release",
+#             "base_ref": "master",
+#             "base_sha": "2bab4e1b820127733105b1d170c47fd71ca0b8f1",
+#             "pulls": [
+#                 {
+#                     "number": 55565,
+#                     "author": "pmtk",
+#                     "sha": "2154ef6d003515dfb93909c9e404acd0c775c611",
+#                     "link": "https://github.com/openshift/release/pull/55565"
+#                 }
+#             ]
+#         },
+#         {
+#             "org": "openshift",
+#             "repo": "microshift",
+#             "base_ref": "main",
+#             "workdir": true
+#         }
+#     ],
+#     "fail": true
+# }
+BRANCH=$(echo $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.repo=="microshift") | .base_ref')
+if [[ "${BRANCH}" == "" ]]; then
+    echo "BRANCH turned out to be empty - investigate"
+    env
+    exit 1
+fi
+
+ssh "${INSTANCE_PREFIX}" "JOB_TYPE=${JOB_TYPE} BRANCH=${BRANCH} bash -x \$HOME/microshift//scripts/ci-footprint-and-performance/3-test.sh"
