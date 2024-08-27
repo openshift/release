@@ -20,12 +20,12 @@ echo "-----EXP: id-----"
 id
 
 # is docker present?
-echo "-----EXP: which docker-----"
-which docker
+#echo "-----EXP: which docker-----"
+#which docker
 
 # is podman present?
 echo "-----EXP: which podman-----"
 which podman
 
 # am i a sudoer?
-sudo -l
+#sudo -l
