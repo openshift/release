@@ -3,7 +3,6 @@
 set -o nounset
 export REPORT_HANDLE_PATH="/usr/bin"
 
-
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 QUAY_AWS_RDS_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/dbname)
@@ -128,7 +127,7 @@ export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 
  
-echo "Run extended-platform-tests" ${QUAY_OPERATOR_CHANNEL}
+echo "Run extended-platform-tests" 
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
 # extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
