@@ -21,7 +21,7 @@ if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST != *"$fips_string"* &&
         $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
         if (( $month_day > 7 )); then
-    echo "Running jobs becuase it's a Monday thats not the first week."
+    echo "Triggering jobs because it's a Monday not in the first week of the month."
     echo "Continue..."
   else
     echo "We do not run self-managed scenarios on first week of the month"
