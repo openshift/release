@@ -224,6 +224,7 @@ CONFIG = {
     'nutanix-qe-quota-slice': {},
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
+    'nutanix-qe-gpu-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
         'default': 18,
@@ -442,6 +443,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-zone-quota-slice']['nutanix-qe-zone-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-gpu-quota-slice']['nutanix-qe-gpu-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
