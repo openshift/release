@@ -339,7 +339,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-dualstack
+    workflow: baremetalds-e2e-ovn-dualstack-cgroupsv1
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -447,6 +447,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -616,6 +617,7 @@ tests:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -944,6 +946,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "365"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -952,6 +955,87 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "730"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-3y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1100"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-4y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1470"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-5y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1830"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-6y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2190"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-7y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2560"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-8y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2930"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-9y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "3290"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-10y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "3650"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1086,7 +1170,7 @@ tests:
 - as: e2e-aws-ovn-edge-zones-manifest-validation
   cron: '@daily'
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 1h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
@@ -1148,7 +1232,7 @@ tests:
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: aws-2
     env:
@@ -1161,7 +1245,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-ipi-ovn-kube-apiserver-rollout
   cluster: build05
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -1172,7 +1256,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-vsphere-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1183,13 +1267,163 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-azure-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: azure4
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
     workflow: openshift-e2e-azure
+- as: e2e-vsphere-ipi-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-cgroupsv1
+- as: e2e-azure-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cgroupsv1
+- as: e2e-gcp-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-cgroupsv1
+- as: e2e-aws-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cgroupsv1
+- as: e2e-vsphere-ipi-ovn-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-crun
+- as: e2e-azure-ovn-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-crun
+- as: e2e-gcp-ovn-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-crun
+- as: e2e-aws-ovn-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-crun
+- as: e2e-vsphere-ovn-serial-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-serial-crun
+- as: e2e-vsphere-ovn-serial-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-serial-cgroupsv1
+- as: e2e-azure-ovn-serial-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial-crun
+- as: e2e-azure-ovn-serial-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial-cgroupsv1
+- as: e2e-gcp-ovn-serial-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-serial-crun
+- as: e2e-gcp-ovn-serial-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-serial-cgroupsv1
+- as: e2e-aws-serial-crun
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-serial-crun
+- as: e2e-aws-serial-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-serial-cgroupsv1
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -70,10 +70,6 @@ CONFIG = {
     'aws-interop-qe-quota-slice': {
         'us-east-2': 5,
     },
-    'aws-local-zones-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
-    },
     'aws-edge-zones-quota-slice': {
         'us-east-1': 5,
         'us-west-2': 5

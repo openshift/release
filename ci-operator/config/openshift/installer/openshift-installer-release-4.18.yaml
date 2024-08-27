@@ -221,7 +221,7 @@ releases:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -279,7 +279,7 @@ tests:
   commands: go test ./pkg/... -tags=aro
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^pkg/asset/agent/)
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
@@ -311,7 +311,7 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^terraform/providers)|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
     cluster_profile: aws
     env:
@@ -402,7 +402,7 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -815,7 +815,7 @@ tests:
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-powervs-ovn
+  as: e2e-powervs-capi-ovn
   cluster: build01
   optional: true
   steps:
@@ -824,8 +824,8 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
       ARCH: ppc64le
-      BRANCH: "4.18"
-      CLUSTER_NAME_MODIFIER: capi-418
+      BRANCH: master
+      CLUSTER_NAME_MODIFIER: capi-master
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
