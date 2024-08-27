@@ -1002,7 +1002,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-azure-capi-ovn
     decorate: true
     decoration_config:
@@ -1085,7 +1085,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-azure-ovn-shared-vpc
     decorate: true
     decoration_config:
@@ -1516,7 +1516,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-ibmcloud-capi-ovn
     decorate: true
     decoration_config:
@@ -1766,7 +1766,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-ccpmso-zone
     decorate: true
     decoration_config:
@@ -1849,7 +1849,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-dualstack
     decorate: true
     labels:
@@ -1930,7 +1930,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-dualstack-upi
     decorate: true
     decoration_config:
@@ -2013,7 +2013,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-dualstack-v6primary
     decorate: true
     decoration_config:
@@ -2096,7 +2096,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-externallb
     decorate: true
     decoration_config:
@@ -2179,7 +2179,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-nfv-intel
     decorate: true
     decoration_config:
@@ -2345,7 +2345,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-e2e-openstack-capi-proxy
     decorate: true
     decoration_config:
@@ -2423,90 +2423,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )altinfra-e2e-openstack-capi-proxy,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build01
-    context: ci/prow/altinfra-e2e-powervs-capi-ovn
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: powervs-5
-      ci-operator.openshift.io/cloud-cluster-profile: powervs-5
-      ci-operator.openshift.io/cluster: build01
-      ci-operator.openshift.io/variant: altinfra
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.19-altinfra-e2e-powervs-capi-ovn
-    optional: true
-    rerun_command: /test altinfra-e2e-powervs-capi-ovn
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-powervs-capi-ovn-cluster-profile
-        - --target=e2e-powervs-capi-ovn
-        - --variant=altinfra
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-powervs-capi-ovn-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-powervs-5
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )altinfra-e2e-powervs-capi-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2844,7 +2760,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/altinfra-images
     decorate: true
     labels:
@@ -2901,7 +2817,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/aro-unit
     decorate: true
     labels:
@@ -2909,7 +2825,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.19-aro-unit
     rerun_command: /test aro-unit
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^pkg/asset/agent/)
     spec:
       containers:
       - args:
@@ -2955,7 +2871,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/azure-ovn-marketplace-images
     decorate: true
     decoration_config:
@@ -3710,7 +3626,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.19-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^terraform/providers)|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
     spec:
       containers:
       - args:
@@ -5083,7 +4999,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -5164,7 +5080,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     decoration_config:
@@ -5245,7 +5161,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     decoration_config:
@@ -5327,7 +5243,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     decoration_config:
@@ -5408,7 +5324,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     decoration_config:
@@ -6668,7 +6584,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     decoration_config:
@@ -6750,7 +6666,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -7246,7 +7162,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -7492,7 +7408,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-ccpmso-zone
     decorate: true
     decoration_config:
@@ -7573,7 +7489,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-dualstack
     decorate: true
     labels:
@@ -7652,7 +7568,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-dualstack-upi
     decorate: true
     decoration_config:
@@ -7734,7 +7650,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-externallb
     decorate: true
     decoration_config:
@@ -7815,7 +7731,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-nfv-intel
     decorate: true
     decoration_config:
@@ -7978,7 +7894,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
@@ -8055,6 +7971,88 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-proxy,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build01
+    context: ci/prow/e2e-powervs-capi-ovn
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: powervs-5
+      ci-operator.openshift.io/cloud-cluster-profile: powervs-5
+      ci-operator.openshift.io/cluster: build01
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.19-e2e-powervs-capi-ovn
+    optional: true
+    rerun_command: /test e2e-powervs-capi-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-powervs-capi-ovn-cluster-profile
+        - --target=e2e-powervs-capi-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-powervs-capi-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-powervs-5
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-powervs-capi-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -8712,7 +8710,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -8766,7 +8764,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/golint
     decorate: true
     labels:
@@ -8820,7 +8818,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     labels:
@@ -8874,7 +8872,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -8929,7 +8927,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/integration-tests
     decorate: true
     labels:
@@ -9651,7 +9649,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -9707,7 +9705,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/okd-unit
     decorate: true
     labels:
@@ -9763,7 +9761,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/okd-verify-codegen
     decorate: true
     labels:
@@ -9899,7 +9897,7 @@ presubmits:
     branches:
     - ^release-4.19$
     - ^release-4.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -9928,7 +9926,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/terraform-images
     decorate: true
     labels:
@@ -9985,7 +9983,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/terraform-verify-vendor
     decorate: true
     labels:
@@ -10041,7 +10039,7 @@ presubmits:
     branches:
     - ^release-4.19$
     - ^release-4.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -10071,7 +10069,7 @@ presubmits:
     branches:
     - ^release-4.19$
     - ^release-4.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -10100,7 +10098,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     labels:
@@ -10154,7 +10152,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/verify-codegen
     decorate: true
     labels:
@@ -10207,7 +10205,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/verify-vendor
     decorate: true
     labels:
@@ -10261,7 +10259,7 @@ presubmits:
     branches:
     - ^release-4.19$
     - ^release-4.19-
-    cluster: build05
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     labels:
