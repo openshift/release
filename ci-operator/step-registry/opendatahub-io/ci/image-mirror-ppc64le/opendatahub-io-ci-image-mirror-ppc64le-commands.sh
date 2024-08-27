@@ -8,16 +8,24 @@ cd "$HOME" || exit 1
 
 
 # what env?
+echo "-----EXP: cat /etc/os-release-----"
 cat /etc/os-release
+echo "-----EXP: uname -a-----"
 uname -a
 
 # user details
+echo "-----EXP: woami-----"
 whoami
+echo "-----EXP: id-----"
+id
+echo "-----EXP: groups-----"
 groups
 
 
 # is docker present?
+echo "-----EXP: which docker-----"
 which docker
 
 # is podman present?
+echo "-----EXP: which podman-----"
 which podman
