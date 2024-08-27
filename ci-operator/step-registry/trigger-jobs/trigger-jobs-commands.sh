@@ -14,6 +14,11 @@ echo ""
 
 retry_interval=60  # 60 seconds = 1 minute
 
+if [[ "$JOB_NAME" == *"rehearse"* ]]; then
+  echo "Job name contains 'rehearse'. Exiting with status 0."
+  exit 0
+fi
+
 if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 
   echo "# Test to make sure gangway api is up and running."
