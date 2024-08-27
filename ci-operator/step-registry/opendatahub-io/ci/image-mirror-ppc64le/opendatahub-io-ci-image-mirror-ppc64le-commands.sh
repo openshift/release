@@ -18,8 +18,10 @@ echo "-----EXP: woami-----"
 whoami
 echo "-----EXP: id-----"
 id
-echo "-----EXP: groups-----"
-groups
+echo "-----EXP: cat /etc/sudoers-----"
+cat /etc/sudoers
+echo "-----EXP: sudo -l-----"
+sudo -l
 
 
 # is docker present?
