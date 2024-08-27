@@ -74,4 +74,4 @@ spec:
 EOF
 
 # Setting nodeSelector on ingresscontroller to worker to make sure router pod gets spawn on each worker node
-oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+# oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
