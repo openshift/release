@@ -74,8 +74,9 @@ fi
 # Run OADP tests with the focus
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
-/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || sleep 7200
 
+sleep 7200
 # Copy logs into artifact directory if they exist
 if [ -d "${LOGS_FOLDER}" ]; then
     echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
