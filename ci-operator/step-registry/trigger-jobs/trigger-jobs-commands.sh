@@ -33,7 +33,7 @@ if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST == *"$fips_string"* &&
         $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
   if (( $month_day <= 7 )); then
-    echo "Running jobs becuase it's the first Monday of the month."
+    echo "Triggering jobs because it's the first Monday of the month."
     echo "Continue..."
   else
     echo "We do not run self-managed fips scenarios past the first Monday of the month"
