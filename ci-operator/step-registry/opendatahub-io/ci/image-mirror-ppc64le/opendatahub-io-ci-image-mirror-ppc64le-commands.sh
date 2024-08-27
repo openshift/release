@@ -18,11 +18,6 @@ echo "-----EXP: woami-----"
 whoami
 echo "-----EXP: id-----"
 id
-echo "-----EXP: cat /etc/sudoers-----"
-cat /etc/sudoers
-echo "-----EXP: sudo -l-----"
-sudo -l
-
 
 # is docker present?
 echo "-----EXP: which docker-----"
@@ -31,3 +26,6 @@ which docker
 # is podman present?
 echo "-----EXP: which podman-----"
 which podman
+
+# am i a sudoer?
+sudo -l
