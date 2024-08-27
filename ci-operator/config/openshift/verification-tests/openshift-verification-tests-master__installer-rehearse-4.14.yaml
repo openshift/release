@@ -40,14 +40,18 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: equinix-ocp-metal-qe
     env:
-      SLEEP_DURATION: 1h
+      SLEEP_DURATION: 8h
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: arm64
+      masters: "3"
+      workers: "2"
     post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    - chain: baremetal-lab-post
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - chain: baremetal-lab-upi-conf
+    - chain: baremetal-lab-upi-install
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
