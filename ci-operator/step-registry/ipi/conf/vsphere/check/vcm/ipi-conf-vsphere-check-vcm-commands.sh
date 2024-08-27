@@ -60,7 +60,7 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
@@ -314,8 +314,8 @@ for LEASE in $LEASES; do
   portgroup_name=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
   log "portgroup ${portgroup_name}"
 
-  bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
-  extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+  bastion_leased_resource=$(jq -r .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
+  extra_leased_resource=$(jq -r .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
   NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
 
@@ -328,13 +328,13 @@ for LEASE in $LEASES; do
 
   if [ "${bastion_leased_resource}" != "null" ]; then
     log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"
-    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+    cat >>"${SHARED_DIR}/vsphere_bastion_leased_context.sh" <<EOF
 export vsphere_bastion_portgroup="${portgroup_name}"
 EOF
 
   elif [ "${extra_leased_resource}" != "null" ]; then
     log "setting extra leased network ${portgroup_name} in vsphere_context.sh"
-    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+    cat >>"${SHARED_DIR}/vsphere_extra_leased_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
 
@@ -390,6 +390,12 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   else
     resource_pool=${cluster}/Resources/ipi-ci-clusters
   fi
+  # Check and make sure the zone doesn't already exist in the failureDomains definition
+  # It happens when VSPHERE_EXTRA_LEASED_RESOURCE exist
+  # if ! echo "${platformSpec}" | jq -e --arg ZONE "$zone" --arg REGION "$region" '.failureDomains[] | select(.zone == $ZONE and .region == $REGION)' ; then
+  #   platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+  # fi
+
   platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
 
   # Add / Update vCenter list
