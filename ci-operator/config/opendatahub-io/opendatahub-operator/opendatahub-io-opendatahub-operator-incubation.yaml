@@ -4,10 +4,13 @@ base_images:
     namespace: origin
     tag: stream8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  project_image:
+    dockerfile_literal: |
+      FROM redhat/ubi8
+      RUN dnf install -y go yum-utils \
+          && dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \
+          && dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+          && systemctl start docker
 images:
 - build_args:
   - name: MANIFEST_RELEASE
