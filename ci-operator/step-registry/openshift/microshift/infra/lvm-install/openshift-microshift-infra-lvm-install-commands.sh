@@ -5,6 +5,18 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
+trap 'finalize' EXIT TERM INT
+
+# Look at sos step for the exit codes definitions
+function finalize()
+{
+  if [[ "$?" -ne "0" ]] ; then
+    echo "6" >> "${SHARED_DIR}/install-status.txt"
+  else
+    echo "0" >> "${SHARED_DIR}/install-status.txt"
+  fi
+}
+
 device="/dev/xvdc"
 
 if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* || "${EC2_INSTANCE_TYPE%.*}" =~ "t3".* || "${EC2_INSTANCE_TYPE%.*}" =~ c7i.2xlarge ]]; then

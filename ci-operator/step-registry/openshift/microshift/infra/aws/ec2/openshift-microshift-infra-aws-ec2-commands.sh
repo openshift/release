@@ -5,8 +5,7 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
 
-# Save stacks events
-trap 'save_stack_events_to_shared' EXIT TERM INT
+trap 'finalize' EXIT TERM INT
 
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
 declare regions=(us-west-2 us-east-1 eu-central-1)
@@ -71,6 +70,17 @@ function save_stack_events_to_shared()
   set +o errexit
   aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
   set -o errexit
+}
+
+# Look at sos step for the exit codes definitions
+function finalize()
+{
+  if [[ "$?" -ne "0" ]] ; then
+    echo "3" >> "${SHARED_DIR}/install-status.txt"
+  else
+    echo "0" >> "${SHARED_DIR}/install-status.txt"
+  fi
+  save_stack_events_to_shared
 }
 
 # shellcheck disable=SC2154

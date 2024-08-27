@@ -5,6 +5,16 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
+# Look at sos step for the exit codes definitions
+function finalize()
+{
+  if [[ "$?" -ne "0" ]] ; then
+    echo "7" >> "${SHARED_DIR}/install-status.txt"
+  else
+    echo "0" >> "${SHARED_DIR}/install-status.txt"
+  fi
+}
+
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 
