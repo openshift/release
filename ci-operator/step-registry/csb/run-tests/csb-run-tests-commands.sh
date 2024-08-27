@@ -160,26 +160,37 @@ function check_tests() {
   sleep 10
   runningPod=true
   count=0
-  maxFailures=100
+  maxFailures=10
   while $runningPod; do
     tnbtestsPod=$(oc get pods -n csb-interop -l deployment=tnb-tests --no-headers=true | awk '{print $1}')
     sleep 60
     podlog=$(while read line; do echo "$line"; done <<< "$(oc logs --tail=50 "$tnbtestsPod" -n csb-interop)")
     if [[ "$podlog" == *"[INFO] Results:"* ]]; then
+      echo "tnb-tests exited with results"
       runningPod=false
+      oc logs --tail=5000 "$tnbtestsPod" -n csb-interop > "${ARTIFACT_DIR}"/run-tests.log
       oc -n csb-interop exec $tnbtestsPod -- find /deployments/tnb-tests/tests/springboot/examples/target/ -name '*.log' -exec cp {} /tmp/log \;
     elif [[ "$podlog" == *"BUILD FAILURE"* ]]; then
-      echo "Failure during the build on $tnbtestsPod, deploy/tnb-tests rolling out"
+      echo "Failure during the build on $tnbtestsPod"
       oc exec $tnbtestsPod -n csb-interop -- /bin/bash -c 'cp -rf /artifacts-tests/* /deployments/.m2/repository' || true
       echo "Artifacts re-sync, wait 10 seconds ..."
       sleep 10
+      echo "Store tnb-tests logs"
+      oc logs --tail=5000 "$tnbtestsPod" -n csb-interop > "${ARTIFACT_DIR}"/run-tests.log
+      echo "deploy/tnb-tests rolling out"
       restartPodAfterFailure
-      count=$((count + 1))
+      count=$(expr $count + 1)
       if [[ $count -gt $maxFailures ]]; then
         echo "Max retries reached: exiting ..."
         break
       fi
       sleep 60
+    elif [[ "$podlog" == *"[ERROR]"* ]] || [[ "$podlog" == *"Exception"* ]]; then
+      echo "Exception occurred during execution"
+      echo $podlog
+      oc logs --tail=5000 "$tnbtestsPod" -n csb-interop > "${ARTIFACT_DIR}"/run-tests.log
+      runningPod=false
+      break
     fi
     echo "Check if tnb-tests are still running: $runningPod - attempt # $count"
   done

@@ -41,7 +41,9 @@ Following the test cluster being provisioned, the following steps are executed i
     - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
     - **If left empty**: The [`firewatch-ipi-aws` workflow](../../../step-registry/ipi/aws/firewatch-ipi-aws-workflow.yaml) will fail.
 - `CSB_RELEASE`
-    - **Definition**: Release related to CSB version and GitHub repo tag as well [GIT tags](https://github.com/jboss-fuse/camel-spring-boot-examples/tags)
+    - **Definition**: Release related to CSB version
+- `CSB_PATCH`
+    - **Definition**: CSB Examples GitHub repo and [GIT tags](https://github.com/jboss-fuse/camel-spring-boot-examples/tags) 
 
 ### Custom Images
 
