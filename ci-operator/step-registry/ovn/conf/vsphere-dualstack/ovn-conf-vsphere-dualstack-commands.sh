@@ -41,13 +41,14 @@ if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | 
 fi
 machine_cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipv6prefix' "${SUBNETS_CONFIG}")
 
-IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
-IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
-export IPV6_API_VIP
-export IPV6_INGRESS_VIP
+#IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
+#IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
+#export IPV6_API_VIP
+#export IPV6_INGRESS_VIP
 
-/tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), strenv(IPV6_API_VIP)]' ${SHARED_DIR}/install-config.yaml
-/tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), strenv(IPV6_INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
+# disable VIPs
+#/tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), strenv(IPV6_API_VIP)]' ${SHARED_DIR}/install-config.yaml
+#/tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), strenv(IPV6_INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 networking:
@@ -67,8 +68,8 @@ EOF
 
 if [[ "${IP_FAMILIES}" == "DualStackIPv6Primary" ]]; then
   echo Swapping IP addresses
-  /tmp/yq e --inplace '.platform.vsphere.apiVIPs = (.platform.vsphere.apiVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
-  /tmp/yq e --inplace '.platform.vsphere.ingressVIPs = (.platform.vsphere.ingressVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
+#  /tmp/yq e --inplace '.platform.vsphere.apiVIPs = (.platform.vsphere.apiVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
+#  /tmp/yq e --inplace '.platform.vsphere.ingressVIPs = (.platform.vsphere.ingressVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
   /tmp/yq e --inplace '.networking.machineNetwork = (.networking.machineNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
   /tmp/yq e --inplace '.networking.clusterNetwork = (.networking.clusterNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
   /tmp/yq e --inplace '.networking.serviceNetwork = (.networking.serviceNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
