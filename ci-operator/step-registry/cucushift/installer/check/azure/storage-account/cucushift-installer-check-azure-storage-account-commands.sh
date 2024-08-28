@@ -83,8 +83,8 @@ if [[ ${no_critical_check_result} == 1 ]]; then
     [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
 fi 
 
-echo "Create a new storage account"
-ACCOUNT_NAME="aaastoragetest01"
-az storage account create -g ${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS --endpoint Standard --min-tls-version TLS1_2
+#echo "Create a new storage account"
+#ACCOUNT_NAME="aaastoragetest01"
+#az storage account create -g ${RESOURCE_GROUP} --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS --endpoint Standard --min-tls-version TLS1_2
 
 exit 0
