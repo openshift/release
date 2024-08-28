@@ -5,7 +5,8 @@ export REPORT_HANDLE_PATH="/usr/bin"
 
 # echo "list generated shared resources"
 # ls ${SHARED_DIR}
-echo "working dir..." `pwd`
+echo "working dir..." 
+pwd
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
