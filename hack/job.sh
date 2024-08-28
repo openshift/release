@@ -15,6 +15,7 @@ if [ -z ${VOLUME_MOUNT_FLAGS+x} ]; then VOLUME_MOUNT_FLAGS=':z'; else echo "VOLU
 
 
 STATE=${STATE:-triggered}
+CLUSTER=${CLUSTER:-}
 
 $CONTAINER_ENGINE run $CONTAINER_ENGINE_OPTS \
     --rm \
