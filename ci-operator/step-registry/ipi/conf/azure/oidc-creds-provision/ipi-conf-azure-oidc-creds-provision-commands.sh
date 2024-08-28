@@ -117,6 +117,10 @@ fi
 
 # create required credentials infrastructure and installer manifests
 ccoctl_ouptut="/tmp/ccoctl_output"
+cmd="ccoctl azure create-all --name=\"${CLUSTER_NAME}\" --region=\"${REGION}\" --subscription-id=\"${AZURE_SUBSCRIPTION_ID}\" --tenant-id=\"${AZURE_TENANT_ID}\" --credentials-requests-dir=\"/tmp/credrequests\" --dnszone-resource-group-name=\"${BASE_DOMAIN_RESOURCE_GROUP_NAME}\" --storage-account-name=\"$(tr -d '-' <<< ${CLUSTER_NAME})oidc\" --output-dir=\"/tmp\" ${ADDITIONAL_CCOCTL_ARGS} "
+echo "debug: $cmd"
+sleep 3600
+
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
