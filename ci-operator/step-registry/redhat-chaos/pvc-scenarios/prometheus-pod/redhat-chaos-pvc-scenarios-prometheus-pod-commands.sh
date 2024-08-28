@@ -48,10 +48,6 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ELASTIC_INDEX=krkn_chaos_ci
 
 export KUBECONFIG=/tmp/config
-export PVC_NAME=$PVC_NAME
-export POD_NAME=$POD_NAME     
-export FILL_PERCENTAGE=$FILL_PERCENTAGE
-export DURATION=$DURATION
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
