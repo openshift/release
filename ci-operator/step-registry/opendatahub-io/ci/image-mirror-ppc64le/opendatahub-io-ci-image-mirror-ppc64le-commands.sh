@@ -19,9 +19,13 @@ whoami
 echo "-----EXP: id-----"
 id
 
+# cpu details
+echo "-----EXP: lscpu-----"
+lscpu
+
 # is docker present?
-echo "-----EXP: which docker-----"
-which docker
+#echo "-----EXP: which docker-----"
+#which docker
 
 # is podman present?
 #echo "-----EXP: which podman-----"
