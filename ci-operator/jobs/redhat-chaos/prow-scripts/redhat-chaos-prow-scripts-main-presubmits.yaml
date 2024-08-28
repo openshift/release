@@ -281,6 +281,172 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.16-nightly-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.16-nightly-krkn-hub-tests-416-azure
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci-operator.openshift.io/variant: 4.16-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.16-nightly-krkn-hub-tests-416-azure
+    rerun_command: /test 4.16-nightly-krkn-hub-tests-416-azure
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-tests-416-azure-cluster-profile
+        - --target=krkn-hub-tests-416-azure
+        - --variant=4.16-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-tests-416-azure-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-azure-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.16-nightly-krkn-hub-tests-416-azure|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.16-nightly-krkn-hub-tests-416-azure-node
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci-operator.openshift.io/variant: 4.16-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.16-nightly-krkn-hub-tests-416-azure-node
+    rerun_command: /test 4.16-nightly-krkn-hub-tests-416-azure-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-tests-416-azure-node-cluster-profile
+        - --target=krkn-hub-tests-416-azure-node
+        - --variant=4.16-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-tests-416-azure-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-azure-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.16-nightly-krkn-hub-tests-416-azure-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
