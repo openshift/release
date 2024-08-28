@@ -90,9 +90,6 @@ wait-for-nodes-to-be-ready
 # Wait for kube-apiserver operator to generate new lb-ext kubeconfig
 wait-for-valid-lb-ext-kubeconfig
 
-# Approve certificates for workers, so that all operators would complete
-wait-for-nodes-to-be-ready
-
 pod-restart-workarounds
 
 wait-for-operators-to-stabilize
