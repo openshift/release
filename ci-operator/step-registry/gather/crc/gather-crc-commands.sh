@@ -33,16 +33,9 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/.crc/crc.log ${ARTIFACT_DIR}
 
-echo "scp e2e test logs back to pod"
+echo "scp test logs and build artifacts dir back to pod"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --quiet \
     --project "${GOOGLE_PROJECT_ID}" \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/e2e/out/test-results/ ${ARTIFACT_DIR} || true
-
-echo "scp integration test logs back to pod"
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-    --quiet \
-    --project "${GOOGLE_PROJECT_ID}" \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/integration/out/ ${ARTIFACT_DIR} || true
+    --recurse packer@"${INSTANCE_PREFIX}":~/crc/out/ ${ARTIFACT_DIR} || true
