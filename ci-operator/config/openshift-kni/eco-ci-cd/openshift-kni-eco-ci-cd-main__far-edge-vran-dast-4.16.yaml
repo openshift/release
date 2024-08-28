@@ -1,0 +1,38 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: ci
+    namespace: openshift
+    tag: golang-1.20
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  cron: 00 13 * * 1
+  steps:
+    env:
+      OPERATORS: |
+          [
+              {"name": "lifecycle-agent", "source": "redhat-operators-custom", "channel": "stable", "install_namespace": "openshift-lifecycle-agent","target_namespace": "", "operator_group": "openshift-lifecycle-agent"},
+          ]
+    test:
+          #- ref: enable-stage-catalogsource
+          - ref: install-operators
+          #- ref: distributed-tracing-tests-dast
+    workflow: generic-claim
