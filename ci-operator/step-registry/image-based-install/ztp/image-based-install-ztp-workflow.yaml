@@ -1,0 +1,25 @@
+workflow:
+  as: image-based-install-ztp
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+    - chain: image-based-install
+    - ref: image-based-install-ztp-preinstall-host
+    test:
+    - ref: image-based-install-ztp
+    post:
+    - ref: baremetalds-packet-gather-metadata
+    - chain: baremetalds-ipi-post
+    env:
+      PACKET_PLAN: "m3.large.x86"
+      PACKET_OS: "rocky_9"
+      USER_DATA_FILENAME: "user-data"
+      NUM_EXTRA_WORKERS: "1"
+      GO_VERSION: "1.19"
+      DEVSCRIPTS_CONFIG: |
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
+  documentation: |-
+    Using hub-cluster with IBIO to deploy extra worker as a spoke cluster.
+    Installation will be following ZTP flow (Zero Touch Provisioning), meaning no explicit
+    provisioning actions will be made outside of the system.

@@ -3,6 +3,14 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  installer:
+    name: "4.17"
+    namespace: ocp
+    tag: installer
 build_root:
   image_stream_tag:
     name: release
@@ -12,6 +20,12 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: image-based-install-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -54,6 +68,15 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: e2e-ibio-ztp
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+    workflow: image-based-install-ztp
 zz_generated_metadata:
   branch: main
   org: openshift
