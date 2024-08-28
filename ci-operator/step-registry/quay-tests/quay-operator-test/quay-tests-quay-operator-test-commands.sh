@@ -3,23 +3,20 @@
 set -o nounset
 export REPORT_HANDLE_PATH="/usr/bin"
 
+# echo "list generated shared resources"
+# ls ${SHARED_DIR}
+echo "working dir..." `pwd`
+
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 QUAY_AWS_RDS_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/dbname)
 QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/username)
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
-echo "list generated shared resources"
-ls ${SHARED_DIR}
 QUAY_REDIS_IP_ADDRESS=$(cat ${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS)
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(cat ${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS)
 QUAY_AWS_S3_BUCKET=$(cat ${SHARED_DIR}/QUAY_AWS_S3_BUCKET)
 CLAIR_ROUTE_NAME=$(cat ${SHARED_DIR}/CLAIR_ROUTE_NAME)
-
-echo "working dir..."
-pwd
-echo "Quay upgrade test..." $QUAY_AWS_S3_BUCKET
-oc version
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
@@ -107,8 +104,7 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
-
-
+#export env variabels for Go test cases
 export quayregistry_postgresql_db_hostname=${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}
 export quayregistry_postgresql_db_name=${QUAY_AWS_RDS_POSTGRESQL_DBNAME}
 export quayregistry_postgresql_db_username=${QUAY_AWS_RDS_POSTGRESQL_USERNAME}
@@ -130,7 +126,7 @@ echo "Run extended-platform-tests"
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
 # extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
-extended-platform-tests run all --dry-run | grep -E "Quay-Medium"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
+extended-platform-tests run all --dry-run | grep -E "Quay-High|Quay-Medium"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 function handle_result {
 
