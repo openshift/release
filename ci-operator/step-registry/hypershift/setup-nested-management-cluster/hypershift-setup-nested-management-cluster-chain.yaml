@@ -25,10 +25,14 @@ chain:
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Latest stable release image is used by default"
+    - name: ENABLE_NETWORKSEGMENTATION
+      default: ""
+      documentation: "set as 'true' to enable the CustomNoUpgrade techpreview NetworkSegmentation feature"
     - name: CLOUD_PROVIDER
       default: "AWS"
       documentation: "The cloud provider to use for the management cluster"
     commands: |-
+      set -x
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
@@ -44,23 +48,61 @@ chain:
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
-      bin/hypershift create cluster aws \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-        --name=${CLUSTER_NAME} \
-        --region=us-east-1 \
-        --infra-id=${CLUSTER_NAME} \
-        --base-domain=${DOMAIN} \
-        --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-        --zones=${HYPERSHIFT_ZONES} \
-        --service-cidr=172.29.0.0/16 \
-        --cluster-cidr=10.124.0.0/14 \
-        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-        --node-selector=hypershift.openshift.io/control-plane=true \
-        --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-        --release-stream=${DEFAULT_RELEASE_STREAM} \
-        --namespace=${HYPERSHIFT_NAMESPACE}
+      COMMAND=(
+        bin/hypershift create cluster aws \
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --name=${CLUSTER_NAME} \
+          --region=us-east-1 \
+          --infra-id=${CLUSTER_NAME} \
+          --base-domain=${DOMAIN} \
+          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+          --zones=${HYPERSHIFT_ZONES} \
+          --service-cidr=172.29.0.0/16 \
+          --cluster-cidr=10.124.0.0/14 \
+          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+          --node-selector=hypershift.openshift.io/control-plane=true \
+          --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+          --release-stream=${DEFAULT_RELEASE_STREAM} \
+          --namespace=${HYPERSHIFT_NAMESPACE}
+      )
+      
+      # if we want NetworkSegmentation enabled we can render the cluster config
+      # to a yaml and add that feature. "oc apply" will create the cluster. else
+      # we can just run the ${COMMAND[@]} to create the cluster
+      
+      if [ "${ENABLE_NETWORKSEGMENTATION}" = "true" ]; then
+        # Render the cluster configuration to a YAML file
+        "${COMMAND[@]}" --render > "${SHARED_DIR}/cluster.yaml"
+        echo "The default cluster.yaml created using the --render flag"
+        cat ${SHARED_DIR}/cluster.yaml
+      
+        curl -L -o /tmp/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod +x /tmp/yq
+
+        /tmp/yq eval '
+            (. | select(.kind == "HostedCluster")) |= (
+              .spec.configuration.featureGate.featureSet = "CustomNoUpgrade" |
+              .spec.configuration.featureGate.customNoUpgrade.enabled = ["NetworkSegmentation"] |
+              .spec.configuration.featureGate.customNoUpgrade.disabled = []
+            )
+        ' -i "${SHARED_DIR}/cluster.yaml"
+        echo "The cluster.yaml after NetworkSegmentation config change"
+        cat ${SHARED_DIR}/cluster.yaml
+
+        # using 'oc apply' with the cluster.yaml doesn't automatically create the pull/etcd secret.
+        # doing it manually here first.  
+        oc create secret generic ${CLUSTER_NAME}-pull-secret \
+          --from-file=.dockerconfigjson=/etc/ci-pull-credentials/.dockerconfigjson \
+          --type=kubernetes.io/dockerconfigjson -n clusters
+        head -c 32 /dev/urandom > /tmp/encryption-key.bin
+        oc create secret generic ${CLUSTER_NAME}-etcd-encryption-key --from-file=key=/tmp/encryption-key.bin -n clusters
+      
+        oc apply -f "${SHARED_DIR}/cluster.yaml"
+      else
+        "${COMMAND[@]}"
+      fi
       
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
@@ -89,6 +131,22 @@ chain:
           oc get clusterversion 2>/dev/null || true
           sleep 1s
       done
+
+      # while debugging, it was seen that the below informational command outputs may fail briefly immediately
+      # after the cluster has been created. trying it a few times for 1m may run the commands multiple times,
+      # but in the case of failure, the extra output is worth it.
+      set +e
+      timeout 60s bash -c '
+          while true; do
+            oc get clusteroperators
+            oc get nodes -A
+            oc get pods -A
+            oc get featuregate cluster -o yaml
+            sleep 15
+        done
+      '
+      set -e
+      
       # Data for cluster bot.
       echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
     credentials:

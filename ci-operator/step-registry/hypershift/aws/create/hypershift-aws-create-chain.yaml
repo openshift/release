@@ -20,6 +20,9 @@ chain:
       documentation: |
         Specifies the AWS AZs to create the NodePools. If intentionally left as an empty string,  
         it defaults to an AZ utilized by the management cluster.
+    - name: ENABLE_NETWORKSEGMENTATION
+      default: ""
+      documentation: "set as 'true' to enable the CustomNoUpgrade techpreview NetworkSegmentation feature"
     - name: ENDPOINT_ACCESS
       default: "Public"
       documentation: "Access for control plane endpoints (Public, PublicAndPrivate, Private)"
@@ -96,14 +99,43 @@ chain:
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
       fi
-     
-      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
-        "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
-        exit 0
+      
+      # if we want NetworkSegmentation enabled we can render the cluster config
+      # to a yaml and add that feature. "oc apply" will create the cluster. else
+      # we can just run the ${COMMAND[@]} to create the cluster
+      
+      if [ "${ENABLE_NETWORKSEGMENTATION}" = "true" ]; then
+        # Render the cluster configuration to a YAML file
+        "${COMMAND[@]}" --render > "${SHARED_DIR}/cluster.yaml"
+      
+        echo "The default cluster.yaml created using the --render flag"
+        cat ${SHARED_DIR}/cluster.yaml
+        curl -L -o /tmp/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod +x /tmp/yq
+        /tmp/yq eval '
+            (. | select(.kind == "HostedCluster")) |= (
+              .spec.configuration.featureGate.featureSet = "CustomNoUpgrade" |
+              .spec.configuration.featureGate.customNoUpgrade.enabled = ["NetworkSegmentation"] |
+              .spec.configuration.featureGate.customNoUpgrade.disabled = []
+            )
+        ' -i "${SHARED_DIR}/cluster.yaml"
+        echo "The cluster.yaml after NetworkSegmentation config change"
+        cat ${SHARED_DIR}/cluster.yaml
+      
+        # using 'oc apply' with the cluster.yaml doesn't automatically create the clusters namespace
+        # or a pull/etcd secret. doing it manually here first.
+        oc create namespace clusters
+        oc create secret generic ${CLUSTER_NAME}-pull-secret \
+          --from-file=.dockerconfigjson=/etc/ci-pull-credentials/.dockerconfigjson \
+          --type=kubernetes.io/dockerconfigjson -n clusters
+        head -c 32 /dev/urandom > /tmp/encryption-key.bin
+        oc create secret generic ${CLUSTER_NAME}-etcd-encryption-key --from-file=key=/tmp/encryption-key.bin -n clusters
+      
+        oc apply -f "${SHARED_DIR}/cluster.yaml"
+      else
+        "${COMMAND[@]}"
       fi
       
-      "${COMMAND[@]}"
-
       set +e
       export CLUSTER_NAME
       timeout 25m bash -c '
@@ -111,6 +143,8 @@ chain:
             sleep 15
         done
       '
+      oc describe hostedcluster ${CLUSTER_NAME} -n clusters
+      
       if [[ $? -ne 0 ]]; then
         cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
       <?xml version="1.0" encoding="UTF-8"?>
@@ -142,9 +176,22 @@ chain:
       EOF
       fi
       set -e
-
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      # while debugging, it was seen that the below informational command outputs may fail briefly immediately
+      # after the cluster has been created. trying it a few times for 1m may run the commands multiple times,
+      # but in the case of failure, the extra output is worth it.
+      set +e
+      timeout 60s bash -c '
+          while true; do
+            oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig get clusteroperators
+            oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig get nodes -A
+            oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig get pods -A
+            oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig get featuregate cluster -o yaml
+            sleep 15
+        done
+      '
+      set -e
     from: hypershift-operator
     grace_period: 5m0s
     resources:
