@@ -121,6 +121,19 @@ function wait-for-nodes-to-be-ready {
   run-on-first-master-silent-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
 }
 
+cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+  echo "Waiting for lb-ext kubeconfig to be valid"
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  until oc get nodes; do sleep 10; done
+EOZ
+chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
+run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh && chmod a+x /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
+
+function wait-for-valid-lb-ext-kubeconfig {
+  run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
+}
+
 function pod-restart-workarounds {
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
