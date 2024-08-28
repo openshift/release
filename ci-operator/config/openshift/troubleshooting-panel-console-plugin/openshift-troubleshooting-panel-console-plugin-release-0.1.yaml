@@ -1,0 +1,38 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  to: troubleshooting-panel-console-plugin
+- dockerfile_path: Dockerfile.test
+  to: troubleshooting-panel-console-plugin-test
+promotion:
+  to:
+  - excluded_images:
+    - troubleshooting-panel-console-plugin-test
+    name: "0.1"
+    namespace: observability-ui
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint-frontend
+  container:
+    from: troubleshooting-panel-console-plugin-test
+- as: fips-image-scan
+  steps:
+    dependencies:
+      SCAN_IMAGE: troubleshooting-panel-console-plugin
+    test:
+    - ref: fips-check-image-scan
+zz_generated_metadata:
+  branch: release-0.1
+  org: openshift
+  repo: troubleshooting-panel-console-plugin

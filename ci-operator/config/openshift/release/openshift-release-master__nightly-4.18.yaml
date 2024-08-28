@@ -464,6 +464,30 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-multi-vcenter
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
+    workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-upi-multi-vcenter
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
+    workflow: openshift-e2e-vsphere-upi-multi-vcenter
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -1424,6 +1448,90 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial-cgroupsv1
+- as: e2e-vsphere-ipi-ovn-cgroupsv1-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-cgroupsv1
+- as: e2e-azure-ovn-cgroupsv1-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cgroupsv1
+- as: e2e-gcp-ovn-cgroupsv1-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-cgroupsv1
+- as: e2e-aws-ovn-cgroupsv1-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cgroupsv1
+- as: e2e-vsphere-ipi-ovn-crun-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-crun
+- as: e2e-azure-ovn-crun-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-crun
+- as: e2e-gcp-ovn-crun-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-crun
+- as: e2e-aws-ovn-crun-techpreview
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-crun
 zz_generated_metadata:
   branch: master
   org: openshift
