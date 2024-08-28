@@ -95,7 +95,7 @@ INGRESS_PODS_MOVED="false"
 for i in $(seq 0 60); do
   echo "Checking ingress pods, attempt ${i}"
   mapfile -t INGRESS_NODES < <(oc get pods -n openshift-ingress -o jsonpath='{.items[*].spec.nodeName}')
-  if [[ -z "$(echo "${INGRESS_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+  if [[ ! "${INGRESS_NODES[*]}" =~ "worker" ]]; then
     INGRESS_PODS_MOVED="true"
     echo "Ingress pods moved to infra nodes"
     break
@@ -130,7 +130,7 @@ REGISTRY_PODS_MOVED="false"
 for i in $(seq 0 60); do
   echo "Checking registry pods, attempt ${i}"
   mapfile -t REGISTRY_NODES < <(oc get pods -n openshift-image-registry -l docker-registry=default -o jsonpath='{.items[*].spec.nodeName}')
-  if [[ -z "$(echo "${REGISTRY_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+  if [[ ! "${REGISTRY_NODES[*]}" =~ "worker" ]]; then
     REGISTRY_PODS_MOVED="true"
     echo "Registry pods moved to infra nodes"
     break
@@ -185,7 +185,7 @@ MONITORING_PODS_MOVED="false"
 for i in $(seq 0 60); do
   echo "Checking monitoring pods, attempt ${i}"
   mapfile -t MONITORING_NODES < <(oc get pods -n openshift-monitoring -o jsonpath='{.items[*].spec.nodeName}' -l app.kubernetes.io/component=alert-router)
-  if [[ -z "$(echo "${MONITORING_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+  if [[ ! "${MONITORING_NODES[*]}" =~ "worker" ]]; then
     MONITORING_PODS_MOVED="true"
     echo "Monitoring pods moved to infra nodes"
     break
@@ -200,4 +200,4 @@ fi
 
 echo "Waiting for all pods to settle"
 sleep 5
-while [[ $(oc get pods --no-headers -A | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
+while [[ $(oc get pods --no-headers -A | grep -Pv "(Completed|Running|installer)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
