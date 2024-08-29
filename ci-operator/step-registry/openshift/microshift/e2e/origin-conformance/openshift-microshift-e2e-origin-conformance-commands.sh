@@ -1,8 +1,10 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+trap_subprocesses_on_term
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 MICROSHIFT_URL="https://${IP_ADDRESS}:6443"
