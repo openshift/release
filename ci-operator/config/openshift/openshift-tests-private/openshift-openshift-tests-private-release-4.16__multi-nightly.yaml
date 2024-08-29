@@ -222,28 +222,36 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-sno-etcd-encryption-arm-f2
-  cron: 24 16 13,18 * *
+- as: aws-ipi-sno-etcd-encryption-basecap-none-arm-f14
+  cron: 36 1 5,19 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+        MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
       OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
-- as: aws-ipi-sno-etcd-encryption-amd-f9-destructive
-  cron: 18 2 12,19 * *
+- as: aws-ipi-sno-etcd-encryption-basecap-none-amd-f28-destructive
+  cron: 32 22 9 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+        MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
@@ -1447,7 +1455,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
-- as: baremetal-ipi-ovn-ipv4-basecap-none-f28
+- as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f28
   cluster: build05
   cron: 12 15 29 * *
   steps:
@@ -1467,7 +1475,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-external-lb-f7
+- as: baremetal-ipi-ovn-ipv4-external-lb-arm-f14
   cluster: build05
   cron: 10 5 9,20 * *
   steps:
@@ -1485,7 +1493,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
-- as: baremetal-ipi-ovn-ipv4-arm-f7
+- as: baremetal-ipi-ovn-ipv4-arm-f14
   cluster: build05
   cron: 1 5 11,21 * *
   steps:
@@ -1503,7 +1511,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-amd-f7
+- as: baremetal-ipi-ovn-ipv4-amd-f14
   cluster: build05
   cron: 45 13 13,20 * *
   steps:
@@ -1521,6 +1529,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
+- as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f14
+  cluster: build05
+  cron: 45 4 8,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-upi-ovn-ipv4-arm-mixarch-f14-day2-64k-pagesize
   cluster: build05
   cron: 36 18 8,24 * *
@@ -1545,6 +1571,22 @@ tests:
     - ref: mco-conf-day2-kerneltype
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
+- as: baremetal-upi-ovn-ipv4-disconnected-proxy-arm-f14
+  cluster: build05
+  cron: 30 21 1,14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-install-disconnected-proxy
 - as: gcp-ipi-basecap-none-additionalcaps-amd-f28-destructive
   cron: 11 21 15 * *
   steps:
@@ -2048,57 +2090,6 @@ tests:
       WORKFLOW_TYPE: cucushift
       YQ_VERSION: 4.30.5
     workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
-- as: baremetal-upi-ovn-ipv4-disconnected-proxy-arm-f14
-  cluster: build05
-  cron: 30 21 1,14 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disconnected'
-      architecture: arm64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-upi-install-disconnected-proxy
-- as: baremetal-ipi-ovn-ipv4-amd-vmedia-f7
-  cluster: build05
-  cron: 37 20 7,25 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      MULTI_RELEASE_IMAGE: release:multi-latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-ipi-virtual-media
-- as: baremetal-ipi-ovn-ipv4-fips-amd-vmedia-f7
-  cluster: build05
-  cron: 45 4 8,26 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      MULTI_RELEASE_IMAGE: release:multi-latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FIPS_ENABLED: "true"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

@@ -24,6 +24,11 @@ promotion:
     name: 4.16-priv
     namespace: ocp-private
 releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
   nightly-amd64:
     candidate:
       product: ocp
@@ -42,9 +47,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.16-priv
-  namespace: ocp-private
 tests:
 - as: verify
   steps:
@@ -91,21 +93,6 @@ tests:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
-- as: microshift-metal-cache
-  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
-  steps:
-    cluster_profile: aws
-    env:
-      MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-metal-cache
-- as: microshift-metal-cache-arm
-  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
-      MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-metal-cache
 - as: metal-periodic-test
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:

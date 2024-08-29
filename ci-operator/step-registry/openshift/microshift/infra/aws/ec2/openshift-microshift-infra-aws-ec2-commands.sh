@@ -1,13 +1,12 @@
 #!/bin/bash
+set -xeuo pipefail
 
-set -x
-set -o nounset
-set -o errexit
-set -o pipefail
-export PS4='+ $(date "+%T.%N") \011'
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+trap_subprocesses_on_term
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save stacks events
+# Save stacks events
 trap 'save_stack_events_to_shared' EXIT TERM INT
 
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
