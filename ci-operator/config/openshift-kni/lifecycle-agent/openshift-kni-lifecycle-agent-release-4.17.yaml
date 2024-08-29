@@ -1,0 +1,133 @@
+base_images:
+  installer:
+    name: "4.17"
+    namespace: ocp
+    tag: installer
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: ubi9-minimal
+  to: lifecycle-agent-operator
+- dockerfile_path: bundle.Dockerfile
+  to: lifecycle-agent-operator-bundle
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
+    with: pipeline:lifecycle-agent-operator
+promotion:
+  to:
+  - name: "4.17"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: |
+    unset VERSION
+    make ci-job
+  container:
+    from: src
+- always_run: false
+  as: integration
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
+      OO_PACKAGE: lifecycle-agent
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-lifecycle-agent-main
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name lifecycle-agent
+        ci-org-name openshift-kni
+    test:
+    - as: integration
+      cli: latest
+      commands: |
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: ibu-e2e-flow
+  cluster: build02
+  optional: true
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.17"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.16"
+      SEED_IMAGE_TAG_FORMAT: release
+    workflow: openshift-image-based-upgrade-presubmit
+  timeout: 4h0m0s
+- as: ibi-e2e-flow
+  cluster: build02
+  optional: true
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.17"
+      SEED_IMAGE_TAG_FORMAT: release
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+  timeout: 3h0m0s
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: lifecycle-agent
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-kni
+  repo: lifecycle-agent
