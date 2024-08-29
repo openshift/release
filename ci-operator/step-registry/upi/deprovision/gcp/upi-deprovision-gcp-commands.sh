@@ -36,6 +36,7 @@ echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 # return 0 if OCP version >= the minimum version, otherwise 1
 function version_check() {
   local -r minimum_version="$1"
+  local ret
 
   dir=$(mktemp -d)
   pushd "${dir}"
@@ -43,6 +44,7 @@ function version_check() {
   cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
   KUBECONFIG="" oc registry login --to pull-secret
   ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  rm pull-secret
 
   echo "[DEBUG] minimum OCP version: '${minimum_version}'"
   echo "[DEBUG] current OCP version: '${ocp_version}'"
@@ -51,7 +53,7 @@ function version_check() {
   min_x=$(echo "${minimum_version}" | cut -d. -f1)
   min_y=$(echo "${minimum_version}" | cut -d. -f2)
 
-  if [ ${curr_x} -ge ${min_x} ] && [ ${curr_y} -ge ${min_y} ]; then
+  if [ ${curr_x} -gt ${min_x} ] || ( [ ${curr_x} -eq ${min_x} ] && [ ${curr_y} -ge ${min_y} ] ); then
     echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
     ret=0
   else
@@ -59,7 +61,6 @@ function version_check() {
     ret=1
   fi
 
-  rm pull-secret
   popd
   return ${ret}
 }

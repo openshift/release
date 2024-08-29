@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.1
   ocp_4.17_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -7,19 +11,21 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
+  use_build_cache: true
 canonical_go_repository: github.com/openshift/vertical-pod-autoscaler-operator
 images:
-- inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
-  to: vertical-pod-autoscaler-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  dockerfile_path: Dockerfile
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -27,7 +33,17 @@ images:
     openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
-  to: vpa-operator-registry
+  to: vertical-pod-autoscaler-operator
+operator:
+  bundles:
+  - as: vertical-pod-autoscaler-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-vertical-pod-autoscaler-operator.*
+    with: pipeline:vertical-pod-autoscaler-operator
+  - pullspec: quay.io/openshift/origin-vertical-pod-autoscaler.*
+    with: stable:vertical-pod-autoscaler
 promotion:
   to:
   - name: 4.19-priv
@@ -42,6 +58,11 @@ releases:
       include_built_images: true
       name: 4.19-priv
       namespace: ocp-private
+  multilatest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -49,25 +70,30 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: NO_DOCKER=1 make test
+  commands: make test
   container:
     from: src
 - as: manifest-diff
-  commands: IS_CONTAINER=TRUE make manifest-diff
+  commands: make manifest-diff
   container:
     from: src
 - as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
+  commands: make fmt
   container:
     from: src
 - as: govet
-  commands: IS_CONTAINER=TRUE make vet
+  commands: make vet
   container:
     from: src
-- as: golint
-  commands: IS_CONTAINER=TRUE make lint
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
   container:
-    from: src
+    clone: true
+    from: golangci-lint
 - as: security
   optional: true
   steps:
@@ -82,12 +108,8 @@ tests:
       cli: latest
       commands: make e2e-ci
       dependencies:
-      - env: CI_OPERATOR_IMAGE
+      - env: OPERATOR_IMG
         name: vertical-pod-autoscaler-operator
-      - env: CI_OPERAND_IMAGE
-        name: vertical-pod-autoscaler
-      - env: CI_REGISTRY_IMAGE
-        name: vpa-operator-registry
       from: src
       resources:
         requests:
@@ -97,21 +119,43 @@ tests:
   steps:
     cluster_profile: aws
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create ns openshift-vertical-pod-autoscaler
+        operator-sdk run bundle --timeout=10m -n openshift-vertical-pod-autoscaler --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-vertical-pod-autoscaler deployment/vertical-pod-autoscaler-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: vertical-pod-autoscaler-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make e2e-olm-ci
-      dependencies:
-      - env: CI_OPERATOR_IMAGE
-        name: vertical-pod-autoscaler-operator
-      - env: CI_OPERAND_IMAGE
-        name: vertical-pod-autoscaler
-      - env: CI_REGISTRY_IMAGE
-        name: vpa-operator-registry
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: scorecard
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multilatest
+    test:
+    - as: test
+      cli: latest
+      commands: make test-scorecard
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

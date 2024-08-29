@@ -274,7 +274,7 @@ build_farm_credentials_folder:
 
 update-ci-build-clusters:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_cluster-init_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_cluster-init_latest -release-repo=/release -create-pr=false -update=true
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_cluster-init_latest --release-repo=/release --create-pr=false --update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:

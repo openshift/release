@@ -36,6 +36,43 @@ images:
 - build_args:
   - name: TAGS
     value: scos
+  dockerfile_path: images/infrastructure-providers/Dockerfile
+  from: origin_scos-4.18_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - linuxarmbuilder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: installer-terraform-providers
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: origin_scos-4.18_base-stream9
+  inputs:
+    installer-terraform-providers:
+      as:
+      - providers
+      - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    origin_scos-4.18_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:cli
+    origin_scos-4.18_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
+    origin_scos-4.18_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: scos
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: origin_scos-4.18_base-stream9
   inputs:
@@ -97,17 +134,6 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: images/infrastructure-providers/Dockerfile
-  from: origin_scos-4.18_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - linuxarmbuilder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: installer-terraform-providers
-- build_args:
-  - name: TAGS
-    value: scos
   dockerfile_path: images/installer/Dockerfile.ci
   from: origin_scos-4.18_base-stream9
   inputs:
@@ -128,32 +154,6 @@ images:
       - kas-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
   to: installer
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: origin_scos-4.18_base-stream9
-  inputs:
-    installer-terraform-providers:
-      as:
-      - providers
-      - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    origin_scos-4.18_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:cli
-    origin_scos-4.18_installer-etcd-artifacts:
-      as:
-      - etcd-artifacts
-      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    origin_scos-4.18_installer-kube-apiserver-artifacts:
-      as:
-      - kas-artifacts
-      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-  to: upi-installer
 promotion:
   to:
   - name: scos-4.18

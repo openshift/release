@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-arch-builder-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multi-arch-builder-controller
+  template:
+    metadata:
+      labels:
+        app: multi-arch-builder-controller
+    spec:
+      serviceAccountName: multi-arch-builder-controller
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+      - name: multi-arch-builder-controller
+        image: multi-arch-builder-controller:latest
+        args:
+        - --dry-run=false
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: docker-config
+          mountPath: /.docker/config.json
+          subPath: .dockerconfigjson
+          readOnly: true
+      volumes:
+      - name: docker-config
+        secret:
+          secretName: multi-arch-builder-controller-build11-registry-credentials
