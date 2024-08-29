@@ -224,6 +224,7 @@ else
     source $HOME/golang-1.22.4
 fi
 
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
