@@ -19,12 +19,23 @@ function save_stack_events_to_artifacts()
   set -o errexit
 }
 
+function aws_add_param_to_json() {
+    local k="$1"
+    local v="$2"
+    local param_json="$3"
+    if [ ! -e "$param_json" ]; then
+        echo -n '[]' > "$param_json"
+    fi
+    cat <<< "$(jq  --arg k "$k" --arg v "$v" '. += [{"ParameterKey":$k, "ParameterValue":$v}]' "$param_json")" > "$param_json"
+}
+
 # Using source region for C2S and SC2S
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
 fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
+bastion_params="${ARTIFACT_DIR}/bastion_params.json"
 # 1. get vpc id and public subnet
 if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; then
   if [[ ! -f ${SHARED_DIR}/metadata.json ]]; then
@@ -37,6 +48,12 @@ if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; 
   echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
   VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
   PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
+
+  ControlPlaneSecurityGroup=$(aws --region ${REGION} ec2 describe-security-groups --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=${infra_id}-controlplane" --query 'SecurityGroups[0].GroupId' --output text)
+  echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
+  if [[ ${ControlPlaneSecurityGroup} != "" ]] && [[ ${ControlPlaneSecurityGroup} != "None" ]]; then
+    aws_add_param_to_json "ControlPlaneSecurityGroup" ${ControlPlaneSecurityGroup} "$bastion_params"
+  fi
 else
   VpcId=$(cat "${SHARED_DIR}/vpc_id")
   PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
@@ -48,7 +65,6 @@ stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 bastion_cf_tpl_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion-cf-tpl.yaml"
-
 
 if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   # create bastion host dynamicly
@@ -109,6 +125,10 @@ Parameters:
   PublicSubnet:
     Description: The subnets (recommend public) to launch the registry nodes into
     Type: AWS::EC2::Subnet::Id
+  ControlPlaneSecurityGroup:
+    Description: Control plane security group
+    Type: String
+    Default: ""
   BastionHostInstanceType:
     Default: t2.medium
     Type: String
@@ -136,6 +156,7 @@ Metadata:
 
 Conditions:
   UseIgnition: !Not [ !Equals ["NA", !Ref BastionIgnitionLocation] ]
+  HasControlPlaneSecurityGroupSet: !Not [ !Equals ["", !Ref ControlPlaneSecurityGroup] ]
 
 Resources:
   BastionIamRole:
@@ -220,7 +241,8 @@ Resources:
       - AssociatePublicIpAddress: "True"
         DeviceIndex: "0"
         GroupSet:
-        - !GetAtt BastionSecurityGroup.GroupId
+          - !GetAtt BastionSecurityGroup.GroupId
+          - !If [ "HasControlPlaneSecurityGroupSet", !Ref "ControlPlaneSecurityGroup", !Ref "AWS::NoValue"]
         SubnetId: !Ref "PublicSubnet"
       Tags:
       - Key: Name
@@ -266,17 +288,18 @@ EOF
 
 # create bastion instance bucket
 echo -e "==== Start to create bastion host ===="
+aws_add_param_to_json "VpcId" ${VpcId} "$bastion_params"
+aws_add_param_to_json "BastionHostInstanceType" ${BastionHostInstanceType} "$bastion_params"
+aws_add_param_to_json "Machinename" ${stack_name} "$bastion_params"
+aws_add_param_to_json "PublicSubnet" ${PublicSubnet} "$bastion_params"
+aws_add_param_to_json "AmiId" ${ami_id} "$bastion_params"
+aws_add_param_to_json "BastionIgnitionLocation" ${ign_location} "$bastion_params"
+
 echo ${stack_name} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --template-body file://${bastion_cf_tpl_file} \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameters \
-        ParameterKey=VpcId,ParameterValue="${VpcId}"  \
-        ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
-        ParameterKey=Machinename,ParameterValue="${stack_name}"  \
-        ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
-        ParameterKey=AmiId,ParameterValue="${ami_id}" \
-        ParameterKey=BastionIgnitionLocation,ParameterValue="${ign_location}"  &
+    --parameters file://${bastion_params} &
 
 wait "$!"
 echo "Created stack"
