@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-harness-build
+  container:
+    from: src
+  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
+- as: lint
+  commands: |
+    export HOME=$(mktemp -d)
+    export REPORT_DIR=/tmp/artifacts
+    make lint
+  container:
+    from: src
+  skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: osd-example-operator

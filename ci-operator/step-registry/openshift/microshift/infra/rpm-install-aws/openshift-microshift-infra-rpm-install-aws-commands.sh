@@ -1,24 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+ci_script_prologue
+trap_subprocesses_on_term
 
 cat << EOF > /tmp/config.yaml
 apiServer:
@@ -35,9 +22,8 @@ cat <<EOF > /tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
 
-sudo subscription-manager register \
-  --org="$(cat /var/run/rhsm/subscription-manager-org)" \
-  --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
+source /tmp/ci-functions.sh
+ci_subscription_register
 
 sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
@@ -50,7 +36,10 @@ chmod +x /tmp/install.sh
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
+  /tmp/ci-functions.sh \
   /tmp/install.sh \
+  /var/run/rhsm/subscription-manager-org \
+  /var/run/rhsm/subscription-manager-act-key \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
   /tmp/microshift.tgz \
   /tmp/config.yaml \

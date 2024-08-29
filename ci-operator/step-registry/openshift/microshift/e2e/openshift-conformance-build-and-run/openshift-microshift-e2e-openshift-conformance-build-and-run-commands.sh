@@ -1,26 +1,15 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -xeuo pipefail
 
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+ci_script_prologue
+
 DEST_DIR="/tmp/conformance"
 ROOT_DIR="/home/${HOST_USER}/microshift"
 
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
-
-cat > /tmp/run.sh << EOF
+cat > /tmp/run.sh <<EOF
 set -xe
 if [[ "$JOB_TYPE" == "presubmit" ]]; then
     export MICROSHIFT_SKIP_MONITOR_TESTS=true
