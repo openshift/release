@@ -130,7 +130,7 @@ if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"Ext
     cat > "${PATCH}" << EOF
 platform:
   azure:
-    baseDomainResourceGroupName: "${BASE_DOMAIN_RESOURCE_GROUP}"
+    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
