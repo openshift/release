@@ -556,6 +556,7 @@ function pre-OCP-60397(){
 
 function defer-OCP-60397(){
     echo "Defer Recovery: ${FUNCNAME[0]}"
+    oc adm upgrade --clear || true
     set_upstream_graph "${upstream:-empty}"
     switch_channel "candidate"
 }
