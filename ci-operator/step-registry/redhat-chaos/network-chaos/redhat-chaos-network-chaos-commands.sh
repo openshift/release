@@ -19,19 +19,11 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 export KUBECONFIG=/tmp/config
-export DURATION=$DURATION
-export NODE_NAME=$NODE_NAME
-export LABEL_SELECTOR=$LABEL_SELECTOR
-export INSTANCE_COUNT=$INSTANCE_COUNT
-export INTERFACES=$INTERFACES
-export EXECUTION=$EXECUTION
-export EGRESS=$EGRESS
+
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
-export NETWORK_PARAMS=$NETWORK_PARAMS
-export WAIT_DURATION=$WAIT_DURATION
 
 ./network-chaos/prow_run.sh
 rc=$?

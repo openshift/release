@@ -15,6 +15,7 @@ python ci-operator/config/openshift/openshift-tests-private/tools/get_missed_upg
 import re
 import subprocess
 import sys
+import yaml 
 
 def get_jobs(yaml_file):
     """Get all jobs from a Prow job config file
@@ -54,31 +55,35 @@ def get_missed_profiles(e2e_jobs, upgrade_jobs, mode='y'):
     """
     missed_profiles = []
     common_skipped_profiles=[
-        'agent',
+        '-agent',
         'alibaba',
-        'aro',
-        'cloud',
+        '-aro',
+        '-cloud',
         'day2-64k-pagesize',
         'destructive',
         'disasterrecovery',
         'disconnecting',
         'fips-check',
-        'hive',
+        '-hive',
         'hypershift',
         'longduration',
-        'mco',
+        '-mco',
+        'migrate',
+        'migration',
         'netobserv',
         'nokubeadmin',
-        'ocm',
-        'regen',
-        'rhel',
-        'rosa',
+        '-obo',
+        '-ocm',
+        '-regen',
+        '-rhel',
+        '-rosa',
         'security-profiles-operator',
-        'stress',
+        '-stress',
         'to-multiarch',
-        'ui',
-        'winc',
-        'wrs'
+        '-ppc64le',
+        '-ui',
+        '-winc',
+        '-wrs'
     ]
     if mode == 'y':
         common_skipped_profiles.append('tp')
@@ -100,18 +105,69 @@ def get_missed_profiles(e2e_jobs, upgrade_jobs, mode='y'):
                 
     return missed_profiles
 
+def addtional_check(e2e_yaml_file, upgrade_yaml_file, missed_jobs):
+    """
+    Additional check on the missed jobs.
+    
+    Args:
+        e2e_yaml_file: e2e yaml file
+        upgrade_yaml_file: upgrade yaml file
+        missed_jobs: the missed job list which get from get_missed_profiles()
+    Returns:
+        Job name list, the jobs may not exact correct, need manual check.
+        for example:
+            - as: vsphere-upi-platform-external-f28
+            - as: vsphere-upi-platform-none-f28
+            - as: vsphere-upi-zones-f28
+    """
+    jobs = []
+    if "multi" in upgrade_yaml_file:
+        for job in missed_jobs:
+            if "-disc" in job and "-mixarch" in job:
+                # it's better to skip the jobs which is a combination of disconnected and mixarch
+                # for example: aws-ipi-disc-priv-arm-mixarch-f7
+                continue
+            
+            jobs.append(job)
+    else:
+        jobs = [x for x in missed_jobs]
+    
+
+    with open(e2e_yaml_file, 'r') as file:
+        e2e_config = yaml.safe_load(file)
+        tests = e2e_config["tests"]
+    
+    for job in jobs:
+        e2e_job_name = job.replace("- as: ", '')
+        filtered_job = list(filter(lambda x: x.get('as') == e2e_job_name, tests))[0]
+        steps = filtered_job.get("steps")
+        if steps.get("env") and \
+            steps.get("env").get("FEATURE_SET") and \
+            steps.get("env").get("FEATURE_SET") == "CustomNoUpgrade":
+            jobs.remove(job)
+            
+    minor_version = int(upgrade_yaml_file.split("__")[0].split("openshift-openshift-tests-private-release-")[1].split(".")[1])
+    if minor_version > 15:
+        for job in jobs:
+            if "sdn" in job:
+                jobs.remove(job)
+    return jobs
+    
 
 if __name__ == "__main__":
     args = sys.argv
     if len(args) < 3:
         raise Exception("Missing e2e config file or upgrade config file")
+    e2e_yaml = args[1]
+    upgrade_yaml = args[2]
     
-    e2e_jobs = get_jobs(args[1])
-    upgrade_jobs = get_jobs(args[2])
+    e2e_jobs = get_jobs(e2e_yaml)
+    upgrade_jobs = get_jobs(upgrade_yaml)
     
     # upgrade mode, y means y version upgrade, z means z version upgrade
     mode = args[3] if len(args) == 4 else 'y'
 
     missed_jobs = get_missed_profiles(e2e_jobs, upgrade_jobs, mode=mode)
+    missed_jobs = addtional_check(e2e_yaml, upgrade_yaml, missed_jobs=missed_jobs)
     missed_jobs.sort()
     print('\n'.join(missed_jobs))

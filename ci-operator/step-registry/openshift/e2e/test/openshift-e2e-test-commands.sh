@@ -47,6 +47,9 @@ fi
 if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
     export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 fi
+if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]] && [[ -e "${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}" ]]; then
+    export TEST_OCP_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 

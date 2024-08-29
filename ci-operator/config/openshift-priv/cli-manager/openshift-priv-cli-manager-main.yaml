@@ -1,6 +1,6 @@
 base_images:
   ocp_4.17_base-rhel9:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -22,7 +22,7 @@ images:
   to: cli-manager
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.18-priv
     namespace: ocp-private
 resources:
   '*':
@@ -30,7 +30,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.17-priv
+  name: 4.18-priv
   namespace: ocp-private
 tests:
 - as: verify
@@ -41,10 +41,19 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: fips-image-scan-cli-manager
+  steps:
+    dependencies:
+      SCAN_IMAGE: cli-manager
+    test:
+    - ref: fips-check-image-scan
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
     test:
+    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
       commands: make test-e2e

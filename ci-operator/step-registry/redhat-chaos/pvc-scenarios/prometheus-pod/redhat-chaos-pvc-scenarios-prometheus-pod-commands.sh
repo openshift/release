@@ -9,7 +9,6 @@ oc projects
 python3 --version
 
 function cluster_monitoring_config(){
-
 oc apply -f- <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -21,16 +20,20 @@ data:
     prometheusK8s:
       volumeClaimTemplate:
         spec:
-          storageClassName: gp3-csi
+          storageClassName: $DEFAULT_STORAGE_CLASS
           resources:
             requests:
               storage: 2Gi
 EOF
 }
 
+#Check Storage Class
+echo "Checking Storage Class"
+DEFAULT_STORAGE_CLASS=$(oc get storageclass -o json | jq -r '.items[] | select(.metadata.annotations."storageclass.kubernetes.io/is-default-class" == "true") | .metadata.name')
+echo "Default Storage Class is $DEFAULT_STORAGE_CLASS"
 #Create PV and PVC for prometheus
 echo "Creating PV and PVC"
-cluster_monitoring_config
+cluster_monitoring_config $DEFAULT_STORAGE_CLASS
 echo "Sleeping for 60 seconds for the PV and PVC to be bound"
 sleep 60
 
@@ -45,10 +48,6 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ELASTIC_INDEX=krkn_chaos_ci
 
 export KUBECONFIG=/tmp/config
-export PVC_NAME=$PVC_NAME
-export POD_NAME=$POD_NAME     
-export FILL_PERCENTAGE=$FILL_PERCENTAGE
-export DURATION=$DURATION
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
@@ -76,7 +75,8 @@ if [ -z "$PVC_CHECK" ]; then
     ELAPSED=$((ELAPSED + INTERVAL))
   done
   if [ -z "$PVC_CHECK" ]; then
-    echo "PVC '$PVC_NAME' did not appear in namespace '$NAMESPACE' within the timeout period of $TIMEOUT seconds."
+    echo "PVC '$PVC_NAME' did not appear in namespace '$NAMESPACE' within the timeout period of $TIMEOUT seconds. Exiting"
+    exit 1
   fi
 else
   echo "PVC '$PVC_NAME' exists in namespace '$NAMESPACE'."

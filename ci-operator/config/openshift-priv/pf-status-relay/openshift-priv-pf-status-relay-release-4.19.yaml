@@ -1,0 +1,53 @@
+base_images:
+  ocp_4.17_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/pf-status-relay
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: pf-status-relay
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: pf-status-relay
