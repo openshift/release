@@ -764,29 +764,21 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
-  node_architecture: arm64
 - as: codegen
-  cluster: build10
   commands: make verify-gen
   container:
     from: src
-  node_architecture: arm64
 - as: format
-  cluster: build10
   commands: make format
   container:
     from: src
-  node_architecture: arm64
 - as: integration
-  cluster: build10
   commands: make integration
   container:
     from: test-bin
-  node_architecture: arm64
 - always_run: false
   as: e2e
   steps:
@@ -859,7 +851,7 @@ tests:
     test:
     - as: e2e-oo-post
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -876,36 +868,31 @@ tests:
       - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        namespace: test-credentials
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
   commands: make check-breaking-changes
   container:
     from: test-bin
-  node_architecture: arm64
   optional: true
 - as: checkconfig
-  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
-  node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
   commands: make validate-vendor
   container:
     from: src
-  node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
-  node_architecture: arm64
 - as: lint
   commands: make lint
   container:

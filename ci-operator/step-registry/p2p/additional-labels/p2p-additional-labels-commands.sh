@@ -18,7 +18,8 @@ for operator_value in $operator_configs; do
     operator_value=$(extract_operator_config "$operator_value")
     if [ "${operator_value}" ]; then
         name=$(echo $operator_value | sed -E 's/.*name=([^;]+);.*/\1/')
-        version=$(oc get csv -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
+        namespace=$(echo $operator_value | sed -E 's/.*namespace=([^;]+);?.*/\1/')
+        version=$(oc get csv -n "$namespace" -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
         echo "$name-v$version" >> "${SHARED_DIR}/firewatch-additional-labels"
     fi
 done
