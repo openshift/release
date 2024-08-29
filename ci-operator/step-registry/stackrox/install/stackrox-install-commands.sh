@@ -235,7 +235,8 @@ function create_cr() {
   curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml"
   { diff "${app}-cr.yaml" "new.${app}-cr.yaml" || true; } \
     | grep -v password
-  oc apply -f "${app}-cr.yaml"
+  oc apply -f "${app}-cr.yaml" \
+    || oc apply -f "${app}-cr.yaml" --overwrite=true
   set -e
 }
 
@@ -275,7 +276,7 @@ function wait_deploy() {
 
 function wait_pods_running() {
   retry oc get pods "${@}" --field-selector="status.phase==Running" \
-    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
+    -o jsonpath="{.items[0].metadata.name}" 2>&1 \
     || { oc get pods "${@}"; return 1; }
 }
 
