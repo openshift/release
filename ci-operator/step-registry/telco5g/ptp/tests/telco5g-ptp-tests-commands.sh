@@ -275,6 +275,10 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
+
+# update golang version to latest master 1.22.4 to build test code.
+source $HOME/golang-1.22.4
+
 git clone https://github.com/nishant-parekh/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
