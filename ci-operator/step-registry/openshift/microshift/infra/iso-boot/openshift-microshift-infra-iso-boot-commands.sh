@@ -1,6 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+ci_script_prologue
+trap_subprocesses_on_term
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
@@ -67,22 +72,7 @@ EOF
 EOF
 }
 
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+trap 'finalize' EXIT
 
 # Install the settings for the scenario runner.  The ssh keys have
 # already been copied into place in the iso-build step.
@@ -92,11 +82,6 @@ SSH_PUBLIC_KEY=\${HOME}/.ssh/id_rsa.pub
 SSH_PRIVATE_KEY=\${HOME}/.ssh/id_rsa
 EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
-
-trap 'finalize' EXIT
-# Call wait regardless of the outcome of the kill command, in case some of the children are finished
-# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 # Determine the tests to run depending on the job name and type.
 # Exclude long-running tests from presubmit jobs.

@@ -1,25 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+ci_script_prologue
+trap_subprocesses_on_term
 
 cat <<EOF >/tmp/config.yaml
 apiServer:
@@ -32,7 +18,14 @@ MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
 cat <<'EOF' >/tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
+
+source /tmp/ci-functions.sh
+ci_subscription_register
+download_microshift_scripts
+
+hash git || "${DNF_RETRY}" "install" "git-core"
+
+source /tmp/microshift-clusterbot-settings
 
 enable_mirror_repo() {
     local -r url="${1}"
@@ -45,20 +38,6 @@ gpgcheck=0
 skip_if_unavailable=0
 2EOF2
 }
-
-DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
-curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"
-chmod 755 "${DNF_RETRY}"
-
-source /tmp/microshift-clusterbot-settings
-
-if ! sudo subscription-manager status >&/dev/null; then
-    sudo subscription-manager register \
-        --org="$(cat /tmp/subscription-manager-org)" \
-        --activationkey="$(cat /tmp/subscription-manager-act-key)"
-fi
-
-hash git || "${DNF_RETRY}" "install" "git-core"
 
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml
@@ -126,6 +105,7 @@ chmod +x /tmp/install.sh
 
 scp \
     "${MICROSHIFT_CLUSTERBOT_SETTINGS}" \
+    /tmp/ci-functions.sh \
     /tmp/install.sh \
     /tmp/config.yaml \
     /var/run/rhsm/subscription-manager-org \
