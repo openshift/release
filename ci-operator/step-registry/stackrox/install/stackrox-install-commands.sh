@@ -66,7 +66,7 @@ function get_roxctl() {
   os=${2:-linux}
   arch=${3:+-}${3:-}
   # https://mirror.openshift.com/pub/rhacs/assets/latest/bin/linux/
-  curl "https://mirror.openshift.com/pub/rhacs/assets/${release}/bin/${os}/roxctl${arch}" --output roxctl
+  curl "https://mirror.openshift.com/pub/rhacs/assets/${version}/bin/${os}/roxctl${arch}" --output roxctl
   chmod +x roxctl
 }
 
