@@ -148,18 +148,7 @@ function handle_result {
         return
     fi 
     rm -fr ${resultfile}
-    echo ${newresultfile}
-
- ## Copy quay operator logs to ARTIFACT_DIR
-    quayoperatorlogfile=`ls -rt -1 /tmp/*quayoperatorlogs.txt 2>&1 || true`
-    echo $quayoperatorlogfile
-
-    if (echo $quayoperatorlogfile | grep -E "no matches found") || (echo $quayoperatorlogfile | grep -E "No such file or directory") ; then
-        echo "there is no operator log file generated"
-        return
-    fi
-    cp $quayoperatorlogfile ${ARTIFACT_DIR}/ || true
-    
+ 
 }
 
 handle_result
