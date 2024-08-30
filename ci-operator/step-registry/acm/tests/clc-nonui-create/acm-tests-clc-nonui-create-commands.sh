@@ -34,6 +34,9 @@ export CLC_OCP_IMAGE_VERSION
 CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
+GH_TOKEN=$(cat $SECRETS_DIR/clc/token)
+export GH_TOKEN 
+
 # run the test execution script
 bash +x ./execute_clc-nonui_interop_commands.sh
 
