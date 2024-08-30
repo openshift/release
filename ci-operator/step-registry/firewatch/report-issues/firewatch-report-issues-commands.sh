@@ -38,6 +38,5 @@ if [ -f "${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
 fi
 
 echo $report_command
-sleep 7200
 
 eval "$report_command"
