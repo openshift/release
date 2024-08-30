@@ -17,11 +17,11 @@ SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
 
 
-HOME=/home/$(whoami)
+HOME=$(pwd)
 mkdir -p $HOME/.ssh
 
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
-SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
+SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR"
 
 ###################### DEBUG SSH KEY ############################
 echo "** whoami **"
