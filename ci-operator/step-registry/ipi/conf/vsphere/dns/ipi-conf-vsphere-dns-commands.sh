@@ -1,5 +1,47 @@
 #!/bin/bash
 
+dns_reserve_and_defer_cleanup() {
+  idx=$1
+  hostname=$2
+
+  if [ "${JOB_NAME_SAFE}" = "launch" ]; then
+    if [ "$idx" -eq 0 ]; then
+      # api dns target
+      # setup DNS records for clusterbot to point to the IBM VIP
+      dns_target='"TTL": 60,
+      "ResourceRecords": [{"Value": "[{"Value": "vsphere-clusterbot-2284482-dal12.clb.appdomain.cloud"}]'
+    elif [ "$idx" -eq 1 ]; then
+      # apps dns target
+      dns_target='"TTL": 60,
+      "ResourceRecords": [{"Value": "vsphere-clusterbot-2284482-dal12.clb.appdomain.cloud"}]'
+    fi 
+  else
+    dns_target='"TTL": 60,
+    "ResourceRecords": [{"Value": "'${vips[$idx]}'"}]'
+  fi 
+
+  json_create="{
+    \"Action\": \"UPSERT\",
+    \"ResourceRecordSet\": {
+      \"Name\": \"$hostname\",
+      \"Type\": \"$RECORD_TYPE\",
+      $dns_target
+    }
+  }"
+  jq --argjson jc "$json_create" '.Changes += [$jc]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-create.json
+
+  json_delete="{
+    \"Action\": \"DELETE\",
+    \"ResourceRecordSet\": {
+      \"Name\": \"$hostname\",
+      \"Type\": \"A\",
+      $dns_target
+    }
+  }"
+  jq --argjson jd "$json_delete" '.Changes += [$jd]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-delete.json
+
+}
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -9,6 +51,42 @@ echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
+
+if [ "${VSPHERE_ADDITIONAL_CLUSTER}" = "true" ]; then
+  source "${SHARED_DIR}/vsphere_context.sh"
+  source "${SHARED_DIR}/govc.sh"
+
+  network_name="$(jq -r '.metadata.name' ${SHARED_DIR}/NETWORK_single.json)" #FIXME confirm
+
+  echo "1) $GOVC_DATACENTER, 2) $GOVC_DATASTORE, 3) $network_name, 4) $VCENTER"
+
+
+  # Spoke
+  cluster_name_spoke="hive-$(uuidgen | tr '[:upper:]' '[:lower:]')"
+  cluster_domain_spoke="${cluster_name_spoke}.${base_domain}"
+
+  # FIXME: temporary workaround
+  env_file="${SHARED_DIR}/vsphere_env.txt"
+  echo "#!/bin/bash" > "$env_file"
+
+  echo "export CLUSTER_NAME=$cluster_name_spoke" > $env_file
+  echo "export BASE_DOMAIN=$base_domain" > $env_file
+  echo "export NETWORK_NAME=$network_name" > $env_file
+  echo "export VSPHERE_CLUSTER=DEVQEcluster" > $env_file
+  echo "export VCENTER=$VCENTER" > $env_file
+
+  # Export creds created in ipi-conf-vsphere-check-vcm-commands.sh
+  echo "export GOVC_USERNAME=$GOVC_USERNAME" > "$env_file"
+  echo "export GOVC_PASSWORD=$GOVC_PASSWORD" > "$env_file"
+  echo "export GOVC_TLS_CA_CERTS=$GOVC_TLS_CA_CERTS" > "$env_file"
+
+  echo "export GOVC_DATACENTER=$GOVC_DATACENTER"> "$env_file"
+  echo "export GOVC_DATASTORE=$GOVC_DATASTORE"> "$env_file"
+
+  chmod +x "$env_file"
+  # FIXME what hive spoke information must be saved for hub?
+
+fi
 
 export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
@@ -70,12 +148,33 @@ else
   apps_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
 fi
 
+
+
+HOSTNAMES=("api.$cluster_domain." "*.apps.$cluster_domain.")
+if [ "$HIVE" -eq 1 ]; then # FXIME BOOLEAN
+  # Add spoke cluster domain to hostnames in order to provision extra hive cluster
+  HOSTNAMES+=("api.$cluster_domain_spoke." "*.apps.$cluster_domain_spoke.")
+fi
+
+for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
+  echo "Adding ${HOSTNAMES[$i]} to batch files"
+  dns_reserve_and_defer_cleanup $i ${HOSTNAMES[$i]}  # $i is the index in vips.txt
+done
+# Snowflake for the default api-int, which shares a vip with the default api.
+echo "Adding "api-int.$cluster_domain" to batch files"
+RECORD_TYPE="A"
+dns_reserve_and_defer_cleanup 0 "api-int.$cluster_domain."
+
+
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
 "Comment": "Create public OpenShift DNS records for VSphere IPI CI install",
+"Changes": []
+}
+
 "Changes": [{
     "Action": "UPSERT",
     "ResourceRecordSet": {

@@ -218,14 +218,17 @@ tests:
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
+    env:
+      VSPHERE_ADDITIONAL_CLUSTER: "true"
     test:
     - as: test
       cli: latest
       commands: |
-        source $SHARED_DIR/vsphere_env.txt
-        cat $SHARED_DIR/vsphere_env.txt
-        cat $SHARED_DIR/govc.sh
+        source $SHARED_DIR/vsphere_context.sh
+        source $SHARED_DIR/govc.sh
+        echo "datacenter: $GOVC_DATACENTER, datastore: $GOVC_DATASTORE, vcenter: $VCENTER"
+        GO_COMPLIANCE_INFO=0 CLOUD= make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
