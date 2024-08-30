@@ -60,15 +60,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: azure-ipi-workers-rhel8-f28
-  cron: 6 9 3 * *
+- as: azure-ipi-workers-rhel8-f14
+  cron: 31 22 14,30 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @azure-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @azure-ipi'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -84,43 +82,12 @@ tests:
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
-- as: baremetalds-ipi-ovn-ipv4-fips-f28
-  cron: 22 2 5 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FIPS_MODE=true
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-      FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @baremetal-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @baremetal-ipi'
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-oidc-rt-fips-f28
-  cron: 23 3 3 * *
+- as: gcp-upi-private-xpn-sdn-f14
+  cron: 24 6 8,24 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FILTERS_ADDITIONAL: ~TELCO&
-      FIPS_ENABLED: "true"
-      RT_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -135,17 +102,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: ibmcloud-ipi-f28
-  cron: 2 22 3 * *
+    workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-sdn
+- as: ibmcloud-ipi-private-fips-f14
+  cron: 54 13 15,29 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
       FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @ibmcloud-ipi and not
-        @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @ibmcloud-ipi and not
-        @fips'
+      FIPS_ENABLED: "true"
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -160,17 +124,15 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi
-- as: nutanix-ipi-proxy-fips-f28
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: nutanix-ipi-proxy-fips-f14
   cluster: build01
-  cron: 13 3 18 * *
+  cron: 46 9 1,15 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
       FILTERS_ADDITIONAL: ~TELCO&
       FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @nutanix-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @nutanix-ipi'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -187,14 +149,12 @@ tests:
     - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-f28
-  cron: 28 6 18 * *
+- as: vsphere-ipi-ovn-ipsec-f14
+  cron: 26 13 14,28 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-check and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-prepare and not @fips'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -209,7 +169,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-vsphere-ipi
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
