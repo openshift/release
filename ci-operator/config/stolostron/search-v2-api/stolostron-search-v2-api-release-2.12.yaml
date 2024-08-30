@@ -19,10 +19,11 @@ images:
     stolostron_builder_go1.20-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.20-linux
-  to: search-indexer
+  to: search-v2-api
 promotion:
   to:
-  - name: "2.12"
+  - disabled: true
+    name: "2.12"
     namespace: stolostron
 resources:
   '*':
@@ -33,17 +34,11 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: search-v2-api
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: search-v2-api
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: git-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.12
-    workflow: ocm-ci-fastforward
 - as: lint
   commands: |
     GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
@@ -64,6 +59,31 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-v2-api
+    env:
+      IMAGE_REPO: search-v2-api
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_VERSION="2.12"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -75,6 +95,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.12
   org: stolostron
-  repo: search-indexer
+  repo: search-v2-api
