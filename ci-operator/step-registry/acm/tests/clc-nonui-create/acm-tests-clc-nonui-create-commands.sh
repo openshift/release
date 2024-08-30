@@ -35,6 +35,6 @@ CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
 # run the test execution script
-bash +x ./execute_clc_nonui_interop_commands.sh
+bash +x ./execute_clc-nonui_interop_commands.sh
 
 cp -r reports $ARTIFACT_DIR/
