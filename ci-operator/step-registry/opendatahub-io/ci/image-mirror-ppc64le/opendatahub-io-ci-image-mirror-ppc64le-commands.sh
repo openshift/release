@@ -19,10 +19,9 @@ PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
 
 HOME=/tmp
 mkdir -p $HOME/.ssh
-echo "" > $HOME/known_hosts
 
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
-SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR UserKnownHostsFile=$HOME/known_hosts"
+SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR"
 
 ###################### DEBUG SSH KEY ############################
 echo "** whoami **"
@@ -47,9 +46,9 @@ fi
 
 log "INFO Copying secret file ${REGISTRY_TOKEN_FILE}"
 # for docker
-#cat ${REGISTRY_TOKEN_FILE} | ssh "${SSH_ARGS[@]}" "root@${POWERVS_IP}" "mkdir -p /root/.docker; cat > /root/.docker/config.json"
+#cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.docker; cat > /root/.docker/config.json"
 # for podman
-cat ${REGISTRY_TOKEN_FILE} | ssh -i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR UserKnownHostsFile=/dev/null "root@${POWERVS_IP}" "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
+cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
 
 # Get current date
 current_date=$(date +%F)
@@ -136,12 +135,12 @@ fi
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
-IMG=${DESTINATION_IMAGE_REF}
+IMG=$DESTINATION_IMAGE_REF
 EOF
-cat $HOME/env_vars.sh | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "cat > /root/env_vars.sh"
-tar -czf - . | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "cat > /root/opendatahub-operator.tar.gz"
+cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
+tar -czf - . | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/opendatahub-operator.tar.gz"
 
-timeout --kill-after 15m 60m ssh "${SSH_ARGS}" "root@{POWERVS_IP}" bash -x - << EOF
+timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 	
 	# install docker
 	#dnf install -y yum-utils \
