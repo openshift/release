@@ -17,11 +17,12 @@ SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
 
 
-HOME=$(pwd)
+HOME=/tmp
 mkdir -p $HOME/.ssh
+echo "" > $HOME/known_hosts
 
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
-SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR"
+SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR UserKnownHostsFile=$HOME/known_hosts"
 
 ###################### DEBUG SSH KEY ############################
 echo "** whoami **"
@@ -134,10 +135,10 @@ if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
 fi
 
 # set build any env to be set on Power VM
-cat <<EOF > env_vars.sh
+cat <<EOF > $HOME/env_vars.sh
 IMG=${DESTINATION_IMAGE_REF}
 EOF
-
+cat $HOME/env_vars.sh | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "cat > /root/env_vars.sh"
 tar -czf - . | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "cat > /root/opendatahub-operator.tar.gz"
 
 timeout --kill-after 15m 60m ssh "${SSH_ARGS}" "root@{POWERVS_IP}" bash -x - << EOF
@@ -154,6 +155,8 @@ timeout --kill-after 15m 60m ssh "${SSH_ARGS}" "root@{POWERVS_IP}" bash -x - << 
 
 	# Install repo specific dependencies
 	dnf install -y go gcc gcc-c++ make
+
+	source env_vars.sh
 	
 	BUILD_DIR=opendatahub-operator-build
 
@@ -162,7 +165,7 @@ timeout --kill-after 15m 60m ssh "${SSH_ARGS}" "root@{POWERVS_IP}" bash -x - << 
 	chown -R root:root $BUILD_DIR
 
 	cd $BUILD_DIR
-	source env_vars.sh
+	#source env_vars.sh
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
 	make image-build
 	#make image-push
