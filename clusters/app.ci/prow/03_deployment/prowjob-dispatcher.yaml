@@ -108,7 +108,9 @@ items:
           - --cluster-config-path=/var/repo/release/core-services/sanitize-prow-jobs/_clusters.yaml
           - --jobs-storage-path=/cache/job-cache.gob
           - --prow-jobs-dir=/var/repo/release/ci-operator/jobs
+          - --slack-token-path=/etc/slack/oauth_token
           - --self-approve=true
+          - --assign=openshift/test-platform
           - --daemonize
           - --prometheus-bearer-token-path=/etc/prometheus/token
           - --create-pr=true
@@ -116,6 +118,9 @@ items:
           - name: main
             containerPort: 8888
           volumeMounts:
+          - mountPath: /etc/slack
+            name: slack
+            readOnly: true
           - name: cache
             mountPath: /cache
           - mountPath: /etc/prometheus
@@ -131,6 +136,9 @@ items:
               memory: "2Gi"
               cpu: "0.7"
         volumes:
+        - name: slack
+          secret:
+            secretName: slack-credentials-dptp-bot
         - name: cache
           persistentVolumeClaim:
             claimName: prowjob-dispatcher
