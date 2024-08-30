@@ -20,13 +20,14 @@ for operator_value in $operator_configs; do
         name=$(echo $operator_value | sed -E 's/.*name=([^;]+);.*/\1/')
         version=$(oc get csv -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
         echo "$name-v$version" >> "${SHARED_DIR}/firewatch-additional-labels"
-        echo "$name-v$version"
     fi
 done
 
 # Populate cluster version label
 cluster_version=$(oc get clusterversion -o jsonpath='{.items[0].status.desired.version}')
-echo "ocp-v${cluster_version}"
 if [ "$cluster_version" ]; then
     echo "ocp-v${cluster_version}" >> "${SHARED_DIR}/firewatch-additional-labels"
 fi
+
+echo "ADDITIONAL LABELS:"
+cat "$SHARED_DIR"/firewatch-additional-labels
