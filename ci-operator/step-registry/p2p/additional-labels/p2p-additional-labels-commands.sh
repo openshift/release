@@ -26,7 +26,7 @@ done
 
 # Populate cluster version label
 cluster_version=$(oc get clusterversion -o jsonpath='{.items[0].status.desired.version}')
+echo "ocp-v${cluster_version}"
 if [ -z "$cluster_version" ]; then
     echo "ocp-v${cluster_version}" >> "${SHARED_DIR}/firewatch-additional-labels"
-    echo "ocp-v${cluster_version}"
 fi

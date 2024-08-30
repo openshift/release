@@ -37,6 +37,7 @@ if [ -f "${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
     report_command+=" --additional-labels-file=${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
 fi
 
+echo $report_command
 sleep 7200
 
 eval "$report_command"
