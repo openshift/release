@@ -21,7 +21,6 @@ SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -
 
 ###################### DEBUG SSH KEY ############################
 ls -al $SECRET_DIR
-head $PRIVATE_KEY_FILE -n1
 #################################################################
 
 
