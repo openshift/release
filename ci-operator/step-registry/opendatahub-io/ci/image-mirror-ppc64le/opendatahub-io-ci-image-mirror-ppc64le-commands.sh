@@ -16,7 +16,11 @@ log() {
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
 
-SSH_KEY_PATH="/tmp/id_rsa"
+
+HOME=/home/$(whoami)
+mkdir -p $HOME/.ssh
+
+SSH_KEY_PATH="$HOME/.ssh/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
 
 ###################### DEBUG SSH KEY ############################
@@ -24,25 +28,12 @@ echo "** whoami **"
 whoami
 echo "** pwd **"
 pwd
-echo "** ls -al **"
-ls -al
-echo "** ls -al $SECRET_DIR **"
-ls -al $SECRET_DIR
-echo "** First line of $PRIVATE_KEY_FILE **"
-head $PRIVATE_KEY_FILE -n1
 #################################################################
-
 
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
-###################### DEBUG SSH KEY ############################
-echo "** ls -al /tmp **"
-ls -al /tmp
-echo "** First line of $SSH_KEY_PATH **"
-head $SSH_KEY_PATH -n1
-#################################################################
 
 
 POWERVS_IP="169.45.57.76"
