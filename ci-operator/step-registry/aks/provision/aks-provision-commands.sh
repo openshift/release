@@ -42,7 +42,7 @@ fi
 
 echo "Building up the aks create command"
 CLUSTER="${RESOURCE_NAME_PREFIX}-aks-cluster"
-AKE_CREATE_COMMAND=(
+AKS_CREATE_COMMAND=(
     az aks create
     --name "$CLUSTER"
     --resource-group "$RESOURCEGROUP"
@@ -55,19 +55,23 @@ AKE_CREATE_COMMAND=(
 )
 
 if [[ "$AKS_GENERATE_SSH_KEYS" == "true" ]]; then
-    AKE_CREATE_COMMAND+=(--generate-ssh-keys)
+    AKS_CREATE_COMMAND+=(--generate-ssh-keys)
 fi
 
 if [[ "$AKS_ENABLE_FIPS_IMAGE" == "true" ]]; then
-    AKE_CREATE_COMMAND+=(--enable-fips-image)
+    AKS_CREATE_COMMAND+=(--enable-fips-image)
 fi
 
 if [[ -n "$AKS_NODE_VM_SIZE" ]]; then
-    AKE_CREATE_COMMAND+=(--node-vm-size "$AKS_NODE_VM_SIZE")
+    AKS_CREATE_COMMAND+=(--node-vm-size "$AKS_NODE_VM_SIZE")
+fi
+
+if [[ -n "$AKS_ZONES" ]]; then
+    AKS_CREATE_COMMAND+=(--zones "$AKS_ZONES")
 fi
 
 echo "Creating AKS cluster"
-eval "${AKE_CREATE_COMMAND[*]}"
+eval "${AKS_CREATE_COMMAND[*]}"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
 
 echo "Building up the aks get-credentials command"

@@ -57,6 +57,12 @@ chain:
     - name: HYPERSHIFT_CUSTOM_NSG
       default: "false"
       documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for hosted cluster components"
+    - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for infrastructure services in guest cluster"
     - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
       default: ""
       documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
@@ -145,6 +151,14 @@ chain:
         if [[ $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE == "UserManaged" ]]; then
           EXTRA_ARGS+=" --diagnostics-storage-account-uri=$(cat "${SHARED_DIR}"/azure_storage_account_blob_endpoint)"
         fi
+      fi
+      
+      if [[ -n $HYPERSHIFT_CP_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --control-plane-availability-policy=${HYPERSHIFT_CP_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_INFRA_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --infra-availability-policy=${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
       fi
       
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
