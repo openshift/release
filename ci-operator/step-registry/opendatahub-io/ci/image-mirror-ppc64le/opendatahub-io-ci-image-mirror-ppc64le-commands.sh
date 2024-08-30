@@ -19,6 +19,12 @@ PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
 
+###################### DEBUG SSH KEY ############################
+ls -al $SECRET_DIR
+head $PRIVATE_KEY_FILE -n1
+#################################################################
+
+
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
