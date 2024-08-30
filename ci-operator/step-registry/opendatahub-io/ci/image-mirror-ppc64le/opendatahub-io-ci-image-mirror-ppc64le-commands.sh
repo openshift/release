@@ -47,9 +47,9 @@ fi
 
 log "INFO Copying secret file ${REGISTRY_TOKEN_FILE}"
 # for docker
-#cat ${REGISTRY_TOKEN_FILE} | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "mkdir -p /root/.docker; cat > /root/.docker/config.json"
+#cat ${REGISTRY_TOKEN_FILE} | ssh "${SSH_ARGS[@]}" "root@${POWERVS_IP}" "mkdir -p /root/.docker; cat > /root/.docker/config.json"
 # for podman
-cat ${REGISTRY_TOKEN_FILE} | ssh "${SSH_ARGS}" "root@${POWERVS_IP}" "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
+cat ${REGISTRY_TOKEN_FILE} | ssh -i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR UserKnownHostsFile=/dev/null "root@${POWERVS_IP}" "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
 
 # Get current date
 current_date=$(date +%F)
