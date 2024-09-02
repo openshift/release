@@ -29,3 +29,9 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "$(date -u --rfc-3339=seconds) - Removing ${agent_iso} from iso-datastore.."
 
 govc datastore.rm -ds "${GOVC_DATASTORE}" agent-installer-isos/"${agent_iso}"
+
+if test -f "${SHARED_DIR}/node-iso.txt"; then
+  node_iso=$(<"${SHARED_DIR}"/node-iso.txt)
+  echo "$(date -u --rfc-3339=seconds) - Removing ${node_iso} from iso-datastore.."
+  govc datastore.rm -ds "${GOVC_DATASTORE}" agent-installer-isos/"${node_iso}"
+fi

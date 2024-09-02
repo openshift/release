@@ -177,6 +177,11 @@ else
    log "determined this is an IPI job"
 fi
 
+if [[ -n "${MULTI_NIC_IPI}" ]]; then
+  echo "multi-nic is enabled, an additional NIC will be attached to nodes"
+  VSPHERE_EXTRA_LEASED_RESOURCE=1
+fi
+
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   log "creating extra lease resources"
 
@@ -205,7 +210,6 @@ spec:
   i=$((i + 1))
   done
 fi
-
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
@@ -301,6 +305,7 @@ declare -A vcenter_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
+vsphere_extra_portgroup=""
 LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
@@ -337,6 +342,7 @@ EOF
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
+  vsphere_extra_portgroup="${portgroup_name}"
 
   else
     vcenter_portgroups[$VCENTER]=${portgroup_name}
@@ -390,7 +396,22 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   else
     resource_pool=${cluster}/Resources/ipi-ci-clusters
   fi
-  platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+
+  # prevent duplicate failure domains if in the event we have a network-only lease in addition to the primary lease
+  add_failure_domain=0
+  failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
+  if [[ $failure_domain_count == 0 ]]; then
+    add_failure_domain=1
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$name" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+    add_failure_domain=1
+  fi
+
+  if [[ $add_failure_domain == 1 ]] ; then
+    if [ -n "${MULTI_NIC_IPI}" ]; then
+      network="${network}\",\"${vsphere_extra_portgroup}"
+    fi
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+  fi  
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then

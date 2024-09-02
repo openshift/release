@@ -342,13 +342,14 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
         cluster_version="${TARGET_VERSION}"
     fi
-    echo "Starting the upgrade checking on $(date "+%F %T")"
+    echo -e "Upgrade checking start at $(date "+%F %T")\n"
+    start_time=$(date "+%s")
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -372,7 +373,9 @@ function check_upgrade_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
-            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
+            end_time=$(date "+%s")
+            echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
@@ -382,7 +385,10 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
+        end_time=$(date "+%s")
+        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        return 1
     fi
 }
 
@@ -433,11 +439,11 @@ run_command "oc version --client"
 run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
+export TARGET_MINOR_VERSION=""
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
-export TARGET_MINOR_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -450,7 +456,7 @@ export FORCE_UPDATE="false"
 if ! check_signed; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
-    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
+    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-56083"; then
         echo "The case need to run against a signed target image!"
         exit 1
     fi

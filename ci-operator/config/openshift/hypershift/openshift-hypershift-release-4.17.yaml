@@ -7,8 +7,8 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.16_base-rhel9:
-    name: "4.16"
+  ocp_4.17_base-rhel9:
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -31,9 +31,9 @@ images:
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -81,13 +81,11 @@ tests:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: e2e-aks
-  optional: true
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_CATALOG_IMAGE_VERSION: "4.16"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
@@ -145,8 +143,7 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
-- always_run: false
-  as: e2e-kubevirt-metal-conformance
+- as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -154,13 +151,12 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- as: e2e-azure-ovn-conformance
+- as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-azure-conformance
-- always_run: false
-  as: e2e-openstack
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-openstack
   optional: true
   steps:
     cluster_profile: hypershift
@@ -170,7 +166,9 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-e2e
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-nested
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
