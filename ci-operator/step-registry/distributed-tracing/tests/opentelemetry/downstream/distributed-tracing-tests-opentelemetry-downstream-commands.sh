@@ -46,6 +46,9 @@ fi
 # Initialize a variable to keep track of errors
 any_errors=false
 
+echo "Start debugging now"
+sleep 7200
+
 # Execute OpenTelemetry e2e tests
 chainsaw test \
 --report-name "junit_otel_e2e" \
