@@ -130,7 +130,7 @@ fi
 export REPO_OWNER=opendatahub-io
 export REPO_NAME=opendatahub-operator
 export PULL_BASE_REF=incubation
-export PULL_NUMBER=921
+export PULL_NUMBER=1047
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
