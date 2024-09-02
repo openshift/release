@@ -26,8 +26,21 @@ oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
 # after recent updates to images, we need to also mirror the new location of the image as well
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
-# new image coming in k8s 1.31
+# Temporary workaround for handling new images introduced in Kubernetes 1.31. This is necessary because the "oc image mirror" command cannot mirror 2 different images with the same layers but different names.
+# Once openshift/origin is updated to Kubernetes 1.31, this workaround can be removed (except for the pause image).
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/e2e-test-images/agnhost:2.52 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-1-registry-k8s-io-e2e-test-images-agnhost-2-52-vo_U710PrYLetnfE
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/e2e-test-images/busybox:1.29-2 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-51-registry-k8s-io-e2e-test-images-busybox-1-29-2-ZYWRth-o9U_JR2ZE
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/e2e-test-images/regression-issue-74839:1.2 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-30-registry-k8s-io-e2e-test-images-regression-issue-74839-1-2-pZ_RxNuqvcwEiCKE
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/e2e-test-images/resource-consumer:1.13 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-31-registry-k8s-io-e2e-test-images-resource-consumer-1-13-LT0C2W4wMzShSeGS
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/e2e-test-images/volume/nfs:1.4 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-32-registry-k8s-io-e2e-test-images-volume-nfs-1-4-u7V8iW5QIcWM2i6h
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/csi-attacher:v4.6.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-47-registry-k8s-io-sig-storage-csi-attacher-v4-6-1-NP4z4EcSo-N1xk_4
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-45-registry-k8s-io-sig-storage-csi-node-driver-registrar-v2-10-1-bVz-v06gRSvh6Rp3
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/csi-provisioner:v5.0.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-48-registry-k8s-io-sig-storage-csi-provisioner-v5-0-1-wPw2vjyYX1LWVmkn
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/csi-resizer:v1.11.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-49-registry-k8s-io-sig-storage-csi-resizer-v1-11-1-6jB55ZThgstz1GrW
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/csi-snapshotter:v8.0.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-50-registry-k8s-io-sig-storage-csi-snapshotter-v8-0-1-vAVT_GHf7Vm-TXyx
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/sig-storage/hostpathplugin:v1.14.0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-43-registry-k8s-io-sig-storage-hostpathplugin-v1-14-0-LWjla55lyZB4CQu0
 EOF
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
