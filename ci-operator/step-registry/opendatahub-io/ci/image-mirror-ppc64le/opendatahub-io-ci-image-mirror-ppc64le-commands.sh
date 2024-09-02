@@ -173,7 +173,6 @@ PR_URLS=${PR_URLS:-UNKNOWN}
 
 
 JOB_SPEC=$JOB_SPEC
-BUILD_DIR=${IMAGE_TAG:-BUILD}
 EOF
 
 log "INFO Request Metadata:"
@@ -200,12 +199,9 @@ timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 
 	source env_vars.sh
 	
-	#BUILD_DIR=opendatahub-operator-build
-
-	rm -rf $BUILD_DIR
-	git clone https://github.com/$REPO_OWNER/$REPO_NAME.git -b $PULL_BASE_REF $BUILD_DIR
-
-	cd $BUILD_DIR
+	rm -rf BUILD
+	mkdir BUILD && cd BUILD
+	git clone https://github.com/$REPO_OWNER/$REPO_NAME.git -b $PULL_BASE_REF .
 
 	git fetch origin pull/$PULL_NUMBER/head:build_branch
 	git checkout build_branch
