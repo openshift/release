@@ -4,18 +4,7 @@ set -xeuo pipefail
 # shellcheck disable=SC1091
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
-
-trap 'finalize' EXIT TERM INT
-
-# Look at sos step for the exit codes definitions
-function finalize()
-{
-  if [[ "$?" -ne "0" ]] ; then
-    echo "6" >> "${SHARED_DIR}/install-status.txt"
-  else
-    echo "0" >> "${SHARED_DIR}/install-status.txt"
-  fi
-}
+trap_install_status_exit_code $EXIT_CODE_LVM_INSTALL_FAILURE
 
 device="/dev/xvdc"
 

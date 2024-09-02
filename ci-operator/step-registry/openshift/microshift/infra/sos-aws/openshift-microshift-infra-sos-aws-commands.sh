@@ -13,14 +13,6 @@ function generate_junit() {
         return 0
     fi
 
-  local -r EXIT_CODE_AWS_EC2_FAILURE=3
-  local -r EXIT_CODE_AWS_EC2_LOG_FAILURE=4
-  local -r EXIT_CODE_LVM_INSTALL_FAILURE=5
-  local -r EXIT_CODE_RPM_INSTALL_FAILURE=6
-  local -r EXIT_CODE_CONFORMANCE_SETUP_FAILURE=7
-  local -r EXIT_CODE_PCP_FAILURE=8
-  local -r EXIT_CODE_WAIT_CLUSTER_FAILURE=9
-
     EXIT_CODE=`tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}'`
     cp "${SHARED_DIR}/install-status.txt" "${ARTIFACT_DIR}/"
     if [ "$EXIT_CODE" ==  0  ]; then
