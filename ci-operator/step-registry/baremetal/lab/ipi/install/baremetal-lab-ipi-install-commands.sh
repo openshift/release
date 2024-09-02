@@ -134,8 +134,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         enabled: true
         dhcp: true
       ipv6:
-        enabled: true
-        dhcp: true
+        enabled: false
+        dhcp: false
 "
   # split the ipi_disabled_ifaces semi-comma separated list into an array
   IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
