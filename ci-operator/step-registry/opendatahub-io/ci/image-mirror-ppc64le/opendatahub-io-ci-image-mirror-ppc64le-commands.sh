@@ -39,10 +39,11 @@ if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
 fi
 
 log "INFO Copying secret file ${REGISTRY_TOKEN_FILE}"
+ls -al
 # for docker
 #cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.docker; cat > /root/.docker/config.json"
 # for podman
-cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
+#cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.podman/containers; cat > /root/.podman/containers/auth.json"
 
 # Get current date
 current_date=$(date +%F)
@@ -129,13 +130,17 @@ fi
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
-REPO_OWNER=${REPO_OWNER:-UNKNOWN}
-REPO_NAME=${REPO_NAME:-UNKNOWN}
+#REPO_OWNER=${REPO_OWNER:-UNKNOWN}
+REPO_OWNER=opendatahub-io
+#REPO_NAME=${REPO_NAME:-UNKNOWN}
+REPO_NAME=opendatahub-operator
 
-PULL_BASE_REF=${PULL_BASE_REF:-UNKNOWN}
+#PULL_BASE_REF=${PULL_BASE_REF:-UNKNOWN}
+PULL_BASE_REF=incubation
 PULL_BASE_SHA=${PULL_BASE_SHA:-UNKNOWN}
 PULL_HEAD_REF=${PULL_HEAD_REF:-UNKNOWN}
-PULL_NUMBER=${PULL_NUMBER:-UNKNOWN}
+#PULL_NUMBER=${PULL_NUMBER:-UNKNOWN}
+PULL_NUMBER=921
 PULL_ORGANIZATION=${PULL_ORGANIZATION:-UNKNOWN}
 PULL_PULL_SHA=${PULL_PULL_SHA:-UNKNOWN}
 PULL_REFS=${PULL_REFS:-UNKNOWN}
@@ -147,7 +152,8 @@ REGISTRY_ORG=${REGISTRY_ORG:-UNKNOWN}
 IMAGE_REPO=${IMAGE_REPO:-UNKNOWN}
 IMAGE_TAG=${IMAGE_TAG:-UNKNOWN}
 DESTINATION_REGISTRY_REPO=${DESTINATION_REGISTRY_REPO:-UNKNOWN}
-DESTINATION_IMAGE_REF=${DESTINATION_IMAGE_REF:-UNKNOWN}
+#DESTINATION_IMAGE_REF=${DESTINATION_IMAGE_REF:-UNKNOWN}
+DESTINATION_IMAGE_REF=quay.io/shafi_rhel/opendatahub-operator:incubation-pr-921
 IMAGE_FLOATING_TAG=${IMAGE_FLOATING_TAG:-UNKNOWN}
 FLOATING_IMAGE_REF=${FLOATING_IMAGE_REF:-UNKNOWN}
 
@@ -155,6 +161,7 @@ JOB_NAME=${JOB_NAME:-UNKNOWN}
 JOB_TYPE=${JOB_TYPE:-UNKNOWN}
 PROW_JOB_ID=${PROW_JOB_ID:-UNKNOWN}
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:-UNKNOWN}
+RELEASE_VERSION=${RELEASE_VERSION:-UNKNOWN}
 
 PR_AUTHOR=${PR_AUTHOR:-UNKNOWN}
 PR_CHANGESET=${PR_CHANGESET:-UNKNOWN}
@@ -163,6 +170,10 @@ PR_NUMBER=${PR_NUMBER:-UNKNOWN}
 PR_REPO_NAME=${PR_REPO_NAME:-UNKNOWN}
 PR_SHA=${PR_SHA:-UNKNONW}
 PR_URLS=${PR_URLS:-UNKNOWN}
+
+
+JOB_SPEC=$JOB_SPEC
+BUILD_DIR=${IMAGE_TAG:-BUILD}
 EOF
 
 log "INFO Request Metadata:"
@@ -182,22 +193,26 @@ timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 
 	# install podman
 	dnf install -y podman
-        export XDG_RUNTIME_DIR=/root/.podman
+        #export XDG_RUNTIME_DIR=/root/.podman
 
 	# Install repo specific dependencies
 	dnf install -y go gcc gcc-c++ make
 
 	source env_vars.sh
 	
-	BUILD_DIR=opendatahub-operator-build
+	#BUILD_DIR=opendatahub-operator-build
 
 	rm -rf $BUILD_DIR
 	git clone https://github.com/$REPO_OWNER/$REPO_NAME.git -b $PULL_BASE_REF $BUILD_DIR
 
-	#cd $BUILD_DIR
-	#sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
-	#IMG=$DESTINATION_IMAGE_REF make image-build
-	#make image-push
+	cd $BUILD_DIR
+
+	git fetch origin pull/$PULL_NUMBER/head:build_branch
+	git checkout build_branch
+
+	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
+	IMG=$DESTINATION_IMAGE_REF make image-build
+	make image-push
 	
 	# cleanup
 	#docker rmi $(docker images -a -q) --force
