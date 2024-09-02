@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,24 +14,11 @@ images:
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
 releases:
-  arm64-latest:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.14"
   latest:
     candidate:
-      architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.14"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -42,11 +29,8 @@ tests:
   cron: 0 6 1 10 *
   steps:
     cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
@@ -57,11 +41,29 @@ tests:
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
         ]
-      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
-        tests/e2e-instrumentation/instrumentation-nginx* tests/e2e-instrumentation/instrumentation-dotnet*
-        tests/e2e-instrumentation/instrumentation-apache* tests/e2e/smoke-ip-families
     test:
-    - ref: idp-htpasswd
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-downstream
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: opentelemetry-stage-tests-fips
+  cron: 0 6 1 10 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+    test:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
@@ -70,4 +72,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: opentelemetry-product-ocp-4.14-arm-stage
+  variant: opentelemetry-product-ocp-4.17-stage
