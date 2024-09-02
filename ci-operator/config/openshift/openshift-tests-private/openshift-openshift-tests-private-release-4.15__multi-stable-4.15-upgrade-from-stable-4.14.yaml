@@ -61,8 +61,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-ipsec-amd-mixarch-day2-f14
-  cron: 1 2 11,27 * *
+- as: aws-ipi-ovn-ipsec-amd-mixarch-day2-f28
+  cron: 31 17 20 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -70,8 +70,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
-  cron: 54 6 14,28 * *
+- as: aws-ipi-ovn-ipsec-amd-mixarch-f28
+  cron: 2 21 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -80,6 +80,46 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-proxy-sts-arm-f28
+  cron: 40 3 17 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-24358
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: azure-ipi-fullyprivate-proxy-arm-f28
+  cron: 5 14 2 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-24358
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: gcp-ipi-proxy-oidc-amd-mixarch-f28
+  cron: 31 0 2 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_OTA_TEST: OCP-24358
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

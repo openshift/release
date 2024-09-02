@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
 build_root:
@@ -36,7 +36,32 @@ tests:
             {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
             {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "amq-streams", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-downstream
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: opentelemetry-stage-tests-fips
+  cron: 0 6 1 10 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
         ]
     test:
     - ref: enable-stage-catalogsource

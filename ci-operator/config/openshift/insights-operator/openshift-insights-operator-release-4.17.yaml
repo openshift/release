@@ -6,7 +6,7 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
+    tag: "4.17"
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -28,8 +28,7 @@ images:
   to: insights-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -94,7 +93,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not UI and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks_4.17
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -130,6 +129,131 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-e2e-tests-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp-3
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -k "not tp_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic_4.17
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-e2e-tests-slow-tests
+  cron: 0 0 * * 6
+  steps:
+    cluster_profile: gcp-3
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -k "slow and not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_slow_tests
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-test-time-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
       resources:
         requests:
@@ -147,7 +271,7 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
+        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.17
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -188,6 +312,13 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: fips-image-scan-operator
+  cron: 0 3 7 * *
+  steps:
+    dependencies:
+      SCAN_IMAGE: insights-operator
+    test:
+    - ref: fips-check-image-scan
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
   cluster: build05

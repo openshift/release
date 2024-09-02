@@ -3,8 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-
-
 export OPENSHIFT_API \
   OPENSHIFT_PASSWORD \
   NAMESPACE \
@@ -14,13 +12,10 @@ export OPENSHIFT_API \
   GITOPS__GIT_TOKEN \
   GITHUB__APP__WEBHOOK__SECRET \
   GITLAB__TOKEN \
-  GITLAB__APP__CLIENT__ID \
-  GITLAB__APP__CLIENT__SECRET \
   QUAY__DOCKERCONFIGJSON \
   QUAY__API_TOKEN \
   ACS__CENTRAL_ENDPOINT \
   ACS__API_TOKEN
-
 
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 NAMESPACE=rhtap
@@ -31,8 +26,6 @@ GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-gi
 GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 GITHUB__APP__WEBHOOK__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITLAB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
-GITLAB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
-GITLAB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 QUAY__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay_api_token)
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
@@ -62,11 +55,6 @@ configure_rhtap(){
 
   # Turn ci to true
   sed -i 's/ci: false/ci: true/' $tpl_file
-  
-  config_file="config.yaml"
-  sed -i '/redHatAdvancedClusterSecurity:/,/namespace: rhtap-acs/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
-  sed -i '/redHatQuay:/,/namespace: rhtap-quay/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
-  sed -i 's|/release/|/main/|' $config_file
 
   cat <<EOF >> $tpl_file
 integrations:
@@ -80,22 +68,54 @@ $(echo "${GITHUB__APP__PRIVATE_KEY}" | sed 's/^/      /')
     webhookSecret: "${GITHUB__APP__WEBHOOK__SECRET}"
 EOF
 
+  # Edit config.yaml
+  config_file="config.yaml"
+  sed -i '/redHatAdvancedClusterSecurity:/,/namespace: rhtap-acs/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
+  sed -i '/redHatQuay:/,/namespace: rhtap-quay/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
+  sed -i 's|/release/|/main/|' $config_file
+
+}
+
+configure_rhtap_for_prerelease_versions(){
+  # Prepare for pre-release install capabilities
+  # Define the file path
+  subscription_values_file="charts/rhtap-subscriptions/values.yaml"
+
+  # Function to update the values
+  update_values() {
+    local section=$1
+    local channel=$2
+    local source=$3
+
+    sed -i "/$section:/,/sourceNamespace:/ {
+      /^ *channel:/ s/: .*/: $channel/
+      /^ *source:/ s/: .*/: $source/
+    }" $subscription_values_file
+  }
+
+  echo "Check the PRODUCT variable and update the corresponding section"
+  if [ "$PRODUCT" == "gitops" ]; then
+    update_values "openshiftGitOps" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  elif [ "$PRODUCT" == "rhdh" ]; then
+    update_values "redHatDeveloperHub" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  elif [ "$PRODUCT" == "pipelines" ]; then
+    update_values "openshiftPipelines" "$NEW_OPERATOR_CHANNEL" "$NEW_SOURCE"
+  else
+    echo "No prerelease product specified nothing needs doing."
+  fi
+  
+  echo "Show subscription values"
+  cat $subscription_values_file
+
 }
 
 install_rhtap(){
   echo "install"
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" quay --url="https://quay.io" --dockerconfigjson="${QUAY__DOCKERCONFIGJSON}" --token="${QUAY__API_TOKEN}"
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" acs --endpoint="${ACS__CENTRAL_ENDPOINT}" --token="${ACS__API_TOKEN}"
-  ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" gitlab --app-id "${GITLAB__APP__CLIENT__ID}" --app-secret "${GITLAB__APP__CLIENT__SECRET}" --token "${GITLAB__TOKEN}"
+  ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" gitlab --token "${GITLAB__TOKEN}"
+  
   ./bin/rhtap-cli deploy --config ./config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
-
-  # Check if "Deployment complete" is in the output
-  if grep -q "Developer Hub deployed" /tmp/command_output.txt; then
-    echo "Deployment completed"
-  else
-    echo "Deployment did not complete"
-    exit 1
-  fi
 
 
   WEBHOOK_URL="https://$(oc get routes -n openshift-pipelines pipelines-as-code-controller -ojsonpath='{.spec.host}')"
@@ -117,11 +137,12 @@ show_installed_versions(){
       containerImage: .metadata.annotations.containerImage
     } |
     "Operator: \(.name)\nVersion: \(.version)\nImage: \(.containerImage)\n-----------------------------------------"
-  '| tee /tmp/installed_versions.txt
+  '| tee -a $SHARED_DIR/installed_versions.txt
 
-  cp /tmp/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
+  cp $SHARED_DIR/installed_versions.txt "${ARTIFACT_DIR}/installed_versions.txt"
 }
 
 configure_rhtap
+configure_rhtap_for_prerelease_versions
 install_rhtap
 show_installed_versions

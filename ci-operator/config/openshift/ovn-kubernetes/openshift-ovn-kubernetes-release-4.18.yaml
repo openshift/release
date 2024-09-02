@@ -54,7 +54,8 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.18"
+  - disabled: true
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -323,6 +324,20 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: e2e-azure-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
 - always_run: true
   as: e2e-gcp-ovn-techpreview
   steps:
@@ -330,6 +345,49 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
+- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp-upgrade
+- as: e2e-metal-ipi-ovn-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-vsphere-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

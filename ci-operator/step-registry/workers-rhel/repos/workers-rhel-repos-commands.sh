@@ -178,6 +178,56 @@ enabled_metadata = 1
 module_hotfixes = 1
 EOF
 
+cat > rhel-9-server-ose-devel-rpms.repo.j2 <<-'EOF'
+[rhel-9-server-ose-{{ release_version }}-devel-rpms]
+name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
+baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-9-server-ose-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
+failovermethod = priority
+gpgcheck = 0
+enabled = 1
+sslverify = 0
+module_hotfixes = 1
+
+[rhel-9-fast-datapath-{{ release_version }}-devel-rpms]
+name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
+baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-9-fast-datapath-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
+failovermethod = priority
+gpgcheck = 0
+sslverify = 0
+enabled = 1
+module_hotfixes = 1
+EOF
+
+cat > rhel-9-server-rpms.repo.j2 <<-'EOF'
+[rhel-9-for-x86_64-baseos-rpms]
+name = Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-9-baseos-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
+gpgcheck = 0
+sslverify = 0
+enabled = 1
+metadata_expire = 86400
+enabled_metadata = 1
+module_hotfixes = 1
+
+[rhel-9-for-x86_64-appstream-rpms]
+name = Red Hat Enterprise Linux 9 for x86_64 - AppStream (RPMs)
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-9-appstream-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
+gpgcheck = 0
+sslverify = 0
+enabled = 1
+metadata_expire = 86400
+enabled_metadata = 1
+module_hotfixes = 1
+EOF
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     echo "Setting proxy"
     source "${SHARED_DIR}/proxy-conf.sh"

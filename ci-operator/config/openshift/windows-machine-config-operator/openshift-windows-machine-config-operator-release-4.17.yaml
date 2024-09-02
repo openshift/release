@@ -39,7 +39,6 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    disabled: true
     name: "4.17"
     namespace: ocp
 releases:
@@ -131,6 +130,13 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
   steps:
@@ -191,7 +197,7 @@ tests:
       cli: latest
       commands: |
         export WMCO_NS=openshift-windows-machine-config-operator
-        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
         sleep 5m
         oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
       dependencies:
