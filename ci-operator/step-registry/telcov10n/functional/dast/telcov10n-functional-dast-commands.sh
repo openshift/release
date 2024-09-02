@@ -1,8 +1,11 @@
-#!/bin/bash
+!/bin/bash
 
 set -o nounset
 set -o errexit
 set -o pipefail
+
+# Fix user IDs in a container
+~/fix_uid.sh
 
 echo "Setting the cluster to Cincinnati instance: $CINCINNATI_URL"
 oc patch clusterversion version --patch '{"spec":{"upstream":"'"$CINCINNATI_URL"'"}}' --type=merge
