@@ -182,7 +182,7 @@ log "INFO Sending Metadata to $POWERVS_IP"
 cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Build/Push"
-ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
+timeout --kill-after 10m 120m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	
 	# install docker
 	#dnf install -y yum-utils \
@@ -198,12 +198,13 @@ ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	dnf install -y go gcc gcc-c++ make
 
 	source env_vars.sh
+	env >> debug_env
 	
 	rm -rf BUILD
 	mkdir BUILD && cd BUILD
-	git clone https://github.com/$REPO_OWNER/$REPO_NAME.git -b $PULL_BASE_REF .
+	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
 
-	git fetch origin pull/$PULL_NUMBER/head:build_branch
+	git fetch origin pull/$$PULL_NUMBER/head:build_branch
 	git checkout build_branch
 
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
