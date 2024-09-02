@@ -49,6 +49,12 @@ EOF
     testname=$(basename "${test}")
     cat >>${REPORT} <<EOF
     <p>${testname}:&nbsp;
+    <a target="_blank" href="${URL}/${testname}/boot.log">boot.log</a>
+EOF
+  for test in ${ARTIFACT_DIR}/scenario-info/*; do
+    testname=$(basename "${test}")
+    cat >>${REPORT} <<EOF
+    <p>${testname}:&nbsp;
     <a target="_blank" href="${URL}/${testname}">directory</a>
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/run.log">run.log</a>
 EOF
