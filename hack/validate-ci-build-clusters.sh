@@ -16,7 +16,7 @@ fi
 
 cp -r "${base_dir}/"* "${workdir}"
 
-cluster-init --release-repo="${workdir}" --create-pr=false --update=true
+cluster-init config generate --release-repo="${workdir}" --create-pr=false --update=true
 
 declare -a files=(
               "/clusters/build-clusters"
