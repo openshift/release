@@ -39,7 +39,6 @@ if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
 fi
 
 log "INFO Copying secret file ${REGISTRY_TOKEN_FILE}"
-ls -al
 # for docker
 #cat ${REGISTRY_TOKEN_FILE} | ssh $SSH_ARGS root@$POWERVS_IP "mkdir -p /root/.docker; cat > /root/.docker/config.json"
 # for podman
@@ -210,7 +209,7 @@ timeout --kill-after 10m 120m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
 	IMG=$DESTINATION_IMAGE_REF make image-build
-	make image-push
+	IMG=$DESTINATION_IMAGE_REF make image-push
 	
 EOF
 
