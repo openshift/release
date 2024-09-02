@@ -8,6 +8,8 @@ export PUBKUBECONFIG=$KUBECONFIG
 
 export PRIVKUBECONFIG=$KUBECONFIG
 
+export WAITLIMIT=300
+
 cd /app
 
 status=0
