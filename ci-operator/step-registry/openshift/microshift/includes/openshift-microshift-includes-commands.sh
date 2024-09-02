@@ -130,7 +130,7 @@ EXIT_CODE_WAIT_CLUSTER_FAILURE=9
 
 function trap_install_status_exit_code() {
     local -r code=$1
-    trap "([ \"$?\" -ne \"0\" ] && echo ${code} || echo 0) >> ${SHARED_DIR}/install-status.txt" EXIT
+    trap '([ "$?" -ne "0" ] && echo '$code' || echo 0) >> ${SHARED_DIR}/install-status.txt' EXIT
 }
 
 function download_microshift_scripts() {

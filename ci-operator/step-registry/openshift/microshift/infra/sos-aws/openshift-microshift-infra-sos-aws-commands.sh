@@ -6,7 +6,7 @@ source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 trap_subprocesses_on_term
 
-trap 'generate_junit' EXIT TERM INT
+trap 'generate_junit' EXIT
 
 function generate_junit() {
     if ! test -f "${SHARED_DIR}/install-status.txt"; then
@@ -161,5 +161,3 @@ ssh "${INSTANCE_PREFIX}" <<'EOF'
   fi
 EOF
 scp "${INSTANCE_PREFIX}":/tmp/sosreport-* "${ARTIFACT_DIR}" || true
-
-#TODO junit
