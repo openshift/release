@@ -23,12 +23,6 @@ mkdir -p $HOME/.ssh
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR"
 
-###################### DEBUG SSH KEY ############################
-echo "** whoami **"
-whoami
-echo "** pwd **"
-pwd
-#################################################################
 
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
@@ -135,11 +129,49 @@ fi
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
-IMG=$DESTINATION_IMAGE_REF
-EOF
-cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
-tar -czf - . | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/opendatahub-operator.tar.gz"
+REPO_OWNER=$REPO_OWNER
+REPO_NAME=$REPO_NAME
 
+PULL_BASE_REF=$PULL_BASE_REF
+PULL_BASE_SHA=$PULL_BASE_SHA
+PULL_HEAD_REF=$PULL_HEAD_REF
+PULL_NUMBER=$PULL_NUMBER
+PULL_ORGANIZATION=$PULL_ORGANIZATION
+PULL_PULL_SHA=$PULL_PULL_SHA
+PULL_REFS=$PULL_REFS
+PULL_REGISTRY=$PULL_REGISTRY
+PULL_URL=$PULL_URL
+
+REGISTRY_HOST=$REGISTRY_HOST
+REGISTRY_ORG=$REGISTRY_ORG
+IMAGE_REPO=$IMAGE_REPO
+IMAGE_TAG=$IMAGE_TAG
+DESTINATION_REGISTRY_REPO=$DESTINATION_REGISTRY_REPO
+DESTINATION_IMAGE_REF=$DESTINATION_IMAGE_REF
+IMAGE_FLOATING_TAG=$IMAGE_FLOATING_TAG
+FLOATING_IMAGE_REF=$FLOATING_IMAGE_REF
+
+JOB_NAME=$JOB_NAME
+JOB_TYPE=$JOB_TYPE
+PROW_JOB_ID=$PROW_JOB_ID
+RELEASE_IMAGE_LATEST=$RELEASE_IMAGE_LATEST
+
+PR_AUTHOR=$PR_AUTHOR
+PR_CHANGESET=$PR_CHANGESET
+PR_COMMENTERS=$PR_COMMENTERS
+PR_NUMBER=$PR_NUMBER
+PR_REPO_NAME=$PR_REPO_NAME
+PR_SHA=$PR_SHA
+PR_URLS=$PR_URLS
+EOF
+
+log "INFO Request Metadata:"
+cat $HOME/env_vars.sh
+
+log "INFO Sending Metadata to $POWERVS_IP"
+cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
+
+log "INFO SSH to Power VM for Build/Push"
 timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 	
 	# install docker
@@ -160,18 +192,16 @@ timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 	BUILD_DIR=opendatahub-operator-build
 
 	rm -rf $BUILD_DIR
-	tar -xzvf opendatahub-operator.tar.gz -C $BUILD_DIR
-	chown -R root:root $BUILD_DIR
+	git clone https://github.com/$REPO_OWNER/$REPO_NAME.git -b $PULL_BASE_REF $BUILD_DIR
 
-	cd $BUILD_DIR
-	#source env_vars.sh
-	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
-	make image-build
+	#cd $BUILD_DIR
+	#sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
+	#IMG=$DESTINATION_IMAGE_REF make image-build
 	#make image-push
 	
 	# cleanup
 	#docker rmi $(docker images -a -q) --force
-	podman rmi $(podman images -a -q) --force
+	#podman rmi $(podman images -a -q) --force
 
 EOF
 
