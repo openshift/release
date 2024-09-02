@@ -182,7 +182,7 @@ log "INFO Sending Metadata to $POWERVS_IP"
 cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Build/Push"
-timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
+ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 	
 	# install docker
 	#dnf install -y yum-utils \
@@ -210,9 +210,5 @@ timeout --kill-after 15m 60m ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
 	IMG=$DESTINATION_IMAGE_REF make image-build
 	make image-push
 	
-	# cleanup
-	#docker rmi $(docker images -a -q) --force
-	#podman rmi $(podman images -a -q) --force
-
 EOF
 
