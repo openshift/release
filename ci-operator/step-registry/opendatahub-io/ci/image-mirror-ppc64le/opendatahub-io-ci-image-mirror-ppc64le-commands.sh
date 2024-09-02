@@ -182,7 +182,7 @@ log "INFO Sending Metadata to $POWERVS_IP"
 cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Build/Push"
-ssh $SSH_ARGS root@POWERVS_IP bash -x - << EOF
+ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	
 	# install docker
 	#dnf install -y yum-utils \
