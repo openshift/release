@@ -6,4 +6,6 @@ set -o pipefail
 set -o xtrace
 set -x
 
-pip list
+python3 --version
+
+python3 -m pip list

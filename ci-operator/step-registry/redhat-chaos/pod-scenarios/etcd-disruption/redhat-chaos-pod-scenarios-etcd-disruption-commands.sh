@@ -37,6 +37,9 @@ oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 ./pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
+
+cat /tmp/*.log 
+
 echo "Return code: $rc"
 exit $rc
 echo $ENABLE_ALERTS
