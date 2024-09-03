@@ -22,6 +22,6 @@ echo "Gathering network artifacts ..."
 
 mkdir -p ${ARTIFACT_DIR}/network
 
-oc adm must-gather --dest-dir="${ARTIFACT_DIR}/network" -- /usr/bin/gather_network_logs
+timeout 30m oc adm must-gather --dest-dir="${ARTIFACT_DIR}/network" -- /usr/bin/gather_network_logs
 tar -czC "${ARTIFACT_DIR}/network" -f "${ARTIFACT_DIR}/network.tar.gz" .
 rm -rf "${ARTIFACT_DIR}/network"

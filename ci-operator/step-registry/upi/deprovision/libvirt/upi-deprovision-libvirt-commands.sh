@@ -1,1 +1,0 @@
-../../../ipi/libvirt/cleanup/ipi-libvirt-cleanup-commands.sh
