@@ -15,12 +15,8 @@ log() {
 
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/ODH_POWER_SSH_KEY"
-
-
 HOME=/tmp
-mkdir -p $HOME/.ssh
-
-SSH_KEY_PATH="$HOME/.ssh/id_rsa"
+SSH_KEY_PATH="$HOME/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR"
 
 
@@ -28,9 +24,7 @@ SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
-
-
-POWERVS_IP="169.45.57.76"
+POWERVS_IP=odh-power-node.ecosystemci.cis.ibm.net
 
 REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
@@ -135,43 +129,24 @@ export DESTINATION_IMAGE_REF=quay.io/shafi_rhel/opendatahub-operator:incubation-
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
+BUILD=${IMAGE_TAG:-$(date +%s)}
 REPO_OWNER=${REPO_OWNER:-UNKNOWN}
 REPO_NAME=${REPO_NAME:-UNKNOWN}
-
 PULL_BASE_REF=${PULL_BASE_REF:-UNKNOWN}
 PULL_BASE_SHA=${PULL_BASE_SHA:-UNKNOWN}
-PULL_HEAD_REF=${PULL_HEAD_REF:-UNKNOWN}
 PULL_NUMBER=${PULL_NUMBER:-UNKNOWN}
-PULL_ORGANIZATION=${PULL_ORGANIZATION:-UNKNOWN}
 PULL_PULL_SHA=${PULL_PULL_SHA:-UNKNOWN}
 PULL_REFS=${PULL_REFS:-UNKNOWN}
-PULL_REGISTRY=${PULL_REGISTRY:-UNKNOWN}
-PULL_URL=${PULL_URL:-UNKNOWN}
-
 REGISTRY_HOST=${REGISTRY_HOST:-UNKNOWN}
 REGISTRY_ORG=${REGISTRY_ORG:-UNKNOWN}
 IMAGE_REPO=${IMAGE_REPO:-UNKNOWN}
 IMAGE_TAG=${IMAGE_TAG:-UNKNOWN}
 DESTINATION_REGISTRY_REPO=${DESTINATION_REGISTRY_REPO:-UNKNOWN}
 DESTINATION_IMAGE_REF=${DESTINATION_IMAGE_REF:-UNKNOWN}
-IMAGE_FLOATING_TAG=${IMAGE_FLOATING_TAG:-UNKNOWN}
-FLOATING_IMAGE_REF=${FLOATING_IMAGE_REF:-UNKNOWN}
-
 JOB_NAME=${JOB_NAME:-UNKNOWN}
 JOB_TYPE=${JOB_TYPE:-UNKNOWN}
 PROW_JOB_ID=${PROW_JOB_ID:-UNKNOWN}
-RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:-UNKNOWN}
 RELEASE_VERSION=${RELEASE_VERSION:-UNKNOWN}
-
-PR_AUTHOR=${PR_AUTHOR:-UNKNOWN}
-PR_CHANGESET=${PR_CHANGESET:-UNKNOWN}
-PR_COMMENTERS=${PR_COMMENTERS:-UNKNOWN}
-PR_NUMBER=${PR_NUMBER:-UNKNOWN}
-PR_REPO_NAME=${PR_REPO_NAME:-UNKNOWN}
-PR_SHA=${PR_SHA:-UNKNONW}
-PR_URLS=${PR_URLS:-UNKNOWN}
-
-
 JOB_SPEC=$JOB_SPEC
 EOF
 
@@ -182,34 +157,26 @@ log "INFO Sending Metadata to $POWERVS_IP"
 cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Build/Push"
-timeout --kill-after 10m 120m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
-	
-	# install docker
-	#dnf install -y yum-utils \
-	#&& dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \
-	#&& dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-	#&& systemctl start docker
-
-	# install podman
-	dnf install -y podman
-        #export XDG_RUNTIME_DIR=/root/.podman
-
-	# Install repo specific dependencies
-	dnf install -y go gcc gcc-c++ make
-
+timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	source env_vars.sh
-	env >> debug_env
-	
-	rm -rf BUILD
-	mkdir BUILD && cd BUILD
-	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
 
+    # clone & checkout pull number
+	rm -rf $$BUILD
+	mkdir $$BUILD && cd $$BUILD
+	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
 	git fetch origin pull/$$PULL_NUMBER/head:build_branch
 	git checkout build_branch
 
+    # build & push
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
-	IMG=$DESTINATION_IMAGE_REF make image-build
-	IMG=$DESTINATION_IMAGE_REF make image-push
-	
+	IMG=$$DESTINATION_IMAGE_REF make image-build
+	IMG=$$DESTINATION_IMAGE_REF make image-push
+
+    # cleanup
+    podman rmi --all
+    DOCKER_IMAGES=$(docker images -a -q)
+    if [ -n "$$DOCKER_IMAGES" ]; then
+        docker rmi $$DOCKER_IMAGES
+    fi
 EOF
 
