@@ -42,13 +42,13 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 
-export ES_PASSWORD=$(cat "/secret/es/password")
-export ES_USERNAME=$(cat "/secret/es/username")
+ES_PASSWORD=$(cat "/secret/es/password" || "")
+ES_USERNAME=$(cat "/secret/es/username" || "")
 
+export ES_PASSWORD
+export ES_USERNAME
 
-export ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-
-
+export ELASTIC_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
