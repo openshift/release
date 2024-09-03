@@ -133,4 +133,5 @@ function format_ps4() {
     local -r line=$2
     echo -en "+ ${date} ${file#"${HOME}/"}:${line} \011"
 }
+export -f format_ps4
 export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
