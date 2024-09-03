@@ -9,9 +9,12 @@ oc projects
 python3 --version
 ls
 
-export ES_PASSWORD=$(cat "/secret/es/password")
-export ES_USERNAME=$(cat "/secret/es/username")
 
+ES_USERNAME=$(cat "/secret/es/username")
+ES_PASSWORD=$(cat "/secret/es/password")
+
+export ES_USERNAME
+export ES_PASSWORD
 
 export ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
