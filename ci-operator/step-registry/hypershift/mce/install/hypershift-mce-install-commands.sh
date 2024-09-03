@@ -234,3 +234,14 @@ EOF
       sleep 10
   done
 fi
+
+# display HyperShift cli version
+HYPERSHIFT_NAME=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )) && echo "hypershift" || echo "hcp" )
+arch=$(arch)
+if [ "$arch" == "x86_64" ]; then
+  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+  cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+  chmod +x /tmp/${HYPERSHIFT_NAME}
+  cd -
+fi
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
