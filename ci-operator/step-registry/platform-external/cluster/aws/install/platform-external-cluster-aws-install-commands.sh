@@ -57,8 +57,8 @@ echo "==============================="
 echo "Patch CloudFormation Templates"
 echo "==============================="
 
-TEMPLATES_BASE=https://raw.githubusercontent.com/openshift-splat-team/labs
-TEMPLATES_VERSION=platform-external-aws
+TEMPLATES_BASE=https://raw.githubusercontent.com/openshift-splat-team/installer-labs
+TEMPLATES_VERSION=main
 TEMPLATES_PATH=installer-upi/aws/cloudformation/templates
 
 TEMPLATE_URL=${TEMPLATES_BASE}/${TEMPLATES_VERSION}/${TEMPLATES_PATH}
