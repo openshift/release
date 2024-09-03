@@ -987,6 +987,8 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export TARGET_MINOR_VERSION=""
+
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
 release_string="$(< "${SHARED_DIR}/upgrade-edge")"
 # shellcheck disable=SC2207
@@ -1009,7 +1011,6 @@ for target in "${TARGET_RELEASES[@]}"; do
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
     export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
