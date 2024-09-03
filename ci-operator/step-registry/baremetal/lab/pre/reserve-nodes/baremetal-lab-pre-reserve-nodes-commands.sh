@@ -23,6 +23,11 @@ gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 # Other profiles add to the cluster_name the suffix "-${UNIQUE_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
+# It's harmless to create this file always
+HYPERSHIFT_HOSTED_CLUSTER_NAME="$(echo -n "$PROW_JOB_ID" | sha256sum | cut -c-20)"
+echo "$HYPERSHIFT_HOSTED_CLUSTER_NAME" > "$SHARED_DIR"/hostedcluster_name
+
+[ "${HYPERSHIFT}" == "true" ] && touch "$SHARED_DIR/deploy_hypershift_hosted"
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \

@@ -1,0 +1,152 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.17.0-0
+        upper: 4.18.0-0
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: loaded-upgrade-417to418-24nodes
+  cron: 0 10 3,10,17,24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      WORKER_REPLICA_COUNT: "24"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+- as: loaded-upgrade-417to418-120nodes
+  cron: 0 0 24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "15"
+      PROFILE_TYPE: reporting
+      USER_TAGS: |
+        TicketId 382
+      WORKER_REPLICA_COUNT: "120"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+- always_run: false
+  as: loaded-upgrade-417to418-180nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "22"
+      PROFILE_TYPE: reporting
+      USER_TAGS: |
+        TicketId 382
+      WORKER_REPLICA_COUNT: "180"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+- as: loaded-upgrade-417to418-252nodes
+  cron: 0 6 24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "31"
+      PROFILE_TYPE: reporting
+      USER_TAGS: |
+        TicketId 382
+      WORKER_REPLICA_COUNT: "252"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.18-nightly-x86-loaded-upgrade-from-4.17

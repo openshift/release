@@ -62,9 +62,16 @@ TENANT_ID=$(jq -r .tenantId "${SHARED_DIR}/osServicePrincipal.json")
 cat >> "${SHARED_DIR}/azurestack-login-script.sh" << EOF
 
 if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
-  cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-  cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
-  export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+    cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+    if ls /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem > /dev/null 2>&1; then
+        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+    elif ls /go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem > /dev/null 2>&1; then
+        cat /go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+    else
+        echo "ERROR: unable to find cacert.pem in pyhton library that azure-cli depends on, exit..."
+        exit 1
+    fi
+    export REQUESTS_CA_BUNDLE=/tmp/ca.pem
 fi
 az cloud register \
     -n ${cloud_name} \

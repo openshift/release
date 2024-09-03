@@ -122,7 +122,7 @@ tests:
     test:
     - as: cloud-provider-powervs
       commands: |
-        export BRANCH_NAME=release-1.29
+        export BRANCH_NAME=release-1.30
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-powervs:main \
                   --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \
@@ -577,6 +577,33 @@ tests:
         namespace: test-credentials
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: topolvm
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: topolvm
+      commands: |
+        rebasebot --source https://github.com/topolvm/topolvm:main \
+                  --dest openshift/topolvm:main \
+                  --rebase openshift/topolvm-rebase:rebase-bot-main \
+                  --github-app-id 966050 \
+                  --github-app-key /secrets/lvms/rebase-bot/edge-enablement-team-rebase-bot-key \
+                  --github-cloner-key /secrets/lvms/rebase-bot/edge-enablement-team-cloner-bot-key \
+                  --github-cloner-id 966053 \
+                  --git-username edge-enablement-team-rebase-bot \
+                  --git-email openshift-edge-enablement@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/lvms/rebase-bot
+        name: lvms-rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
       resources:

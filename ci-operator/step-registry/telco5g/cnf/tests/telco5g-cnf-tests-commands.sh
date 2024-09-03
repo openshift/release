@@ -94,6 +94,11 @@ if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
 # TESTNAME
 sriov "SCTP integration Test Connectivity"
 
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
 EOF
 
 fi
@@ -117,6 +122,36 @@ if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
 # TESTNAME
 sriov "SCTP integration Test Connectivity"
 
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_18 {
+# List of temporarly skipped tests for 4.18
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
 EOF
 fi
 }
@@ -126,7 +161,7 @@ function is_bm_node {
 
     if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
         # Define thresholds
-        CPU_THRESHOLD=80
+        CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
 
         echo "Checking if node $node is baremetal or virtual"
@@ -292,8 +327,12 @@ checkout_submodules(){
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
-else
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 echo "Go version: $(go version)"
@@ -345,7 +384,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.17" ]]; then
+if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.16"
 else
@@ -369,7 +408,7 @@ fi
 pushd $CNF_REPO_DIR
 echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]] || [[ "$T5CI_VERSION" == "4.17" ]]; then
+if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
@@ -413,8 +452,12 @@ if [[ "$CNF_BRANCH" == *"4.16"* ]]; then
     create_tests_temp_skip_list_16
     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
-if [[ "$CNF_BRANCH" == *"4.17"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.17"* ]]; then
     create_tests_temp_skip_list_17
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+fi
+if [[ "$CNF_BRANCH" == *"4.18"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_18
     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"

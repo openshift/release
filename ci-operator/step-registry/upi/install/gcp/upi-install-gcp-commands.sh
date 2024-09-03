@@ -41,6 +41,7 @@ echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 # return 0 if OCP version >= the minimum version, otherwise 1
 function version_check() {
   local -r minimum_version="$1"
+  local ret
 
   dir=$(mktemp -d)
   pushd "${dir}"
@@ -48,14 +49,23 @@ function version_check() {
   cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
   KUBECONFIG="" oc registry login --to pull-secret
   ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  rm pull-secret
 
-  if [[ "${ocp_version}" == "${minimum_version}" ]] || [[ "${ocp_version}" > "${minimum_version}" ]]; then
+  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
+  echo "[DEBUG] current OCP version: '${ocp_version}'"
+  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
+  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
+  min_x=$(echo "${minimum_version}" | cut -d. -f1)
+  min_y=$(echo "${minimum_version}" | cut -d. -f2)
+
+  if [ ${curr_x} -gt ${min_x} ] || ( [ ${curr_x} -eq ${min_x} ] && [ ${curr_y} -ge ${min_y} ] ); then
+    echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
     ret=0
   else
+    echo "[DEBUG] version_check result: ${ocp_version} < ${minimum_version}"
     ret=1
   fi
 
-  rm pull-secret
   popd
   return ${ret}
 }
@@ -292,6 +302,9 @@ else # for workflow before internal load balancers
 fi
 CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-public-ip" "--region=${REGION}" --format json | jq -r .address)"
 
+API_INTERNAL_BACKEND_SVC=$(gcloud compute backend-services list --filter="name~${INFRA_ID}-api-internal" --format='value(name)')
+echo "[DEBUG] API internal backend-service: '${API_INTERNAL_BACKEND_SVC}'"
+
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
@@ -431,8 +444,13 @@ echo "$(date -u --rfc-3339=seconds) - Adding the bootstrap instance to the load 
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
+  # https://github.com/openshift/installer/pull/8582
   gcloud compute instance-groups unmanaged add-instances "${BOOTSTRAP_INSTANCE_GROUP}" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+
+  cmd="gcloud compute backend-services add-backend ${API_INTERNAL_BACKEND_SVC} --region=${REGION} --instance-group=${BOOTSTRAP_INSTANCE_GROUP} --instance-group-zone=${ZONE_0}"
+  echo "[DEBUG] Running Command: '${cmd}'"
+  eval "${cmd}"
+
 else # for workflow before internal load balancers
   gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
@@ -575,11 +593,29 @@ echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap r
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
-  gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
+  # https://github.com/openshift/installer/pull/8582
+  cmd="gcloud compute backend-services remove-backend ${API_INTERNAL_BACKEND_SVC} --region=${REGION} --instance-group=${BOOTSTRAP_INSTANCE_GROUP} --instance-group-zone=${ZONE_0}"
+  echo "[DEBUG] Running Command: '${cmd}'"
+  eval "${cmd}"
+
 else # for workflow before internal load balancers
   gcloud compute target-pools remove-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools remove-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
 fi
+# remove from the backend service of random id
+backend_service_random_id=$(gcloud compute backend-services list --format=json --filter="backends[].group~${INFRA_ID}" | jq -r .[].name | grep -v "${INFRA_ID}" || echo "")
+echo "[DEBUG] the backend service of random id: '${backend_service_random_id}'"
+if [[ -n "${backend_service_random_id}" ]]; then
+  echo "[DEBUG] Running Command: 'gcloud compute backend-services describe ${backend_service_random_id} --region ${REGION} --format json | jq -r .backends | grep \"${BOOTSTRAP_INSTANCE_GROUP}\"'"
+  if gcloud compute backend-services describe ${backend_service_random_id} --region ${REGION} --format json | jq -r .backends | grep "${BOOTSTRAP_INSTANCE_GROUP}"; then
+    cmd="gcloud compute backend-services remove-backend ${backend_service_random_id} --region=${REGION} --instance-group=${BOOTSTRAP_INSTANCE_GROUP} --instance-group-zone=${ZONE_0}"
+    echo "[DEBUG] Running Command: '${cmd}'"
+    eval "${cmd}"
+  else
+    echo "[DEBUG] ${BOOTSTRAP_INSTANCE_GROUP} is not in ${backend_service_random_id} backends."
+  fi
+fi
+
 gsutil rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
 gsutil rb "gs://${INFRA_ID}-bootstrap-ignition"
 gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"

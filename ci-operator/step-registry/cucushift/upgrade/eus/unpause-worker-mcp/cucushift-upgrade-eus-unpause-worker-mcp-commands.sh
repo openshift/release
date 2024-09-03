@@ -41,7 +41,7 @@ function check_mcp() {
         if [[ ${updated} == "True" && ${updating} == "False" && ${degraded} == "False" ]]; then
             echo "Worker pool status check passed" && return 0
         fi  
-        sleep 120
+        sleep 300
         (( try += 1 ))
     done  
     echo >&2 "Worker pool status check failed" && return 1

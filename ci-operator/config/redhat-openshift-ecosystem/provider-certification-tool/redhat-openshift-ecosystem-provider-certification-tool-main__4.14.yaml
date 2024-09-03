@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.22
 releases:
   latest:
     release:
@@ -28,26 +28,23 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-none-vsphere
-  cron: 0 0 * * 6
+  cron: '@monthly'
   steps:
-    cluster_profile: vsphere-2
-    env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
+    cluster_profile: vsphere-elastic
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
 - as: platform-external-vsphere
-  cron: 0 0 * * 6
+  cron: '@monthly'
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
 - as: platform-none-vsphere-upgrade
-  cron: 0 0 * * 6
+  cron: '@monthly'
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       OPCT_RUN_MODE: upgrade
       UPGRADE_TO_CHANNEL_TYPE: candidate

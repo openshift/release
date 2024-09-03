@@ -90,3 +90,6 @@ echo "Custom Pool Patch:"
 cat ${CONFIG_PATCH}
 
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+
+# save pool id for post-check
+echo ${pool_id} > ${SHARED_DIR}/ipv4_pool_id

@@ -64,6 +64,7 @@ spec:
                           request_handle:headers():add("x-endpoint-api-consumer-type", "PROJECT") \n\
                           request_handle:headers():add("x-endpoint-api-consumer-number", "1") \n\
                           local path = request_handle:headers():get(":path") \n\
+                          request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "path", path) \n\
                           local job_name = string.match(path, "/v1/executions/([^/]+)$") \n\
                           local body = request_handle:body() \n\
                           local jsonString = tostring(body:getBytes(0, body:length())) \n\
@@ -78,6 +79,17 @@ spec:
                           end \n\
                           local newBody = json.encode(bodyTable) \n\
                           request_handle:body():setBytes(newBody) \n\
+                      end \n\
+                      function envoy_on_response(response_handle) \n\
+                        local path = response_handle:streamInfo():dynamicMetadata():get("envoy.filters.http.lua")["path"] \n\
+                        if path == "/v1/bulk-job-status-update" then \n\
+                          local status = response_handle:headers():get(":status") \n\
+                          if status == "200" then \n\
+                            response_handle:headers():replace(":status", "202") \n\
+                            local response_text = "Your request is being handled. Check gangway logs." \n\
+                            response_handle:body():setBytes(response_text) \n\
+                          end \n\
+                        end \n\
                       end \n\
                 - name: envoy.filters.http.grpc_json_transcoder \n\
                   typed_config: \n\

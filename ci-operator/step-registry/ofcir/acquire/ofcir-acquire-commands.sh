@@ -9,7 +9,7 @@ echo "************ ofcir setup command ************"
 
 function send_slack(){
     set +x
-    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
+    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat "$CLUSTER_PROFILE_DIR/slackhook")"
 
     curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/test-platform-results/logs/$JOB_NAME/$BUILD_ID|Ofcir setup failed> $1\n\"}" \
         "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
@@ -28,7 +28,7 @@ EOF
 function exit_with_failure(){
   # TODO: update message to reflect job name/link
   MESSAGE="${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"}"
-  echo $MESSAGE
+  echo "$MESSAGE"
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="1">
     <testcase name="[sig-metal] should get working host from infra provider">
@@ -78,7 +78,7 @@ EOF
 
 function getCIR(){
     OFCIRURL="https://ofcir-service.ofcir-system.svc.cluster.local/v1/ofcir"
-    OFCIRTOKEN="$(cat ${CLUSTER_PROFILE_DIR}/ofcir-auth-token)"
+    OFCIRTOKEN="$(cat "${CLUSTER_PROFILE_DIR}/ofcir-auth-token")"
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
     PORTFILE=$SHARED_DIR/server-sshport
@@ -86,7 +86,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
     # we don't want to overdo it on the retries incase we start leaking CIR's
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
+    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -96,21 +96,21 @@ function getCIR(){
         exit_with_failure "Could not acquire CI resource: $BODY"
     fi
 
-    NAME=$(jq -r .name < $CIRFILE)
+    NAME=$(jq -r .name < "$CIRFILE")
 
     # If the node is being provisioned on demand it may take some time to be provisioned
     # wait upto 30 minutes to allow this to happen
     for _ in $(seq 60) ; do
-        curl --retry-all-errors --retry-delay 60 --retry 1 -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o $CIRFILE
-        if [ "$(jq -r 'select(.status == "in use" and .ip != "")' < $CIRFILE)" ] ; then
+        curl --retry-all-errors --retry-delay 60 --retry 1 -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o "$CIRFILE"
+        if [ "$(jq -r 'select(.status == "in use" and .ip != "")' < "$CIRFILE")" ] ; then
             break
         fi
         sleep 30
     done
 
-    jq -r .ip < $CIRFILE > $IPFILE
-    jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
-    if [ "$(cat $IPFILE)" == "" ] ; then
+    jq -r .ip < "$CIRFILE" > "$IPFILE"
+    jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" | jq ".ofcir_port_ssh // 22" -r > "$PORTFILE"
+    if [ "$(cat "$IPFILE")" == "" ] ; then
         set +x
         echo "<==== OFCIR ACQUIRE ERROR ====="
         echo "Timeout waiting for CI resource provisioning"

@@ -24,16 +24,16 @@ echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 
+declare GOVC_URL
 declare GOVC_DATACENTER
 declare GOVC_DATASTORE
-declare vsphere_cluster
 declare vsphere_portgroup
 declare GOVC_RESOURCE_POOL
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
-unset SSL_CERT_FILE 
+unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 govc_version=$(govc version)
@@ -47,15 +47,25 @@ vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{pr
 FDS=$(jq '.failureDomains | length' "$SHARED_DIR"/platform.json)
 fd_idx=0
 
-# iterate each failure domain and ensure a template is available in 
+
+echo "$(date -u --rfc-3339=seconds) - ***** DEBUG: ${FDS}"
+
+
+# iterate each failure domain and ensure a template is available in
 # each failure domain
-while [[ $fd_idx -lt $FDS ]]; do    
+while [[ $fd_idx -lt $FDS ]]; do
     FD=$(jq -c -r '.failureDomains['${fd_idx}']' "$SHARED_DIR"/platform.json)
-            
-    CLUSTER=${vsphere_cluster}
+
+    echo "$(date -u --rfc-3339=seconds) - ***** DEBUG: index: ${fd_idx} $(echo "${FD}" | jq -r '.')"
+
+    CLUSTER=$(echo "${FD}" | jq -r .topology.computeCluster)
     GOVC_DATASTORE=$(echo "${FD}" | jq -r .topology.datastore)
     GOVC_DATACENTER=$(echo "${FD}" | jq -r .topology.datacenter)
-    GOVC_RESOURCE_POOL="${vsphere_cluster}/Resources"
+    # shellcheck disable=SC2034
+    GOVC_URL=$(echo "${FD}" | jq -r '.server')
+
+    # Since the resource pool doesn't exist yet use the cluster hidden Resources
+    GOVC_RESOURCE_POOL="${CLUSTER}/Resources"
     vsphere_portgroup=$(echo "${FD}" | jq -r .topology.networks[0])
 
     OVA_NETWORK=""
@@ -102,6 +112,13 @@ while [[ $fd_idx -lt $FDS ]]; do
 }
 EOF
 
+    echo "$(date -u --rfc-3339=seconds) - Configured Datacenter: ${GOVC_DATACENTER}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Resource Pool: ${GOVC_RESOURCE_POOL}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Leased Resource: ${vsphere_portgroup}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Portgroup: ${LEASED_RESOURCE}"
+    echo "$(date -u --rfc-3339=seconds) - Configured OVA Network as MOB ID: ${OVA_NETWORK}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Datastore: ${GOVC_DATASTORE}"
+
     if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]; then
         echo "$(date -u --rfc-3339=seconds) - Creating a template for the VMs from ${ova_url}..."
         curl -L -o /tmp/rhcos.ova "${ova_url}"
@@ -110,12 +127,6 @@ EOF
     else
         echo "$(date -u --rfc-3339=seconds) - Skipping ova import due to image already existing."
     fi
-
-    echo "$(date -u --rfc-3339=seconds) - Configured Resource Pool: ${GOVC_RESOURCE_POOL}"
-    echo "$(date -u --rfc-3339=seconds) - Configured Leased Resource: ${vsphere_portgroup}"
-    echo "$(date -u --rfc-3339=seconds) - Configured Portgroup: ${LEASED_RESOURCE}"
-    echo "$(date -u --rfc-3339=seconds) - Configured OVA Network as MOB ID: ${OVA_NETWORK}"
-    echo "$(date -u --rfc-3339=seconds) - Configured Datastore: ${GOVC_DATASTORE}"
 
     hw_versions=(15 17 18 19)
     if [[ ${vsphere_version} -eq 8 ]]; then
@@ -139,6 +150,6 @@ EOF
             echo "$(date -u --rfc-3339=seconds) - Skipping ova import for hw${hw_version} due to image already existing."
         fi
     done
-    
-    fd_idx=$((fd_idx+1)); 
+
+    fd_idx=$((fd_idx+1));
 done

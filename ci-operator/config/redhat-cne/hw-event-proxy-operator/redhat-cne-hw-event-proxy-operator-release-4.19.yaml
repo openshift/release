@@ -1,0 +1,94 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: baremetal-hardware-event-proxy-operator
+- dockerfile_path: bundle.Dockerfile
+  to: baremetal-hardware-event-proxy-operator-bundle
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/baremetal-hardware-event-proxy-operator:.*
+    with: pipeline:baremetal-hardware-event-proxy-operator
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname redhat-cne-e2e-aws-hw-event-proxy-operator-main
+        ci-job-type e2e-aws
+        ci-repo-name hw-event-proxy-operator
+        ci-org-name redhat-cne
+    workflow: openshift-e2e-aws
+- as: e2e-operator
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname redhat-cne-e2e-operator-hw-event-proxy-operator-main
+        ci-job-type e2e-operator
+        ci-repo-name hw-event-proxy-operator
+        ci-org-name redhat-cne
+    test:
+    - as: e2e-operator
+      cli: latest
+      commands: "cp $(echo \"${KUBECONFIG}\") ${PWD}/kubeconfig\nexport IMG=${IMAGE_HW_EVENT_PROXY_OPERATOR}\nmake
+        test-ci      \n"
+      dependencies:
+      - env: IMAGE_HW_EVENT_PROXY_OPERATOR
+        name: pipeline:baremetal-hardware-event-proxy-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: redhat-cne
+  repo: hw-event-proxy-operator

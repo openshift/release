@@ -44,7 +44,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-gcp-olm
-  cron: 0 0 * * *
+  cron: 0 14 * * 1,3,5
   steps:
     cluster_profile: gcp
     test:
@@ -62,6 +62,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-olm-flaky
+  cron: 0 14 * * 1,3,5
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm TEST='\[FLAKE\]'
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
     workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.14

@@ -11,8 +11,14 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-ES_PASSWORD=$(cat "/secret/password")
-ES_USERNAME=$(cat "/secret/username")
+ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+
+ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+if [ -e "${ES_SECRETS_PATH}/host" ]; then
+    ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
+fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
@@ -21,7 +27,7 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=crd-scale
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 export EXTRA_FLAGS=$FLAGS
 export EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --iterations=${ITERATIONS}"
 

@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -22,6 +27,9 @@ declare vsphere_portgroup
 declare dns_server
 declare vsphere_url
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 openshift_install_path="/var/lib/openshift-install"
 
@@ -148,6 +156,9 @@ source "${SHARED_DIR}/vsphere_context.sh"
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 

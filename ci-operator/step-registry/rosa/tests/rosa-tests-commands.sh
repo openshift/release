@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_LABEL_FILTERS=${TEST_LABEL_FILTERS:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
@@ -39,6 +40,12 @@ if [[ -f "${AWSCRED}" ]]; then
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
+fi
+
+# Configure shared vpc aws account file
+if [[ -f ${CLUSTER_PROFILE_DIR}/.awscred_shared_account ]];then
+  echo "Got awscred_shared_account and set it to env variable SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE"
+  export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 fi
 
 # Log in

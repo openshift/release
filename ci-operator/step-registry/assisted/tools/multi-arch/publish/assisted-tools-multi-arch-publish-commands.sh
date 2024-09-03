@@ -21,6 +21,11 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
       EXTRA_PARAMS="--push"
     fi
 
+    # workaround for error 
+    # 'fatal: detected dubious ownership in repository at '/go/src/github.com/openshift/assisted-installer'
+    # https://nvd.nist.gov/vuln/detail/cve-2022-24765
+    git config --global --add safe.directory '*'
+
     echo "${DOCKERFILE_IMAGE_PAIRS}" | tr -d '[:space:]' | awk -F , 'BEGIN{RS="|"}{printf("-f %s -t %s\n", \$1, \$2)}' | \
     while read -r params ; do
       docker buildx build --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x . \${EXTRA_PARAMS} \$params

@@ -1,6 +1,9 @@
 ref:
   as: fips-check-image-scan
-  from: check-payload
+  from_image:
+    namespace: ci
+    name: check-payload
+    tag: latest
   credentials:
   - mount_path: /var/secrets/registry-pull-secret
     name: registry-pull-credentials
@@ -11,9 +14,8 @@ ref:
       cpu: 50m
       memory: 100Mi
   grace_period: 150s
-  env:
-  - name: SCAN_IMAGE
-    default: ""
-    documentation: The image to scan with check-payload tool
+  dependencies:
+  - name: ci-image
+    env: SCAN_IMAGE
   documentation: >-
-    This step checks if a specified container image with the environment variable ${SCAN_IMAGE} has FIPS compliant binaries.
+    This step checks if a specified container image with the dependent environment variable ${SCAN_IMAGE} has FIPS compliant binaries.

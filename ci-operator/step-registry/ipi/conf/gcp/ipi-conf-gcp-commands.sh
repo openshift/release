@@ -20,25 +20,44 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-# Temporary test to see if this helps the consistent high CPU alerts and random test failures
-master_type_suffix="-custom-6-16384"
-# TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
-# custom sizes are not supported by arm64 VMs
-if [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type_suffix="-standard-4"
+control_plane_arch="${CONTROL_ARCH:-${OCP_ARCH}}"
+case "${SIZE_VARIANT}" in
+  "xlarge")
+    master_type_suffix="standard-32"
+  ;;
+  "large")
+    master_type_suffix="standard-16"
+  ;;
+  "compact")
+    master_type_suffix="standard-8"
+  ;;
+  *)
+    if [[ "${control_plane_arch}" == "arm64" ]]; then
+      master_type_suffix="standard-4"
+    else
+      # Temporary test to see if this helps the consistent high CPU alerts and random test failures
+      master_type_suffix="custom-6-16384"
+      # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+      # custom sizes are not supported by arm64 VMs
+    fi
+  ;;
+esac
+
+if [[ "${control_plane_arch}" == "amd64" ]]; then
+  master_type="e2-${master_type_suffix}"
+elif [[ "${control_plane_arch}" == "arm64" ]]; then
+  master_type="t2a-${master_type_suffix}"
 fi
-if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type_suffix="-standard-32"
-elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type_suffix="-standard-16"
-elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type_suffix="-standard-8"
+
+compute_arch="${COMPUTE_ARCH:-${OCP_ARCH}}"
+if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
+  if [[ "${compute_arch}" == "arm64" ]]; then
+    COMPUTE_NODE_TYPE="t2a-standard-4"
+  else
+    COMPUTE_NODE_TYPE="e2-standard-4"
+  fi
 fi
-if [ "${OCP_ARCH}" = "amd64" ]; then
-  master_type="e2${master_type_suffix}"
-elif [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type="t2a${master_type_suffix}"
-fi
+
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -47,7 +66,7 @@ platform:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
 controlPlane:
-  architecture: ${OCP_ARCH}
+  architecture: ${control_plane_arch}
   name: master
   platform:
     gcp:
@@ -57,7 +76,7 @@ controlPlane:
         diskSizeGB: 200
   replicas: ${masters}
 compute:
-- architecture: ${OCP_ARCH}
+- architecture: ${compute_arch}
   name: worker
   replicas: ${workers}
   platform:

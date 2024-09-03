@@ -16,7 +16,7 @@ function set_cluster_access() {
     fi
 }
 function preparation_for_test() {
-    if ! which kubectl > /dev/null ; then
+    if ! which kubectl &> /dev/null ; then
         mkdir --parents /tmp/bin
         export PATH=$PATH:/tmp/bin
         ln --symbolic "$(which oc)" /tmp/bin/kubectl
@@ -254,9 +254,20 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]+' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
     while read row ; do
 	for ctype in "${!results[@]}" ; do
             count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"

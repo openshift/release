@@ -1,0 +1,92 @@
+base_images:
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-base-nodejs-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-nodejs-openshift-4.15
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: console-plugin-test-cypress
+canonical_go_repository: github.com/openshift/networking-console-plugin
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-8-base-nodejs-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.15
+  to: networking-console-plugin
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: yarn install && yarn run lint && yarn build
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: i18n
+      commands: |
+        yarn install && yarn i18n
+        GIT_STATUS="$(git status --short --untracked-files locales)"
+        if [ -n "$GIT_STATUS" ]; then
+          echo "i18n files are not up to date. Commit them to fix."
+          git diff
+          exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: CYPRESS_PLUGIN_TEMPLATE_PULL_SPEC
+        name: networking-console-plugin
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: networking-console-plugin

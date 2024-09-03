@@ -14,7 +14,13 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 # shellcheck source=/dev/null
 declare cloud_where_run
 declare vsphere_portgroup
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
@@ -32,7 +38,7 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
-function collect_sosreport_from_unprovisioned_machines {  
+function collect_sosreport_from_unprovisioned_machines {
   set +e
   echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
 
@@ -50,7 +56,7 @@ function collect_sosreport_from_unprovisioned_machines {
       echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
       ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
       echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core      
+      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
       ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
       echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
       scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
@@ -135,7 +141,6 @@ function collect_diagnostic_data {
   net.usage.average
   sys.uptime.latest"
 
-  source "${SHARED_DIR}/govc.sh"
   vcenter_state="${ARTIFACT_DIR}/vcenter_state"
   mkdir "${vcenter_state}"
   unset GOVC_DATACENTER

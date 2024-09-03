@@ -1,12 +1,16 @@
 base_images:
+  fedora:
+    name: fedora
+    namespace: openshift
+    tag: "31"
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
   os:
-    name: centos
-    namespace: openshift
-    tag: "7"
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -31,7 +35,7 @@ images:
         source_path: /go/bin/janitor
   to: janitor
 - dockerfile_path: ./images/worker/Dockerfile
-  from: os
+  from: fedora
   inputs:
     bin:
       paths:
@@ -54,6 +58,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/apiserver
   to: apiserver
+- dockerfile_path: ./images/results-handler/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/results-handler
+  to: results-handler
 promotion:
   to:
   - namespace: vega-project
