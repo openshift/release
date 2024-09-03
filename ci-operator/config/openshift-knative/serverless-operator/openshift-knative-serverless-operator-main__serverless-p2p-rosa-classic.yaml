@@ -7,18 +7,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
-  console-tests:
-    name: "4.17"
-    namespace: ocp
-    tag: console-tests
-  ocp_4.17_cli:
-    name: "4.17"
+  ocp_4.15_cli:
+    name: "4.15"
     namespace: ocp
     tag: cli
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   openshift_eventing-istio-src_knative-v1.14:
     name: eventing-istio-src
     namespace: openshift
@@ -35,12 +27,12 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.14
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
-  origin_4.17_operator-registry:
-    name: "4.17"
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+  origin_4.15_operator-registry:
+    name: "4.15"
     namespace: origin
     tag: operator-registry
   rosa-aws-cli:
@@ -53,36 +45,30 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   inputs:
-    origin_4.17_operator-registry:
+    origin_4.15_operator-registry:
       as:
-      - registry.ci.openshift.org/origin/4.17:operator-registry
+      - registry.ci.openshift.org/origin/4.15:operator-registry
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
-    ocp_4.17_cli:
+    ocp_4.15_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.17:cli
+      - registry.ci.openshift.org/ocp/4.15:cli
     openshift_eventing-istio-src_knative-v1.14:
       as:
       - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.14
@@ -98,21 +84,11 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -144,7 +120,7 @@ tests:
           "success_rules": [{"jira_epic": "MSINTEROP-1164"}]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","rosa-classic-p2p","serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","rosa-classic-p2p","serverless-p2p","serverless-servicemesh"]'
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-1165
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
@@ -152,6 +128,8 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.17"
+      OPERATOR1_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR2_CONFIG: name=servicemeshoperator;namespace=openshift-operators
       REGION: us-west-2
     test:
     - as: mesh-e2e-tests
@@ -178,6 +156,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    - ref: p2p-additional-labels
     workflow: firewatch-rosa-aws-sts
   timeout: 6h0m0s
 zz_generated_metadata:
