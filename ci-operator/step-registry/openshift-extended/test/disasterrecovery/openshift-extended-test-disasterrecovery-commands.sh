@@ -206,6 +206,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
         IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
         echo "using the specified key for minimal permission!!"
