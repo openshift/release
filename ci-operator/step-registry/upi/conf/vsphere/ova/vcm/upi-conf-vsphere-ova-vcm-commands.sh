@@ -24,6 +24,7 @@ echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 
+declare GOVC_URL
 declare GOVC_DATACENTER
 declare GOVC_DATASTORE
 declare vsphere_portgroup
@@ -60,6 +61,8 @@ while [[ $fd_idx -lt $FDS ]]; do
     CLUSTER=$(echo "${FD}" | jq -r .topology.computeCluster)
     GOVC_DATASTORE=$(echo "${FD}" | jq -r .topology.datastore)
     GOVC_DATACENTER=$(echo "${FD}" | jq -r .topology.datacenter)
+    # shellcheck disable=SC2034
+    GOVC_URL=$(echo "${FD}" | jq -r '.server')
 
     # Since the resource pool doesn't exist yet use the cluster hidden Resources
     GOVC_RESOURCE_POOL="${CLUSTER}/Resources"

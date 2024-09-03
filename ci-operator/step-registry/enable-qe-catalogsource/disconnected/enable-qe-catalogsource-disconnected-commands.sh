@@ -476,7 +476,7 @@ function check_olm_capability(){
         enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
           if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
               echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
-              return 0
+              return 1
           fi
     fi
     return 0
