@@ -24,10 +24,11 @@ then
 fi
 
 # Adding the infra label
-echo "infra nodes"
+echo "infra nodes:"
 for i in $(seq 0 $((INFRA_NODES_TO_TAG -1))); do oc label nodes/${WORKER_NODES[$i]} node-role.kubernetes.io/infra=; done
 
 # Adding the app label to the rest of the worker nodes
+echo "app nodes:"
 for i in "${WORKER_NODES[@]:$INFRA_NODES_TO_TAG}"; do oc label nodes/$i node-role.kubernetes.io/app=; done
 
 # Patching the scheduler cluster to add infra nodes as defaultNodeSelector
