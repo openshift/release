@@ -15,14 +15,18 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.17"
-  ocp_4.17_tools:
-    name: "4.17"
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
+  ocp_4.18_tools:
+    name: "4.18"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   image_stream_tag:
     name: builder
@@ -38,6 +42,9 @@ images:
     ci_tests-private-builder_4.17:
       as:
       - registry.ci.openshift.org/ci/tests-private-builder:4.17
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -90,16 +97,16 @@ images:
   to: tests-private-tools
 - dockerfile_path: images/Dockerfile.base
   inputs:
-    ocp_4.17_tools:
+    ocp_4.18_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.17:tools
+      - registry.ci.openshift.org/ocp/4.18:tools
   optional: true
   to: tests-private-base
 - dockerfile_path: images/Dockerfile.builder
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   optional: true
   to: tests-private-builder
 promotion:
