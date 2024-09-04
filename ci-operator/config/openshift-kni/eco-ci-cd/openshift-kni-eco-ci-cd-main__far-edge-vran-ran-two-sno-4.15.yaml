@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: telco-bastion
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  cron: 00 01 * * 5
+  steps:
+    env:
+      CNF_POLARION_BRANCH: auto-update-existing
+      CNF_POLARION_REPO: https://gitlab.cee.redhat.com/klaskosk/cnf-polarion.git"
+      DEPLOY_DU: "true"
+      DU_PULL_SPEC: latest-4.15
+      DU_USE_NEXUS_CACHE: "false"
+      JENKINS_INSTANCE: ci
+      LAUNCH_DESCRIPTION: telco ran tests
+      LAUNCH_NAME: telco-ran
+      LOCK_LBL_HOST: registry.kni-qe-16.lab.eng.rdu2.redhat.com
+      MIRROR_SPOKE_OPERATOR_IMAGES: "true"
+      PYLARION_TITLE: Telco 5G RAN Regression - Build <build>
+      RAN_HUB: "true"
+      RAN_METRICS_FORMAL_TEST: "true"
+      RAN_SPOKE: "true"
+      SPOKE_NAME: worker-0
+      SPOKE_OPERATOR_IMAGES_SOURCE: stage
+      TALM_MINOR_VERSION: "15"
+      TEST_DESCRIPTION: Telco QE TALM and ZTP func test
+      TEST_TYPE: ecogotests=talm;ztp,ztp-generator
+      UPLOAD_METRICS: "true"
+      UPLOAD_XML_POLARION: "true"
+      UPLOAD_XML_REPORT_PORTAL: "true"
+      UPLOAD_XML_SPLUNK: "false"
+      VERSION: "4.15"
+      ZTP_POLICIES_REPO_BRANCH: workers-4.15
+      ZTP_SITECONFIG_REPO_BRANCH: workers-4.15
+    test:
+    - ref: telcov10n-functional-ocp-far-edge-vran-tests
+    workflow: telcov10n-functional-far-edge-vran-ran-two-sno
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: far-edge-vran-ran-two-sno-4.15
