@@ -20,6 +20,9 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 REGION=${REGION:-$LEASED_RESOURCE}
 
+
+sleep 1800
+
 function save_stack_events_to_artifacts()
 {
   set +o errexit
