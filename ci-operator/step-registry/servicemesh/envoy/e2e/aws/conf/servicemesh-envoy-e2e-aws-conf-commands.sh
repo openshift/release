@@ -63,10 +63,6 @@ function eval_instance_capacity() {
   set -o errexit
 }
 
-
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
-
 CONTROL_PLANE_INSTANCE_SIZE="xlarge"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="8xlarge"
@@ -86,25 +82,27 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
     COMPUTE_NODE_TYPE="m5.xlarge"
   fi
 
-  if [[ "${COMPUTE_NODE_ROOTVOLUME_SIZE}" == "" ]]; then
-    COMPUTE_NODE_ROOTVOLUME_SIZE="300"
-  fi
-
   if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
     CONTROL_PLANE_INSTANCE_TYPE="m5.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
-  architecture="arm64"
+  CONTROL_ARCH="arm64"
+  COMPUTE_ARCH="arm64"
+
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     COMPUTE_NODE_TYPE="m6g.xlarge"
+  fi
+
+  if [[ "${COMPUTE_NODE_ROOTVOLUME_SIZE}" == "" ]]; then
+    COMPUTE_NODE_ROOTVOLUME_SIZE="300"
   fi
 
   if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
     CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 else
-  # AMD 64
+  # AMD 64 or Multiarch Compute
 
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
@@ -117,20 +115,34 @@ else
   # Do not change auto-types unless it is coordinated with the cloud
   # financial operations team. Savings plans may be in place to
   # decrease the cost of certain instance families.
-  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-    else
-      CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+  if [[ "${CONTROL_ARCH}" == "amd64" ]]; then
+    if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+      else
+        CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+      fi
     fi
+  elif [[ "${CONTROL_ARCH}" == "arm64" ]]; then
+    CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
+  else
+    echo "${CONTROL_ARCH} is not a valid control plane architecture..."
+    exit 1
   fi
 
-  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-    else
-      COMPUTE_NODE_TYPE="m6i.xlarge"
+  if [[ "${COMPUTE_ARCH}" == "amd64" ]]; then
+    if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+      else
+        COMPUTE_NODE_TYPE="m6i.xlarge"
+      fi
     fi
+  elif [[ "${COMPUTE_ARCH}" == "arm64" ]]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
+  else
+    echo "${COMPUTE_ARCH} is not a valid compute plane architecture..."
+    exit 1
   fi
 
 fi
@@ -138,18 +150,19 @@ fi
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
-workers=${COMPUTE_NODE_REPLICAS:-3}
+worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
-    workers=0
-elif [[ "${COMPUTE_NODE_REPLICAS}" -gt 5 ]]; then
-    workers=5
-fi
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  workers=0
+    worker_replicas=0
 fi
 
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  worker_replicas=0
+fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
+
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[].ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
 if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
@@ -176,7 +189,7 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
-if [[ ${existing_zones_setting} == "" ]]; then
+if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
@@ -200,7 +213,8 @@ fi
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 echo "Using compute instance root volume size: ${COMPUTE_NODE_ROOTVOLUME_SIZE}"
-echo "Using compute node replicas: ${workers}"
+echo "Using compute node replicas: ${worker_replicas}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
@@ -210,16 +224,18 @@ platform:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
+      clusterName: ${NAMESPACE}-${UNIQUE_HASH}
 controlPlane:
-  architecture: ${architecture}
+  architecture: ${CONTROL_ARCH}
   name: master
+  replicas: ${master_replicas}
   platform:
     aws:
       type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
-- architecture: ${architecture}
+- architecture: ${COMPUTE_ARCH}
   name: worker
-  replicas: ${workers}
+  replicas: ${worker_replicas}
   platform:
     aws:
       rootVolume:
@@ -228,6 +244,22 @@ compute:
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
+do
+  printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
+  yq-go write -i "${CONFIG}" "platform.aws.userTags.${TAG}" "${VALUE}"
+done
+
+if [[ "${PROPAGATE_USER_TAGS:-}" == "yes" ]]; then
+  patch_propagate_user_tags="${SHARED_DIR}/install-config-propagate_user_tags.yaml.patch"
+  cat > "${patch_propagate_user_tags}" << EOF
+platform:
+  aws:
+    propagateUserTags: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_propagate_user_tags}"
+fi
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
@@ -277,8 +309,16 @@ fi
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
-  openshift-install version
-  RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
+  if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+    # 4.9 and below
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
+  else
+    # 4.10 and above
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+  fi
+  echo "RHCOS for C2S: ${RHCOS_AMI}"
 fi
 
 if [ ! -z ${RHCOS_AMI} ]; then
@@ -313,4 +353,37 @@ EOF
 
   yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
   cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
+fi
+
+if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
+  edge_zones=""
+  while IFS= read -r line; do
+    if [[ -z "${edge_zones}" ]]; then
+      edge_zones="$line";
+    else
+      edge_zones+=",$line";
+    fi
+  done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
+
+  edge_zones_str="[ $edge_zones ]"
+  patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
+  cat > "${patch_edge}" << EOF
+compute:
+- architecture: ${COMPUTE_ARCH}
+  name: edge
+  platform:
+    aws:
+      zones: ${edge_zones_str}
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
+fi
+
+if [[ "${PRESERVE_BOOTSTRAP_IGNITION}" == "yes" ]]; then
+  patch_bootstrap_ignition="${SHARED_DIR}/install-config-bootstrap_ignition.yaml.patch"
+  cat > "${patch_bootstrap_ignition}" << EOF
+platform:
+  aws:
+    preserveBootstrapIgnition: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
 fi
