@@ -2,6 +2,10 @@
 
 set -ex
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 MCE_VERSION=${MCE_VERSION:-"2.2"}
 if [[ $MCE_QE_CATALOG != "true" ]]; then
   _REPO="quay.io/acm-d/mce-custom-registry"
