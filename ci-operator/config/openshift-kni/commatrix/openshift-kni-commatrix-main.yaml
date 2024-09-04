@@ -38,7 +38,22 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: e2e-aws-commatrix-run
-      commands: find / -name "openshift-tests"
+      commands: |
+        go mod vendor
+        make e2e-test 
+        # Extract openshift-tests binary from OpenShift image
+        T5_JOB_TESTS_IMAGE=$(oc adm release info --image-for=tests "registry.ci.openshift.org/ocp/release:4.17")
+        oc run test-binary-extractor --restart=Never --image "$T5_JOB_TESTS_IMAGE" --command -- sleep 3600
+        oc wait --for=condition=Ready pod/test-binary-extractor --timeout=5m
+        oc cp test-binary-extractor:/usr/bin/openshift-tests ./openshift-tests
+        chmod +x ./openshift-tests
+        oc delete pod test-binary-extractor
+
+        # Run all OpenShift tests
+        ./openshift-tests run all --provider '{"type":"baremetal"}' -o e2e.log --junit-dir junit
+
+        # Optional: compress and upload test results
+        tar -czf openshift-tests-results.tar.gz e2e.log junit/
       from: src
       resources:
         requests:
