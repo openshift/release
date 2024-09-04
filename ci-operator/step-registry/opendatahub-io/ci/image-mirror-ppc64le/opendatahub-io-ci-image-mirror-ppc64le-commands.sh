@@ -126,6 +126,7 @@ export REPO_NAME=opendatahub-operator
 export PULL_BASE_REF=incubation
 export PULL_NUMBER=1047
 export DESTINATION_IMAGE_REF=quay.io/shafi_rhel/opendatahub-operator:incubation-pr-$PULL_NUMBER
+#export SOURCE_IMAGE_REF=quay.io/opendatahub/opendatahub-operator:latest
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
@@ -141,6 +142,7 @@ REGISTRY_HOST=${REGISTRY_HOST:-UNKNOWN}
 REGISTRY_ORG=${REGISTRY_ORG:-UNKNOWN}
 IMAGE_REPO=${IMAGE_REPO:-UNKNOWN}
 IMAGE_TAG=${IMAGE_TAG:-UNKNOWN}
+SOURCE_IMAGE_REF=${SOURCE_IMAGE_REF:-UNKNOWN}
 DESTINATION_REGISTRY_REPO=${DESTINATION_REGISTRY_REPO:-UNKNOWN}
 DESTINATION_IMAGE_REF=${DESTINATION_IMAGE_REF:-UNKNOWN}
 JOB_NAME=${JOB_NAME:-UNKNOWN}
@@ -159,24 +161,33 @@ cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 log "INFO SSH to Power VM for Build/Push"
 timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	source env_vars.sh
+	
+	# for manifests. quay.io does not support format=oci (ref: https://github.com/containers/podman/issues/8353)
+	export BUILDAH_FORMAT=docker
 
-    # clone & checkout pull number
+	# clone & checkout pull number
 	rm -rf $$BUILD
 	mkdir $$BUILD && cd $$BUILD
 	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
 	git fetch origin pull/$$PULL_NUMBER/head:build_branch
 	git checkout build_branch
 
-    # build & push
+	# build & push
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
-	IMG=$$DESTINATION_IMAGE_REF make image-build
-	IMG=$$DESTINATION_IMAGE_REF make image-push
+	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-build
+	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-push
 
-    # cleanup
-    podman rmi --all
-    DOCKER_IMAGES=$(docker images -a -q)
-    if [ -n "$$DOCKER_IMAGES" ]; then
-        docker rmi $$DOCKER_IMAGES
-    fi
+
+	# manifest creation
+	#IMG_BUILDER=$(grep -Eo "IMAGE_BUILDER\s*[?]?=\s*(.+)" Makefile | cut -d= -f2 | tr -d [:space:])
+	#$IMG_BUILDER manifest create $$DESTINATION_IMAGE_REF
+	#$IMG_BUILDER manifest add $$DESTINATION_IMAGE_REF $$DESTINATION_IMAGE_REF-ppc64le
+
+	# cleanup
+	podman rmi --all
+	DOCKER_IMAGES=$(docker images -a -q)
+	if [ -n "$$DOCKER_IMAGES" ]; then
+		docker rmi $$DOCKER_IMAGES
+	fi
 EOF
 
