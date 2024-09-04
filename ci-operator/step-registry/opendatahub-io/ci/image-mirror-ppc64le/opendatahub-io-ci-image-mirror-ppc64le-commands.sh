@@ -165,9 +165,8 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	export BUILDAH_FORMAT=docker
 
 	# clone & checkout pull number
-	BUILD=$${IMAGE_TAG:-$$(date +%s)}
-	rm -rf $$BUILD
-	mkdir $$BUILD && cd $$BUILD
+	rm -rf BUILD
+	mkdir BUILD && cd BUILD
 	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
 	git fetch origin pull/$$PULL_NUMBER/head:build_branch
 	git checkout build_branch
