@@ -176,12 +176,6 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-build
 	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-push
 
-
-	# manifest creation
-	#IMG_BUILDER=$(grep -Eo "IMAGE_BUILDER\s*[?]?=\s*(.+)" Makefile | cut -d= -f2 | tr -d [:space:])
-	#$IMG_BUILDER manifest create $$DESTINATION_IMAGE_REF
-	#$IMG_BUILDER manifest add $$DESTINATION_IMAGE_REF $$DESTINATION_IMAGE_REF-ppc64le
-
 	# cleanup
 	podman rmi --all
 	DOCKER_IMAGES=$(docker images -a -q)
