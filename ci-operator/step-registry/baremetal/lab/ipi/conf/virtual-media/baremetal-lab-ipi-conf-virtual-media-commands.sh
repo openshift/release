@@ -40,10 +40,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
           ipv6:
             enabled: ${ipv6_enabled}
             dhcp: ${ipv6_enabled}
-            auto-gateway: ${ipv6_enabled}
-            auto-routes: ${ipv6_enabled}
             autoconf: ${ipv6_enabled}
-            auto-dns: ${ipv6_enabled}
 EOF
 
   # Append configurations for disabled interfaces
