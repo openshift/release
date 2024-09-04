@@ -1,81 +1,67 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
-endpoint=$(cat "/var/run/token/dpu-token/url")
+TMP_FILE=$(mktemp)
 
-job_url="https://${endpoint}/job/Lab140_DPU_Operator_Test/lastBuild"
+cat <<EOF > "$TMP_FILE"
+import jenkins
+import time
+import sys
+import tenacity
 
-endpoint_resolve="${endpoint}:443:10.0.180.88"
+def read_file_strip(filename: str) -> str:
+    with open(filename, "r") as f:
+        return f.read().strip()
 
-max_sleep_duration=86400  # Maximum sleep duration in seconds (2 hours)
-sleep_counter=0
-#this is a queue system in case other jobs are running
+class JenkinsAutomation:
+    def __init__(self, endpoint: str, token: str):
+        self.endpoint = endpoint
+        self.token = token
+        self.server = jenkins.Jenkins(endpoint)
 
-BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
+    def start_and_block(self, name: str, pull_number: int) -> int:
+        print(f"Starting job {name} with pull_number {pull_number}")
+        queue_item = self._start(name, pull_number)
+        print(f"Blocking until queue item {queue_item} is started")
+        ret_val = self._block(queue_item)
+        print(f"Queue item {queue_item} is started")
+        return ret_val
 
-if [ -z "$PULL_NUMBER" ]; then
-  echo "Error: PULL_NUMBER is not set"
-  exit 1
-fi
+    def _start(self, name: str, pull_number: int) -> int:
+        params = {"pullnumber": pull_number}
+        return self.server.build_job(name, params, self.token)
 
-if [ -z "$BUILD_NUMBER" ]; then
-  echo "Error: BUILD_NUMBER is not set"
-  exit 1
-fi
-if [ $PULL_NUMBER == $BUILD_NUMBER ]; then
-	curl -k -s --resolve "$endpoint_resolve" "${job_url}/stop"
-	sleep 20
-fi
-while : 
-do
-    job_check=$(curl -k -s --resolve "$endpoint_resolve" "$job_url/api/json")
-    result=$(echo "$job_check" | jq -r '.result')
-    if [ $result != "null" ]; then
-	sleep $((RANDOM % 61 + 60))
-        break
-    else
-        if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            echo "Exiting due to long sleep duration..."
-            exit 1
-        fi
-        sleep_counter=$((sleep_counter + 60))
-        sleep 60
+    @tenacity.retry(wait=tenacity.wait_fixed(5),
+                    stop=tenacity.stop_after_delay(5 * 60 * 60))
+    def _block(self, queue_item_id: int) -> int:
+        queue_item = self.server.get_queue_item(queue_item_id)
+        if not queue_item["blocked"]:
+            return queue_item["executable"]["number"]
+        else:
+            raise Exception("Blocked")
 
-    fi
-done
+    def wait_done(self, name: str, job_number: int) -> dict:
+        output = ""
+        while True:
+            build_info = self.server.get_build_info(name, job_number)
+            if not build_info["inProgress"]:
+                break
+            new_output = self.server.get_build_console_output(name, job_number)
+            print(new_output[len(output):])
+            output = new_output
+            time.sleep(5)
+        return build_info
 
-curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/job/Lab140_DPU_Operator_Test/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
+def main():
+    url = read_file_strip("/tmp/url")
+    endpoint = f"https://{url}"
+    token = read_file_strip("/tmp/token")
+    name = "Lab140_DPU_Operator_Test"
+    server = JenkinsAutomation(endpoint, token)
+    job_number = server.start_and_block(name, 141)
+    build_info = server.wait_done(name, job_number)
+    sys.exit(build_info["result"] == "SUCCESS")
 
-echo "Waiting for job completion..."
-max_sleep_duration=7200  # Maximum sleep duration in seconds (2 hours)
-sleep_counter=0
-
-
-while :
-do
-    job_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json")
-
-    # Extract the result field
-    result=$(echo "$job_info" | jq -r '.result')
-
-    if [ "$result" != "null" ]; then
-        # Job has completed
-        echo "Job Result: $result"
-	
-	curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
-	echo "$curl_info"
-        
-	if [ "$result" == "SUCCESS" ]; then
-            exit 0
-        else
-            exit 1
-        fi
-    else
-        if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            echo "Exiting due to long sleep duration..."
-            exit 1
-        fi
-        sleep_counter=$((sleep_counter + 60))
-        sleep 60
-    fi
-done
+if __name__ == "__main__":
+    main()
+EOF
+python "$TMP_FILE"
