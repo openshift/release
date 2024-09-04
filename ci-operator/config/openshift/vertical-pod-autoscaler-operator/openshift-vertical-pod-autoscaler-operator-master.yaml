@@ -23,6 +23,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: vertical-pod-autoscaler-operator
+  ubi-python-311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
 build_root:
   from_repository: true
   use_build_cache: true
@@ -41,6 +45,11 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: vertical-pod-autoscaler-operator
+- dockerfile_literal: |
+    FROM ubi-python-311
+    RUN pip3 install yamllint
+  from: ubi-python-311
+  to: vpa-yamllint
 operator:
   bundles:
   - as: vertical-pod-autoscaler-operator-bundle
@@ -103,6 +112,11 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: yamllint
+  commands: IS_CONTAINER=true make yamllint
+  container:
+    clone: true
+    from: vpa-yamllint
 - as: security
   optional: true
   steps:
