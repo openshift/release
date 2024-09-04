@@ -1,6 +1,6 @@
 base_images:
   ocp_4.17_base-rhel9:
-    name: "4.19"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -11,7 +11,7 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/kube-proxy/Dockerfile.rhel
+- dockerfile_path: Dockerfile
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -20,15 +20,20 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: kube-proxy
+promotion:
+  to:
+  - disabled: true
+    name: "4.18"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -37,30 +42,14 @@ resources:
       memory: 6Gi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
-- as: verify
-  commands: |
-    make verify -k --warn-undefined-variables
-  container:
-    from: bin
-- as: verify-deps
-  commands: |
-    HOME=$( mktemp -d )
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
-- as: unit
-  commands: |
-    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
-  container:
-    from: test-bin
 - as: security
   optional: true
   steps:
     env:
       ALL_PROJECTS: "true"
-      PROJECT_NAME: sdn
+      PROJECT_NAME: standalone-kube-proxy
     workflow: openshift-ci-security
 zz_generated_metadata:
-  branch: release-4.19
+  branch: release-4.18
   org: openshift
-  repo: sdn
+  repo: standalone-kube-proxy
