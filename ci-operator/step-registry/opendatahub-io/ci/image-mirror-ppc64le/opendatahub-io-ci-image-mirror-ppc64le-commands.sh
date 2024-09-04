@@ -176,11 +176,5 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-build
 	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-push
 
-	# cleanup
-	podman rmi --all
-	DOCKER_IMAGES=$(docker images -a -q)
-	if [ -n "$$DOCKER_IMAGES" ]; then
-		docker rmi $$DOCKER_IMAGES
-	fi
 EOF
 
