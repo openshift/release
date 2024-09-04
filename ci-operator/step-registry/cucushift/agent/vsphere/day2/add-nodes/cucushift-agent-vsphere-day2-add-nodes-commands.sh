@@ -19,77 +19,57 @@ fi
 
 export HOME=/tmp
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
-fi
-
-declare vlanid
-declare primaryrouterhostname
-declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
+declare target_hw_version
+declare vsphere_portgroup
 declare vsphere_datacenter
 declare vsphere_datastore
 declare dns_server
 
-if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-  exit 1
-fi
-
-dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
-cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
-cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
-
-# select a hardware version for testing
-hw_versions=(15 17 18 19)
-hw_available_versions=${#hw_versions[@]}
-selected_hw_version_index=$((RANDOM % +hw_available_versions))
-target_hw_version=${hw_versions[$selected_hw_version_index]}
-
-echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
-
-echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-echo "export target_hw_version=${target_hw_version}" >>"${SHARED_DIR}"/vsphere_context.sh
+source "${SHARED_DIR}/network-config.txt"
+declare dns_server
+declare gateway
+declare gateway_ipv6
+declare cidr
+declare cidr_ipv6
 
 folder_name=$(<"${SHARED_DIR}"/cluster-name.txt)
-total_workers="${ADDITIONAL_WORKERS_DAY2}"
+declare -a additional_worker_ipv4Addresses
+mapfile -t additional_worker_ipv4Addresses <"${SHARED_DIR}"/additional_worker_ipv4Addresses.txt
+
+declare -a additional_worker_ipv6Addresses
+mapfile -t additional_worker_ipv6Addresses <"${SHARED_DIR}"/additional_worker_ipv6Addresses.txt
+
+declare -a additional_worker_hostnames
+mapfile -t additional_worker_hostnames <"${SHARED_DIR}"/additional_worker_hostnames.txt
+
 declare -a mac_addresses=()
 
-for ((i = 0; i < total_workers; i++)); do
+for ((i = 0; i < ${#additional_worker_hostnames[@]}; i++)); do
   mac_addresses+=(00:50:56:ac:b8:1"$i")
   echo "${mac_addresses[$i]}"
 done
 
-declare -a hostnames=()
-for ((i = 0; i < total_workers; i++)); do
-  hostnames+=("${folder_name}-additional-worker-$i")
-  echo "${hostnames[$i]}"
-done
-
-for ((i = 0; i < total_workers; i++)); do
-  ipaddress=$(jq -r --argjson N $((i + 10)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-  ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
-  ipv4_addresses+="${ipaddress},"
+for ((i = 0; i < ${#additional_worker_hostnames[@]}; i++)); do
+  # storing ipv4_addresses for monitoring
+  ipv4_addresses+="${additional_worker_ipv4Addresses[$i]},"
   ipv4="
         ipv4:
           enabled: true
           address:
-            - ip: ${ipaddress}
+            - ip: ${additional_worker_ipv4Addresses[$i]}
               prefix-length: ${cidr}
           dhcp: false"
   ipv6="
         ipv6:
           enabled: true
           address:
-            - ip: "${ipv6_address%%::*}::"$((i + 12))
+            - ip: ${additional_worker_ipv6Addresses[$i]}
               prefix-length: ${cidr_ipv6}
           dhcp: false"
   route_ipv4="
@@ -111,8 +91,8 @@ for ((i = 0; i < total_workers; i++)); do
     ipv4=""
     route_ipv4=""
   fi
-  echo " - hostname: ${hostnames[$i]}
-   role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
+  echo " - hostname: ${additional_worker_hostnames[$i]}
+   role: $(echo "${additional_worker_hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
     - name: ens32
       macAddress: ${mac_addresses[$i]}
@@ -172,8 +152,8 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-for ((i = 0; i < total_workers; i++)); do
-  vm_name=${hostnames[$i]}
+for ((i = 0; i < ${#additional_worker_hostnames[@]}; i++)); do
+  vm_name=${additional_worker_hostnames[$i]}
   echo "creating Vm $vm_name.."
   govc vm.create \
     -m=16384 \
@@ -210,34 +190,24 @@ for ((i = 0; i < total_workers; i++)); do
     -on=true "/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 done
 
-# To check if there are pending CSRs
-function wait_for_pending_csrs_and_approve() {
-  for ((i = 0; i < 3; i++)); do
-    pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
-    if [ -n "$pending_csrs" ]; then
-      for csr in $pending_csrs; do
-        echo "Approving CSR: $csr"
-        oc adm certificate approve "$csr"
-      done
-      echo "All pending CSRs approved."
-      break
-    fi
-    echo "No pending CSRs found. Waiting..."
-    sleep 30
-  done
-}
-
 echo "Monitoring additional worker nodes IPs ${ipv4_addresses} to join the cluster"
 sleep 60
-oc adm node-image monitor --ip-addresses "${ipv4_addresses%,}" 2>&1 | tee output.txt &
-
-for ((i = 0; i < 20; i++)); do
-  if grep -q "Kubelet" output.txt; then
-    # TODO: Handle CSR approvals based on pending CSRs that require DNS entries for nodes.
-    wait_for_pending_csrs_and_approve
-    sleep 20
-    wait_for_pending_csrs_and_approve
-    break
+# shellcheck disable=SC2001
+oc adm node-image monitor --ip-addresses "${ipv4_addresses%,}" 2>&1 | \
+tee output.txt | while IFS= read -r line; do
+  if [[ "$line" = *"kube-apiserver-client-kubelet"* ]]; then
+    node_ip=$(echo "$line" | sed 's/^.*Node \(.*\): CSR.*$/\1/')
+    csr=$(echo "$line" | sed 's/^.*CSR \([^ ]*\).*$/\1/')
+    echo "Approving CSR $csr for node $node_ip"
+    oc adm certificate approve "$csr"
   fi
-  sleep 30
+  if [[ "$line" = *"kubelet-serving"* ]]; then
+    node_ip=$(echo "$line" | sed 's/^.*Node \(.*\): CSR.*$/\1/')
+    csr=$(echo "$line" | sed 's/^.*CSR \([^ ]*\).*$/\1/')
+    echo "Approving CSR $csr for node $node_ip"
+    oc adm certificate approve "$csr"
+  fi
 done
+EXIT_STATUS="${PIPESTATUS[0]}"
+echo "Exiting with status $EXIT_STATUS"
+exit "$EXIT_STATUS"

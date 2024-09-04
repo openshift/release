@@ -27,44 +27,32 @@ fi
 
 export HOME=/tmp
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
-fi
-
-declare vlanid
-declare primaryrouterhostname
-declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
+declare vsphere_portgroup
 declare vsphere_url
 declare GOVC_USERNAME
 declare GOVC_PASSWORD
 declare vsphere_datacenter
 declare vsphere_datastore
-declare dns_server
 declare vsphere_cluster
 
-machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-  exit 1
-fi
-
-dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
-cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
-cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
-machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
-# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
+source "${SHARED_DIR}/network-config.txt"
+declare dns_server
+declare gateway
+declare gateway_ipv6
+declare cidr
+declare cidr_ipv6
+declare machine_cidr
+declare rendezvous_ip_address
 
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
+cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
+base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
 
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
 build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
@@ -72,16 +60,7 @@ extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org
 final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
 echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
-echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
-# Create base-domain.txt
-echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
-base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
-
 pull_secret=$(<"${SHARED_DIR}/pull-secrets")
-
-# Create cluster-name.txt
-echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
-cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
 # Add build02 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
@@ -151,56 +130,35 @@ compute:
   replicas: ${WORKERS}
 EOF
 
-# Create cluster-domain.txt
-echo "${cluster_name}.${base_domain}" >"${SHARED_DIR}"/cluster-domain.txt
+declare -a ipv4Addresses
+mapfile -t ipv4Addresses <"${SHARED_DIR}"/ipv4Addresses.txt
 
-# select a hardware version for testing
-hw_versions=(15 17 18 19)
-hw_available_versions=${#hw_versions[@]}
-selected_hw_version_index=$((RANDOM % +hw_available_versions))
-target_hw_version=${hw_versions[$selected_hw_version_index]}
+declare -a ipv6Addresses
+mapfile -t ipv6Addresses <"${SHARED_DIR}"/ipv6Addresses.txt
 
-echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
+declare -a hostnames
+mapfile -t hostnames <"${SHARED_DIR}"/hostnames.txt
 
-echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-echo "export target_hw_version=${target_hw_version}" >>"${SHARED_DIR}"/vsphere_context.sh
-
-total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
 
-for ((i = 0; i < total_host; i++)); do
+for ((i = 0; i < ${#hostnames[@]}; i++)); do
   mac_addresses+=(00:50:56:ac:b8:0"$i")
   echo "${mac_addresses[$i]}"
 done >"${SHARED_DIR}"/mac-addresses.txt
 
-declare -a hostnames=()
-for ((i = 0; i < total_host; i++)); do
-  if [ "${WORKERS}" -gt 0 ]; then
-    hostnames+=("${cluster_name}-master-$i")
-    hostnames+=("${cluster_name}-worker-$i")
-    echo "${hostnames[$i]}"
-  else
-    hostnames+=("${cluster_name}-master-$i")
-    echo "${hostnames[$i]}"
-  fi
-done >"${SHARED_DIR}"/hostnames.txt
-
-for ((i = 0; i < total_host; i++)); do
-  ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-  ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
-
+for ((i = 0; i < ${#hostnames[@]}; i++)); do
   ipv4="
         ipv4:
           enabled: true
           address:
-            - ip: ${ipaddress}
+            - ip: ${ipv4Addresses[$i]}
               prefix-length: ${cidr}
           dhcp: false"
   ipv6="
         ipv6:
           enabled: true
           address:
-            - ip: "${ipv6_address%%::*}::"$((i + 6))
+            - ip: ${ipv6Addresses[$i]}
               prefix-length: ${cidr_ipv6}
           dhcp: false"
   route_ipv4="

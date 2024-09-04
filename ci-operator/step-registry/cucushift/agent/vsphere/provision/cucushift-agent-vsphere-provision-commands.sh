@@ -48,7 +48,6 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 unset SSL_CERT_FILE 
 unset GOVC_TLS_CA_CERTS
 
-total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses
 mapfile -t mac_addresses <"${SHARED_DIR}"/mac-addresses.txt
 declare -a hostnames
@@ -59,7 +58,7 @@ govc folder.create "/${vsphere_datacenter}/vm/${folder_name}"
 
 [[ ${MASTERS} -eq 1 ]] && cpu="8" || cpu="4"
 
-for ((i = 0; i < total_host; i++)); do
+for ((i = 0; i < ${#hostnames[@]}; i++)); do
   vm_name=${hostnames[$i]}
   echo "creating Vm $vm_name.."
   govc vm.create \
