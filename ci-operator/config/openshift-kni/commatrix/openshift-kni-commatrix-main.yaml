@@ -42,13 +42,24 @@ tests:
         go mod vendor
         make e2e-test 
         # Extract openshift-tests binary from OpenShift image
+        # shellcheck disable=SC1091
+        source "$SHARED_DIR/main.env"
+        # Set go version
+        if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+            source $HOME/golang-1.19
+        elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
+            source $HOME/golang-1.20
+        elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+            source $HOME/golang-1.21.11
+        else
+            source $HOME/golang-1.22.4
+        fi
         T5_JOB_TESTS_IMAGE=$(oc adm release info --image-for=tests "registry.ci.openshift.org/ocp/release:4.17")
         oc run test-binary-extractor --restart=Never --image "$T5_JOB_TESTS_IMAGE" --command -- sleep 3600
         oc wait --for=condition=Ready pod/test-binary-extractor --timeout=5m
         oc cp test-binary-extractor:/usr/bin/openshift-tests ./openshift-tests
         chmod +x ./openshift-tests
         oc delete pod test-binary-extractor
-
         # Run all OpenShift tests
         ./openshift-tests run all --provider '{"type":"baremetal"}' -o e2e.log --junit-dir junit
 
