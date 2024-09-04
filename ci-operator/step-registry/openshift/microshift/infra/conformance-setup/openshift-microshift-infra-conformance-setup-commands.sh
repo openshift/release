@@ -13,6 +13,8 @@ if "${SRC_FROM_GIT}"; then
     branch="main"
   fi
   git clone https://github.com/openshift/microshift -b $branch /go/src/github.com/openshift/microshift
+else
+  clone_src
 fi
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
