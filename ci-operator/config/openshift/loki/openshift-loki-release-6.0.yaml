@@ -1,9 +1,9 @@
 base_images:
   base:
-    name: "4.17"
+    name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  loki-tag:
+  loki:
     name: v3.1.0
     namespace: logging
     tag: loki
@@ -11,10 +11,6 @@ base_images:
     name: mirror-5.y
     namespace: logging
     tag: lokistack-gateway
-  ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
   opa-openshift:
     name: mirror-5.y
     namespace: logging
@@ -25,21 +21,6 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  multi_arch: true
-  to: loki
-- dockerfile_path: Dockerfile.promtail.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: promtail
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
@@ -54,7 +35,7 @@ operator:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
   - pullspec: quay.io/openshift-logging/loki:v3.1.0
-    with: pipeline:loki-tag
+    with: pipeline:loki
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
   - pullspec: quay.io/observatorium/opa-openshift:latest
@@ -63,7 +44,7 @@ promotion:
   to:
   - additional_images:
       loki-operator-bundle: loki-operator-bundle
-    name: 5.y
+    name: "6.0"
     namespace: logging
 releases:
   latest:
@@ -156,6 +137,6 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-generic-claim
 zz_generated_metadata:
-  branch: main
+  branch: release-6.0
   org: openshift
   repo: loki
