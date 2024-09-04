@@ -130,7 +130,6 @@ export DESTINATION_IMAGE_REF=quay.io/shafi_rhel/opendatahub-operator:incubation-
 
 # set build any env to be set on Power VM
 cat <<EOF > $HOME/env_vars.sh
-BUILD=${IMAGE_TAG:-$(date +%s)}
 REPO_OWNER=${REPO_OWNER:-UNKNOWN}
 REPO_NAME=${REPO_NAME:-UNKNOWN}
 PULL_BASE_REF=${PULL_BASE_REF:-UNKNOWN}
@@ -166,6 +165,7 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	export BUILDAH_FORMAT=docker
 
 	# clone & checkout pull number
+	BUILD=${IMAGE_TAG:-$(date +%s)}
 	rm -rf $$BUILD
 	mkdir $$BUILD && cd $$BUILD
 	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
