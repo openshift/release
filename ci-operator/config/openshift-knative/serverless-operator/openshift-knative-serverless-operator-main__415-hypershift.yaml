@@ -11,6 +11,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
   openshift_eventing-istio-src_knative-v1.14:
     name: eventing-istio-src
     namespace: openshift
@@ -27,6 +31,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.14
+  openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.21-openshift-4.17
   origin_4.15_operator-registry:
     name: "4.15"
     namespace: origin
@@ -43,12 +51,18 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal
     origin_4.15_operator-registry:
       as:
       - registry.ci.openshift.org/origin/4.15:operator-registry
@@ -57,7 +71,10 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -82,7 +99,10 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
@@ -111,7 +131,7 @@ tests:
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_NODE_COUNT: "5"
+      HYPERSHIFT_NODE_COUNT: "6"
     test:
     - as: operator-e2e
       commands: make USER_MANAGEMENT_ALLOWED=false test-e2e-with-kafka
