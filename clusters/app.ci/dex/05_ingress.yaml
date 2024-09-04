@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+  name: dex
+  namespace: dex
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: dex-tls
+      hosts:
+        - idp.ci.openshift.org
+  rules:
+  - host: idp.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: dex
+            port:
+              number: 80
+        pathType: ImplementationSpecific
