@@ -1,8 +1,8 @@
 base_images:
-  operator-index:
-    name: redhat-operator-index
-    namespace: ci
-    tag: v4.9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -15,8 +15,8 @@ images:
 operator:
   bundles:
   - as: aws-load-balancer-operator-bundle
-    base_index: operator-index
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: openshift.io/aws-load-balancer-operator:latest
     with: pipeline:aws-load-balancer-operator
@@ -53,13 +53,19 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+      OO_BUNDLE: aws-load-balancer-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
-      OO_PACKAGE: aws-load-balancer-operator
-      OO_TARGET_NAMESPACES: '!all'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n aws-load-balancer-operator rollout status deployment aws-load-balancer-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e
@@ -72,14 +78,22 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
-      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+      OO_BUNDLE: aws-load-balancer-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      EVAL_CONFIG_ENVVARS: "yes"
+      OO_CONFIG_ENVVARS: ROLEARN=$(cat ${SHARED_DIR}/operator-role-arn)
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
-      OO_PACKAGE: aws-load-balancer-operator
-      OO_TARGET_NAMESPACES: '!all'
       OPENSHIFT_VERSION: "4.13"
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n aws-load-balancer-operator rollout status deployment aws-load-balancer-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: |
