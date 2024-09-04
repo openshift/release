@@ -9,7 +9,7 @@ source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH="${SHARED_DIR}/template.yaml.patch"
+PATCH="${SHARED_DIR}/customized-resource.yaml.patch"
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
