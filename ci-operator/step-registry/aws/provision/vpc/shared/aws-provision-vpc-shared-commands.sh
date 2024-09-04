@@ -21,6 +21,9 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 REGION=${REGION:-$LEASED_RESOURCE}
 
 
+echo "GCP debug:"
+ls -la /var/run/vault/gcp-qe || true
+
 sleep 1800
 
 function save_stack_events_to_artifacts()
