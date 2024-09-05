@@ -53,6 +53,7 @@ EXIT_CODE_WRONG_VERSION=20
 EXIT_CODE_COREOS_NOT_FOUND=30
 
 IS_PXE_JOB=false
+IS_IPV6_JOB=false
 
 FSM_FILE_PREFIX="/tmp/fsm_"
 
@@ -380,6 +381,14 @@ function isPxeJob(){
   echo "Job name is $JOB_NAME , pxe? $IS_PXE_JOB"
 }
 
+function isIPv6Job(){
+  if [[ $JOB_NAME == *"-ipv6-"* ]]; then
+      IS_IPV6_JOB=true
+  fi
+  echo "Job name is $JOB_NAME , IPv6? $IS_IPV6_JOB"
+}
+
+
 function ipmiRecord(){
       local bmhost="${1}"
       . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
@@ -550,6 +559,7 @@ function initObserverPod(){
   waitFor $KUBECONFIG
   waitFor $COREOS_STREAM_FILE
   isPxeJob
+  isIPv6Job
   recordIPMILog
   initFSM
   checkNodes
