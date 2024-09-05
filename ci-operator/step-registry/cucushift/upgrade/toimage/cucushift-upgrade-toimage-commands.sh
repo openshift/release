@@ -439,11 +439,11 @@ run_command "oc version --client"
 run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
+export TARGET_MINOR_VERSION=""
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
-export TARGET_MINOR_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -456,7 +456,7 @@ export FORCE_UPDATE="false"
 if ! check_signed; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
-    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
+    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-56083"; then
         echo "The case need to run against a signed target image!"
         exit 1
     fi

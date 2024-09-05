@@ -47,7 +47,7 @@ function copy-file-from-first-master {
 echo "control nodes: ${control_nodes[@]}"
 echo "compute nodes: ${compute_nodes[@]}"
 
-ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
