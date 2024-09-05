@@ -52,26 +52,13 @@ else
     exit 1
 fi
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-# A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
-ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
 # Setting proxy only if you need to communicate with installed cluster
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+ocp_major_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1)
+ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 # Mapping between optional capability and operators
 # Need to be updated when new operator marks as optional
