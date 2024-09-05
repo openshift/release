@@ -19,11 +19,8 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
-# Getting the machine network CIDR for all CONFIG_TYPEs. 
-MACHINES_NETWORK_V4_CIDR="$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)"
-
 if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
-	sg_name="${CLUSTER_NAME}-worker-additional"
+	sg_name='additional_workers'
 	sg_id="$(openstack security group create "$sg_name" --description "${CLUSTER_NAME}: additional security group for the compute nodes" -f value -c id)"
 	printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups"
 	(
@@ -32,12 +29,7 @@ if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
 			case $service in
 				netperf)
 					echo "Adding ${service} rule to security group ${sg_id}" 
-					openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0 --description netperf
-					openstack security group rule create "$sg_id" --protocol tcp --dst-port 22865:22865 --remote-ip 0.0.0.0/0 --description iperf3
-					openstack security group rule create "$sg_id" --protocol tcp --dst-port 30000:30000 --remote-ip 0.0.0.0/0 --description uperf
-					openstack security group rule create "$sg_id" --protocol tcp --dst-port 32000:47000 --remote-ip $MACHINES_NETWORK_V4_CIDR --description netserver-tcp
-					openstack security group rule create "$sg_id" --protocol udp --dst-port 32000:62000 --remote-ip $MACHINES_NETWORK_V4_CIDR --description netserver-udp
-					;;
+					openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0
 				*)
 					echo "No known security group rule matches service '$service'. Exiting."
 					exit 1
