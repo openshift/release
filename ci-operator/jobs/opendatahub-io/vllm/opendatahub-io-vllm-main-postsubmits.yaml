@@ -4,14 +4,14 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-vllm-main-fast-image-mirror
+    name: branch-ci-opendatahub-io-vllm-main-cuda-fast-image-mirror
     spec:
       containers:
       - args:
@@ -19,7 +19,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=fast-image-mirror
+        - --target=cuda-fast-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -62,7 +62,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -115,6 +115,64 @@ postsubmits:
       - name: push-secret
         secret:
           secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build09
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-vllm-main-rocm-fast-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=rocm-fast-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

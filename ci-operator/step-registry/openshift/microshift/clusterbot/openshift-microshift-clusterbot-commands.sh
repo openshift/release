@@ -1,6 +1,9 @@
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
 
 # TODO:
 # - Handle MICROSHIFT_GIT=PR_URL

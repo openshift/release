@@ -323,7 +323,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: aws-2
     env:
@@ -336,7 +336,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-ipi-ovn-kube-apiserver-rollout
   cluster: build05
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -347,7 +347,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-vsphere-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -358,7 +358,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-azure-ovn-kube-apiserver-rollout
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: azure4
     env:
@@ -468,6 +468,30 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-multi-vcenter
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
+    workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-upi-multi-vcenter
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
+    workflow: openshift-e2e-vsphere-upi-multi-vcenter
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -841,6 +865,14 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
+- as: e2e-aws-ovn-single-node-one-core-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node-one-core
 - as: e2e-gcp-graceful-shutdown
   interval: 168h
   steps:
@@ -948,6 +980,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "365"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -956,6 +989,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "730"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1069,6 +1103,7 @@ tests:
     cluster_profile: aws-2
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+        Ingress
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"

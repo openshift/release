@@ -13,9 +13,11 @@ python3 --version
 ES_PASSWORD=$(cat "/secret/es/password" || "")
 ES_USERNAME=$(cat "/secret/es/username" || "")
 
+export ES_PASSWORD
+export ES_USERNAME
+
 if [[ -n $ES_PASSWORD ]]; then
-    export ELASTIC_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    export ELASTIC_INDEX=krkn_chaos_ci
+    export ELASTIC_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 fi
 
 echo "kubeconfig loc $$KUBECONFIG"
