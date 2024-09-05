@@ -30,6 +30,7 @@ if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
 				netperf)
 					echo "Adding ${service} rule to security group ${sg_id}" 
 					openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0
+					;;
 				*)
 					echo "No known security group rule matches service '$service'. Exiting."
 					exit 1
