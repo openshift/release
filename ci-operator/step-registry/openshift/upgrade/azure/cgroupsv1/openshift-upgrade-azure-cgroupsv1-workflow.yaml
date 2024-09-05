@@ -1,0 +1,27 @@
+workflow:
+  as: openshift-upgrade-azure-cgroupsv1
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-azure
+    - ref: openshift-manifests-cgroupsv1
+    - ref: ovn-conf
+    - chain: ipi-install-stableinitial
+    - ref: ipi-azure-rbac
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    The Openshift E2E Azure OVN workflow executes the upgrade end-to-end test suite on Azure with a default cluster
+    configuration and Loki as log collector, exercising an upgrade during the process using cgroups v1.

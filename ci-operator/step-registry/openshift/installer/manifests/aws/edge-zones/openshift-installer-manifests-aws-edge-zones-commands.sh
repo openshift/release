@@ -24,7 +24,8 @@ declare -x INSTALLER_BIN
 INSTALLER_BIN="$(which openshift-install)"
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-export INSTALL_CONFIG_BASE="$SHARED_DIR/install-config.yaml"
+export INSTALL_CONFIG_BASE="${SHARED_DIR}"/install-config.yaml
+export FILE_ALL_REGIONS="${ARTIFACT_DIR}"/regions_all.json
 
 JUNIT_TEST_SUITE="installer-manifest-check-edge-zones"
 JUNIT_TEST_COUNT=0
@@ -56,7 +57,7 @@ function add_test_case() {
         cat >>"${JUNIT_BUFFER_FILE_CASES}" <<EOF
       <testcase name="${test_name}" time="${test_time}">
       <system-out>
-        $(cat "$JUNIT_BUFFER_FILE_MSG" || true)
+        $(cat "${JUNIT_BUFFER_FILE_MSG}" || true)
       </system-out>
       </testcase>
 EOF
@@ -66,7 +67,7 @@ EOF
         cat >>"${JUNIT_BUFFER_FILE_CASES}" <<EOF
         <testcase name="${test_name}">
             <failure message="">
-            $(cat "$JUNIT_BUFFER_FILE_MSG" || true)
+            $(cat "${JUNIT_BUFFER_FILE_MSG}" || true)
             </failure>
         </testcase>
 EOF
@@ -75,7 +76,7 @@ EOF
         JUNIT_TEST_SKIPPED=$(( JUNIT_TEST_SKIPPED + 1 ))
         cat >>"${JUNIT_BUFFER_FILE_CASES}" <<EOF
         <testcase name="${test_name}">
-            <skipped message="$(cat "$JUNIT_BUFFER_FILE_MSG" || true)" />
+            <skipped message="$(cat ${JUNIT_BUFFER_FILE_MSG} || true)" />
         </testcase>
 EOF
     ;;
@@ -86,10 +87,6 @@ EOF
 # echo prints a message with timestamp.
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
-}
-
-function save_err() {
-    echo_date "$1" >> "${ARTIFACT_DIR}/errors.txt" ;
 }
 
 # opt_in_zone_group is a helper function to enable the zone group from a given region.
@@ -106,7 +103,7 @@ function opt_in_zone_group() {
     while true; do
         aws --region "${region_name}" ec2 describe-availability-zones --all-availability-zones \
             --filters Name=zone-type,Values="${zone_type}" Name=zone-name,Values="${zone_name}" \
-            | jq -r '.AvailabilityZones[]' |tee /tmp/az.stat
+            | jq -r '.AvailabilityZones[]' | tee /tmp/az.stat
 
         if [[ "$(jq -r .OptInStatus /tmp/az.stat)" == "opted-in" ]]; then break; fi
 
@@ -117,11 +114,13 @@ function opt_in_zone_group() {
         fi
 
         count=$((count+1))
-        echo_date "Waiting OptInStatus with value opted-in [$count/10]"
+        echo_date "Waiting OptInStatus with value opted-in [${count}/10]"
         sleep 30
     done
 
     echo_date "Zone group ${zone_group_name} opted-in."
+    # Final wait is required to prevent inconsistency in AWS API when generating assets.
+    sleep 15
 }
 
 function enable_zones() {
@@ -133,7 +132,7 @@ function enable_zones() {
         local zone_group
         zone_group=$(jq -r ".AvailabilityZones[] | select(.ZoneName==\"${zone_name}\").GroupName" "${ARTIFACT_DIR}/edge-zones_${region}.json")
 
-        echo "Trying to enable zone group ${zone_group} (${zone_type})"
+        echo_date "Trying to enable zone group ${zone_group} (${zone_type})"
         opt_in_zone_group "${region_name}" "${zone_type}" "${zone_name}" "${zone_group}"
     done <<< "$(cat "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}.txt")"
 }
@@ -141,9 +140,9 @@ function enable_zones() {
 # aws_describe_regions describes all regions in the globe, including disabled, creating a json file with raw result.
 function aws_describe_regions() {
     echo_date "Discovering regions"
-    aws ec2 describe-regions --region "us-east-1" --all-regions > "${ARTIFACT_DIR}/regions_all.txt"
+    aws ec2 describe-regions --region "us-east-1" --all-regions > "${FILE_ALL_REGIONS}"
     echo -e "REGION\t\tSTATUS"
-    jq -r ' .Regions[] | [.RegionName, .OptInStatus] |@tsv' "${ARTIFACT_DIR}/regions_all.txt"
+    jq -r ' .Regions[] | [.RegionName, .OptInStatus] | @tsv' "${FILE_ALL_REGIONS}"
 }
 
 # aws_describe_edge_zones describes all zones in the region, creating a json file with raw result.
@@ -184,17 +183,17 @@ function test_render_single_type() {
     zone_name=$(jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf |head -n1)
     local result_file="${ARTIFACT_DIR}/test_single_type-$zone_name.txt"
 
-    echo "#>>>>>
-# [$region] Running test: Render Single Type
-- Zone Type: $zone_type
-- Zone Name selected: $zone_name
-- Result file: $result_file
-#>>>>>"
-
-    if [[ "$zone_name" == "" ]]; then
-        echo "WARN: Unable to find zone type $zone_type in the region $region, ignoring test case..."
+    if [[ "${zone_name}" == "" ]]; then
+        echo "INFO: Unable to find zones with type ${zone_type} in the region ${region}, skipping test case..."
         return
     fi
+
+    echo "#>>>>>
+# [${region}] Running test: Render Single Type
+- Zone Type: ${zone_type}
+- Zone Name selected: ${zone_name}
+- Result file: $result_file
+#>>>>>"
 
     echo "$zone_name" > "$result_file"
     create_install_patch "$test_name" "$region" "$result_file"
@@ -218,8 +217,8 @@ function test_render_mixed_type() {
     zone_type="wavelength-zone"
     jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf | head -n1 >> "$result_file"
 
-    if [[ $(wc -l < "$result_file") -eq 1 ]]; then
-        echo "Skipping mixed test in region ${region} as it has only one edge subnet. 'test_render_all' will perform the required validations."
+    if [[ $(wc -l < "${result_file}") -eq 1 ]]; then
+        echo "Skipping mixed test in region ${region} as it has only one edge zone type. 'test_render_all' will perform the required validations."
         return
     fi
 
@@ -279,7 +278,7 @@ compute:
       zones: [ $zones_arr ]
 EOF
     yq-go m -x -i "${config}" "${patch_file}"
-    echo ">> Install Config:"
+    echo_date ">> Install Config:"
     grep -v "password\|username\|pullSecret\|{\"auths\":{\|sshKey\|ssh-" "$INSTALL_DIR/install-config.yaml" | tee "${result_file}.ic.yaml"
 }
 
@@ -301,10 +300,15 @@ function test_render_validations() {
     if ! ls "$INSTALL_DIR"/openshift/99_openshift-cluster-api_worker-machineset-*; then
         test_result="failed"
         err_msg="[${region}] Unable to find machine set manifests in the path: $INSTALL_DIR/openshift/99_openshift-cluster-api_worker-machineset-*."
-        echo "${err_msg}" >> "${ARTIFACT_DIR}/errors.txt" ;
         echo -e "${test_item_name}\n ${err_msg}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
     fi
     add_test_case "${test_item_name}" "0" "${test_result}"
+
+    # continue the execution across other regions when test case has failed to generate manifests.
+    if [[ "${test_result}" == "failed" ]];
+    then
+        return
+    fi
 
     test_mc_prefix="[${test_name}] machine set for"
     for mc in "$INSTALL_DIR"/openshift/99_openshift-cluster-api_worker-machineset-*;
@@ -319,7 +323,6 @@ function test_render_validations() {
         test_result="pass"
         if [[ "${instanceType}" == "" ]]; then
             err_msg="ERROR [$mc] MachineSet $name has invalid instanceType. Rendered instance type=${instanceType}"
-            echo "${err_msg}" >> "${ARTIFACT_DIR}/errors.txt" ;
             echo -e "${test_item_name}\n ${err_msg}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
            test_result="failed"
         fi
@@ -348,7 +351,6 @@ function test_render_validations() {
         manifest_zoneType=$(yq-go r -j "${mc}" | jq -r '.spec.template.spec.metadata.labels["machine.openshift.io/zone-type"]')
         if [[ "${manifest_zoneType}" != "${zoneType}" ]]; then
             err_msg="[${region}][${zoneName}] The machine set manifest ${mc} has unexpected value for label machine.openshift.io/zone-type. ${manifest_zoneType} != ${zoneType}."
-            echo "${err_msg}" >> "${ARTIFACT_DIR}/errors.txt" ;
             echo -e "${test_item_name}\n ${err_msg}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
            test_result="failed"
         fi
@@ -359,7 +361,6 @@ function test_render_validations() {
         manifest_zoneGroup=$(yq-go r -j "${mc}" | jq -r '.spec.template.spec.metadata.labels["machine.openshift.io/zone-group"]')
         if [[ "${manifest_zoneGroup}" != "${zoneGroup}" ]]; then
             err_msg="[${region}][${zoneName}] The machine set manifest ${mc} has unexpected value for label machine.openshift.io/zone-type. ${manifest_zoneGroup} != ${zoneGroup}."
-            echo "${err_msg}" >> "${ARTIFACT_DIR}/errors.txt" ;
             echo -e "${test_item_name}\n ${err_msg}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
            test_result="failed"
         fi
@@ -370,7 +371,6 @@ function test_render_validations() {
         manifest_edge_taint_effect=$(yq-go r -j "${mc}" | jq -r '.spec.template.spec.taints[] | select(.key="node-role.kubernetes.io/edge").effect')
         if [[ "${manifest_edge_taint_effect}" != "NoSchedule" ]]; then
             err_msg="[${region}][${zoneName}] The machine set manifest ${mc} does not have the required taints to NoSchedule on nodes with label node-role.kubernetes.io/edge."
-            echo "${err_msg}" >> "${ARTIFACT_DIR}/errors.txt" ;
             echo -e "${test_item_name}\n ${err_msg}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
            test_result="failed"
         fi
@@ -384,27 +384,33 @@ function test_render_validations() {
 aws_describe_regions
 touch "${ARTIFACT_DIR}/regions_edge.txt"
 
-# Discover regions with edge zones
-jq -r ' .Regions[] | [.RegionName, .OptInStatus] |@tsv' "${ARTIFACT_DIR}/regions_all.txt" | \
-while read -r line;
+# Discovering and testing regions with edge zones.
+jq -r '.Regions[] | [.RegionName, .OptInStatus] | @tsv' "${FILE_ALL_REGIONS}" | \
+    while read -r line;
 do
-    rm -rvf "$JUNIT_BUFFER_FILE_MSG" || true
-    region_name=$(echo $line | cut -d' ' -f1)
-    status=$(echo $line | cut -d' ' -f2)
+    rm -rvf "${JUNIT_BUFFER_FILE_MSG}" || true
+    region_name=$(echo ${line} | cut -d' ' -f1)
+    status=$(echo ${line} | cut -d' ' -f2)
 
-    echo -e "\n> Processing region ${region_name}" | tee "$JUNIT_BUFFER_FILE_MSG"
+    echo -e "\n**************************\n"
+    echo -e "> Processing region ${region_name}" | tee "$JUNIT_BUFFER_FILE_MSG"
     case $status in
     "opted-in"|"opt-in-not-required")
-        echo "$region_name" >> "${ARTIFACT_DIR}/regions_enabled.txt";
+        echo "${region_name}" >> "${ARTIFACT_DIR}/regions_enabled.txt";
         add_test_case "Region ${region_name} is enabled" "0" "pass"
     ;;
-    *) 
-        err_msg="[$region_name] ERROR: Unexpected status [$status] for the Region [${region_name}]. It is expected to be enabled."
-        echo "$err_msg" >> "${ARTIFACT_DIR}/errors.txt" ;
-        echo "The region ${region_name} has invalid status or is not enabled/opted-in: ${status}." | tee -a "$JUNIT_BUFFER_FILE_MSG"
+    "not-opted-in")
+        echo "The region ${region_name} has the status [${status}] which is invalid for this job." | tee -a "${JUNIT_BUFFER_FILE_MSG}"
+        add_test_case "Region ${region_name} is enabled" "0" "skipped"
+        continue;
+    ;;
+    # Should not happen. It could be a problem in the parser or invalid API results.
+    *)
+        echo "The region ${region_name} has invalid status: ${status}." | tee -a "${JUNIT_BUFFER_FILE_MSG}"
+        echo "ERROR: Unexpected status [$status] for the Region [${region_name}]. It is expected to be enabled[opted-in|opt-in-not-required] or disabled[not-opted-in]." | tee -a "${JUNIT_BUFFER_FILE_MSG}"
         add_test_case "Region ${region_name} is enabled" "0" "failed"
         continue;
-        ;;
+    ;;
     esac
 
     export AWS_REGION=${region_name}
@@ -413,22 +419,22 @@ do
     test_result="pass"
     aws_describe_edge_zones "${region_name}"
     if ! grep "${region_name}" "${ARTIFACT_DIR}/regions_edge.txt"; then
-        echo "skip region ${region_name} of no edge zones available." | tee -a "$JUNIT_BUFFER_FILE_MSG"
+        echo "skip region ${region_name} with no edge zones available." | tee -a "${JUNIT_BUFFER_FILE_MSG}"
         test_result="skipped"
         add_test_case "${test_name}" "0" "${test_result}"
         continue
     fi
     add_test_case "${test_name}" "0" "${test_result}"
 
-    test_name="Region ${region_name} have all edge zones enabled"
+    test_name="Region ${region_name} has all edge zones enabled"
     test_result="pass"
     get_enabled_edge_zones "${region_name}"
     if [[ -f "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}.txt" ]] ; then
-        echo "Detected one or more disabled edge zones, trying to enable it..."
+        echo_date "Detected one or more disabled edge zones, trying to enable it..."
         enable_zones "${region_name}"
 
         if [[ -f "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}_failed-to-enable.txt" ]] ; then
-            echo "One or more zones in the region ${region_name} was not enabled and/or failed to opt-in. Ask the job OWNER to enable the below edge zones manually in AWS EC2 Console." | tee -a "$JUNIT_BUFFER_FILE_MSG"
+            echo "One or more zones in the region ${region_name} were not enabled and/or failed to opt-in. Ask the job OWNER to enable the below edge zones manually in AWS EC2 Console." | tee -a "${JUNIT_BUFFER_FILE_MSG}"
             tee -a "$JUNIT_BUFFER_FILE_MSG" < "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}_failed-to-enable.txt"
             test_result="failed"
         fi

@@ -1,0 +1,80 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+images:
+- dockerfile_path: Dockerfile
+  to: vm-console-proxy-container
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y jq git make findutils which gcc gettext && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: test-src-base
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make test
+      from: test-src-base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_IMG
+        name: vm-console-proxy-container
+      from: test-src-base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.6
+  org: kubevirt
+  repo: vm-console-proxy

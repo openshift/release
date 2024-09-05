@@ -53,7 +53,6 @@ for sc in $(oc get storageclass -o name); do
     oc annotate "$sc" storageclass.kubernetes.io/is-default-class-
 done
 # Ensure the lvm storage class is the default one for the cluster
-storageclass=$(oc get -o name -l owned-by.topolvm.io/name=my-lvmcluster storageclass)
-oc annotate "$storageclass" storageclass.kubernetes.io/is-default-class=true
+oc annotate sc lvms-vg1 storageclass.kubernetes.io/is-default-class=true --overwrite
 
 #oc wait lvmcluster -n openshift-storage my-lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout=20m
