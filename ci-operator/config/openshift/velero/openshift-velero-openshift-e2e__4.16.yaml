@@ -1,0 +1,59 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.22.5
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        set -x;
+        make local;
+        date;
+        oc create ns openshift-adp;
+        date;
+        ln -s $(dirname $(which oc))/oc $(dirname $(which oc))/kubectl;
+        date;
+        BSL_BUCKET=$(cat /var/run/oadp-credentials/new-velero-bucket-name);
+        date;
+        ./_output/bin/linux/amd64/velero install --namespace openshift-adp --image velero/velero:main --use-node-agent --privileged-node-agent --use-volume-snapshots --provider aws --bucket $BSL_BUCKET --secret-file /var/run/oadp-credentials --plugins quay.io/konveyor/openshift-velero-plugin:oadp-1.4,quay.io/konveyor/velero-plugin-for-aws:v1.10.1 --disable-informer-cache=false --uploader-type=kopia --dry-run --output json --crds-only;
+        date;
+        ./_output/bin/linux/amd64/velero install --namespace openshift-adp --image velero/velero:main --use-node-agent --privileged-node-agent --use-volume-snapshots --provider aws --bucket $BSL_BUCKET --secret-file /var/run/oadp-credentials --plugins quay.io/konveyor/openshift-velero-plugin:oadp-1.4,quay.io/konveyor/velero-plugin-for-aws:v1.10.1 --disable-informer-cache=false --uploader-type=kopia --dry-run --output json;
+        date;
+        PLUGINS=quay.io/konveyor/openshift-velero-plugin:oadp-1.4,quay.io/konveyor/velero-plugin-for-aws:v1.10.1 make --debug=j -f Makefile.prow test-e2e;
+        date;
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: ipi-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: openshift-e2e
+  org: openshift
+  repo: velero
+  variant: "4.16"
