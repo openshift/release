@@ -119,6 +119,8 @@ run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nod
 
 function wait-for-nodes-to-be-ready {
   run-on-first-master-silent-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig && ls -la /tmp/lb-ext.kubeconfig"
+  copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
 
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
@@ -135,6 +137,7 @@ function wait-for-valid-lb-ext-kubeconfig {
 }
 
 function pod-restart-workarounds {
+  export KUBECONFIG=/tmp/lb-ext.kubeconfig
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
   oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
@@ -154,6 +157,7 @@ function prepull-tools-image-for-gather-step {
 }
 
 function wait-for-operators-to-stabilize {
+  export KUBECONFIG=/tmp/lb-ext.kubeconfig
   # Wait for operators to stabilize
   if
     ! oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m; then
