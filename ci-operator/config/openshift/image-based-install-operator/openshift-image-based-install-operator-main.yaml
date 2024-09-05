@@ -3,6 +3,14 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  installer:
+    name: "4.17"
+    namespace: ocp
+    tag: installer
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -20,6 +28,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: image-based-install-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -62,6 +76,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: e2e-ibio
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+    workflow: image-based-install-operator
+- as: e2e-ibio-periodic
+  cron: 00 00 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+    workflow: image-based-install-operator
 zz_generated_metadata:
   branch: main
   org: openshift
