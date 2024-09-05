@@ -19,9 +19,6 @@ fi
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 
-#TODo temp
-ls -lh ${SHARED_DIR}
-
 # Disable workload partitioning for annotated pods to avoid throttling.
 ssh "${INSTANCE_PREFIX}" "sudo sed -i 's/resources/#&/g' /etc/crio/crio.conf.d/11-microshift-ovn.conf"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl daemon-reload"
