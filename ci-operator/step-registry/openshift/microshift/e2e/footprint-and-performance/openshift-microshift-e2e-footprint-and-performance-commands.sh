@@ -1,61 +1,26 @@
-#!/usr/bin/env bash
-
-set -xeuo pipefail
-
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
-
-cat << 'EOF' > /tmp/prepare.sh
 #!/bin/bash
 set -xeuo pipefail
 
-if ! sudo subscription-manager status >&/dev/null; then
-    sudo subscription-manager register \
-        --org="$(cat /tmp/subscription-manager-org)" \
-        --activationkey="$(cat /tmp/subscription-manager-act-key)"
-fi
+curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
+# shellcheck disable=SC1091
+source /tmp/ci-functions.sh
+ci_script_prologue
 
-cp /tmp/pull-secret "${HOME}/.pull-secret.json"
+cat <<EOF > /tmp/prepare.sh
+#!/bin/bash
+set -xeuo pipefail
 
-mkdir -p -m 0700 ${HOME}/.aws/
+source /tmp/ci-functions.sh
+ci_subscription_register
+ci_copy_secrets "${CACHE_REGION}"
 
-# Profile configuration
-cat <<EOF2 >> ${HOME}/.aws/config
-[microshift-ci]
-region = us-west-2
-output = json
-EOF2
-
-# Profile credentials
-cat <<EOF2 >>${HOME}/.aws/credentials
-[microshift-ci]
-aws_access_key_id = $(cat /tmp/aws_access_key_id)
-aws_secret_access_key = $(cat /tmp/aws_secret_access_key)
-EOF2
-
-# Permissions and environment settings
-chmod -R go-rwx ${HOME}/.aws/
-
-chmod 0755 ~
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 EOF
 chmod +x /tmp/prepare.sh
 
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 scp \
+  /tmp/ci-functions.sh \
   /tmp/prepare.sh \
   /var/run/rhsm/subscription-manager-org \
   /var/run/rhsm/subscription-manager-act-key \

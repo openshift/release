@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 1 21 * *
   decorate: true
   decoration_config:
@@ -89,181 +89,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 15 16 11,27 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/variant: amd64-nightly-4.16-upgrade-from-eus-4.14
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-baremetalds-ipi-ovn-ipv4-fips-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/baremetalds-ipi-ovn-ipv4-fips-f14-cluster-profile
-      - --target=baremetalds-ipi-ovn-ipv4-fips-f14
-      - --variant=amd64-nightly-4.16-upgrade-from-eus-4.14
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/baremetalds-ipi-ovn-ipv4-fips-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-equinix-ocp-metal-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 9 13 12 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: amd64-nightly-4.16-upgrade-from-eus-4.14
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-gcp-ipi-workers-rhel8-fips-f28
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gcp-ipi-workers-rhel8-fips-f28-cluster-profile
-      - --target=gcp-ipi-workers-rhel8-fips-f28
-      - --variant=amd64-nightly-4.16-upgrade-from-eus-4.14
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/gcp-ipi-workers-rhel8-fips-f28-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-gcp-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 31 19 7,23 * *
+  cron: 12 18 6,20 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -277,7 +103,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-nightly-4.16-upgrade-from-eus-4.14
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-ibmcloud-ipi-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-ibmcloud-ipi-ovn-ipsec-f14
   spec:
     containers:
     - args:
@@ -287,8 +113,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ibmcloud-ipi-f14-cluster-profile
-      - --target=ibmcloud-ipi-f14
+      - --secret-dir=/usr/local/ibmcloud-ipi-ovn-ipsec-f14-cluster-profile
+      - --target=ibmcloud-ipi-ovn-ipsec-f14
       - --variant=amd64-nightly-4.16-upgrade-from-eus-4.14
       command:
       - ci-operator
@@ -305,7 +131,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ibmcloud-ipi-f14-cluster-profile
+      - mountPath: /usr/local/ibmcloud-ipi-ovn-ipsec-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -438,7 +264,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 56 12 7,23 * *
+  cron: 2 23 3,17 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -448,11 +274,11 @@ periodics:
     repo: openshift-tests-private
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
     ci-operator.openshift.io/variant: amd64-nightly-4.16-upgrade-from-eus-4.14
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-vsphere-ipi-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-4.16-upgrade-from-eus-4.14-vsphere-upi-encrypt-f14
   spec:
     containers:
     - args:
@@ -462,8 +288,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-f14-cluster-profile
-      - --target=vsphere-ipi-f14
+      - --secret-dir=/usr/local/vsphere-upi-encrypt-f14-cluster-profile
+      - --target=vsphere-upi-encrypt-f14
       - --variant=amd64-nightly-4.16-upgrade-from-eus-4.14
       command:
       - ci-operator
@@ -480,7 +306,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-upi-encrypt-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -524,7 +350,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 15 7,21 * *
   decorate: true
   decoration_config:
@@ -2134,7 +1960,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 47 5 1 * *
   decorate: true
   decoration_config:
@@ -2221,7 +2047,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 50 10 29 * *
   decorate: true
   decoration_config:
@@ -2308,7 +2134,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 26 12 25 * *
   decorate: true
   decoration_config:
@@ -2395,7 +2221,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 17 16,30 * *
   decorate: true
   decoration_config:
@@ -2482,7 +2308,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 12 1 22 * *
   decorate: true
   decoration_config:
@@ -2569,7 +2395,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 18 17 7,21 * *
   decorate: true
   decoration_config:
@@ -3851,7 +3677,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 9 3 25 * *
   decorate: true
   decoration_config:
@@ -3938,7 +3764,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 22 17 28 * *
   decorate: true
   decoration_config:
@@ -4025,7 +3851,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 2 20 7 * *
   decorate: true
   decoration_config:
@@ -4112,7 +3938,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 22 25 * *
   decorate: true
   decoration_config:
@@ -4199,7 +4025,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 0 13,27 * *
   decorate: true
   decoration_config:
@@ -6585,7 +6411,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 35 2 2 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -6672,7 +6498,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 47 20 29 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -7547,7 +7373,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 2 12 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -7634,7 +7460,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 5 22 4 * *
   decorate: true
   decoration_config:
@@ -7721,7 +7547,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 55 2 26 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -8593,7 +8419,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 30 18 12,18 * *
   decorate: true
   decoration_config:
@@ -8681,7 +8507,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 11 1 13,19 * *
   decorate: true
   decoration_config:
@@ -16963,7 +16789,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 4 13,26 * *
   decorate: true
   decoration_config:
@@ -17051,7 +16877,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 49 14 12,21 * *
   decorate: true
   decoration_config:
@@ -17139,7 +16965,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 28 6 5,24 * *
   decorate: true
   decoration_config:
@@ -17227,7 +17053,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 54 6 7,28 * *
   decorate: true
   decoration_config:
@@ -17315,7 +17141,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 38 10 13,28 * *
   decorate: true
   decoration_config:
@@ -17403,7 +17229,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 18 14,24 * *
   decorate: true
   decoration_config:
@@ -17491,7 +17317,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 25 2 14,23 * *
   decorate: true
   decoration_config:
@@ -17579,7 +17405,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 44 8 11,26 * *
   decorate: true
   decoration_config:
@@ -17667,7 +17493,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 6 0 13,22 * *
   decorate: true
   decoration_config:
@@ -17766,7 +17592,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 7 7,22 * *
   decorate: true
   decoration_config:
@@ -17854,7 +17680,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 9 9,23 * *
   decorate: true
   decoration_config:
@@ -17942,7 +17768,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 10 2 13,21 * *
   decorate: true
   decoration_config:
@@ -18030,7 +17856,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 4 3 12,15 * *
   decorate: true
   decoration_config:
@@ -18118,7 +17944,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 25 8 3,17 * *
   decorate: true
   decoration_config:
@@ -18206,7 +18032,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 7 19 9,25 * *
   decorate: true
   decoration_config:
@@ -18294,7 +18120,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 44 14 5,14,21,28 * *
   decorate: true
   decoration_config:
@@ -18382,7 +18208,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 0 14,28 * *
   decorate: true
   decoration_config:
@@ -18470,7 +18296,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 17 5,12,19,26 * *
   decorate: true
   decoration_config:
@@ -18558,7 +18384,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 57 11 1,8,15,24 * *
   decorate: true
   decoration_config:
@@ -18646,8 +18472,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 12 7 4 * *
+  cluster: build03
+  cron: 31 18 7,22 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -18662,7 +18488,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-azure-aks-hypershift-install-f28-longduration
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-azure-aks-hypershift-install-f14-longduration
   spec:
     containers:
     - args:
@@ -18672,8 +18498,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-aks-hypershift-install-f28-longduration-cluster-profile
-      - --target=azure-aks-hypershift-install-f28-longduration
+      - --secret-dir=/usr/local/azure-aks-hypershift-install-f14-longduration-cluster-profile
+      - --target=azure-aks-hypershift-install-f14-longduration
       - --variant=amd64-nightly
       command:
       - ci-operator
@@ -18690,7 +18516,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-aks-hypershift-install-f28-longduration-cluster-profile
+      - mountPath: /usr/local/azure-aks-hypershift-install-f14-longduration-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -18734,7 +18560,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 16 22 6,19 * *
   decorate: true
   decoration_config:
@@ -18822,7 +18648,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 7 9,26 * *
   decorate: true
   decoration_config:
@@ -18910,7 +18736,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 49 17 2,16 * *
   decorate: true
   decoration_config:
@@ -18998,7 +18824,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 9 4 * *
   decorate: true
   decoration_config:
@@ -19086,7 +18912,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 27 9 21 * *
   decorate: true
   decoration_config:
@@ -19174,7 +19000,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 20 6,25 * *
   decorate: true
   decoration_config:
@@ -19262,7 +19088,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 47 18 7,28 * *
   decorate: true
   decoration_config:
@@ -19350,7 +19176,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 10 18 6,20 * *
   decorate: true
   decoration_config:
@@ -19438,7 +19264,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 18 6,22 * *
   decorate: true
   decoration_config:
@@ -19526,106 +19352,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 12 12 15 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-azure-ipi-ovn-hypershift-install-f28-longduration
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-ovn-hypershift-install-f28-longduration-cluster-profile
-      - --target=azure-ipi-ovn-hypershift-install-f28-longduration
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/azure-ipi-ovn-hypershift-install-f28-longduration-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-azure-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 53 19 11,27 * *
   decorate: true
   decoration_config:
@@ -19713,7 +19440,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 33 0 6,21 * *
   decorate: true
   decoration_config:
@@ -19801,7 +19528,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 26 22 3,17 * *
   decorate: true
   decoration_config:
@@ -19889,7 +19616,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 28 15 7 * *
   decorate: true
   decoration_config:
@@ -19977,7 +19704,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 35 6 6,24 * *
   decorate: true
   decoration_config:
@@ -20065,7 +19792,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 44 7 10,26 * *
   decorate: true
   decoration_config:
@@ -20153,7 +19880,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 16 10 7,18 * *
   decorate: true
   decoration_config:
@@ -20241,7 +19968,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 18 12 9,25 * *
   decorate: true
   decoration_config:
@@ -20340,7 +20067,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 28 12 14,27 * *
   decorate: true
   decoration_config:
@@ -20428,7 +20155,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 22 15 11,15 * *
   decorate: true
   decoration_config:
@@ -20516,7 +20243,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 24 3 13,16 * *
   decorate: true
   decoration_config:
@@ -20604,7 +20331,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 20 3 14,27 * *
   decorate: true
   decoration_config:
@@ -21405,6 +21132,95 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 53 12 10,24 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-baremetal-compact-agent-ipv6-dynamic-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/baremetal-compact-agent-ipv6-dynamic-f14-cluster-profile
+      - --target=baremetal-compact-agent-ipv6-dynamic-f14
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/baremetal-compact-agent-ipv6-dynamic-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-equinix-ocp-metal-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 53 15 11,25 * *
   decorate: true
   decoration_config:
@@ -21539,6 +21355,95 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/baremetal-ha-agent-ipv4-static-disc-fips-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-equinix-ocp-metal-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 53 20 12,26 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-baremetal-ha-agent-ipv6-dynamic-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/baremetal-ha-agent-ipv6-dynamic-f14-cluster-profile
+      - --target=baremetal-ha-agent-ipv6-dynamic-f14
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/baremetal-ha-agent-ipv6-dynamic-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -22073,6 +21978,184 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/baremetal-sno-agent-ipv4-static-connected-fips-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-equinix-ocp-metal-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 53 15 11,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-baremetal-sno-agent-ipv6-dynamic-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/baremetal-sno-agent-ipv6-dynamic-f14-cluster-profile
+      - --target=baremetal-sno-agent-ipv6-dynamic-f14
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/baremetal-sno-agent-ipv6-dynamic-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-equinix-ocp-metal-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 45 9 11,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-baremetal-sno-agent-ipv6-dynamic-fips-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/baremetal-sno-agent-ipv6-dynamic-fips-f14-cluster-profile
+      - --target=baremetal-sno-agent-ipv6-dynamic-fips-f14
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/baremetal-sno-agent-ipv6-dynamic-fips-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -26339,7 +26422,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 22 15 * *
   decorate: true
   decoration_config:
@@ -26427,7 +26510,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 54 0 27 * *
   decorate: true
   decoration_config:
@@ -26515,7 +26598,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 59 11 27 * *
   decorate: true
   decoration_config:
@@ -26603,7 +26686,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 23 29 * *
   decorate: true
   decoration_config:
@@ -26691,7 +26774,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 56 18 19 * *
   decorate: true
   decoration_config:
@@ -26779,7 +26862,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 2 30 * *
   decorate: true
   decoration_config:
@@ -26867,7 +26950,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 42 23 4 * *
   decorate: true
   decoration_config:
@@ -26955,7 +27038,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 42 17 3 * *
   decorate: true
   decoration_config:
@@ -27043,7 +27126,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 7 1 12 * *
   decorate: true
   decoration_config:
@@ -27131,7 +27214,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 13 27 * *
   decorate: true
   decoration_config:
@@ -27219,7 +27302,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 22 16 * *
   decorate: true
   decoration_config:
@@ -27307,7 +27390,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 5 11 2 * *
   decorate: true
   decoration_config:
@@ -27395,7 +27478,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 41 13 4 * *
   decorate: true
   decoration_config:
@@ -27483,7 +27566,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 10 21 5,20 * *
   decorate: true
   decoration_config:
@@ -27571,7 +27654,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 33 1 2 * *
   decorate: true
   decoration_config:
@@ -27659,7 +27742,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 11 12 * *
   decorate: true
   decoration_config:
@@ -27747,7 +27830,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 16 22 12,28 * *
   decorate: true
   decoration_config:
@@ -27835,7 +27918,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 12 16 18 * *
   decorate: true
   decoration_config:
@@ -27923,7 +28006,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 17 17 24 * *
   decorate: true
   decoration_config:
@@ -28011,7 +28094,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 35 9 16 * *
   decorate: true
   decoration_config:
@@ -29890,94 +29973,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 5 0 12,26 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-vsphere-agent-compact-day2-add-nodes-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-agent-compact-day2-add-nodes-f14-cluster-profile
-      - --target=vsphere-agent-compact-day2-add-nodes-f14
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-agent-compact-day2-add-nodes-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
   cron: 10 20 7,21 * *
   decorate: true
   decoration_config:
@@ -30022,94 +30017,6 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/vsphere-agent-compact-fips-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
-  cron: 36 4 10,26 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-dis-2
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-vsphere-agent-disc-compact-day2-add-nodes-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-agent-disc-compact-day2-add-nodes-f14-cluster-profile
-      - --target=vsphere-agent-disc-compact-day2-add-nodes-f14
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-agent-disc-compact-day2-add-nodes-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -30418,94 +30325,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 41 1 11,27 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-vsphere-agent-dualstack-compact-day2-add-nodes-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-agent-dualstack-compact-day2-add-nodes-f14-cluster-profile
-      - --target=vsphere-agent-dualstack-compact-day2-add-nodes-f14
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-agent-dualstack-compact-day2-add-nodes-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
   cron: 55 19 1,15 * *
   decorate: true
   decoration_config:
@@ -30770,94 +30589,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 47 7 14,28 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-vsphere-agent-ha-day2-add-nodes-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-agent-ha-day2-add-nodes-f14-cluster-profile
-      - --target=vsphere-agent-ha-day2-add-nodes-f14
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-agent-ha-day2-add-nodes-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
   cron: 55 6 6,22 * *
   decorate: true
   decoration_config:
@@ -30902,94 +30633,6 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/vsphere-agent-ha-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
-  cron: 20 14 7,21 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-nightly-vsphere-agent-sno-day2-add-nodes-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-agent-sno-day2-add-nodes-f14-cluster-profile
-      - --target=vsphere-agent-sno-day2-add-nodes-f14
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-agent-sno-day2-add-nodes-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -36255,7 +35898,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 16 4 5,12,20,28 * *
   decorate: true
   decoration_config:
@@ -36517,7 +36160,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 36 11 7,15,22,29 * *
   decorate: true
   decoration_config:
@@ -36779,8 +36422,95 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 31 0 7,23 * *
+  cluster: build03
+  cron: 53 10 6,14,21,28 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-rollback-stable
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-rollback-stable-aws-ipi-byo-route53-f7
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-f7-cluster-profile
+      - --target=aws-ipi-byo-route53-f7
+      - --variant=amd64-rollback-stable
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-byo-route53-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 45 23 1 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -36794,7 +36524,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-aws-c2s-ipi-disc-priv-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-aws-c2s-ipi-disc-priv-fips-f28
   spec:
     containers:
     - args:
@@ -36804,8 +36534,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-c2s-ipi-disc-priv-fips-f14-cluster-profile
-      - --target=aws-c2s-ipi-disc-priv-fips-f14
+      - --secret-dir=/usr/local/aws-c2s-ipi-disc-priv-fips-f28-cluster-profile
+      - --target=aws-c2s-ipi-disc-priv-fips-f28
       - --variant=amd64-stable-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -36822,7 +36552,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-c2s-ipi-disc-priv-fips-f14-cluster-profile
+      - mountPath: /usr/local/aws-c2s-ipi-disc-priv-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -36953,7 +36683,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 54 0 12 * *
   decorate: true
   decoration_config:
@@ -37127,8 +36857,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 16 7 7,23 * *
+  cluster: build03
+  cron: 15 6 6 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -37142,7 +36872,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-ibmcloud-ipi-proxy-private-rt-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-ibmcloud-ipi-proxy-private-rt-f28
   spec:
     containers:
     - args:
@@ -37152,8 +36882,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ibmcloud-ipi-proxy-private-rt-f14-cluster-profile
-      - --target=ibmcloud-ipi-proxy-private-rt-f14
+      - --secret-dir=/usr/local/ibmcloud-ipi-proxy-private-rt-f28-cluster-profile
+      - --target=ibmcloud-ipi-proxy-private-rt-f28
       - --variant=amd64-stable-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -37170,7 +36900,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ibmcloud-ipi-proxy-private-rt-f14-cluster-profile
+      - mountPath: /usr/local/ibmcloud-ipi-proxy-private-rt-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -37303,7 +37033,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 12 21 12,26 * *
+  cron: 4 20 24 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -37317,7 +37047,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-vsphere-ipi-disc-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-vsphere-ipi-disc-f28
   spec:
     containers:
     - args:
@@ -37327,8 +37057,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-disc-f14-cluster-profile
-      - --target=vsphere-ipi-disc-f14
+      - --secret-dir=/usr/local/vsphere-ipi-disc-f28-cluster-profile
+      - --target=vsphere-ipi-disc-f28
       - --variant=amd64-stable-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -37345,7 +37075,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-disc-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-ipi-disc-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -37390,7 +37120,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 1 21 10,26 * *
+  cron: 33 7 23 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -37404,7 +37134,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-vsphere-ipi-proxy-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.15-vsphere-ipi-proxy-fips-f28
   spec:
     containers:
     - args:
@@ -37414,8 +37144,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-proxy-fips-f14-cluster-profile
-      - --target=vsphere-ipi-proxy-fips-f14
+      - --secret-dir=/usr/local/vsphere-ipi-proxy-fips-f28-cluster-profile
+      - --target=vsphere-ipi-proxy-fips-f28
       - --variant=amd64-stable-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -37432,7 +37162,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-proxy-fips-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-ipi-proxy-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -37477,443 +37207,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 35 3 25 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.16-aws-ipi-disc-priv-tp-f28
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-disc-priv-tp-f28-cluster-profile
-      - --target=aws-ipi-disc-priv-tp-f28
-      - --variant=amd64-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-disc-priv-tp-f28-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 59 23 30 1,3,5,7,9,11 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: azuremag
-    ci-operator.openshift.io/cloud-cluster-profile: azuremag-qe
-    ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.16-azure-mag-ipi-fullyprivate-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-mag-ipi-fullyprivate-f60-cluster-profile
-      - --target=azure-mag-ipi-fullyprivate-f60
-      - --variant=amd64-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/azure-mag-ipi-fullyprivate-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-azuremag-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 46 5 17 1,3,5,7,9,11 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.16-gcp-ipi-disc-priv-oidc-fips-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gcp-ipi-disc-priv-oidc-fips-f60-cluster-profile
-      - --target=gcp-ipi-disc-priv-oidc-fips-f60
-      - --variant=amd64-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/gcp-ipi-disc-priv-oidc-fips-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-gcp-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 1 4 10 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.16-gcp-ipi-proxy-tp-f28
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gcp-ipi-proxy-tp-f28-cluster-profile
-      - --target=gcp-ipi-proxy-tp-f28
-      - --variant=amd64-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/gcp-ipi-proxy-tp-f28-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-gcp-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 36 16 7 2,4,6,8,10,12 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: nutanix
-    ci-operator.openshift.io/cloud-cluster-profile: nutanix-qe-dis
-    ci-operator.openshift.io/cluster: build01
-    ci-operator.openshift.io/variant: amd64-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-4.16-upgrade-from-stable-4.16-nutanix-ipi-proxy-fips-mini-perm-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nutanix-ipi-proxy-fips-mini-perm-f60-cluster-profile
-      - --target=nutanix-ipi-proxy-fips-mini-perm-f60
-      - --variant=amd64-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/nutanix-ipi-proxy-fips-mini-perm-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-nutanix-qe-dis
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 59 7 5,19 * *
+  cron: 12 4 7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -37927,7 +37221,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-c2s-ipi-disc-priv-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-c2s-ipi-disc-priv-fips-f28
   spec:
     containers:
     - args:
@@ -37937,8 +37231,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-c2s-ipi-disc-priv-fips-f14-cluster-profile
-      - --target=aws-c2s-ipi-disc-priv-fips-f14
+      - --secret-dir=/usr/local/aws-c2s-ipi-disc-priv-fips-f28-cluster-profile
+      - --target=aws-c2s-ipi-disc-priv-fips-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -37955,7 +37249,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-c2s-ipi-disc-priv-fips-f14-cluster-profile
+      - mountPath: /usr/local/aws-c2s-ipi-disc-priv-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -38000,7 +37294,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 21 18 4,18 * *
+  cron: 11 17 4 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -38014,7 +37308,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-ipi-disc-priv-localzone-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-ipi-disc-priv-localzone-fips-f28
   spec:
     containers:
     - args:
@@ -38024,8 +37318,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-disc-priv-localzone-fips-f14-cluster-profile
-      - --target=aws-ipi-disc-priv-localzone-fips-f14
+      - --secret-dir=/usr/local/aws-ipi-disc-priv-localzone-fips-f28-cluster-profile
+      - --target=aws-ipi-disc-priv-localzone-fips-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -38042,7 +37336,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-disc-priv-localzone-fips-f14-cluster-profile
+      - mountPath: /usr/local/aws-ipi-disc-priv-localzone-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -38087,7 +37381,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 54 12 3,17 * *
+  cron: 19 9 28 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -38101,7 +37395,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-ipi-disc-priv-sts-ep-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-aws-ipi-disc-priv-sts-ep-fips-f28
   spec:
     containers:
     - args:
@@ -38111,8 +37405,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-disc-priv-sts-ep-fips-f14-cluster-profile
-      - --target=aws-ipi-disc-priv-sts-ep-fips-f14
+      - --secret-dir=/usr/local/aws-ipi-disc-priv-sts-ep-fips-f28-cluster-profile
+      - --target=aws-ipi-disc-priv-sts-ep-fips-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -38129,7 +37423,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-disc-priv-sts-ep-fips-f14-cluster-profile
+      - mountPath: /usr/local/aws-ipi-disc-priv-sts-ep-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -40164,7 +39458,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 16 1,15 * *
   decorate: true
   decoration_config:
@@ -40251,7 +39545,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 39 19 4 * *
   decorate: true
   decoration_config:
@@ -40338,7 +39632,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 3 6 7,23 * *
   decorate: true
   decoration_config:
@@ -41212,8 +40506,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 17 8 7,21 * *
+  cluster: build03
+  cron: 21 0 22 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41227,7 +40521,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-ibmcloud-ipi-disc-priv-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-ibmcloud-ipi-disc-priv-f28
   spec:
     containers:
     - args:
@@ -41237,8 +40531,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ibmcloud-ipi-disc-priv-f14-cluster-profile
-      - --target=ibmcloud-ipi-disc-priv-f14
+      - --secret-dir=/usr/local/ibmcloud-ipi-disc-priv-f28-cluster-profile
+      - --target=ibmcloud-ipi-disc-priv-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -41255,7 +40549,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ibmcloud-ipi-disc-priv-f14-cluster-profile
+      - mountPath: /usr/local/ibmcloud-ipi-disc-priv-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41299,8 +40593,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 4 22 5,19 * *
+  cluster: build03
+  cron: 16 11 16 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41314,7 +40608,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-ibmcloud-ipi-proxy-private-rt-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-ibmcloud-ipi-proxy-private-rt-f28
   spec:
     containers:
     - args:
@@ -41324,8 +40618,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ibmcloud-ipi-proxy-private-rt-f14-cluster-profile
-      - --target=ibmcloud-ipi-proxy-private-rt-f14
+      - --secret-dir=/usr/local/ibmcloud-ipi-proxy-private-rt-f28-cluster-profile
+      - --target=ibmcloud-ipi-proxy-private-rt-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -41342,7 +40636,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ibmcloud-ipi-proxy-private-rt-f14-cluster-profile
+      - mountPath: /usr/local/ibmcloud-ipi-proxy-private-rt-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41475,7 +40769,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 15 0 7,21 * *
+  cron: 18 1 3 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41489,7 +40783,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-disc-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-disc-f28
   spec:
     containers:
     - args:
@@ -41499,8 +40793,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-disc-f14-cluster-profile
-      - --target=vsphere-ipi-disc-f14
+      - --secret-dir=/usr/local/vsphere-ipi-disc-f28-cluster-profile
+      - --target=vsphere-ipi-disc-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -41517,7 +40811,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-disc-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-ipi-disc-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41562,7 +40856,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 27 18 7,23 * *
+  cron: 3 1 22 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41576,7 +40870,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-ovn-dualstack-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-ovn-dualstack-f28
   spec:
     containers:
     - args:
@@ -41586,8 +40880,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-ovn-dualstack-f14-cluster-profile
-      - --target=vsphere-ipi-ovn-dualstack-f14
+      - --secret-dir=/usr/local/vsphere-ipi-ovn-dualstack-f28-cluster-profile
+      - --target=vsphere-ipi-ovn-dualstack-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -41604,7 +40898,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-ovn-dualstack-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-ipi-ovn-dualstack-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41649,7 +40943,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 43 15 3,17 * *
+  cron: 6 17 12 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41663,7 +40957,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-proxy-fips-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-proxy-fips-f28
   spec:
     containers:
     - args:
@@ -41673,8 +40967,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-proxy-fips-f14-cluster-profile
-      - --target=vsphere-ipi-proxy-fips-f14
+      - --secret-dir=/usr/local/vsphere-ipi-proxy-fips-f28-cluster-profile
+      - --target=vsphere-ipi-proxy-fips-f28
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -41691,94 +40985,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-proxy-fips-f14-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-vsphere
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere02
-  cron: 42 2 6,20 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: amd64-stable
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-amd64-stable-vsphere-ipi-zones-f14
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-ipi-zones-f14-cluster-profile
-      - --target=vsphere-ipi-zones-f14
-      - --variant=amd64-stable
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/vsphere-ipi-zones-f14-cluster-profile
+      - mountPath: /usr/local/vsphere-ipi-proxy-fips-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41823,7 +41030,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 12 1 24 * *
+  cron: 55 11 25 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41832,12 +41039,12 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
     ci-operator.openshift.io/variant: arm64-nightly-4.16-upgrade-from-eus-4.14
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-nightly-4.16-upgrade-from-eus-4.14-aws-ipi-ovn-f28
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-nightly-4.16-upgrade-from-eus-4.14-baremetalds-ipi-ovn-ipv4-f28
   spec:
     containers:
     - args:
@@ -41847,8 +41054,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-ovn-f28-cluster-profile
-      - --target=aws-ipi-ovn-f28
+      - --secret-dir=/usr/local/baremetalds-ipi-ovn-ipv4-f28-cluster-profile
+      - --target=baremetalds-ipi-ovn-ipv4-f28
       - --variant=arm64-nightly-4.16-upgrade-from-eus-4.14
       command:
       - ci-operator
@@ -41865,7 +41072,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-ovn-f28-cluster-profile
+      - mountPath: /usr/local/baremetalds-ipi-ovn-ipv4-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41895,7 +41102,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws-qe
+        secretName: cluster-secrets-equinix-ocp-metal-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -41909,8 +41116,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 14 1 15 * *
+  cluster: build02
+  cron: 35 21 5,21 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -41919,12 +41126,12 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
     ci-operator.openshift.io/variant: arm64-nightly-4.16-upgrade-from-eus-4.14
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-nightly-4.16-upgrade-from-eus-4.14-azure-ipi-f28
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-nightly-4.16-upgrade-from-eus-4.14-gcp-ipi-private-f14
   spec:
     containers:
     - args:
@@ -41934,8 +41141,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-f28-cluster-profile
-      - --target=azure-ipi-f28
+      - --secret-dir=/usr/local/gcp-ipi-private-f14-cluster-profile
+      - --target=gcp-ipi-private-f14
       - --variant=arm64-nightly-4.16-upgrade-from-eus-4.14
       command:
       - ci-operator
@@ -41952,7 +41159,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-f28-cluster-profile
+      - mountPath: /usr/local/gcp-ipi-private-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -41982,7 +41189,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-azure-qe
+        secretName: cluster-secrets-gcp-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -42344,7 +41551,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 0 3 3,17 * *
   decorate: true
   decoration_config:
@@ -43838,7 +43045,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 20 8,22 * *
   decorate: true
   decoration_config:
@@ -43926,7 +43133,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 47 13 17 * *
   decorate: true
   decoration_config:
@@ -44014,7 +43221,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 31 18 13,28 * *
   decorate: true
   decoration_config:
@@ -44102,7 +43309,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 35 19 22 * *
   decorate: true
   decoration_config:
@@ -44190,7 +43397,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 26 16 6,17 * *
   decorate: true
   decoration_config:
@@ -45693,7 +44900,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 13 5 * *
   decorate: true
   decoration_config:
@@ -45868,7 +45075,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 8 21 1,17 * *
+  cron: 14 23 11 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45882,7 +45089,7 @@ periodics:
     ci-operator.openshift.io/variant: arm64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-stable-aws-ipi-disc-priv-sts-ep-f14
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-arm64-stable-aws-ipi-disc-priv-sts-ep-f28
   spec:
     containers:
     - args:
@@ -45892,8 +45099,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-disc-priv-sts-ep-f14-cluster-profile
-      - --target=aws-ipi-disc-priv-sts-ep-f14
+      - --secret-dir=/usr/local/aws-ipi-disc-priv-sts-ep-f28-cluster-profile
+      - --target=aws-ipi-disc-priv-sts-ep-f28
       - --variant=arm64-stable
       command:
       - ci-operator
@@ -45910,7 +45117,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-disc-priv-sts-ep-f14-cluster-profile
+      - mountPath: /usr/local/aws-ipi-disc-priv-sts-ep-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -46041,7 +45248,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 44 22 4 * *
   decorate: true
   decoration_config:
@@ -46664,7 +45871,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 22 4 16 2 *
   decorate: true
   decoration_config:
@@ -46762,7 +45969,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 9 21 16 2 *
   decorate: true
   decoration_config:
@@ -46860,7 +46067,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 5 7 16 2 *
   decorate: true
   decoration_config:
@@ -47451,7 +46658,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 36 21 16 2 *
   decorate: true
   decoration_config:
@@ -47745,7 +46952,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 14 16 2 *
   decorate: true
   decoration_config:
@@ -47842,7 +47049,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 38 13 16 2 *
   decorate: true
   decoration_config:
@@ -47939,7 +47146,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 4 23 16 2 *
   decorate: true
   decoration_config:
@@ -48524,7 +47731,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 56 16 16 2 *
   decorate: true
   decoration_config:
@@ -48915,6 +48122,180 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
+  cron: 6 23 11,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: multi-nightly-4.16-upgrade-from-eus-4.14
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-eus-4.14-aws-ipi-ovn-ipsec-arm-mixarch-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-ovn-ipsec-arm-mixarch-f14-cluster-profile
+      - --target=aws-ipi-ovn-ipsec-arm-mixarch-f14
+      - --variant=multi-nightly-4.16-upgrade-from-eus-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-ovn-ipsec-arm-mixarch-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 11 2 5,19 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.16
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: multi-nightly-4.16-upgrade-from-eus-4.14
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-eus-4.14-azure-ipi-arm-mixarch-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/azure-ipi-arm-mixarch-f14-cluster-profile
+      - --target=azure-ipi-arm-mixarch-f14
+      - --variant=multi-nightly-4.16-upgrade-from-eus-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/azure-ipi-arm-mixarch-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
   cron: 23 3 29 * *
   decorate: true
   decoration_config:
@@ -49016,7 +48397,7 @@ periodics:
     ci-operator.openshift.io/variant: multi-nightly-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.15-aws-ipi-byo-iam-role-fips-amd-f28
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.15-aws-ipi-byo-iam-role-efs-fips-amd-f28
   spec:
     containers:
     - args:
@@ -49026,8 +48407,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-fips-amd-f28-cluster-profile
-      - --target=aws-ipi-byo-iam-role-fips-amd-f28
+      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-efs-fips-amd-f28-cluster-profile
+      - --target=aws-ipi-byo-iam-role-efs-fips-amd-f28
       - --variant=multi-nightly-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -49044,7 +48425,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-iam-role-fips-amd-f28-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-iam-role-efs-fips-amd-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -49190,7 +48571,7 @@ periodics:
     ci-operator.openshift.io/variant: multi-nightly-4.16-upgrade-from-stable-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.15-aws-ipi-byo-route53-compact-arm-f28
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.15-aws-ipi-byo-route53-compact-cloudfront-arm-f28
   spec:
     containers:
     - args:
@@ -49200,8 +48581,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-arm-f28-cluster-profile
-      - --target=aws-ipi-byo-route53-compact-arm-f28
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f28-cluster-profile
+      - --target=aws-ipi-byo-route53-compact-cloudfront-arm-f28
       - --variant=multi-nightly-4.16-upgrade-from-stable-4.15
       command:
       - ci-operator
@@ -49218,7 +48599,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-route53-compact-arm-f28-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -49958,7 +49339,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 23 17 30 * *
   decorate: true
   decoration_config:
@@ -50045,7 +49426,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 31 9 11 * *
   decorate: true
   decoration_config:
@@ -50132,7 +49513,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 15 20 * *
   decorate: true
   decoration_config:
@@ -50219,7 +49600,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 39 9 20 * *
   decorate: true
   decoration_config:
@@ -50306,7 +49687,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 48 14 30 * *
   decorate: true
   decoration_config:
@@ -50393,7 +49774,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 58 9 25 * *
   decorate: true
   decoration_config:
@@ -50480,7 +49861,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 24 5 6 * *
   decorate: true
   decoration_config:
@@ -50567,7 +49948,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 6 16 10 * *
   decorate: true
   decoration_config:
@@ -50654,7 +50035,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 15 1 3,17 * *
   decorate: true
   decoration_config:
@@ -50741,7 +50122,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 33 9 12 * *
   decorate: true
   decoration_config:
@@ -50828,7 +50209,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 21 26 * *
   decorate: true
   decoration_config:
@@ -50915,7 +50296,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 7 15 19 * *
   decorate: true
   decoration_config:
@@ -51002,7 +50383,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 16 4 * *
   decorate: true
   decoration_config:
@@ -51089,7 +50470,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 4 9 3 * *
   decorate: true
   decoration_config:
@@ -52151,7 +51532,7 @@ periodics:
     ci-operator.openshift.io/variant: multi-nightly-4.16-upgrade-from-stable-4.16
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.16-aws-ipi-byo-route53-compact-arm-f60
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-4.16-upgrade-from-stable-4.16-aws-ipi-byo-route53-compact-cloudfront-arm-f60
   spec:
     containers:
     - args:
@@ -52161,8 +51542,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-arm-f60-cluster-profile
-      - --target=aws-ipi-byo-route53-compact-arm-f60
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f60-cluster-profile
+      - --target=aws-ipi-byo-route53-compact-cloudfront-arm-f60
       - --variant=multi-nightly-4.16-upgrade-from-stable-4.16
       command:
       - ci-operator
@@ -52179,7 +51560,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-route53-compact-arm-f60-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f60-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -52832,7 +52213,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 3 2 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -52919,7 +52300,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 10 24 * *
   decorate: true
   decoration_config:
@@ -53006,7 +52387,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 26 23 7 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -53093,7 +52474,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 46 19 7 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -53180,7 +52561,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 54 8 10 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -53267,7 +52648,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 19 5 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -54182,7 +53563,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-iam-role-arm-f2
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-iam-role-efs-arm-f14-custom-cert
   spec:
     containers:
     - args:
@@ -54192,8 +53573,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-arm-f2-cluster-profile
-      - --target=aws-ipi-byo-iam-role-arm-f2
+      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-efs-arm-f14-custom-cert-cluster-profile
+      - --target=aws-ipi-byo-iam-role-efs-arm-f14-custom-cert
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -54210,7 +53591,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-iam-role-arm-f2-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-iam-role-efs-arm-f14-custom-cert-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -54255,7 +53636,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 22 6 10,25 * *
+  cron: 5 19 6 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -54270,7 +53651,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-iam-role-fips-amd-f9-destructive
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-iam-role-efs-fips-amd-f28-destructive
   spec:
     containers:
     - args:
@@ -54280,8 +53661,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-fips-amd-f9-destructive-cluster-profile
-      - --target=aws-ipi-byo-iam-role-fips-amd-f9-destructive
+      - --secret-dir=/usr/local/aws-ipi-byo-iam-role-efs-fips-amd-f28-destructive-cluster-profile
+      - --target=aws-ipi-byo-iam-role-efs-fips-amd-f28-destructive
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -54298,7 +53679,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-iam-role-fips-amd-f9-destructive-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-iam-role-efs-fips-amd-f28-destructive-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -54534,7 +53915,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-route53-compact-amd-f9-destructive
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-route53-compact-cloudfront-amd-f9-destructive
   spec:
     containers:
     - args:
@@ -54544,8 +53925,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-amd-f9-destructive-cluster-profile
-      - --target=aws-ipi-byo-route53-compact-amd-f9-destructive
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-cloudfront-amd-f9-destructive-cluster-profile
+      - --target=aws-ipi-byo-route53-compact-cloudfront-amd-f9-destructive
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -54562,7 +53943,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-route53-compact-amd-f9-destructive-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-route53-compact-cloudfront-amd-f9-destructive-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -54622,7 +54003,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-route53-compact-arm-f2
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-byo-route53-compact-cloudfront-arm-f2
   spec:
     containers:
     - args:
@@ -54632,8 +54013,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-arm-f2-cluster-profile
-      - --target=aws-ipi-byo-route53-compact-arm-f2
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f2-cluster-profile
+      - --target=aws-ipi-byo-route53-compact-cloudfront-arm-f2
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -54650,7 +54031,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-byo-route53-compact-arm-f2-cluster-profile
+      - mountPath: /usr/local/aws-ipi-byo-route53-compact-cloudfront-arm-f2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -55761,182 +55142,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 6 20 10,26 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-ovn-efs-arm-f9-destructive
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-ovn-efs-arm-f9-destructive-cluster-profile
-      - --target=aws-ipi-ovn-efs-arm-f9-destructive
-      - --variant=multi-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-ovn-efs-arm-f9-destructive-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 22 2 6,20 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-cert
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-cert-cluster-profile
-      - --target=aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-cert
-      - --variant=multi-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-ovn-efs-fips-amd-f14-cert-manager-custom-cert-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
   cron: 45 19 8,22 * *
   decorate: true
   decoration_config:
@@ -56850,182 +56055,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 11 23 16 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-registry-s3-cloudfront-amd-f28-destructive
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-registry-s3-cloudfront-amd-f28-destructive-cluster-profile
-      - --target=aws-ipi-registry-s3-cloudfront-amd-f28-destructive
-      - --variant=multi-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-registry-s3-cloudfront-amd-f28-destructive-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 25 21 12,22 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-registry-s3-cloudfront-arm-f5
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-registry-s3-cloudfront-arm-f5-cluster-profile
-      - --target=aws-ipi-registry-s3-cloudfront-arm-f5
-      - --variant=multi-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-registry-s3-cloudfront-arm-f5-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
   cron: 8 19 25 * *
   decorate: true
   decoration_config:
@@ -57114,7 +56143,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 18 2 12,19 * *
+  cron: 32 22 9 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -57129,7 +56158,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-sno-etcd-encryption-amd-f9-destructive
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-sno-etcd-encryption-basecap-none-amd-f28-destructive
   spec:
     containers:
     - args:
@@ -57139,8 +56168,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-sno-etcd-encryption-amd-f9-destructive-cluster-profile
-      - --target=aws-ipi-sno-etcd-encryption-amd-f9-destructive
+      - --secret-dir=/usr/local/aws-ipi-sno-etcd-encryption-basecap-none-amd-f28-destructive-cluster-profile
+      - --target=aws-ipi-sno-etcd-encryption-basecap-none-amd-f28-destructive
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -57157,7 +56186,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-sno-etcd-encryption-amd-f9-destructive-cluster-profile
+      - mountPath: /usr/local/aws-ipi-sno-etcd-encryption-basecap-none-amd-f28-destructive-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -57202,7 +56231,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 24 16 13,18 * *
+  cron: 36 1 5,19 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -57217,7 +56246,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-sno-etcd-encryption-arm-f2
+  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-nightly-aws-ipi-sno-etcd-encryption-basecap-none-arm-f14
   spec:
     containers:
     - args:
@@ -57227,8 +56256,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-sno-etcd-encryption-arm-f2-cluster-profile
-      - --target=aws-ipi-sno-etcd-encryption-arm-f2
+      - --secret-dir=/usr/local/aws-ipi-sno-etcd-encryption-basecap-none-arm-f14-cluster-profile
+      - --target=aws-ipi-sno-etcd-encryption-basecap-none-arm-f14
       - --variant=multi-nightly
       command:
       - ci-operator
@@ -57245,7 +56274,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-sno-etcd-encryption-arm-f2-cluster-profile
+      - mountPath: /usr/local/aws-ipi-sno-etcd-encryption-basecap-none-arm-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -57729,7 +56758,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 28 2 8,15 * *
   decorate: true
   decoration_config:
@@ -57817,7 +56846,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 22 9,24 * *
   decorate: true
   decoration_config:
@@ -57905,7 +56934,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 19 10 10,16 * *
   decorate: true
   decoration_config:
@@ -57993,7 +57022,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 53 3 10,26 * *
   decorate: true
   decoration_config:
@@ -58081,7 +57110,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 24 20 14,27 * *
   decorate: true
   decoration_config:
@@ -58169,7 +57198,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 4 5 6,20 * *
   decorate: true
   decoration_config:
@@ -58257,7 +57286,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 13 19 11,23 * *
   decorate: true
   decoration_config:
@@ -58345,7 +57374,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 12 11 27 * *
   decorate: true
   decoration_config:
@@ -58433,7 +57462,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 7 9 26 * *
   decorate: true
   decoration_config:
@@ -58521,7 +57550,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 21 0 3,17 * *
   decorate: true
   decoration_config:
@@ -58609,7 +57638,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 22 22 15 * *
   decorate: true
   decoration_config:
@@ -58697,7 +57726,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 58 20 8,16 * *
   decorate: true
   decoration_config:
@@ -58785,7 +57814,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 47 7 9,15 * *
   decorate: true
   decoration_config:
@@ -58883,7 +57912,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 23 14,19 * *
   decorate: true
   decoration_config:
@@ -58971,7 +58000,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 30 12 8,17 * *
   decorate: true
   decoration_config:
@@ -59059,7 +58088,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 36 13 10,20 * *
   decorate: true
   decoration_config:
@@ -59147,7 +58176,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 29 9 13,15 * *
   decorate: true
   decoration_config:
@@ -59235,7 +58264,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 57 4 13,17 * *
   decorate: true
   decoration_config:
@@ -59323,7 +58352,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 39 11 11,25 * *
   decorate: true
   decoration_config:
@@ -59411,7 +58440,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 52 7 7,22 * *
   decorate: true
   decoration_config:
@@ -59499,7 +58528,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 36 18 14,19 * *
   decorate: true
   decoration_config:
@@ -59587,7 +58616,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 18 13 7,18 * *
   decorate: true
   decoration_config:
@@ -59675,7 +58704,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 40 6 8,16 * *
   decorate: true
   decoration_config:
@@ -59763,7 +58792,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 55 10 11,27 * *
   decorate: true
   decoration_config:
@@ -59851,7 +58880,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 26 16 5,20 * *
   decorate: true
   decoration_config:
@@ -59939,7 +58968,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 27 14 8,16 * *
   decorate: true
   decoration_config:
@@ -60027,7 +59056,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 36 14 14,28 * *
   decorate: true
   decoration_config:
@@ -60115,7 +59144,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 5 12 8,23 * *
   decorate: true
   decoration_config:
@@ -60203,7 +59232,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 40 22 13,28 * *
   decorate: true
   decoration_config:
@@ -60291,7 +59320,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 27 20 14,23 * *
   decorate: true
   decoration_config:
@@ -60379,7 +59408,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 13 0 11,25 * *
   decorate: true
   decoration_config:
@@ -60467,7 +59496,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 20 10,23 * *
   decorate: true
   decoration_config:
@@ -60555,7 +59584,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 31 8 8,16 * *
   decorate: true
   decoration_config:
@@ -60643,7 +59672,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 37 1 12,21 * *
   decorate: true
   decoration_config:
@@ -60731,7 +59760,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 42 14 11,28 * *
   decorate: true
   decoration_config:
@@ -60819,7 +59848,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 30 15 6,27 * *
   decorate: true
   decoration_config:
@@ -60907,7 +59936,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 9 18 9,26 * *
   decorate: true
   decoration_config:
@@ -60995,7 +60024,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 33 17 4 * *
   decorate: true
   decoration_config:
@@ -61083,7 +60112,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 31 11 8 * *
   decorate: true
   decoration_config:
@@ -61171,7 +60200,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 37 23 5,20 * *
   decorate: true
   decoration_config:
@@ -61259,7 +60288,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 58 12 7,24 * *
   decorate: true
   decoration_config:
@@ -61347,7 +60376,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 25 11 6 * *
   decorate: true
   decoration_config:
@@ -61435,7 +60464,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 12 3 * *
   decorate: true
   decoration_config:
@@ -61523,7 +60552,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 6 21 6,20 * *
   decorate: true
   decoration_config:
@@ -61611,7 +60640,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 38 3 27 * *
   decorate: true
   decoration_config:
@@ -61699,7 +60728,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 2 23 8,17 * *
   decorate: true
   decoration_config:
@@ -61787,7 +60816,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 1 6 13,20 * *
   decorate: true
   decoration_config:
@@ -61875,7 +60904,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 14 0 8,26 * *
   decorate: true
   decoration_config:
@@ -61963,7 +60992,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 38 7 7,25 * *
   decorate: true
   decoration_config:
@@ -66472,7 +65501,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 25 3 11 * *
   decorate: true
   decoration_config:
@@ -66821,7 +65850,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 53 17 16 * *
   decorate: true
   decoration_config:
@@ -66908,7 +65937,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 32 10 19 * *
   decorate: true
   decoration_config:
@@ -67039,441 +66068,6 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/gcp-ipi-proxy-oidc-amd-mixarch-f28-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-gcp-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 51 14 12 1,3,5,7,9,11 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-stable-4.16-upgrade-from-stable-4.16-aws-ipi-ovn-ipsec-arm-mixarch-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-ovn-ipsec-arm-mixarch-f60-cluster-profile
-      - --target=aws-ipi-ovn-ipsec-arm-mixarch-f60
-      - --variant=multi-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-ovn-ipsec-arm-mixarch-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 21 12 7 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: multi-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-stable-4.16-upgrade-from-stable-4.16-aws-ipi-proxy-sts-arm-f28
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-proxy-sts-arm-f28-cluster-profile
-      - --target=aws-ipi-proxy-sts-arm-f28
-      - --variant=multi-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-ipi-proxy-sts-arm-f28-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 23 0 27 2,4,6,8,10,12 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-    ci-operator.openshift.io/variant: multi-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-stable-4.16-upgrade-from-stable-4.16-azure-ipi-fullyprivate-proxy-arm-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-fullyprivate-proxy-arm-f60-cluster-profile
-      - --target=azure-ipi-fullyprivate-proxy-arm-f60
-      - --variant=multi-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/azure-ipi-fullyprivate-proxy-arm-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-azure-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 4 13 6 1,3,5,7,9,11 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-    ci-operator.openshift.io/variant: multi-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-stable-4.16-upgrade-from-stable-4.16-azure-ipi-usertags-sa-encryption-arm-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-usertags-sa-encryption-arm-f60-cluster-profile
-      - --target=azure-ipi-usertags-sa-encryption-arm-f60
-      - --variant=multi-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/azure-ipi-usertags-sa-encryption-arm-f60-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-azure-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 1 21 22 2,4,6,8,10,12 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.16
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: multi-stable-4.16-upgrade-from-stable-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.16-multi-stable-4.16-upgrade-from-stable-4.16-gcp-ipi-proxy-oidc-amd-mixarch-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gcp-ipi-proxy-oidc-amd-mixarch-f60-cluster-profile
-      - --target=gcp-ipi-proxy-oidc-amd-mixarch-f60
-      - --variant=multi-stable-4.16-upgrade-from-stable-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/gcp-ipi-proxy-oidc-amd-mixarch-f60-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -67865,7 +66459,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 33 8 6 * *
   decorate: true
   decoration_config:
@@ -67952,7 +66546,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 56 6 23 * *
   decorate: true
   decoration_config:
@@ -68039,7 +66633,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 38 5 24 * *
   decorate: true
   decoration_config:

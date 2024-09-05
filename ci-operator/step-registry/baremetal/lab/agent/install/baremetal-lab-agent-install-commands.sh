@@ -46,11 +46,11 @@ function get_ready_nodes_count() {
 
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -73,8 +73,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -98,55 +96,17 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
    name: master
    replicas: ${masters}
-"
-
-if [ "${masters}" -eq 1 ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-platform:
-  none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-"
-fi
-
-if [ "${masters}" -gt 1 ]; then
-  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
-platform:
-  none: {}
 "
-  else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
-"
-  fi
-fi
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
 
@@ -156,7 +116,7 @@ do
   if test -f "${f}"
   then
       echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
   fi
 done
 
