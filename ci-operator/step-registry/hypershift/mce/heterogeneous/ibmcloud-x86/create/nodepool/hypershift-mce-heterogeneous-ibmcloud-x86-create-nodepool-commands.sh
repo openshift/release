@@ -73,4 +73,7 @@ spec:
   sshAuthorizedKey: ${SSH_PUB_KEY}
 EOF
 
-oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+#oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+oc patch ingresscontroller default -n openshift-ingress-operator \
+-p '{"spec": {"replicas": 4, "nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' \
+--type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
