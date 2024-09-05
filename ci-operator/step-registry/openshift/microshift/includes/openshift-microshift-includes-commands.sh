@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -euo pipefail
 
 #
 # Note that CI-specific functions have 'ci_' name prefix.
@@ -135,3 +136,35 @@ function format_ps4() {
 }
 export -f format_ps4
 export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
+
+#
+# MAIN
+# When this script is executed directly (i.e. from the 'includes' step), the
+# check for '${SHARED_DIR}/ci-functions.sh' file existence will result in the
+# script to be downloaded from the repository and copied to the shared directory.
+# The '${SHARED_DIR}/ci-functions.sh' can then be sourced by other CI scripts
+# running in subsequent steps.
+#
+set -x
+
+if [ -z "${SHARED_DIR-}" ] ; then
+    echo "The SHARED_DIR environment variable is not defined"
+    exit 1
+fi
+if [ ! -f "${SHARED_DIR}/ci-functions.sh" ] ; then
+    # Automatically download the includes file using the current PR commit if it
+    # is available in the '${JOB_SPEC}' environment variable. Otherwise, fall back
+    # to the 'master' branch.
+    script_branch="master"
+    if which jq &>/dev/null && [ -n "${JOB_SPEC-}" ] ; then
+        refs_pulls_sha=$(jq -r .refs.pulls[0].sha <<< "${JOB_SPEC}" 2>/dev/null)
+        if [ -n "${refs_pulls_sha}" ] && [ "${refs_pulls_sha}" != "null" ] ; then
+            script_branch="${refs_pulls_sha}"
+        fi
+    fi
+    curl \
+        "https://raw.githubusercontent.com/openshift/release/${script_branch}/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh" \
+        -o "${SHARED_DIR}/ci-functions.sh"
+    chmod a+r "${SHARED_DIR}/ci-functions.sh"
+    ls -l "${SHARED_DIR}"
+fi
