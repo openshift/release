@@ -18,6 +18,7 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
 
+
 # Set the dynamic vars based on provisioned hub cluster.
 OCP_HUB_CONSOLE_URL=$(oc whoami --show-console)
 export OCP_HUB_CONSOLE_URL
@@ -38,6 +39,6 @@ GH_TOKEN=$(cat $SECRETS_DIR/clc/token)
 export GH_TOKEN 
 
 # run the test execution script
-bash +x ./execute_clc-nonui_interop_commands.sh
+bash +x ./execute_clc_nonui_interop_commands.sh
 
 cp -r reports $ARTIFACT_DIR/
