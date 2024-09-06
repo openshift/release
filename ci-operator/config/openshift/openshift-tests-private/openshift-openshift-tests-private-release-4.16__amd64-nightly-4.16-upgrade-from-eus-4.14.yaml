@@ -60,66 +60,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: baremetalds-ipi-ovn-ipv4-fips-f14
-  cron: 15 16 11,27 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FIPS_MODE=true
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-      FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @baremetal-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @baremetal-ipi'
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-workers-rhel8-fips-f28
-  cron: 9 13 12 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @gcp-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @gcp-ipi'
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
-- as: ibmcloud-ipi-f14
-  cron: 31 19 7,23 * *
+- as: ibmcloud-ipi-ovn-ipsec-f14
+  cron: 12 18 6,20 * *
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @ibmcloud-ipi and not
-        @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @ibmcloud-ipi and not
-        @fips'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -134,17 +78,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
   cron: 38 0 25 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
-      FILTERS_ADDITIONAL: ~TELCO&
       FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @nutanix-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @nutanix-ipi'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -161,14 +102,10 @@ tests:
     - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-f14
-  cron: 56 12 7,23 * *
+- as: vsphere-upi-encrypt-f14
+  cron: 2 23 3,17 * *
   steps:
-    cluster_profile: vsphere-elastic
-    env:
-      FILTERS_ADDITIONAL: ~TELCO&
-      UPGRADE_CHECK_RUN_TAGS: '@4.14 and @vsphere-ipi and @upgrade-check and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.14 and @vsphere-ipi and @upgrade-prepare and not @fips'
+    cluster_profile: vsphere-connected-2
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -183,7 +120,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-vsphere-ipi
+    workflow: cucushift-installer-rehearse-vsphere-upi-encrypt
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

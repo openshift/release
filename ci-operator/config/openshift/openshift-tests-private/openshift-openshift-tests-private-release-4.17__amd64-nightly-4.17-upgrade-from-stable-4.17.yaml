@@ -7,6 +7,10 @@ base_images:
     name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-service-scripts
+  aws-efs-csi-operator-create-efs:
+    name: "4.17"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.17"
     namespace: ocp
@@ -50,13 +54,10 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
+      channel: candidate
+      version: "4.17"
   target:
     candidate:
       architecture: amd64
@@ -287,6 +288,15 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: azure-aks-hypershift-byo-vnet-replace-guest-f28
+  cron: 16 16 6 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-ipi-confidential-trustedlaunch-f60
   cron: 28 19 1 1,3,5,7,9,11 *
   steps:
@@ -505,6 +515,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
