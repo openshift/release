@@ -149,6 +149,7 @@ JOB_TYPE=${JOB_TYPE:-UNKNOWN}
 PROW_JOB_ID=${PROW_JOB_ID:-UNKNOWN}
 RELEASE_VERSION=${RELEASE_VERSION:-UNKNOWN}
 JOB_SPEC=$JOB_SPEC
+BUILD=${IMAGE_TAG:-$(date +%s)}
 EOF
 
 log "INFO Request Metadata:"
@@ -165,16 +166,16 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	export BUILDAH_FORMAT=docker
 
 	# clone & checkout pull number
-	rm -rf BUILD
-	mkdir BUILD && cd BUILD
-	git clone https://github.com/$$REPO_OWNER/$$REPO_NAME.git -b $$PULL_BASE_REF .
+	rm -rf \$BUILD
+	mkdir \$BUILD && cd \$BUILD
+	git clone https://github.com/\$REPO_OWNER/\$REPO_NAME.git -b \$PULL_BASE_REF .
 	git fetch origin pull/$$PULL_NUMBER/head:build_branch
 	git checkout build_branch
 
 	# build & push
 	sed -i s/amd64/ppc64le/g Dockerfiles/Dockerfile
-	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-build
-	IMG=$$DESTINATION_IMAGE_REF-ppc64le make image-push
+	IMG=\$DESTINATION_IMAGE_REF-ppc64le make image-build
+	IMG=\$DESTINATION_IMAGE_REF-ppc64le make image-push
 
 EOF
 
