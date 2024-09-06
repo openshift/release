@@ -1,33 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 
-# Install Docker if not already installed
-if ! command -v docker &> /dev/null
-then
-    echo "Docker not found. Installing Docker..."
-    dnf install -y yum-utils \
-    && dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \
-    && dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-    && systemctl start docker
+# Ensure necessary tools are installed: make, sed (bash is not needed as we are using sh)
+apk update && apk add --no-cache make sed
 
-    if ! command -v docker &> /dev/null
-    then
-        echo "Docker installation failed"
-        exit 1
-    fi
-fi
-
-# Check if dockerd-entrypoint.sh is available
-if ! command -v dockerd-entrypoint.sh &> /dev/null
-then
-    echo "dockerd-entrypoint.sh could not be found"
-    exit 1
-fi
-
-# Start Docker daemon in the background
-dockerd-entrypoint.sh &
-
-# Wait for Docker daemon to fully start
-sleep 10
 
 # Enable Buildx for multi-platform builds
 docker buildx create --use
