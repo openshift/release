@@ -39,8 +39,8 @@ fi
 
 source /usr/local/share/cert-rotation-functions.sh
 
-# Stop chrony service on all nodes
-run-on-all-nodes "systemctl disable chronyd --now"
+# Mask chrony service on all nodes and set time on guests
+run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${SKEW}"
 
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
 # and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
@@ -60,6 +60,7 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
+  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
     echo -n "."
     sleep 10
@@ -82,6 +83,7 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
+  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
     echo -n "."
     sleep 10
