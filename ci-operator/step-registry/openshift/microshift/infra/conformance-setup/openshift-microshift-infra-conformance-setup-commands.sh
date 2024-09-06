@@ -1,9 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
