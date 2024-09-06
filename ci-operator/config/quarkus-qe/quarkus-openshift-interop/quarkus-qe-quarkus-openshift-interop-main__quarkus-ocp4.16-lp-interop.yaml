@@ -25,12 +25,12 @@ resources:
       cpu: 200m
       memory: 200Mi
 tests:
-- as: quarkus-interop-ibmcloud
+- as: quarkus-interop-aws
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: ibmcloud-cspi-qe
+    cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -39,12 +39,14 @@ tests:
               {"step": "quarkus-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "QUARKUS", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["team/qe"], "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","quarkus-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario quarkus
     test:
     - ref: quarkus-execute-tests
-    workflow: firewatch-ipi-ibmcloud
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: quarkus-qe
