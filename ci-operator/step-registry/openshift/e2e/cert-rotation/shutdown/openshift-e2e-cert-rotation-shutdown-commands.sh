@@ -54,8 +54,12 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo "Shutting down ${vm}"
   virsh shutdown ${vm}
+done
+for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   until virsh domstate ${vm} | grep "shut off"; do
     echo -n "."
     sleep 10
@@ -72,8 +76,12 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo "Starting ${vm}"
   virsh start ${vm}
+done
+for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   until virsh domstate ${vm} | grep "running"; do
     echo -n "."
     sleep 10
