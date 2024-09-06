@@ -615,6 +615,38 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mce-arm-nodepool-guest-f7
+  cron: 2 15 3,10,19,26 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --arch=arm64
+      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
+      MCE_VERSION: "2.7"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-arm-nodepool-guest-f28-destructive
+  cron: 9 3 11 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --arch=arm64
+      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
+      MCE_VERSION: "2.7"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-arm-nodepool-mgmt-f7
   cron: 35 14 5,12,19,28 * *
   steps:
