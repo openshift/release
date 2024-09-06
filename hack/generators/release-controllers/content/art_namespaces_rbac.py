@@ -41,6 +41,13 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'Group',
             'name': 'openshift-private-ci-reps'
         })
+        # OpenShift QE team members are permitted to pull content
+        # from private CI for testing purposes.
+        puller_subjects.append({
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Group',
+            'name': 'aos-qe'
+        })
 
     resources.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
