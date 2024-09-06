@@ -263,8 +263,6 @@ for ((i=1; i<=20; i++)); do
     sleep 60
 done
 
-sleep 1h
-
 if [ $agentsApproved != ${HYPERSHIFT_NODE_COUNT} ]; then
   echo "Approved agents does not match the num of workers count, agents approved: ${agentsApproved}, num of workers: ${HYPERSHIFT_NODE_COUNT}"
   echo "exiting ..."
