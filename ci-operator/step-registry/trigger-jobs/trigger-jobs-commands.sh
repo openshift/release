@@ -46,6 +46,7 @@ jq -c '.[]' "$WEEKLY_JOBS"
 echo ""
 
 retry_interval=60  # 60 seconds = 1 minute
+failed_jobs=""
 
 if [[ "$JOB_NAME" == *"rehearse"* ]]; then
   echo "Job name contains 'rehearse'. Exiting with status 0."
@@ -78,7 +79,6 @@ if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 fi
 
 max_retries=3
-failed_jobs=""
 
 echo ""
 echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"
