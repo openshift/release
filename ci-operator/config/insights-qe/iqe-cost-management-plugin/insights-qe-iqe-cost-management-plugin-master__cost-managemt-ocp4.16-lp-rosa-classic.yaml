@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cost-management-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "insights-qe-iqe-*", "failure_type": "test_failure", "classification": "Cost Management Test Failure", "jira_project": "COST", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "insights-qe-iqe-*", "failure_type": "pod_failure", "classification": "Cost Management Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","rosa-classic-lp","cost-management-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dchorvat@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.16"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    - ref: insights-qe-iqe-cost-management-plugin
+    workflow: firewatch-rosa-aws-sts
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: master
+  org: insights-qe
+  repo: iqe-cost-management-plugin
+  variant: cost-managemt-ocp4.16-lp-rosa-classic
