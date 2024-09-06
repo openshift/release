@@ -105,13 +105,13 @@ log "INFO Image tag is $IMAGE_TAG"
 
 # Check if running in openshift/release only in presubmit jobs because
 # REPO_OWNER and REPO_NAME are not available for other types
-dry=false
-if [[ "$JOB_TYPE" == "presubmit" ]]; then
-    if [[ "$REPO_OWNER" == "openshift" && "$REPO_NAME" == "release" ]]; then
-        log "INFO Running in openshift/release, setting dry-run to true"
-        dry=true
-    fi
-fi
+#dry=false
+#if [[ "$JOB_TYPE" == "presubmit" ]]; then
+#    if [[ "$REPO_OWNER" == "openshift" && "$REPO_NAME" == "release" ]]; then
+#        log "INFO Running in openshift/release, setting dry-run to true"
+#        dry=true
+#    fi
+#fi
 
 # Build destination image reference
 DESTINATION_REGISTRY_REPO="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO"
