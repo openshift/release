@@ -124,4 +124,7 @@ check_pod_status "${MAISTRA_SC_POD}"
 # create ARTIFACT_DIR
 oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 
+# support aarch64 Envoy build 
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- dnf install -y ncurses-compat-libs
+
 echo "Successfully created maistra istio builder pods"
