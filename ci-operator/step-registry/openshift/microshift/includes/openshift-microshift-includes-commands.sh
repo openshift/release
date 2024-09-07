@@ -1,5 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -xeuo pipefail
 
+if [ -z "${SHARED_DIR-}" ] ; then
+    echo "The SHARED_DIR environment variable is not defined"
+    exit 1
+fi
+
+cat > "${SHARED_DIR}/ci-functions.sh" <<'EOF_SHARED_DIR'
 #
 # Note that CI-specific functions have 'ci_' name prefix.
 # The rest should be generic functionality.
@@ -133,4 +140,6 @@ function format_ps4() {
     local -r line=$2
     echo -en "+ ${date} ${file#"${HOME}/"}:${line} \011"
 }
+export -f format_ps4
 export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
+EOF_SHARED_DIR

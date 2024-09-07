@@ -116,7 +116,7 @@ function populate_artifact_dir() {
       s/X-Auth-Token.*/X-Auth-Token REDACTED/;
       s/UserData:.*,/UserData: REDACTED,/;
       ' "${dir}/terraform.txt"
-    tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-$(date +%s).tar.gz" --remove-files "${dir}/terraform.txt"
   fi
   case "${CLUSTER_TYPE}" in
     alibabacloud)
@@ -128,7 +128,7 @@ function populate_artifact_dir() {
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
     mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
-    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-$(date +%s)" 2>/dev/null
   fi
 }
 
@@ -746,7 +746,7 @@ do
   echo "Install attempt $tries of $max"
   if [ $tries -gt 1 ]; then
     write_install_status
-    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+    populate_artifact_dir
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"

@@ -83,7 +83,6 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-/tmp/${HYPERSHIFT_NAME} --version
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
