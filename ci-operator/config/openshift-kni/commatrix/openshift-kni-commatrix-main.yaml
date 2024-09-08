@@ -37,11 +37,18 @@ tests:
         ci-repo-name commatrix
         ci-org-name openshift-kni
     test:
-    - as: e2e-aws-commatrix-run
-      from: tests
+    - as: e2e-aws-commatrix-run-src
+      from: src
       commands: |
         go mod vendor
         make e2e-test 
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-aws-commatrix-run-tests
+      from: tests
+      commands: |
         openshift-tests run openshift/network/stress
       resources:
         requests:
