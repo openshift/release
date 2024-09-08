@@ -15,19 +15,6 @@ chain:
       trap cleanup EXIT
 
       function patch_image_streams() {
-        # workaround for https://issues.redhat.com/browse/OCPBUGS-31446
-        # imagestreams on the hosted cluster are ignoring
-        # the CA injected at creation/(installation) time.
-        # see: https://issues.redhat.com/browse/RFE-3093
-        # and: https://github.com/openshift/enhancements/pull/416/commits/e46072ecf77b58c79b4bece5e0c6a5a5546a1b8a
-
-        echo "### Patching image streams on the hostedcluster"
-        echo "#### Add trust for the mirroring registry"
-        oc get cm -n openshift-config user-ca-bundle -o json | jq -r '.data["ca-bundle.crt"]' > /tmp/ca-bundle.crt
-        oc create configmap registry-config --from-file=${DS_REGISTRY//:/..}=/tmp/ca-bundle.crt -n openshift-config
-        oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
-        sleep 60
-
         DEVSCRIPTS_RELEASE_IMAGE_REPO=${DS_REGISTRY}/localimages/local-release-image
         IMAGESTREAMS=$(oc get imagestreams -n openshift -o=name)
         for isName in ${IMAGESTREAMS}; do
@@ -130,6 +117,7 @@ chain:
       none)
           if [[ "${DISCONNECTED}" == "true" ]]; then
             mirror_test_images
+            patch_image_streams
             export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
           else
             export TEST_PROVIDER='{"type":"baremetal"}'
