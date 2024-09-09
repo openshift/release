@@ -32,6 +32,16 @@ cd ~/microshift
 EOF
 chmod +x /tmp/install.sh
 
+if "${SRC_FROM_GIT}"; then
+  mkdir -p /go/src/github.com/openshift
+  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+  # MicroShift repo is recent enough to use main instead of master.
+  if [ "${branch}" == "master" ]; then
+    branch="main"
+  fi
+  git clone https://github.com/openshift/microshift -b $branch /go/src/github.com/openshift/microshift
+fi
+
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
