@@ -238,12 +238,20 @@ tests:
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
+    set -x
+    echo "jamo looking for some output"
     cd go-controller
     PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
+    echo "PKGS 1: ${PKGS}"
     # these packages need running as a container for TestNewClientset
     PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
+    echo "PKGS 2: ${PKGS}"
+    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/errors"/ }
+    echo "PKGS 3: ${PKGS}"
     PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
+    echo "PKGS 4: ${PKGS}"
     PKGS=$PKGS make test NOROOT=TRUE
+    echo "PKGS 5: ${PKGS}"
   container:
     from: src
 - as: lint
