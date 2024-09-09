@@ -205,6 +205,26 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-ovn-multi-network
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
 - as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
