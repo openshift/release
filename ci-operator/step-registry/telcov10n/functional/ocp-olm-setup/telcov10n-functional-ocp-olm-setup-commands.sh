@@ -45,4 +45,4 @@ PARAMS=$(echo "$PARAMS" | tr -d '\n')
 ansible-playbook playbooks/launch-jenkins-job.yaml -i inventory \
  -e username=$JENKINS_USER_NAME \
  -e token=$JENKINS_USER_TOKEN \
- -e job_params="$PARAMS" -e job_url="https://auto-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-olm-setup/" -vvv
+ -e job_params="$PARAMS" -e job_url="https://ci-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-olm-setup/" -vvv
