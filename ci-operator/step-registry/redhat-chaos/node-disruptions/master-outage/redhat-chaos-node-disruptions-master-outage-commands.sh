@@ -52,6 +52,11 @@ elif [ "$platform" = "Azure" ]; then
     export AZURE_CLIENT_ID
     AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
     export AZURE_CLIENT_SECRET
+elif [ "$platform" = "Vsphere" ]; then
+    # https://github.com/openshift/release/blob/master/ci-operator/step-registry/ipi/conf/vsphere/check/ipi-conf-vsphere-check-commands.sh
+    source ${SHARED_DIR}/platform-conf.sh
+    env
+
 fi
 
 
