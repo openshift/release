@@ -11,7 +11,8 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
 
-tar -xvf ${SHARED_DIR}/junit.tar.gz -C ${ARTIFACT_DIR}
+source ./tests/prow_ci.sh
+extract_existing_junit $SHARED_DIR
 
 log "INFO: Generate report portal report ..."
 rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filter "e2e-report"
