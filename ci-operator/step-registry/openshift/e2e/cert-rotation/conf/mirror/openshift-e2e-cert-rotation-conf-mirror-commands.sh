@@ -44,7 +44,11 @@ sudo mv cfssljson /usr/local/bin
 
 # deploy registry addon
 export MINIKUBE_HOME=/home/assisted/minikube_home
-minikube addons enable registry -p assisted-hub-cluster
+MINIKUBE_PROFILE="minikube"
+if minikube profile list | grep assisted-hub-cluster; then
+    MINIKUBE_PROFILE="assisted-hub-cluster"
+fi
+minikube addons enable registry -p ${MINIKUBE_PROFILE}
 kubectl patch service registry -n kube-system --type json -p='[{"op": "replace", "path": "/spec/type", "value":"LoadBalancer"}]'
 sleep 10
 REGISTRY_HOSTNAME=$(kubectl -n kube-system get svc/registry --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
