@@ -72,11 +72,15 @@ fi
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 
+expiration_date=$(date -d '8 hours' --iso=minutes --utc)
+
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
+    userTags:
+      expirationDate: ${expiration_date}
 controlPlane:
   architecture: ${OCP_ARCH}
   name: master
