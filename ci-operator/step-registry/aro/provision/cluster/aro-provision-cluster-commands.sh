@@ -18,6 +18,9 @@ ARO_WORKER_COUNT=${ARO_WORKER_COUNT:=""}
 ARO_MASTER_VM_SIZE=${ARO_MASTER_VM_SIZE:=""}
 ARO_WORKER_VM_SIZE=${ARO_WORKER_VM_SIZE:=""}
 ARO_CLUSTER_VERSION=${ARO_CLUSTER_VERSION:=""}
+ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:=""}
+ARO_API_SERVER_VISIBILITY=${ARO_API_SERVER_VISIBILITY:=""}
+ARO_OUTBOUND_TYPE=${ARO_OUTBOUND_TYPE:=""}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -77,6 +80,21 @@ if [[ -n ${ARO_CLUSTER_VERSION} ]]; then
     CREATE_CMD="${CREATE_CMD} --version ${ARO_CLUSTER_VERSION}"
 fi
 
+#ARO Ingress Visibility
+if [[ -n ${ARO_INGRESS_VISIBILITY} ]]; then
+    CREATE_CMD="${CREATE_CMD} --ingress-visibility ${ARO_INGRESS_VISIBILITY}"
+fi
+
+#ARO API server Visibility
+if [[ -n ${ARO_API_SERVER_VISIBILITY} ]]; then
+    CREATE_CMD="${CREATE_CMD} --apiserver-visibility ${ARO_API_SERVER_VISIBILITY}"
+fi
+
+#ARO Outbound Type
+if [[ -n ${ARO_OUTBOUND_TYPE} ]]; then
+    CREATE_CMD="${CREATE_CMD} --outbound-type ${ARO_OUTBOUND_TYPE}"
+fi
+
 echo "Running ARO create command:"
 echo "${CREATE_CMD}"
 eval "${CREATE_CMD}" > ${SHARED_DIR}/clusterinfo
@@ -92,6 +110,10 @@ KUBEUSER=$(echo "$KUBECRED" | jq -r '.kubeadminUsername')
 KUBEPASS=$(echo "$KUBECRED" | jq -r '.kubeadminPassword')
 
 echo "Logging into the cluster"
+
+if [[ -f ${SHARED_DIR}/proxy-conf.sh ]]; then
+  source ${SHARED_DIR}/proxy-conf.sh
+fi
 
 echo $KUBECRED > ${SHARED_DIR}/clustercreds
 
