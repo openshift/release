@@ -26,7 +26,7 @@ trap collect_artifacts EXIT TERM
 set +e
 
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s '${OPENSHIFT_TESTS_IMAGE}' '${TEST_TYPE:-"list"}' '${TEST_SUITE:-"openshift/conformance/parallel"}' '${TEST_LIST:-""}' '${TEST_PROVIDER:-"baremetal"}' '${TEST_SKIPS}'" << "EOF"
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPENSHIFT_TESTS_IMAGE}\" \"${TEST_TYPE:-"list"}\" \"${TEST_SUITE:-"openshift/conformance/parallel"}\" \"${TEST_LIST:-""}\" \"${TEST_PROVIDER:-"baremetal"}\" \"${TEST_SKIPS}\"" << "EOF"
     set -x
 
     openshift_tests_image="$1"
