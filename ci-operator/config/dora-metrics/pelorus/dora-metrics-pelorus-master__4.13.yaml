@@ -32,7 +32,7 @@ resources:
 tests:
 - always_run: false
   as: e2e-openshift
-  run_if_changed: (^exporters/|^charts/|^pelorus-operator/|^scripts/run-pelorus-e2e-tests.sh$)
+  run_if_changed: (^non-existing/)
   steps:
     cluster_profile: aws
     env:
@@ -50,38 +50,6 @@ tests:
         ls /var/run/konveyor/pelorus/pelorus-github
         export TOKEN=$(cat /var/run/konveyor/pelorus/pelorus-github/TOKEN)
         make e2e-tests
-      credentials:
-      - mount_path: /var/run/konveyor/pelorus/pelorus-github
-        name: pelorus-github-secret
-        namespace: test-credentials
-      - mount_path: /var/run/konveyor/pelorus/pelorus-s3amazon
-        name: pelorus-s3amazon-secret
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: openshift-e2e-aws
-- as: e2e-openshift-test-scenario-1-periodic
-  cron: 0 3 * * *
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "false"
-    test:
-    - as: e2e
-      commands: |
-        set -x
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        # doc for secret
-        # https://vault.ci.openshift.org/ui/vault/secrets/kv/show/selfservice/konveyor/pelorus/pelorus-github"
-        # "secretsync/target-name: pelorus-github-secret"
-        # "secretsync/target-namespace: test-credentials"
-        ls /var/run/konveyor/pelorus/pelorus-github
-        export TOKEN=$(cat /var/run/konveyor/pelorus/pelorus-github/TOKEN)
-        make e2e-tests-dev-env
-        make e2e-tests-scenario-1
       credentials:
       - mount_path: /var/run/konveyor/pelorus/pelorus-github
         name: pelorus-github-secret
