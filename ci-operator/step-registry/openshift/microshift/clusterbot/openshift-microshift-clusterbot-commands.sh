@@ -1,8 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
-# shellcheck disable=SC1091
-source "${SHARED_DIR}/ci-functions.sh"
+# Note: Cannot source '${SHARED_DIR}/ci-functions.sh' from this script
+# because it is run before the AWS EC2 steps.
 
 # TODO:
 # - Handle MICROSHIFT_GIT=PR_URL
