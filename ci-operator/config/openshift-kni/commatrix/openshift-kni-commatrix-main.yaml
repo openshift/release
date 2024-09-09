@@ -36,16 +36,23 @@ tests:
         ci-job-type e2e-aws-commatrix-run
         ci-repo-name commatrix
         ci-org-name openshift-kni
-    test:
-    - as: e2e-aws-commatrix-run-tests
-      from: tests
+    pre:
+    - as: run firewall-apply
+      from: src
       commands: |
-        openshift-tests run openshift/network/stress
+        go mod vendor
+        make e2e-test
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws-ovn
+    test:
+    - as: e2e-aws-ovn-serial
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn-serial
 - as: security
   optional: true
   steps:
