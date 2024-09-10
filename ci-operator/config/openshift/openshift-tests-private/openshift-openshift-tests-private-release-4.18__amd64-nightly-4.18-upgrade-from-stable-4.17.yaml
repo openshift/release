@@ -12,7 +12,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: hypershift-operator
   openstack-installer:
@@ -319,6 +319,16 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: azure-aks-hypershift-registry-overrides-replace-guest-f28
+  cron: 23 23 4 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: cucushift-hypershift-extended-mirror-release-images-to-acr-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-registry-overrides-guest
 - as: azure-ipi-confidential-trustedlaunch-f28
   cron: 42 14 3 * *
   steps:
@@ -667,7 +677,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: nutanix-ipi-compact-f28
+- as: nutanix-ipi-compact-image-registry-s3-f28
   cluster: build01
   cron: 50 1 10 * *
   steps:
@@ -677,7 +687,17 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi
+    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
+- as: nutanix-ipi-data-disks-f28
+  cluster: build01
+  cron: 47 14 26 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
 - as: nutanix-ipi-disc-rt-f28
   cluster: build01
   cron: 52 2 9 * *
@@ -690,16 +710,16 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-image-registry-s3-f28
+- as: nutanix-ipi-gpu-f28
   cluster: build01
-  cron: 10 2 22 * *
+  cron: 31 12 22 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix-qe-gpu
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
   cron: 6 6 5 * *
