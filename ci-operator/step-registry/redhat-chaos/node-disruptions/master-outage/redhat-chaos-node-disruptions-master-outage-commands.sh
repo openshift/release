@@ -71,8 +71,6 @@ elif [ "$platform" = "IBMCloud" ]; then
     export ACTION
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | awk '{printf "%s%s", sep, $1; sep=","} END{print ""}' )
     export NODE_NAME
-    one_node_name=$(oc get nodes -o name -l $LABEL_SELECTOR | HEAD -1)
-    oc get $one_node_name -o yaml | grep region
 
 fi
 
