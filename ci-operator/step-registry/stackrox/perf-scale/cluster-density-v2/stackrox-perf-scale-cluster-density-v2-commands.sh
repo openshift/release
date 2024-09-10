@@ -21,7 +21,7 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
-REPO_URL="https://github.com/davdhace/e2e-benchmarking";
+REPO_URL="https://github.com/davdhacs/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/davdhacs/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1 \
