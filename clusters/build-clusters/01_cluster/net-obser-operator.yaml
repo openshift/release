@@ -47,12 +47,12 @@ metadata:
   name: netobserv-operator
   namespace: openshift-netobserv-operator
 spec:
-  channel: stable
+  channel: community
   installPlanApproval: Automatic
   name: netobserv-operator
-  source: redhat-operators
+  source: community-operators
   sourceNamespace: openshift-marketplace
-  startingCSV: network-observability-operator.v1.5.0
+  startingCSV: netobserv-operator.v1.6.2-community
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -142,17 +142,19 @@ metadata:
 spec:
   agent:
     ebpf:
+      advanced:
+        env:
+          DNS_TRACKING_PORT: '5353'
       sampling: 1
       privileged: true
       features:
         - PacketDrop
         - DNSTracking
       flowFilter:
-        enable: true
         action: Accept
         cidr: 0.0.0.0/0
-        ports: 53
-        protocol: UDP
+        enable: true
+        ports: '53,5353'
   processor:
     kafkaConsumerReplicas: 6
     resources:
