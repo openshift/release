@@ -33,6 +33,7 @@ CLC_OCP_IMAGE_VERSION=$(cat $SECRETS_DIR/clc/ocp_image_version)
 export CLC_OCP_IMAGE_VERSION
 
 CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
+echo $CLOUD_PROVIDERS
 export CLOUD_PROVIDERS
 
 GH_TOKEN=$(cat $SECRETS_DIR/clc/token)
