@@ -6,6 +6,13 @@ set -o pipefail
 
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
+day2_arch=""
+if [[ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "x86_64" ]]; then
+  day2_arch="amd64"
+elif [[ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "aarch64" ]]; then
+  day2_arch="arm64"
+fi
+
 # Create an agent-config file containing only the minimum required configuration
 ntp_host=$(< "${CLUSTER_PROFILE_DIR}/aux-host-internal-name")
 cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
@@ -30,21 +37,28 @@ additionalNTPSources:
 hosts: []
 EOF
 
+cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+hosts: []
+EOF
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    # Do not create host config for additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
-    # on a single-arch payload migrated to a multi-arch cluster)
-    continue
-  fi
-  ADAPTED_YAML="
-  hostname: ${name}
+  if [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
+    ADAPTED_YAML="
   role: ${name%%-[0-9]*}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+  "
+  else
+    ADAPTED_YAML="
+  CPUArchitecture: ${day2_arch}
+  "
+  fi
+  ADAPTED_YAML+="
+  hostname: ${name}
   interfaces:
   - macAddress: ${mac}
     name: ${baremetal_iface}
@@ -94,8 +108,14 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
           next-hop-interface: ${baremetal_iface}
   "
   # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
-  yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-    "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
+  # Patch the nodes-config.yaml if the host is used for day2
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
+      "$SHARED_DIR/nodes-config.yaml" - <<< "$ADAPTED_YAML"
+  else
+    yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
+      "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
+  fi
 done
 
 else
