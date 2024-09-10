@@ -1,22 +1,19 @@
 #!/bin/bash
 set -xeuo pipefail
 
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
 
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+if "${SRC_FROM_GIT}"; then
+  mkdir -p /go/src/github.com/openshift
+  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+  # MicroShift repo is recent enough to use main instead of master.
+  if [ "${branch}" == "master" ]; then
+    branch="main"
+  fi
+  git clone https://github.com/openshift/microshift -b $branch /go/src/github.com/openshift/microshift
+fi
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"

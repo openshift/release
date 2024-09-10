@@ -1,5 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -xeuo pipefail
 
+if [ -z "${SHARED_DIR-}" ] ; then
+    echo "The SHARED_DIR environment variable is not defined"
+    exit 1
+fi
+
+cat > "${SHARED_DIR}/ci-functions.sh" <<'EOF_SHARED_DIR'
 #
 # Note that CI-specific functions have 'ci_' name prefix.
 # The rest should be generic functionality.
@@ -122,10 +129,17 @@ function download_microshift_scripts() {
 }
 
 #
-# Unconditionally enable tracing after loading the functions
+# Enable tracing with the following format after loading the functions:
+# - Time in hh:mm:ss.ns
+# - Script file name with $HOME prefix stripped ($0 is used if BASH_SOURCE is undefined)
+# - Script line number
 #
-if [ -n "${BASH_SOURCE[0]-}" ] && [ -n "${HOME-}" ] && [ -n "${LINENO-}" ] ; then
-    export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
-else
-    export PS4='+ $(date "+%T.%N") \011'
-fi
+function format_ps4() {
+    local -r date=$(date "+%T.%N")
+    local -r file=$1
+    local -r line=$2
+    echo -en "+ ${date} ${file#"${HOME}/"}:${line} \011"
+}
+export -f format_ps4
+export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
+EOF_SHARED_DIR

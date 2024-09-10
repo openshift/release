@@ -72,11 +72,15 @@ fi
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 
+expiration_date=$(date -d '8 hours' --iso=minutes --utc)
+
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
+    userTags:
+      expirationDate: ${expiration_date}
 controlPlane:
   architecture: ${OCP_ARCH}
   name: master
@@ -125,12 +129,12 @@ PUBLISH=$(yq-go r "${CONFIG}" "publish")
 echo "publish: ${PUBLISH}"
 echo "is Old Version: ${isOldVersion}"
 if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
-  echo "Write the 'baseDomainResourceGroupName: os4-common' to install-config"
+  echo "Write the 'baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}' to install-config"
   PATCH="${SHARED_DIR}/install-config-baseDomainRG.yaml.patch"
     cat > "${PATCH}" << EOF
 platform:
   azure:
-    baseDomainResourceGroupName: os4-common
+    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
