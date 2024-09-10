@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -x
+set +e
 
 # Agent hosted cluster configs
 HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
