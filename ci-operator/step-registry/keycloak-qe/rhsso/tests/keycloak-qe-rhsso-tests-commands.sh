@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 2h
-
 # Set PATH for OC binary
 export PATH=$PATH:/tmp/tests/ansible-tests/
 
