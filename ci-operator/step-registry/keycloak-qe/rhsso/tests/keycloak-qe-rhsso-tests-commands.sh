@@ -14,6 +14,8 @@ export KUBECONFIG=/tmp/kubeconfig
 # Run tests
 echo "Executing rhsso tests ref"
 
+sleep 7900
+
 ansible-playbook -v /tmp/tests/ansible-tests/test-ocp-ci-rhbk.yml --extra-vars "ocp_project_name='${OCP_PROJECT_NAME}'"
 
 #copy junit results to artifacts dir
