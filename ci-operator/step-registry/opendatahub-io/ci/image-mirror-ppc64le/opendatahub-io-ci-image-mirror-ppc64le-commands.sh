@@ -5,6 +5,9 @@ set -o errexit
 set -o pipefail
 set -x
 
+# Make this fail
+exit -1
+
 # log function
 log_file="${ARTIFACT_DIR}/mirror.log"
 log() {
