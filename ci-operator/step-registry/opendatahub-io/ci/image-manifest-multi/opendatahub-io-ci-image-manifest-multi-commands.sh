@@ -5,8 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "Manifest Build got triggered" >> /root/manifest_log
-
 # log function
 log_file="${ARTIFACT_DIR}/mirror.log"
 log() {
