@@ -36,6 +36,31 @@ export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export TESTS_PULL_REF='${TESTS_PULL_REF}'
 export REGISTRY_AUTH_FILE='${PULL_SECRET_FILE}'
 
+# First check for rollouts
+echo "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
+declare -a COMPONENTS=(
+  "openshift-etcd-operator etcd-operator"
+  "openshift-kube-apiserver-operator kube-apiserver-operator"
+  "openshift-kube-controller-manager-operator kube-controller-manager-operator"
+  "openshift-kube-scheduler-operator openshift-kube-scheduler-operator"
+)
+
+for COMPONENT in "${COMPONENTS[@]}"
+do
+  read -a TUPLE <<< "${COMPONENT}"
+  NAMESPACE="${TUPLE[0]}"
+  APP="${TUPLE[1]}"
+
+  if oc logs --namespace "${NAMESPACE}" --selector app="${APP}" --tail=-1 |grep --quiet "RevisionTriggered"
+  then
+      echo "${APP} had additional rollouts after recert. Please check the respective cluster operator's logs for details."
+      exit 1
+  fi
+done
+
+echo "No control-plane component revision triggers logged."
+
+
 mkdir tmp
 
 podman run --quiet --rm -v ./tmp:/tmp:Z ${TESTS_PULL_REF} cp /usr/bin/openshift-tests /tmp/openshift-tests
