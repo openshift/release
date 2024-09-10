@@ -38,7 +38,7 @@ ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+#export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
