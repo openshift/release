@@ -68,7 +68,8 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
                 ;;
         esac
 
-        echo "${test_list}" | grep -v "${test_skips}" > /tmp/test-list
+        echo "${test_skips}" > "/tmp/test-skips"
+        echo "${test_list}" | grep -v -f "/tmp/test-skips" > "/tmp/test-list"
 
         stderr=$( { run_tests "${openshift_tests_image}" "/tmp/test-list"; } 2>&1 )
         exit_code=$?
