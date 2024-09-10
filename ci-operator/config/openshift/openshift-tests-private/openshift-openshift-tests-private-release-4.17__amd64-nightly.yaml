@@ -457,12 +457,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-stresstest
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-f14-destructive
-  cron: 36 16 10,24 * *
+- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14-destructive
+  cron: 59 11 16,30 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       RELEASE_IMAGE_LATEST: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
@@ -472,13 +474,15 @@ tests:
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-f7
-  cron: 19 21 4,11,18,27 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-efs
+- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f7
+  cron: 36 2 2,9,16,25 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       RELEASE_IMAGE_LATEST: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
@@ -487,7 +491,7 @@ tests:
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-efs
 - as: aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f7
   cron: 44 7 1,8,15,22 * *
   steps:
@@ -1428,6 +1432,16 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
+- as: azure-aks-hypershift-registry-overrides-guest-f7
+  cron: 21 17 4,11,18,25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-registry-overrides-guest
 - as: azure-aks-hypershift-install-f14-longduration
   cron: 13 22 14,28 * *
   steps:
@@ -2503,9 +2517,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: nutanix-ipi-boot-categories-project-rt-f28-destructive
+- as: nutanix-ipi-boot-categories-project-rt-f60-destructive
   cluster: build01
-  cron: 2 21 14 * *
+  cron: 24 0 29 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2514,7 +2528,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: nutanix-ipi-compact-f28
+- as: nutanix-ipi-compact-image-registry-s3-f28
   cluster: build01
   cron: 29 17 16 * *
   steps:
@@ -2524,10 +2538,10 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-compact-f28-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
+- as: nutanix-ipi-compact-image-registry-s3-f60-destructive
   cluster: build01
-  cron: 14 9 7 * *
+  cron: 25 10 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2535,7 +2549,7 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-nutanix-ipi
+    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
 - as: nutanix-ipi-data-disks-f28
   cluster: build01
   cron: 28 17 24 * *
@@ -2546,9 +2560,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
-- as: nutanix-ipi-data-disks-f28-destructive
+- as: nutanix-ipi-data-disks-f60-destructive
   cluster: build01
-  cron: 48 16 25 * *
+  cron: 31 3 22 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe-zone
     env:
@@ -2569,9 +2583,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-disc-rt-f28-destructive
+- as: nutanix-ipi-disc-rt-f60-destructive
   cluster: build01
-  cron: 35 4 19 * *
+  cron: 18 6 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -2592,9 +2606,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
-- as: nutanix-ipi-gpu-f28-destructive
+- as: nutanix-ipi-gpu-f60-destructive
   cluster: build01
-  cron: 51 20 3 * *
+  cron: 14 10 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: nutanix-qe-gpu
     env:
@@ -2602,26 +2616,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
-- as: nutanix-ipi-image-registry-s3-f28
-  cluster: build01
-  cron: 16 14 24 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
-- as: nutanix-ipi-image-registry-s3-f28-destructive
-  cluster: build01
-  cron: 47 12 10 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
 - as: nutanix-ipi-proxy-f28-disasterrecovery
   cluster: build01
   cron: 50 18 28 * *
@@ -2643,9 +2637,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
-- as: nutanix-ipi-proxy-fips-mini-perm-f28-destructive
+- as: nutanix-ipi-proxy-fips-mini-perm-f60-destructive
   cluster: build01
-  cron: 56 23 17 * *
+  cron: 1 17 6 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -2665,9 +2659,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-tp-f28-destructive
+- as: nutanix-ipi-tp-f60-destructive
   cluster: build01
-  cron: 29 6 30 * *
+  cron: 4 13 15 2,4,6,8,10,12 *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2688,9 +2682,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
-- as: nutanix-ipi-zones-external-lb-f28-destructive
+- as: nutanix-ipi-zones-external-lb-f60-destructive
   cluster: build01
-  cron: 1 2 6 * *
+  cron: 1 0 11 1,3,5,7,9,11 *
   steps:
     cluster_profile: nutanix-qe-zone
     env:
@@ -2712,9 +2706,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones
-- as: nutanix-ipi-zones-f28-destructive
+- as: nutanix-ipi-zones-f60-destructive
   cluster: build01
-  cron: 58 7 1 * *
+  cron: 32 19 10 2,4,6,8,10,12 *
   steps:
     cluster_profile: nutanix-qe-zone
     env:
