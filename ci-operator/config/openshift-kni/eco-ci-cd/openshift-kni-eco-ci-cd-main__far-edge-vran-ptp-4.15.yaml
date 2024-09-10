@@ -4,10 +4,18 @@ base_images:
     namespace: ocp
     tag: base
 build_root:
-  image_stream_tag:
-    name: ci
-    namespace: openshift
-    tag: golang-1.20
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ci/telco-runner
+
+      ENV SSH_KEY_PATH=/var/run/ssh-key/ssh-key
+      ENV SSH_KEY=~/key
+      ENV BASTION_IP_ADDR="$(cat /var/run/bastion-ip-addr/address)"
+      ENV JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
+
+      RUN ping $BASTION_IP_ADDR -c 10 || true
+          dnf install iputils-ping
+          ansible-galaxy collection install redhatci.ocp --ignore-certs
 resources:
   '*':
     limits:
