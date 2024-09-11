@@ -73,12 +73,12 @@ tests:
 - as: ci-install-e2e
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: numaresources-operator
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -90,24 +90,21 @@ tests:
     - as: e2e-install-test
       cli: latest
       commands: make test-install-e2e
-      dependencies:
-      - env: OO_BUNDLE
-        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -119,25 +116,22 @@ tests:
     - as: e2e-test
       cli: latest
       commands: make test-e2e
-      dependencies:
-      - env: OO_BUNDLE
-        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-must-gather-e2e
   cron: 42 0 * * *
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -149,15 +143,12 @@ tests:
     - as: must-gather-e2e-test
       cli: latest
       commands: make test-must-gather-e2e
-      dependencies:
-      - env: OO_BUNDLE
-        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: security
   optional: true
   steps:
