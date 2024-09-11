@@ -160,7 +160,9 @@ cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Manifest Build/Push"
 timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
-        source env_vars.sh
+        #source env_vars.sh
+	DESTINATION_IMAGE_REF=$DESTINATION_IMAGE_REF
+	
 
         # for manifests. quay.io does not support format=oci (ref: https://github.com/containers/podman/issues/8353)
         export BUILDAH_FORMAT=docker
@@ -169,7 +171,7 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
         docker pull \$DESTINATION_IMAGE_REF-ppc64le
 
         docker pull quay.io/opendatahub/opendatahub-operator:latest
-        AMD=\$(docker inspect quay.io/opendatahub/opendatahub-operator:latest | jq '.[0].Id' | tr -d '"' | cut -d: -f2)
+        AMD=\$(docker inspect --format '{{ .Id }}' quay.io/opendatahub/opendatahub-operator:latest | cut -d: -f2)
         docker tag \$AMD \$DESTINATION_IMAGE_REF-amd64
         docker push \$DESTINATION_IMAGE_REF-amd64
 

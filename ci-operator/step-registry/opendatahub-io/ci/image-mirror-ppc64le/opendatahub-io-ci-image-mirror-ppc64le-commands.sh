@@ -5,9 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-# Make this fail
-exit -1
-
 # log function
 log_file="${ARTIFACT_DIR}/mirror.log"
 log() {
@@ -163,7 +160,13 @@ cat $HOME/env_vars.sh | ssh $SSH_ARGS root@$POWERVS_IP "cat > /root/env_vars.sh"
 
 log "INFO SSH to Power VM for Build/Push"
 timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
-	source env_vars.sh
+	#source env_vars.sh
+	BUILD=${IMAGE_TAG:-$(date +%s)}
+	REPO_OWNER=$REPO_OWNER
+	REPO_NAME=$REPO_NAME
+	PULL_BASE_REF=$PULL_BASE_REF
+	PULL_NUMBER=$PULL_NUMBER
+	DESTINATION_IMAGE_REF=$DESTINATION_IMAGE_REF
 	
 	# for manifests. quay.io does not support format=oci (ref: https://github.com/containers/podman/issues/8353)
 	export BUILDAH_FORMAT=docker
@@ -172,7 +175,7 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
 	rm -rf \$BUILD
 	mkdir \$BUILD && cd \$BUILD
 	git clone https://github.com/\$REPO_OWNER/\$REPO_NAME.git -b \$PULL_BASE_REF .
-	git fetch origin pull/$$PULL_NUMBER/head:build_branch
+	git fetch origin pull/\$PULL_NUMBER/head:build_branch
 	git checkout build_branch
 
 	# build & push
