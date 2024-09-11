@@ -175,7 +175,7 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
         docker tag \$AMD \$DESTINATION_IMAGE_REF-amd64
         docker push \$DESTINATION_IMAGE_REF-amd64
 
-        docker manifest create \$DESTINATION_IMAGE_REF \$DESTINATION_IMAGE_REF-amd64 \$DESTINATION_IMAGE_REF-ppc64le
+        docker manifest create \$DESTINATION_IMAGE_REF --amend \$DESTINATION_IMAGE_REF-amd64 \$DESTINATION_IMAGE_REF-ppc64le
         docker manifest push \$DESTINATION_IMAGE_REF
 
 EOF
