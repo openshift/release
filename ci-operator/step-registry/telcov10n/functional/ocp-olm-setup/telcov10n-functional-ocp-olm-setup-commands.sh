@@ -5,6 +5,8 @@ set -o pipefail
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+BASTION_IP_ADDR="$(cat /var/run/bastion-ip-addr/address)"
+JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
 JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
 
 cp $SSH_KEY_PATH $SSH_KEY
