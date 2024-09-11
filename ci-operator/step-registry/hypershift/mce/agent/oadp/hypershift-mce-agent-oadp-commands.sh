@@ -13,6 +13,10 @@ set -o errexit
 set -o pipefail
 set -x
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 oc create namespace oadp-helper
 IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
@@ -165,45 +169,50 @@ oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clust
 oc annotate hostedcluster -n local-cluster ${CLUSTER_NAME} hypershift.openshift.io/skip-delete-hosted-controlplane-namespace=true
 remove_finalizer machine.c "local-cluster-${CLUSTER_NAME}"
 oc delete machine.c -n "local-cluster-${CLUSTER_NAME}" --all
-#oc delete AgentCluster -n "local-cluster-${CLUSTER_NAME}" --all
+oc delete AgentCluster -n "local-cluster-${CLUSTER_NAME}" --all
+remove_finalizer cluster "local-cluster-${CLUSTER_NAME}"
+oc delete cluster -n "local-cluster-${CLUSTER_NAME}" --all
+oc delete hostedcluster -n local-cluster "${CLUSTER_NAME}"
+cat <<EOF | oc apply -f -
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: hc-clusters-hosted-restore
+  namespace: openshift-adp
+spec:
+  includedNamespaces:
+  - local-cluster
+  - local-cluster-${CLUSTER_NAME}
+  backupName: hc-clusters-hosted-backup
+  restorePVs: true
+  preserveNodePorts: true
+  existingResourcePolicy: update
+  excludedResources:
+  - pod
+  - nodes
+  - events
+  - events.events.k8s.io
+  - backups.velero.io
+  - restores.velero.io
+  - resticrepositories.velero.io
+EOF
+oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
+oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
 
-#oc delete agentcluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
-#remove_finalizer hostedcluster ${CLUSTER_NS}
-#oc delete cluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
-#remove_finalizer cluster ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME}
-#cat <<EOF | oc apply -f -
-#apiVersion: velero.io/v1
-#kind: Restore
-#metadata:
-#  name: hc-clusters-hosted-restore
-#  namespace: openshift-adp
-#spec:
-#  includedNamespaces:
-#  - local-cluster
-#  - local-cluster-${CLUSTER_NAME}
-#  backupName: hc-clusters-hosted-backup
-#  restorePVs: true
-#  preserveNodePorts: true
-#  existingResourcePolicy: update
-#  excludedResources:
-#  - pod
-#  - nodes
-#  - events
-#  - events.events.k8s.io
-#  - backups.velero.io
-#  - restores.velero.io
-#  - resticrepositories.velero.io
-#EOF
-#oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
-#oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
-#export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-#oc get node --no-headers | awk '{print $1}' | while read c ; do oc delete node $c ; done
-#export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-#oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-#oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-#echo "wait agent ready"
-#oc wait --all=true agent -n ${AGENT_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
-#oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
-#oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
-#export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-#oc get pod -A > "${ARTIFACT_DIR}/hostedcluster pods"
+oc patch hostedcluster -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "remove", "path": "/spec/pausedUntil"}]'
+oc patch nodepool -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "remove", "path": "/spec/pausedUntil"}]'
+oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused- --overwrite=true --all
+oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused- --overwrite=true --all
+
+export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+echo "Wait HostedCluster ready..."
+until \
+  oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
+    echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+    oc get clusterversion 2>/dev/null || true
+    sleep 1s
+done
+oc get pod -A > "${ARTIFACT_DIR}/hostedcluster pods"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
+oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
