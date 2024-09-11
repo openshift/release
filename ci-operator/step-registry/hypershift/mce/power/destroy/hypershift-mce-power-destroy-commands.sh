@@ -61,9 +61,9 @@ for instance in "${INSTANCE_ID[@]}"; do
 done
 
 # Delete VSI
-# for instance in "${INSTANCE_ID[@]}"; do
-#     ibmcloud pi ins del $instance
-# done
+for instance in "${INSTANCE_ID[@]}"; do
+     ibmcloud pi ins del $instance
+done
 
 # Cleanup cis dns records
 idToDelete=$(ibmcloud cis dns-records ${CIS_DOMAIN_ID} --name "*.apps.${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN}" --output json | jq -r '.[].id')
