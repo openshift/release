@@ -16,7 +16,7 @@ JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
 ping $BASTION_IP_ADDR -c 10 || true
 echo "exit" | curl "telnet://$BASTION_IP_ADDR:22" && echo "SSH port is opened"|| echo "status = $?"
 
-cp $SSH_KEY_PATH $SSH_KEY
+mkdir -p $SSH_KEY && cp $SSH_KEY_PATH $SSH_KEY
 chmod 600 $SSH_KEY
 
 git clone https://github.com/openshift-kni/eco-ci-cd --depth=1 ${SHARED_DIR}/eco-ci-cd
