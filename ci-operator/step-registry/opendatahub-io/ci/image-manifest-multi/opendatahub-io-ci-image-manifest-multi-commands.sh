@@ -173,6 +173,7 @@ timeout --kill-after 10m 60m ssh $SSH_ARGS root@$POWERVS_IP bash -x - << EOF
         docker pull quay.io/opendatahub/opendatahub-operator:latest
         AMD=\$(docker inspect --format '{{ .Id }}' quay.io/opendatahub/opendatahub-operator:latest | cut -d: -f2)
         docker tag \$AMD \$DESTINATION_IMAGE_REF-amd64
+	docker rmi \$DESTINATION_IMAGE_REF
         docker push \$DESTINATION_IMAGE_REF-amd64
 
         docker manifest create \$DESTINATION_IMAGE_REF --amend \$DESTINATION_IMAGE_REF-amd64 \$DESTINATION_IMAGE_REF-ppc64le
