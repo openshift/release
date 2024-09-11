@@ -5,8 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/e2e-aws-commatrix-run
+    context: ci/prow/e2e-aws-commatrix-run-tests
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -14,8 +13,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-commatrix-main-e2e-aws-commatrix-run
-    rerun_command: /test e2e-aws-commatrix-run
+    name: pull-ci-openshift-kni-commatrix-main-e2e-aws-commatrix-run-tests
+    rerun_command: /test e2e-aws-commatrix-run-tests
     spec:
       containers:
       - args:
@@ -24,8 +23,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-commatrix-run-cluster-profile
-        - --target=e2e-aws-commatrix-run
+        - --secret-dir=/usr/local/e2e-aws-commatrix-run-tests-cluster-profile
+        - --target=e2e-aws-commatrix-run-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -41,7 +40,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-commatrix-run-cluster-profile
+        - mountPath: /usr/local/e2e-aws-commatrix-run-tests-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -78,7 +77,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-commatrix-run,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-commatrix-run-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
