@@ -4,6 +4,11 @@ set -e
 set -u
 set -o pipefail
 
+if  [ "$MCO_CONF_DAY1_TLS_PROFILE" == "" ]; then
+  echo "The tls profile provided is empty"
+  exit 0
+fi
+
 function create_apiserver_manifests(){
     local MANIFESTS_DIR=$1
     local MCO_CONF_DAY1_TLS_PROFILE=$2
