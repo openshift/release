@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#remove_finalizer () {
+#    type=${1};
+#    namespace=${2};
+#    oc get "$type" -n "$namespace" --no-headers | awk '{print $1}' | while read t; do
+#        oc patch -p '[{"op":"remove","path":"/metadata/finalizers"}]' --type=json -n "$namespace" "$type" "$t";
+#    done
+#}
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -104,6 +112,8 @@ echo "scale down ${NODEPOOL_REPLICAS} => 0"
 oc scale nodepool ${CLUSTER_NAME} -n local-cluster --replicas 0
 oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
+oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
 kind: Backup
@@ -155,44 +165,45 @@ spec:
 EOF
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 
-oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-oc delete hostedcluster/${CLUSTER_NAME} -n local-cluster
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: Restore
-metadata:
-  name: hc-clusters-hosted-restore
-  namespace: openshift-adp
-spec:
-  includedNamespaces:
-  - local-cluster
-  - local-cluster-${CLUSTER_NAME}
-  backupName: hc-clusters-hosted-backup
-  restorePVs: true
-  preserveNodePorts: true
-  existingResourcePolicy: update
-  excludedResources:
-  - pod
-  - nodes
-  - events
-  - events.events.k8s.io
-  - backups.velero.io
-  - restores.velero.io
-  - resticrepositories.velero.io
-EOF
-oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
-oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
-export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-oc get node --no-headers | awk '{print $1}' | while read c ; do oc delete node $c ; done
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
-sleep 120
-oc scale nodepool ${CLUSTER_NAME} -n local-cluster --replicas ${NODEPOOL_REPLICAS}
-echo "wait agent ready"
-oc wait --all=true agent -n ${AGENT_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
-oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
-oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
-export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-oc get pod -A > "${ARTIFACT_DIR}/hostedcluster pods"
+#oc delete hostedcluster/${CLUSTER_NAME} -n local-cluster
+#remove_finalizer machine ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME}
+#oc delete agentcluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
+#remove_finalizer hostedcluster ${CLUSTER_NS}
+#oc delete cluster --all -n ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME} --wait=false
+#remove_finalizer cluster ${CLUSTER_NS}-${ASSISTED_CLUSTER_NAME}
+#cat <<EOF | oc apply -f -
+#apiVersion: velero.io/v1
+#kind: Restore
+#metadata:
+#  name: hc-clusters-hosted-restore
+#  namespace: openshift-adp
+#spec:
+#  includedNamespaces:
+#  - local-cluster
+#  - local-cluster-${CLUSTER_NAME}
+#  backupName: hc-clusters-hosted-backup
+#  restorePVs: true
+#  preserveNodePorts: true
+#  existingResourcePolicy: update
+#  excludedResources:
+#  - pod
+#  - nodes
+#  - events
+#  - events.events.k8s.io
+#  - backups.velero.io
+#  - restores.velero.io
+#  - resticrepositories.velero.io
+#EOF
+#oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
+#oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+#export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+#oc get node --no-headers | awk '{print $1}' | while read c ; do oc delete node $c ; done
+#export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+#oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
+#oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "false"}]'
+#echo "wait agent ready"
+#oc wait --all=true agent -n ${AGENT_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
+#oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
+#oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
+#export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+#oc get pod -A > "${ARTIFACT_DIR}/hostedcluster pods"
