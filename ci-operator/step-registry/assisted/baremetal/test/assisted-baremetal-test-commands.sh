@@ -90,7 +90,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
     done
 EOF
 
-
+sleep 3600
 exit_code=$?
 
 set -e
