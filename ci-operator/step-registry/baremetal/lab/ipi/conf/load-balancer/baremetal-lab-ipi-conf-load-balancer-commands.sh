@@ -9,6 +9,23 @@ set -o pipefail
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
 INGRESS_VIP="$(yq .ingress_vip "$SHARED_DIR/vips.yaml")"
+SSH=""
+
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [ -z "$name" ] || [ -z "$ip" ] || [ -z "$ipv6" ] || [ -z "$host" ]; then
+    echo "Error when parsing the Bare Metal Host metadata"
+    exit 1
+  fi
+  SSH="$SSH
+    listen $name-ssh
+    bind :::$((13000 + "$host"))
+    mode tcp
+    balance source
+    server $name $ip:22 check inter 1s
+    server $name-v6 [$ipv6]:22 check inter 1s"
+done
 echo "Generating the template..."
 cat > "${SHARED_DIR}/haproxy.cfg" <<EOF
 global
@@ -62,6 +79,7 @@ listen ingress-router-443
     mode tcp
     balance source
     server api_vip $INGRESS_VIP:443 check inter 1s
+$SSH
 EOF
 
 echo "Templating for HAProxy done..."
