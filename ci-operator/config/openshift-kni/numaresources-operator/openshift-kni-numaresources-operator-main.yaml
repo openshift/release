@@ -40,7 +40,8 @@ images:
   to: numaresources-operator-tests
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: numaresources-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-kni/numaresources-operator:4.18.999-snapshot
     with: numaresources-operator
@@ -90,8 +91,8 @@ tests:
       cli: latest
       commands: make test-install-e2e
       dependencies:
-      - env: OO_INDEX
-        name: ci-index
+      - env: OO_BUNDLE
+        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
@@ -119,8 +120,8 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
-      - env: OO_INDEX
-        name: ci-index
+      - env: OO_BUNDLE
+        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
@@ -131,8 +132,6 @@ tests:
   cron: 42 0 * * *
   steps:
     cluster_profile: aws-telco
-    dependencies:
-      OO_INDEX: ci-index
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_CHANNEL: alpha
@@ -150,6 +149,9 @@ tests:
     - as: must-gather-e2e-test
       cli: latest
       commands: make test-must-gather-e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: numaresources-operator-bundle
       from: src
       resources:
         requests:
