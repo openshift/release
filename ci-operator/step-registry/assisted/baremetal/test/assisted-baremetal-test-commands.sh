@@ -58,7 +58,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
 
         case ${test_type} in
             suite)
-                test_list=$(get_baremetal_test_list "${openshift_tests_image}" "${test_suite}" "${test_provider}")
+                test_list=$(get_baremetal_test_list)
                 ;;
             list)
                 ;;
