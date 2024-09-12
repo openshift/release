@@ -2,13 +2,15 @@
 
 set -euxo pipefail
 
-# Registry overrides
+# Generate registry overrides file
+ACR_LOGIN_SERVER="$(</var/run/vault/acr-pull-credentials/loginserver)"
 REGISTRY_OVERRIDES_FILE="$SHARED_DIR"/hypershift_operator_registry_overrides
-if [[ ! -f "$REGISTRY_OVERRIDES_FILE" ]]; then
-    echo "Registry override file $REGISTRY_OVERRIDES_FILE not found, exiting" >&2
-    exit 1
-fi
+cat <<EOF >> "$REGISTRY_OVERRIDES_FILE"
+quay.io/openshift-release-dev/ocp-v4.0-art-dev=$ACR_LOGIN_SERVER/openshift-release-dev/ocp-v4.0-art-dev
+quay.io/openshift-release-dev/ocp-release=$ACR_LOGIN_SERVER/openshift-release-dev/ocp-release
+EOF
 
+# Get registry overrides from file
 REGISTRY_OVERRIDES=""
 while read -r line || [[ -n "$line" ]]; do
     if [[ -z $line ]]; then
@@ -28,4 +30,6 @@ oc patch deployment operator -n hypershift --type=json -p='[
     "value": "'"--registry-overrides=$REGISTRY_OVERRIDES"'"
   }
 ]'
-oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
+oc wait deployment operator -n hypershift --for='condition=PROGRESSING=True' --timeout=1m
+oc rollout status deployment -n hypershift operator --timeout=5m
+
