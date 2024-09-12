@@ -64,22 +64,22 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 "
 
 # Workaround: Comment out this code until OCPBUGS-34849 is fixed
-#  # split the ipi_disabled_ifaces semi-comma separated list into an array
-#  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
-#  for iface in "${ipi_disabled_ifaces[@]}"; do
-#    # Take care of the indentation when adding the disabled interfaces to the above yaml
-#    ADAPTED_YAML+="
-#    - name: ${iface}
-#      type: ethernet
-#      state: up
-#      ipv4:
-#        enabled: false
-#        dhcp: false
-#      ipv6:
-#        enabled: false
-#        dhcp: false
-#    "
-#  done
+ # split the ipi_disabled_ifaces semi-comma separated list into an array
+ IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
+ for iface in "${ipi_disabled_ifaces[@]}"; do
+   # Take care of the indentation when adding the disabled interfaces to the above yaml
+   ADAPTED_YAML+="
+   - name: ${iface}
+     type: ethernet
+     state: up
+     ipv4:
+       enabled: false
+       dhcp: false
+     ipv6:
+       enabled: false
+       dhcp: false
+   "
+ done
   # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
