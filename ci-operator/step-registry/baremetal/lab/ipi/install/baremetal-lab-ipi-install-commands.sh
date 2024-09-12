@@ -100,8 +100,6 @@ platform:
   baremetal:
     libvirtURI: >-
       qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
-    apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
-    ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
     externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
@@ -133,11 +131,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       type: ethernet
       state: up
       ipv4:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv4_enabled}
+        dhcp: ${ipv4_enabled}
       ipv6:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}
+        autoconf: ${ipv6_enabled}
+        auto-gateway: ${ipv6_enabled}
+        auto-routes: ${ipv6_enabled}
+        auto-dns: ${ipv6_enabled}
 "
   # split the ipi_disabled_ifaces semi-comma separated list into an array
   IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
