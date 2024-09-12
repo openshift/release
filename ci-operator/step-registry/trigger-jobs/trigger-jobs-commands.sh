@@ -8,7 +8,7 @@ GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 #Get the day of the month
-month_day=$(date +%d)
+month_day=$(date +%-d)
 
 # additional checks for self-managed fips and non-fips testing
 self_managed_string='self-managed-lp-interop-jobs'
@@ -46,6 +46,7 @@ jq -c '.[]' "$WEEKLY_JOBS"
 echo ""
 
 retry_interval=60  # 60 seconds = 1 minute
+failed_jobs=""
 
 if [[ "$JOB_NAME" == *"rehearse"* ]]; then
   echo "Job name contains 'rehearse'. Exiting with status 0."
@@ -78,7 +79,6 @@ if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 fi
 
 max_retries=3
-failed_jobs=""
 
 echo ""
 echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"

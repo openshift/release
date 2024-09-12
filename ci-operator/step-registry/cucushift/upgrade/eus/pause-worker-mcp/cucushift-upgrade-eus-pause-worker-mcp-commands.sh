@@ -21,10 +21,16 @@ function debug() {
 
 function pause() {
     echo "Pausing worker pool..."
-    oc patch --type=merge --patch='{"spec":{"paused":true}}' machineconfigpool/worker
-    ret=$(oc get machineconfigpools worker -ojson | jq -r '.spec.paused')
+    local mcp="$1" ret
+    oc patch --type=merge --patch='{"spec":{"paused":true}}' mcp/${mcp}
+    if [ $? -ne 0 ]; then
+        echo "Failed to pause mcp"
+        exit 1
+    fi
+
+    ret=$(oc get machineconfigpools ${mcp} -ojson | jq -r '.spec.paused')
     if [[ "${ret}" != "true" ]]; then
-        echo >&2 "Worker pool failed to pause, exiting" && return 1
+        echo >&2 "${mcp} pool failed to pause, exiting" && exit 1
     fi
 }
 
@@ -34,4 +40,29 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-pause
+# check all actual mcp, if any of them unknown then break the job.
+echo "Checking if there are unexpected mcps..."
+expected_mcp=("master" "worker")
+declare -a arr=()
+mapfile -t arr < <(echo "${MCO_CONF_DAY2_CUSTOM_MCP}"|  jq -r '.[].mcp_name')
+expected_mcp+=("${arr[*]}")
+echo -e "Expected mcps: ${expected_mcp[*]} \n"
+
+actual_mcp=$(oc get mcp --output jsonpath="{.items[*].metadata.name}")
+IFS=" " read -r -a actual_mcp_arr <<<"$actual_mcp"
+echo -e "Observed mcps: ${actual_mcp_arr[*]}\n"
+for mcp in "${actual_mcp_arr[@]}";
+do
+    if [[ ! " ${expected_mcp[*]} " =~ [[:space:]]${mcp}[[:space:]] ]]; then
+        echo "Unknown mcp found: ${mcp}"
+        exit 1
+    fi
+done
+echo -e "Finished checking unexpected mcps, all mcps are expected.\n"
+
+# pause all custom mcp
+IFS=" " read -r -a arr <<<"$PAUSED_MCP_NAME"
+for mcp in "${arr[@]}";
+do
+    pause $mcp
+done

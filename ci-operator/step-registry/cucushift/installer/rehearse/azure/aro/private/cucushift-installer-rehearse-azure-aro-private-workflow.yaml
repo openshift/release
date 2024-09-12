@@ -1,0 +1,20 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-aro-private
+  steps: 
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: aro-provision-cluster
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: enable-qe-catalogsource
+    post:
+    - ref: aro-deprovision
+    env:
+      ARO_API_SERVER_VISIBILITY: Private
+      ARO_INGRESS_VISIBILITY: Private
+      ARO_OUTBOUND_TYPE: UserDefinedRouting
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow for aro

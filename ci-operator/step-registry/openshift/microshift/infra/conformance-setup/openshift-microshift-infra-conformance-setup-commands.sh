@@ -1,10 +1,20 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
+trap_install_status_exit_code $EXIT_CODE_CONFORMANCE_SETUP_FAILURE
+
+if "${SRC_FROM_GIT}"; then
+  mkdir -p /go/src/github.com/openshift
+  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+  # MicroShift repo is recent enough to use main instead of master.
+  if [ "${branch}" == "master" ]; then
+    branch="main"
+  fi
+  git clone https://github.com/openshift/microshift -b $branch /go/src/github.com/openshift/microshift
+fi
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
