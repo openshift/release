@@ -50,7 +50,7 @@ EOF
     <p>${testname}:&nbsp;
     <a target="_blank" href="${URL}/${testname}">directory</a>
 EOF
-    if [ -f "${URL}/${testname}/boot_and_run.log" ]; then
+    if [ -f "${test}/boot_and_run.log" ]; then
       cat >>${REPORT} <<EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/boot_and_run.log">boot_and_run.log</a>
 EOF
