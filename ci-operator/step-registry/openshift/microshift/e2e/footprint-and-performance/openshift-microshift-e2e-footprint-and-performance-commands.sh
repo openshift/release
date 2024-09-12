@@ -17,7 +17,9 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 EOF
 chmod +x /tmp/prepare.sh
 
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+
 scp \
   "${SHARED_DIR}/ci-functions.sh" \
   /tmp/prepare.sh \
