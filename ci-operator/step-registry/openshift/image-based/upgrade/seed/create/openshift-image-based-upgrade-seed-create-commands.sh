@@ -83,6 +83,11 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
+# Determine if we should replace the LCA version
+if [[ ! -z "${LCA_PULL_REF_OVERRIDE}" ]]; then
+  LCA_PULL_REF=$LCA_PULL_REF_OVERRIDE
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
