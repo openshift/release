@@ -21,6 +21,7 @@ ARO_CLUSTER_VERSION=${ARO_CLUSTER_VERSION:=""}
 ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:=""}
 ARO_API_SERVER_VISIBILITY=${ARO_API_SERVER_VISIBILITY:=""}
 ARO_OUTBOUND_TYPE=${ARO_OUTBOUND_TYPE:=""}
+ARO_FIPS=${ARO_FIPS:="false"}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -93,6 +94,11 @@ fi
 #ARO Outbound Type
 if [[ -n ${ARO_OUTBOUND_TYPE} ]]; then
     CREATE_CMD="${CREATE_CMD} --outbound-type ${ARO_OUTBOUND_TYPE}"
+fi
+
+# FIPS support
+if [[ ${ARO_FIPS} == "true" ]]; then
+  CREATE_CMD="${CREATE_CMD} --fips ${ARO_FIPS}"
 fi
 
 echo "Running ARO create command:"
