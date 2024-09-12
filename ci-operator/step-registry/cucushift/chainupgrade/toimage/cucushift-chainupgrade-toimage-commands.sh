@@ -1054,6 +1054,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     if [[ ${TARGET_MINOR_VERSION} == "16" && ${currentPlugin} == "OpenShiftSDN" ]]; then
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
+	sleep 8h
 	health_check
     fi
 
