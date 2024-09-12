@@ -71,6 +71,7 @@ elif [ "$platform" = "IBMCloud" ]; then
     export ACTION
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
     export NODE_NAME
+    export TIMEOUT=320
 
 fi
 
