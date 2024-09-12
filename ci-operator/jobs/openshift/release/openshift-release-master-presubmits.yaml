@@ -5,6 +5,32 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/check-cluster-profiles-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-cluster-profiles-config
+    rerun_command: /test check-cluster-profiles-config
+    run_if_changed: ^step-registry/cluster-profiles/cluster-profiles-config.yaml
+    spec:
+      containers:
+      - args:
+        - --config-path=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        command:
+        - check-cluster-profiles-config
+        image: registry.ci.openshift.org/ci/check-cluster-profiles-config:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )check-cluster-profiles-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/prow/check-gh-automation
     decorate: true
@@ -280,31 +306,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/build-clusters
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-clusters
-    rerun_command: /test build-clusters
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-ci-build-clusters.sh
-        image: registry.ci.openshift.org/ci/cluster-init:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: ((?m)^/test build-clusters,?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -896,7 +897,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20240902-b4c04a9b6
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20240911-5886b0452
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

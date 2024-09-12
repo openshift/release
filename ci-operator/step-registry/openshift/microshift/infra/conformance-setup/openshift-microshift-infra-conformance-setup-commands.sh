@@ -4,16 +4,32 @@ set -xeuo pipefail
 # shellcheck disable=SC1091
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
+trap_install_status_exit_code $EXIT_CODE_CONFORMANCE_SETUP_FAILURE
 
 if "${SRC_FROM_GIT}"; then
-  mkdir -p /go/src/github.com/openshift
   branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
   # MicroShift repo is recent enough to use main instead of master.
   if [ "${branch}" == "master" ]; then
     branch="main"
   fi
-  git clone https://github.com/openshift/microshift -b $branch /go/src/github.com/openshift/microshift
+  CLONEREFS_OPTIONS=$(jq -n --arg branch "${branch}" '{
+    "src_root": "/go",
+    "log":"/dev/null",
+    "git_user_name": "ci-robot",
+    "git_user_email": "ci-robot@openshift.io",
+    "fail": true,
+    "refs": [
+      {
+        "org": "openshift",
+        "repo": "microshift",
+        "base_ref": $branch,
+        "workdir": true
+      }
+    ]
+  }')
+  export CLONEREFS_OPTIONS
 fi
+ci_clone_src
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"

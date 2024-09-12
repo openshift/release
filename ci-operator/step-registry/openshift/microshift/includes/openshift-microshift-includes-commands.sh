@@ -120,12 +120,54 @@ function trap_subprocesses_on_term() {
     trap 'PIDS=$(jobs -p); if test -n "${PIDS}"; then kill ${PIDS} || true && wait; fi' TERM
 }
 
+EXIT_CODE_AWS_EC2_FAILURE=3
+EXIT_CODE_AWS_EC2_LOG_FAILURE=4
+EXIT_CODE_LVM_INSTALL_FAILURE=5
+EXIT_CODE_RPM_INSTALL_FAILURE=6
+EXIT_CODE_CONFORMANCE_SETUP_FAILURE=7
+EXIT_CODE_PCP_FAILURE=8
+EXIT_CODE_WAIT_CLUSTER_FAILURE=9
+
+function trap_install_status_exit_code() {
+    local -r code=$1
+    trap '([ "$?" -ne "0" ] && echo '$code' || echo 0) >> ${SHARED_DIR}/install-status.txt' EXIT
+}
+
 function download_microshift_scripts() {
     DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
     export DNF_RETRY
 
     curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"
     chmod 755 "${DNF_RETRY}"
+}
+
+function ci_clone_src() {
+    local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
+    if (( go_version < 22 )); then
+        # Releases that use older Go, cannot compile the most recent prow code.
+        # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
+        mkdir -p /tmp/prow
+        cd /tmp/prow
+        git init
+        git remote add origin https://github.com/kubernetes-sigs/prow.git
+        git fetch origin 1a7a18f054ada0ed638678c1ee742ecfc9742958
+        git reset --hard FETCH_HEAD
+    else
+        git clone --depth 1 https://github.com/kubernetes-sigs/prow.git /tmp/prow
+        cd /tmp/prow
+    fi
+    go build -mod=mod -o /tmp/clonerefs ./cmd/clonerefs
+
+    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+        # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
+        CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [.refs, .extra_refs[]]}')
+        export CLONEREFS_OPTIONS
+    fi
+
+    # Following procedure is taken from original clonerefs image used to construct `src` image.
+    umask 0002
+    /tmp/clonerefs
+    find /go/src -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod g+xw
 }
 
 #
