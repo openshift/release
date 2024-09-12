@@ -52,8 +52,6 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-
 if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
    echo "No additional workers requested"
    exit 0
@@ -87,14 +85,9 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
-export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
 oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
-
-#echo "Extract the latest oc client..."
-#oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-#   --command=oc --to=/tmp --insecure=true
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
@@ -174,18 +167,9 @@ echo "Monitoring day2 workers and pending CSRs..."
 /cli/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
   tee /tmp/output.txt | while IFS= read -r line; do
   echo "$line"
-  if [[ "$line" = *"with signerName kubernetes.io/kube-apiserver-client-kubelet and username system:serviceaccount:openshift-machine-config-operator:node-bootstrapper is Pending and awaiting approval"* ]]; then
+  if [[ "$line" = *"with signerName kubernetes.io/kube-apiserver-client-kubelet and username system:serviceaccount:openshift-machine-config-operator:node-bootstrapper is Pending and awaiting approval"* ]] || [[ "$line" = *"with signerName kubernetes.io/kubelet-serving and username "*" is Pending and awaiting approval"* ]]; then
     node_ip=$(echo "$line" | sed 's/^.*Node \(.*\): CSR.*$/\1/')
     csr=$(echo "$line" | sed 's/^.*CSR \([^ ]*\).*$/\1/')
-    echo "Approving CSR $csr for node $node_ip"
-    oc adm certificate approve "$csr"
-  fi
-  if [[ "$line" = *"with signerName kubernetes.io/kubelet-serving and username "*" is Pending and awaiting approval"* ]]; then
-    node_ip=$(echo "$line" | sed 's/^.*Node \(.*\): CSR.*$/\1/')
-    csr=$(echo "$line" | sed 's/^.*CSR \([^ ]*\).*$/\1/')
-    if oc get nodes -o wide | grep "$node_ip" | awk '$2 != "NotReady" {print $1,$2}'; then
-       echo "$node_ip status should be NotReady, something wrong with Monitoring..."
-    fi
     echo "Approving CSR $csr for node $node_ip"
     oc adm certificate approve "$csr"
   fi

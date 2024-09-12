@@ -9,12 +9,7 @@ if [ "${ipv6_enabled:-}" == "true" ]; then
 fi
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 "${QUERY}" "${SHARED_DIR}/hosts.yaml")"
 
-day2_arch=""
-if [[ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "x86_64" ]]; then
-  day2_arch="amd64"
-elif [[ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "aarch64" ]]; then
-  day2_arch="arm64"
-fi
+day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64')"
 
 # Create an agent-config file containing only the minimum required configuration
 
@@ -96,11 +91,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 #    "
 #  done
   # Patch agent-config.yaml or nodes-config.yaml if host used for day2 by adding the given host to the hosts list
+  CONFIG_FILE=agent-config.yaml
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-      "$SHARED_DIR/nodes-config.yaml" - <<< "$ADAPTED_YAML"
-  else
-    yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-      "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
+    CONFIG_FILE="nodes-config.yaml"
   fi
+  yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
+      "$SHARED_DIR/$CONFIG_FILE" - <<< "$ADAPTED_YAML"
 done
