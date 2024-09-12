@@ -38,10 +38,10 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
 
     function get_baremetal_test_list() {
         podman run --network host --rm -i \
-            -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "$1" \
-            openshift-tests run "$2" \
+            -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
+            openshift-tests run "$test_type" \
             --dry-run \
-            --provider "{\"type\": \"$3\"}"
+            --provider "{\"type\": \"$test_suite\"}"
     }
 
     function run_tests() {
