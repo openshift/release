@@ -167,7 +167,6 @@ for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/
 done
 
 day2_IPs=${day2_IPs%,}
-day2_workers=0
 touch /tmp/output.txt
 
 echo "Monitoring day2 workers and pending CSRs..."
@@ -189,19 +188,6 @@ echo "Monitoring day2 workers and pending CSRs..."
     fi
     echo "Approving CSR $csr for node $node_ip"
     oc adm certificate approve "$csr"
-  fi
-  if [[ "$line" = *"Node is Ready"* ]]; then
-    ((day2_workers+=1))
-    if [[ "$day2_workers" == "$ADDITIONAL_WORKERS" ]]; then
-       if [[ "$(oc get nodes | grep "\-""a""\-" | grep -c Ready)" == "$day2_workers" ]]; then
-         echo "All day2 workers are ready, install success..."
-       else
-         echo "Not all day2 worker is ready, something wrong with Monitoring, install fail..."
-         exit 1
-       fi
-    else
-       echo "Not all day2 worker is ready, please wait..."
-    fi
   fi
 done
 

@@ -4,6 +4,7 @@ set -xeuo pipefail
 # shellcheck disable=SC1091
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
+trap_install_status_exit_code $EXIT_CODE_CONFORMANCE_SETUP_FAILURE
 
 if "${SRC_FROM_GIT}"; then
   mkdir -p /go/src/github.com/openshift

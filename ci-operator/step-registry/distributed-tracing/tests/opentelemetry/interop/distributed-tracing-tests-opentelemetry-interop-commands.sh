@@ -24,7 +24,7 @@ oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 #Set parameters for running the test cases on OpenShift and remove contrib collector images from tests.
 unset NAMESPACE
 find ./tests/e2e-otel ./tests/e2e-openshift -type f -exec sed -i '/image: ghcr.io\/open-telemetry\/opentelemetry-collector-releases\/opentelemetry-collector-contrib:/d' {} \;
-oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
+# oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 OPAMP_BRIDGE_SERVER="quay.io/rhn_support_ikanse/opamp-bridge-server:v3.3"
 find . -type f -exec sed -i "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:ve2e|${OPAMP_BRIDGE_SERVER}|g" {} \;
 find ./tests/e2e-otel/journaldreceiver -type f -exec sed -i '/image: registry.redhat.io\/rhosdt\/opentelemetry-collector-rhel8@sha256:[a-f0-9]\{64\}/d' {} +

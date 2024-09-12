@@ -49,6 +49,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     ADAPTED_YAML="
   role: ${name%%-[0-9]*}
   rootDeviceHints:
+    ${root_device:+deviceName: ${root_device}}
+    ${root_dev_hctl:+hctl: ${root_dev_hctl}}
   "
   else
     ADAPTED_YAML="
@@ -57,8 +59,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   ADAPTED_YAML+="
   hostname: ${name}
-    ${root_device:+deviceName: ${root_device}}
-    ${root_dev_hctl:+hctl: ${root_dev_hctl}}
   interfaces:
   - macAddress: ${mac}
     name: ${baremetal_iface}

@@ -19,32 +19,46 @@ function debug() {
     fi
 }
 
+# unpause the paused mcp
 function unpause() {
-    oc patch --type=merge --patch='{"spec":{"paused":false}}' machineconfigpool/worker
-    ret=$(oc get machineconfigpools worker -ojson| jq .spec.paused)
+    echo "Unpause the paused mcp..."
+    local mcp="$1" ret
+    oc patch --type=merge --patch='{"spec":{"paused":false}}' mcp/${mcp}
+    if [ $? -ne 0 ]; then
+        echo "Unpause mcp failed"
+        exit 1
+    fi
+
+    ret=$(oc get machineconfigpools ${mcp} -ojson | jq -r '.spec.paused')
     if [[ "${ret}" != "false" ]]; then
-        echo >&2 "Failed to resume worker pool, exiting..." && return 1
+        echo >&2 "${mcp} pool failed to unpause, exiting" && exit 1
     fi
 }
 
 function check_mcp() {
+    local mcp="$1" expected_status="$2"
     local out updated updating degraded try=0 max_retries=30
+    echo "Checking mcp ${mcp}, expected status ${expected_status}..."
     while (( try < max_retries )); 
     do
-        echo "Checking worker pool status #${try}..."
-        run_command "oc get machineconfigpools"
-        out="$(oc get machineconfigpools worker --no-headers)"
+        sleep 300
+        echo "Checking ${mcp} pool status #${try}..."
+        out="$(oc get machineconfigpools ${mcp} --no-headers)"
+        echo $out
         updated="$(echo "${out}" | awk '{print $3}')"
         updating="$(echo "${out}" | awk '{print $4}')"
         degraded="$(echo "${out}" | awk '{print $5}')"
     
-        if [[ ${updated} == "True" && ${updating} == "False" && ${degraded} == "False" ]]; then
-            echo "Worker pool status check passed" && return 0
+        if [[ "${updated}" == "${expected_status}" && ${updating} == "False" && ${degraded} == "False" ]]; then
+            echo -e "${mcp} pool status check passed\n" && return 0
         fi  
-        sleep 300
         (( try += 1 ))
-    done  
-    echo >&2 "Worker pool status check failed" && return 1
+    done
+    printf "\n"
+    run_command "oc get machineconfigpools"
+    run_command "oc get node -owide"
+    printf "\n"
+    echo >&2 "MCP status check failed" && exit 1
 }
 
 function run_command() {
@@ -53,18 +67,41 @@ function run_command() {
     eval "${CMD}"
 }
 
-
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-unpause
-if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-    echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
-    run_command "oc get machineconfigpools"
-    run_command "oc get node -owide"
-else
-    check_mcp
-fi
+# get all normal mcp
+actual_mcp=$(oc get mcp --output jsonpath="{.items[*].metadata.name}")
+IFS=" " read -r -a actual_mcp_arr <<<"$actual_mcp"
+echo -e "all observed mcps: ${actual_mcp_arr[*]}\n"
+normal_mcp_arr=()
+for mcp in "${actual_mcp_arr[@]}"
+do
+    if [[ ! " ${PAUSED_MCP_NAME} " =~ [[:space:]]${mcp}[[:space:]] ]]; then
+        normal_mcp_arr+=("$mcp")
+    fi
+done
+echo -e "all normal mcps: ${normal_mcp_arr[*]} \n"
+
+for mcp in "${normal_mcp_arr[@]}"
+do
+    check_mcp ${mcp} "True"
+done
+IFS=" " read -r -a arr <<<"$PAUSED_MCP_NAME"
+for mcp in "${arr[@]}";
+do
+    check_mcp $mcp "False"
+    printf "\n"
+    unpause ${mcp}
+    printf "\n"
+    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+        echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
+        run_command "oc get machineconfigpools"
+        run_command "oc get node -owide"
+    else
+        check_mcp ${mcp} "True"
+    fi
+done
