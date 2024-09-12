@@ -5,6 +5,32 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/check-cluster-profiles-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-cluster-profiles-config
+    rerun_command: /test check-cluster-profiles-config
+    run_if_changed: ^step-registry/cluster-profiles/cluster-profiles-config.yaml
+    spec:
+      containers:
+      - args:
+        - --config-path=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        command:
+        - check-cluster-profiles-config
+        image: registry.ci.openshift.org/ci/check-cluster-profiles-config:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )check-cluster-profiles-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/prow/check-gh-automation
     decorate: true
