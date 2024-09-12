@@ -128,14 +128,8 @@ function download_microshift_scripts() {
     chmod 755 "${DNF_RETRY}"
 }
 
-function clone_src() {
-    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
-        # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
-        CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [.refs, .extra_refs[]]}')
-        export CLONEREFS_OPTIONS
-    fi
-
-    go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
+function ci_clone_src() {
+    local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
     if (( go_version < 22 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
@@ -151,6 +145,13 @@ function clone_src() {
     fi
     go build -mod=mod -o /tmp/clonerefs ./cmd/clonerefs
 
+    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+        # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
+        CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [.refs, .extra_refs[]]}')
+        export CLONEREFS_OPTIONS
+    fi
+
+    # Following procedure is taken from original clonerefs image used to construct `src` image.
     umask 0002
     /tmp/clonerefs
     find /go/src -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod g+xw

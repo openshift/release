@@ -29,7 +29,7 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
-clone_src
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
