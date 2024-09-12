@@ -45,8 +45,8 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
     }
 
     function run_tests() {
-        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "$1" \
-            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "$2"
+        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
+            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_type}"
     }
     
     # prepending each printed line with a timestamp
