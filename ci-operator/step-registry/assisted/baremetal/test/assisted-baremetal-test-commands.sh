@@ -35,18 +35,20 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
     test_list="$4"
     test_provider="$5"
     test_skips="$6"
+    test_list_file="/tmp/test-list"
+    test_skips_file="/tmp/test-skips"
 
     function get_baremetal_test_list() {
         podman run --network host --rm -i \
             -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run "$test_type" \
+            openshift-tests run "${test_type}" \
             --dry-run \
-            --provider "{\"type\": \"$test_suite\"}"
+            --provider "{\"type\": \"${test_suite}\"}"
     }
 
     function run_tests() {
         podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_type}"
+            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_list_file}"
     }
     
     # prepending each printed line with a timestamp
@@ -68,10 +70,10 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
                 ;;
         esac
 
-        echo "${test_skips}" > "/tmp/test-skips"
-        echo "${test_list}" | grep -v -F -f "/tmp/test-skips" > "/tmp/test-list"
+        echo "${test_skips}" > "${test_skips_file}"
+        echo "${test_list}" | grep -v -F -f "${test_skips_file}" > "${test_list_file}"
 
-        stderr=$( { run_tests "${openshift_tests_image}" "/tmp/test-list"; } 2>&1 )
+        stderr=$(run_tests 2>&1)
         exit_code=$?
         
         # TODO: remove this part once we fully handle the problem described at
