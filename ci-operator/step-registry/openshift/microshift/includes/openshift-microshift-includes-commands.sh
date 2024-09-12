@@ -1,5 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -xeuo pipefail
 
+if [ -z "${SHARED_DIR-}" ] ; then
+    echo "The SHARED_DIR environment variable is not defined"
+    exit 1
+fi
+
+cat > "${SHARED_DIR}/ci-functions.sh" <<'EOF_SHARED_DIR'
 #
 # Note that CI-specific functions have 'ci_' name prefix.
 # The rest should be generic functionality.
@@ -113,6 +120,19 @@ function trap_subprocesses_on_term() {
     trap 'PIDS=$(jobs -p); if test -n "${PIDS}"; then kill ${PIDS} || true && wait; fi' TERM
 }
 
+EXIT_CODE_AWS_EC2_FAILURE=3
+EXIT_CODE_AWS_EC2_LOG_FAILURE=4
+EXIT_CODE_LVM_INSTALL_FAILURE=5
+EXIT_CODE_RPM_INSTALL_FAILURE=6
+EXIT_CODE_CONFORMANCE_SETUP_FAILURE=7
+EXIT_CODE_PCP_FAILURE=8
+EXIT_CODE_WAIT_CLUSTER_FAILURE=9
+
+function trap_install_status_exit_code() {
+    local -r code=$1
+    trap '([ "$?" -ne "0" ] && echo '$code' || echo 0) >> ${SHARED_DIR}/install-status.txt' EXIT
+}
+
 function download_microshift_scripts() {
     DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
     export DNF_RETRY
@@ -135,3 +155,4 @@ function format_ps4() {
 }
 export -f format_ps4
 export PS4='$(format_ps4 "${BASH_SOURCE:-$0}" "${LINENO}")'
+EOF_SHARED_DIR

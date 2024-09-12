@@ -46,6 +46,7 @@ promotion:
     namespace: ocp
   - additional_images:
       hypershift-operator: hypershift-operator
+      hypershift-tests: test-bin
     excluded_images:
     - '*'
     namespace: hypershift
@@ -55,12 +56,23 @@ releases:
     candidate:
       product: ocp
       stream: ci
+      version: "4.18"
+  initial-417:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
       version: "4.17"
   latest:
     integration:
       include_built_images: true
       name: "4.18"
       namespace: ocp
+  latest-417:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -97,6 +109,17 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-4-17
+  run_if_changed: test/e2e
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-417
+      OCP_IMAGE_PREVIOUS: release:initial-417
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"

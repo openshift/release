@@ -72,10 +72,12 @@ queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --reques
 queue ${ARTIFACT_DIR}/oc_cmds/machineconfigs oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs
 queue ${ARTIFACT_DIR}/controlplanemachinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get controlplanemachinesets -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/controlplanemachinesets oc --insecure-skip-tls-verify --request-timeout=5s get controlplanemachinesets -A
-queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A
-queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o wide
+queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A
+queue ${ARTIFACT_DIR}/machinesets.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o wide
+queue ${ARTIFACT_DIR}/machines.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o json
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json

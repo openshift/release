@@ -1,13 +1,10 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
-
-# Save stacks events
-trap 'save_stack_events_to_shared' EXIT TERM INT
+trap_install_status_exit_code $EXIT_CODE_AWS_EC2_FAILURE
 
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
 declare regions=(us-west-2 us-east-1 eu-central-1)
