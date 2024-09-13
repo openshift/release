@@ -26,6 +26,6 @@ if virsh list --all --name | grep -q "${CLUSTER_NAME}"; then
 fi
 
 timeout -s 9 2m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" \
-bash -s -- "${CLUSTER_NAME}" << EOF
-rm -rf /var/lib/libivrt/openshift-images/"${1}"-*-bootstrap*
+bash -s -- "${CLUSTER_NAME}" << 'EOF'
+rm -rf /var/lib/libvirt/openshift-images/"${1}"-*-bootstrap
 EOF
