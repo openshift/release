@@ -198,6 +198,22 @@ if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
 fi
 
+function version_lt() {
+  local ver1
+  ver1=$(echo "$1" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')
+  local ver2
+  ver2=$(echo "$2" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')
+  test "$(printf '%s\n' "$ver1" "$ver2" | sort -V | head -n 1)" != "$ver2"
+}
+
+MIN_SECBOOT_SUPPORTED_VERSION="4.13.0"
+logger "INFO" "MIN_SECBOOT_SUPPORTED_VERSION is: ${MIN_SECBOOT_SUPPORTED_VERSION}"
+logger "INFO" "OPENSFHIT_VERSION is: ${OPENSHIFT_VERSION}"
+if version_lt "$OPENSHIFT_VERSION" "$MIN_SECBOOT_SUPPORTED_VERSION"; then
+  logger "INFO" "OpenShift version $OPENSHIFT_VERSION is less than $MIN_SECBOOT_SUPPORTED_VERSION, disabling secure boot for shielded VMs."
+  SECURE_BOOT_FOR_SHIELDED_VMS=false
+fi
+
 SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH=""
 if [[ "$SECURE_BOOT_FOR_SHIELDED_VMS" == "true" ]]; then
   SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH="--secure-boot-for-shielded-vms"
