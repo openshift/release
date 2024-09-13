@@ -77,10 +77,10 @@ make ibi-reboot wait-for-ibi
 t_ibi_config_reboot=\$SECONDS
 
 echo "IBI Times:"
-echo "ISO Creation: \${t_ibi_iso_create}"
-echo "Installation Time: \${t_ibi_install}"
-echo "Config Time: \${t_ibi_config}"
-echo "Config Reboot Time: \${t_ibi_config_reboot}"
+echo "ISO Creation: \${t_ibi_iso_create} seconds"
+echo "Installation Time: \${t_ibi_install} seconds"
+echo "Config Time: \${t_ibi_config} seconds"
+echo "Config Reboot Time: \${t_ibi_config_reboot} seconds"
 EOF
 
 chmod +x ${SHARED_DIR}/image_based_install.sh
