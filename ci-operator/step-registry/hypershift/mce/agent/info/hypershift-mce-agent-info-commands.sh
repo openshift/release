@@ -41,3 +41,5 @@ oc get node -o jsonpath='{range .items[*]}Node: {@.metadata.name}  InternalIP: {
 
 echo "HostedCluster ClusterVersion"
 oc get clusterversion
+
+sleep 20m
