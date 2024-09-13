@@ -33,7 +33,7 @@ test_env_file="test-env"
 
 echo "${TEST_LIST:-""}" > "${ARTIFACT_DIR}/${test_list_file}"
 echo "${TEST_SKIPS:-""}" > "${ARTIFACT_DIR}/${test_skips_file}"
-cat "${ARTIFACT_DIR}/${test_env_file}" << EOF
+cat << EOF > "${ARTIFACT_DIR}/${test_env_file}"
 openshift_tests_image="${OPENSHIFT_TESTS_IMAGE}"
 test_type="${TEST_TYPE:-"list"}"
 test_suite="${TEST_SUITE:-"openshift/conformance/parallel"}"
