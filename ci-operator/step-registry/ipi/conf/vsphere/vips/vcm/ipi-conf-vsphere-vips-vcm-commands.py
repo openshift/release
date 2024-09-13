@@ -15,6 +15,7 @@ except ImportError:
 cluster_profile_name = os.environ.get("CLUSTER_PROFILE_NAME")
 leased_resource = os.environ.get("LEASED_RESOURCE")
 shared_dir = os.environ.get("SHARED_DIR")
+vsphere_additional_cluster = os.environ.get("VSPHERE_ADDITIONAL_CLUSTER")
 
 if cluster_profile_name is None:
     print("CLUSTER_PROFILE_NAME is undefined")
@@ -38,10 +39,16 @@ with open(subnets_config) as f:
     machine_cidr = subnet_obj["spec"]["machineNetworkCidr"]
     api_vip = subnet_obj["spec"]["ipAddresses"][2]
     ingress_vip = subnet_obj["spec"]["ipAddresses"][3]
+    
+    if vsphere_additional_cluster == "true":
+        print("Adding additional cluster vips")
+        api_vip_spoke = subnet_obj["spec"]["ipAddresses"][4]
+        ingress_vip_spoke = subnet_obj["spec"]["ipAddresses"][5]
+        network_name = subnet_obj["metadata"]["name"] # FIXME remove?
 
     with open(vips_file_name, "w") as vip_file:
-        print("vip addresses {} {}".format(api_vip, ingress_vip))
-        vip_file.write("{}\n{}".format(api_vip, ingress_vip))
+        print("vip addresses {} {} {} {}".format(api_vip, ingress_vip, api_vip_spoke, ingress_vip_spoke))
+        vip_file.write("{}\n{}\n{}\n{}\n".format(api_vip, ingress_vip, api_vip_spoke, ingress_vip_spoke))
 
     with open(machine_cidr_filename, "w") as machine_cidr_file:
         print("machine cidr {}".format(machine_cidr))
