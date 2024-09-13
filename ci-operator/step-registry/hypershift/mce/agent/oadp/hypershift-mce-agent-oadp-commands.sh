@@ -109,8 +109,10 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
 fi
 oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc patch hostedcontrolplane -n local-cluster-${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
 oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
+oc annotate agent -n ${AGENT_NAMESPACE} agent.agent-install.openshift.io/detached-agent=true --all
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
 kind: Backup
