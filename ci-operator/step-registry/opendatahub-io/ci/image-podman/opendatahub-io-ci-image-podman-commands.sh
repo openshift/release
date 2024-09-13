@@ -5,9 +5,10 @@ set -o errexit
 set -o pipefail
 set -x
 
+su -c '
+#!/bin/bash
+set -x
 
-echo "Env check"
-whoami
-which podman
-
-podman pull quay.io/opendatahub/opendatahub-operator:latest
+dnf install -y podman
+podman pull quay.io/opendatahub/opendatahub-operator
+' - newRoot
