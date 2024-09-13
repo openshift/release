@@ -223,3 +223,7 @@ sleep 10
 create_icsp_connected
 check_marketplace
 create_catalog_sources
+
+# Sleep 6h for debugging
+echo "Pause deleting. Sleep 6h for personal usage"
+sleep 21600
