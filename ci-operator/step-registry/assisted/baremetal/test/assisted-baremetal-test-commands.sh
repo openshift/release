@@ -25,18 +25,34 @@ trap collect_artifacts EXIT TERM
 # Tests execution
 set +e
 
+echo "### Prepare test environment"
+
+test_list_file="test-list"
+test_skips_file="test-skips"
+test_env_file="test-env"
+
+echo "${TEST_LIST:-""}" > "${ARTIFACT_DIR}/${test_list_file}"
+echo "${TEST_SKIPS:-""}" > "${ARTIFACT_DIR}/${test_skips_file}"
+cat "${ARTIFACT_DIR}/${test_env_file}" << EOF
+openshift_tests_image="${OPENSHIFT_TESTS_IMAGE}"
+test_type="${TEST_TYPE:-"list"}"
+test_suite="${TEST_SUITE:-"openshift/conformance/parallel"}"
+test_provider="${TEST_PROVIDER:-"baremetal"}"
+test_list_file="/tmp/${test_list_file}"
+test_skips="/tmp/${test_skips_file}"
+EOF
+
+timeout --kill-after 10m 120m scp "${SSHOPTS[@]}"   \
+    "${ARTIFACT_DIR}/${test_list_file}"             \
+    "${ARTIFACT_DIR}/${test_skips_file}"            \
+    "${ARTIFACT_DIR}/${test_env_file}"              \
+    "root@${IP}:/tmp"
+
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPENSHIFT_TESTS_IMAGE}\" \"${TEST_TYPE:-"list"}\" \"${TEST_SUITE:-"openshift/conformance/parallel"}\" \"${TEST_LIST:-""}\" \"${TEST_PROVIDER:-"baremetal"}\" \"${TEST_SKIPS}\"" << "EOF"
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF"
     set -x
 
-    openshift_tests_image="$1"
-    test_type="$2"
-    test_suite="$3"
-    test_list="$4"
-    test_provider="$5"
-    test_skips="$6"
-    test_list_file="/tmp/test-list"
-    test_skips_file="/tmp/test-skips"
+    source /tmp/test-env
 
     function get_baremetal_test_list() {
         podman run --network host --rm -i \
@@ -60,7 +76,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s \"${OPEN
 
         case ${test_type} in
             suite)
-                test_list=$(get_baremetal_test_list)
+                get_baremetal_test_list > "${test_list_file}"
                 ;;
             list)
                 ;;
