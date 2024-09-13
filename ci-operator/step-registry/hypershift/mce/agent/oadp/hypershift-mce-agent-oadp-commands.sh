@@ -99,8 +99,8 @@ spec:
         provider: aws
 EOF
 
-oc wait --timeout=20m --for=condition=Reconciled DataProtectionApplication/dpa-sample -n openshift-adp
-oc wait --timeout=20m --all --for=jsonpath='{.status.phase}'=Available backupStorageLocation -n openshift-adp
+oc wait --all=true --for=condition=Reconciled DataProtectionApplication/dpa-sample -n openshift-adp
+oc wait --all=true --all --for=jsonpath='{.status.phase}'=Available backupStorageLocation -n openshift-adp
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 if [[ -z ${AGENT_NAMESPACE} ]] ; then
@@ -161,7 +161,7 @@ spec:
   defaultVolumesToFsBackup: false
   snapshotVolumes: true
 EOF
-oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
+oc wait --all=true --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 
 #oc delete hostedcluster/${CLUSTER_NAME} -n local-cluster
 #cat <<EOF | oc apply -f -
