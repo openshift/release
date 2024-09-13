@@ -1,0 +1,64 @@
+base_images:
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.21-openshift-4.16
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/eventmesh/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: knative-backstage-plugins-eventmesh
+- dockerfile_path: openshift/ci-operator/knative-images/migrate/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: knative-backstage-plugins-migrate
+- dockerfile_path: openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: knative-backstage-plugins-test-eventshub
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-backstage-plugins-source-image
+promotion:
+  to:
+  - additional_images:
+      backstage-plugins-src: src
+    name: knative-v1.14
+    namespace: openshift
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+zz_generated_metadata:
+  branch: release-v1.14
+  org: openshift-knative
+  repo: backstage-plugins
+  variant: "413"

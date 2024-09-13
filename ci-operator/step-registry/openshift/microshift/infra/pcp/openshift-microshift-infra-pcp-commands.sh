@@ -5,6 +5,7 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 trap_subprocesses_on_term
+trap_install_status_exit_code $EXIT_CODE_PCP_FAILURE
 
 ssh "${IP_ADDRESS}" "\
     sudo dnf install -y pcp-zeroconf pcp-pmda-libvirt && \
