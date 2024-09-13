@@ -1,0 +1,115 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-version-operator
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m1s
+  container:
+    clone: true
+    from: golangci-lint
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-agnostic-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-agnostic-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- as: e2e-agnostic-ovn-upgrade-into-change
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-agnostic-ovn-upgrade-out-of-change
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-azure
+- as: e2e-hypershift-conformance
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-ovn-techpreview
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-version-operator

@@ -322,7 +322,9 @@ spec:
           name: kubelet-dir
 EOZ
 oc create -f /tmp/kubelet-bootstrap-cred-manager-ds.yaml
-oc -n openshift-machine-config-operator wait --for jsonpath='{.status.currentNumberScheduled}'=1 ds/kubelet-bootstrap-cred-manager
+
+NODE_COUNT=$(oc get nodes --selector='node-role.kubernetes.io/master' --no-headers 2>/dev/null | wc -l)
+oc -n openshift-machine-config-operator wait --for jsonpath='{.status.currentNumberScheduled}'=${NODE_COUNT} ds/kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator wait pods -l k8s-app=kubelet-bootstrap-cred-manager --for condition=Ready --timeout=300s
 oc -n openshift-kube-controller-manager-operator delete secrets/csr-signer-signer secrets/csr-signer
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m

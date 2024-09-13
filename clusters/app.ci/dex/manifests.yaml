@@ -30,6 +30,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  creationTimestamp: null
   labels:
     app: dex
   name: dex
@@ -39,320 +40,342 @@ spec:
   selector:
     matchLabels:
       app: dex
+  strategy: {}
   template:
     metadata:
-      labels:
-        app: dex
       annotations:
         config.yaml: |
-          logger:
-            level: debug
-            format: json
-          issuer: https://idp.ci.openshift.org
-          storage:
-            type: kubernetes
-            config:
-              inCluster: true
-          web:
-            http: 0.0.0.0:8000
-          enablePasswordDB: false
-          oauth2:
-            skipApprovalScreen: true
           connectors:
-          - type: oidc
-            id: sso
-            name: SSO
-            config:
-              issuer: https://auth.redhat.com/auth/realms/EmployeeIDP
-              clientID: $CLIENT_ID
-              clientSecret: $CLIENT_SECRET
-              redirectURI: https://idp.ci.openshift.org/callback
-              insecureSkipEmailVerified: true
-              getUserInfo: true
+          - config:
               claimMapping:
                 preferred_username: preferred_username
+              clientID: $CLIENT_ID
+              clientSecret: $CLIENT_SECRET
+              getUserInfo: true
+              insecureSkipEmailVerified: true
+              issuer: https://auth.redhat.com/auth/realms/EmployeeIDP
+              redirectURI: https://idp.ci.openshift.org/callback
+            id: sso
+            name: SSO
+            type: oidc
+          enablePasswordDB: false
+          issuer: https://idp.ci.openshift.org
+          logger:
+            format: json
+            level: debug
+          oauth2:
+            skipApprovalScreen: true
           staticClients:
           - idEnv: APP-CI-ID
-            name: "app.ci"
-            secretEnv: APP-CI-SECRET
+            name: app.ci
             redirectURIs:
             - https://oauth-openshift.apps.ci.l2s4.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: APP-CI-SECRET
           - idEnv: ART-ID
             name: art
-            secretEnv: ART-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.art.xq1c.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: ART-SECRET
           - idEnv: BUILD01-ID
             name: build01
-            secretEnv: BUILD01-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build01.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD01-SECRET
           - idEnv: BUILD02-ID
             name: build02
-            secretEnv: BUILD02-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build02.gcp.ci.openshift.org/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD02-SECRET
           - idEnv: BUILD03-ID
             name: build03
-            secretEnv: BUILD03-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build03.ky4t.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD03-SECRET
           - idEnv: BUILD04-ID
             name: build04
-            secretEnv: BUILD04-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build04.34d2.p2.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD04-SECRET
           - idEnv: BUILD05-ID
             name: build05
-            secretEnv: BUILD05-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build05.l9oh.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD05-SECRET
           - idEnv: BUILD09-ID
             name: build09
-            secretEnv: BUILD09-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build09.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD09-SECRET
           - idEnv: BUILD10-ID
             name: build10
-            secretEnv: BUILD10-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build10.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD10-SECRET
+          - idEnv: BUILD11-ID
+            name: build11
+            redirectURIs:
+            - https://oauth-openshift.apps.build11.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD11-SECRET
           - idEnv: HOSTED-MGMT-ID
             name: hosted-mgmt
-            secretEnv: HOSTED-MGMT-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.hosted-mgmt.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: HOSTED-MGMT-SECRET
           - idEnv: VSPHERE-BUILD02-ID
             name: vsphere02
-            secretEnv: VSPHERE-BUILD02-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.build02.vmc.ci.openshift.org/oauth2callback/RedHat_Internal_SSO
+            secretEnv: VSPHERE-BUILD02-SECRET
           - idEnv: DPCR-ID
             name: dpcr
-            secretEnv: DPCR-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.cr.j7t7.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: DPCR-SECRET
           - idEnv: HIVE-ID
             name: hive
-            secretEnv: HIVE-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.hive.9xw5.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: HIVE-SECRET
           - idEnv: VAULT_ID
             name: vault
-            secretEnv: VAULT_SECRET
             redirectURIs:
             - https://vault.ci.openshift.org/ui/vault/auth/oidc/oidc/callback
             - http://localhost:8250/oidc/callback
+            secretEnv: VAULT_SECRET
           - idEnv: VAULT_SECRET_MANAGER_ID
             name: vault-secret-manager
-            secretEnv: VAULT_SECRET_MANAGER_SECRET
             redirectURIs:
-            -  https://selfservice.vault.ci.openshift.org/oauth2/callback
+            - https://selfservice.vault.ci.openshift.org/oauth2/callback
+            secretEnv: VAULT_SECRET_MANAGER_SECRET
+          storage:
+            config:
+              inCluster: true
+            type: kubernetes
+          web:
+            http: 0.0.0.0:8000
+      creationTimestamp: null
+      labels:
+        app: dex
     spec:
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
+          - podAffinityTerm:
               labelSelector:
                 matchExpressions:
                 - key: app
                   operator: In
                   values:
                   - dex
-              topologyKey: "kubernetes.io/hostname"
-      serviceAccountName: dex
+              topologyKey: kubernetes.io/hostname
+            weight: 100
       containers:
-      - image: ghcr.io/dexidp/dex:v2.31.0
-        name: dex
-        command: ["/usr/local/bin/dex", "serve", "/etc/dex/cfg/config.yaml"]
-        readinessProbe:
-          httpGet:
-            path: /.well-known/openid-configuration
-            port: 8000
+      - command:
+        - /usr/local/bin/dex
+        - serve
+        - /etc/dex/cfg/config.yaml
         env:
         - name: PW
           valueFrom:
             secretKeyRef:
-              name: dex-static-user
               key: pw
+              name: dex-static-user
         - name: APP-CI-SECRET
           valueFrom:
             secretKeyRef:
-              name: app.ci-secret
               key: app.ci-secret
+              name: app.ci-secret
         - name: APP-CI-ID
           valueFrom:
             secretKeyRef:
-              name: app.ci-secret
               key: app.ci-id
+              name: app.ci-secret
         - name: ART-ID
           valueFrom:
             secretKeyRef:
-              name: art-secret
               key: art-id
+              name: art-secret
         - name: ART-SECRET
           valueFrom:
             secretKeyRef:
-              name: art-secret
               key: art-secret
+              name: art-secret
         - name: BUILD01-SECRET
           valueFrom:
             secretKeyRef:
-              name: build01-secret
               key: build01-secret
+              name: build01-secret
         - name: BUILD01-ID
           valueFrom:
             secretKeyRef:
-              name: build01-secret
               key: build01-id
+              name: build01-secret
         - name: BUILD02-SECRET
           valueFrom:
             secretKeyRef:
-              name: build02-secret
               key: build02-secret
+              name: build02-secret
         - name: BUILD02-ID
           valueFrom:
             secretKeyRef:
-              name: build02-secret
               key: build02-id
+              name: build02-secret
         - name: BUILD03-SECRET
           valueFrom:
             secretKeyRef:
-              name: build03-secret
               key: build03-secret
+              name: build03-secret
         - name: BUILD03-ID
           valueFrom:
             secretKeyRef:
-              name: build03-secret
               key: build03-id
+              name: build03-secret
         - name: BUILD04-SECRET
           valueFrom:
             secretKeyRef:
-              name: build04-secret
               key: build04-secret
+              name: build04-secret
         - name: BUILD04-ID
           valueFrom:
             secretKeyRef:
-              name: build04-secret
               key: build04-id
+              name: build04-secret
         - name: BUILD05-SECRET
           valueFrom:
             secretKeyRef:
-              name: build05-secret
               key: build05-secret
+              name: build05-secret
         - name: BUILD05-ID
           valueFrom:
             secretKeyRef:
-              name: build05-secret
               key: build05-id
+              name: build05-secret
         - name: BUILD09-SECRET
           valueFrom:
             secretKeyRef:
-              name: build09-secret
               key: build09-secret
+              name: build09-secret
         - name: BUILD09-ID
           valueFrom:
             secretKeyRef:
-              name: build09-secret
               key: build09-id
+              name: build09-secret
         - name: BUILD10-SECRET
           valueFrom:
             secretKeyRef:
-              name: build10-secret
               key: build10-secret
+              name: build10-secret
         - name: BUILD10-ID
           valueFrom:
             secretKeyRef:
-              name: build10-secret
               key: build10-id
+              name: build10-secret
+        - name: BUILD11-SECRET
+          valueFrom:
+            secretKeyRef:
+              key: build11-secret
+              name: build11-secret
+        - name: BUILD11-ID
+          valueFrom:
+            secretKeyRef:
+              key: build11-id
+              name: build11-secret
         - name: HOSTED-MGMT-SECRET
           valueFrom:
             secretKeyRef:
-              name: hosted-mgmt-secret
               key: hosted-mgmt-secret
+              name: hosted-mgmt-secret
         - name: HOSTED-MGMT-ID
           valueFrom:
             secretKeyRef:
-              name: hosted-mgmt-secret
               key: hosted-mgmt-id
+              name: hosted-mgmt-secret
         - name: VSPHERE-BUILD02-SECRET
           valueFrom:
             secretKeyRef:
-              name: vsphere-build02
               key: vsphere02-secret
+              name: vsphere-build02
         - name: VSPHERE-BUILD02-ID
           valueFrom:
             secretKeyRef:
-              name: vsphere-build02
               key: vsphere02-id
+              name: vsphere-build02
         - name: DPCR-SECRET
           valueFrom:
             secretKeyRef:
-              name: dpcr-secret
               key: dpcr-secret
+              name: dpcr-secret
         - name: DPCR-ID
           valueFrom:
             secretKeyRef:
-              name: dpcr-secret
               key: dpcr-id
+              name: dpcr-secret
         - name: HIVE-SECRET
           valueFrom:
             secretKeyRef:
-              name: hive-secret
               key: hive-secret
+              name: hive-secret
         - name: HIVE-ID
           valueFrom:
             secretKeyRef:
-              name: hive-secret
               key: hive-id
+              name: hive-secret
         - name: VAULT_ID
           valueFrom:
             secretKeyRef:
-              name: vault-secret
               key: vault-id
+              name: vault-secret
         - name: VAULT_SECRET
           valueFrom:
             secretKeyRef:
-              name: vault-secret
               key: vault-secret
+              name: vault-secret
         - name: VAULT_SECRET_MANAGER_ID
           valueFrom:
             secretKeyRef:
-              name: vault-secret-manager
               key: vault-secret-manager-id
+              name: vault-secret-manager
         - name: VAULT_SECRET_MANAGER_SECRET
           valueFrom:
             secretKeyRef:
-              name: vault-secret-manager
               key: vault-secret-manager-secret
+              name: vault-secret-manager
         - name: CLIENT_ID
           valueFrom:
             secretKeyRef:
-              name: rh-sso
               key: client-id
+              name: rh-sso
         - name: CLIENT_SECRET
           valueFrom:
             secretKeyRef:
-              name: rh-sso
               key: client-secret
-        - name: KUBERNETES_POD_NAMESPACE # workaround for https://github.com/dexidp/dex/issues/2082
+              name: rh-sso
+        - name: KUBERNETES_POD_NAMESPACE
           valueFrom:
-           fieldRef:
-             fieldPath: metadata.namespace
-        ports:
-        - name: http
-          containerPort: 80
-        volumeMounts:
-        - name: config
-          mountPath: /etc/dex/cfg
-      volumes:
-      - name: config
-        downwardAPI:
-          items:
-          - path: config.yaml
             fieldRef:
+              fieldPath: metadata.namespace
+        image: ghcr.io/dexidp/dex:v2.31.0
+        name: dex
+        ports:
+        - containerPort: 80
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /.well-known/openid-configuration
+            port: 8000
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/dex/cfg
+          name: config
+      serviceAccountName: dex
+      volumes:
+      - downwardAPI:
+          items:
+          - fieldRef:
               fieldPath: metadata.annotations['config.yaml']
+            path: config.yaml
+        name: config
+status: {}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

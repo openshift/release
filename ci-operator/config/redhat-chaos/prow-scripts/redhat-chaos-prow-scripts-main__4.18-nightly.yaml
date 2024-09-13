@@ -1,0 +1,78 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  krkn.prow:
+    name: krkn
+    namespace: chaos
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: krkn.prow
+  to: prow-scripts-418
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-418
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: krkn-hub-tests
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+  timeout: 6h0m0s
+- as: krkn-hub-node-tests
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: redhat-chaos-krkn-hub-node-tests
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.18-nightly

@@ -73,5 +73,4 @@ if [[ ! -f "${stacks_file}" ]]; then
   exit 0
 fi
 
-install_awscli
 delete_stacks

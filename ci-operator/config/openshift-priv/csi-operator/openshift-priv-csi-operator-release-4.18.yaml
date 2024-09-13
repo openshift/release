@@ -15,10 +15,18 @@ base_images:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
+  ocp_4.18_base-rhel9:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -42,7 +50,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.17"
+    tag: "4.18"
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -53,18 +61,30 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-ebs-csi-driver-operator
 - dockerfile_path: Dockerfile.aws-efs
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
@@ -80,9 +100,15 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: azure-disk-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
@@ -95,9 +121,15 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: azure-file-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
@@ -107,9 +139,15 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: smb-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
@@ -209,7 +247,7 @@ tests:
     env:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
-    workflow: openshift-e2e-aws-csi-efs-extended
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
 - as: e2e-azure
   steps:
     cluster_profile: azure4
@@ -222,6 +260,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
 - as: e2e-azure-csi-extended
   optional: true
   steps:

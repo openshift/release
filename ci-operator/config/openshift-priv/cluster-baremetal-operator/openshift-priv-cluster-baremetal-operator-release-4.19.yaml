@@ -1,0 +1,142 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-baremetal-operator
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-baremetal-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: ./hack/ci-test.sh
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+- as: govet
+  commands: make vet
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+- as: generate-check
+  commands: make generate-check
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+- as: e2e-agnostic-ovn
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-metal-ipi-bm
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-upgrade
+  cluster: build05
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
+  cluster: build05
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-virtualmedia
+  cluster: build05
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cluster-baremetal-operator

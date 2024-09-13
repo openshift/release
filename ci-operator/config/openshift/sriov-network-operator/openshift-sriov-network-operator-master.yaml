@@ -3,10 +3,18 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   openstack-installer:
     name: "4.18"
     namespace: ocp
@@ -38,16 +46,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.ocp
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+- dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -56,7 +70,7 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
+- dockerfile_path: Dockerfile.webhook.ocp
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -90,7 +104,7 @@ operator:
     with: pipeline:rdma-cni
 promotion:
   to:
-  - name: sriov-4.17
+  - name: sriov-4.18
     namespace: origin
   - name: "4.18"
     namespace: ocp
@@ -173,15 +187,15 @@ tests:
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
-- as: e2e-openstack-nfv-hwoffload
+- as: e2e-openstack-nfv-config-drive
   optional: true
   steps:
-    cluster_profile: openstack-hwoffload
+    cluster_profile: openstack-nfv
     dependencies:
       OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
-      ADDITIONAL_WORKERS_NETWORKS: ""
-      OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
+      CONFIG_DRIVE: "true"
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - as: security
   optional: true

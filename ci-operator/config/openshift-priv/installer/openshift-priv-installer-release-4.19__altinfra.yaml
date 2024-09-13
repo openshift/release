@@ -1,0 +1,468 @@
+base_images:
+  ocp_4.10_cli:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.18_installer-etcd-artifacts:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: installer-etcd-artifacts
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: installer-kube-apiserver-artifacts
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/installer
+images:
+- build_args:
+  - name: OPENSHIFT_INSTALL_CLUSTER_API
+    value: "true"
+  dockerfile_path: images/installer-altinfra/Dockerfile.ci
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: installer
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y nmstate
+    # Cache dir must be accessible when running the integration tests
+    RUN mkdir /.cache -m 0777
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+promotion:
+  to:
+  - additional_images:
+      installer-altinfra: installer
+    excluded_images:
+    - installer
+    - src-oc
+    name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: e2e-aws-custom-security-groups
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-custom-security-groups
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-imdsv2
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-proxy
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-sharednetwork
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-single-node
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-single-node
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-localzones
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EDGE_ZONE_TYPES: local-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-edge-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-wavelengthzones
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EDGE_ZONE_TYPES: wavelength-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-edge-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-local-zones
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EDGE_ZONE_TYPES: local-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-wavelength-zones
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EDGE_ZONE_TYPES: wavelength-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-azure-sharednetwork
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-byo-network-capi
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-xpn-capi
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp-xpn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-secureboot-capi
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp-secureboot
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-ibmcloud-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-ibmcloud
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-nutanix-capi-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-dualstack-upi
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dual-stack-upi
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
+      OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
+        group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
+        endpoints using hostNetwork
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-dualstack-v6primary
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dualstack-v6primary
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: when FIPS is disabled the HAProxy router should serve routes when
+        configured with a 1024-bit RSA key\|should redirect on blob pull
+    workflow: openshift-e2e-openstack-dualstack
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-proxy
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-proxy
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-dualstack
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-dualstack
+- always_run: false
+  as: e2e-openstack-capi-nfv-intel
+  optional: true
+  steps:
+    cluster_profile: openstack-nfv
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-externallb
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-external-lb
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-ccpmso
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-ccpmso-zone
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-multi-vcenter-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true","VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: installer
+  variant: altinfra

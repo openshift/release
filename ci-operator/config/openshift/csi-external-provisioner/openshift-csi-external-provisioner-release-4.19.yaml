@@ -1,0 +1,91 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-csi/external-provisioner
+images:
+- dockerfile_path: Dockerfile.openshift.rhel7
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-external-provisioner
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: src
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+- as: e2e-gcp-csi
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: csi-external-provisioner
+    workflow: openshift-ci-security
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: csi-external-provisioner

@@ -19,8 +19,12 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+# download the istio version with 1.19.1 bookinfo app
+hack/istio/download-istio.sh -iv 1.22.3
 hack/istio/install-bookinfo-demo.sh -c oc -n bookinfo -tg -in ${SMCP_NAMESPACE}
 sleep 120
+oc wait --for condition=Successful kiali/kiali -n ${SMCP_NAMESPACE} --timeout=250s
+oc wait --for condition=available deployment/kiali -n ${SMCP_NAMESPACE} --timeout=250s
 
 make test-integration -e URL="https://$(oc get route -n ${SMCP_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)"
 

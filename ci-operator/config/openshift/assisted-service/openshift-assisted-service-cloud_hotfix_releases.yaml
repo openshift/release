@@ -19,10 +19,6 @@ base_images:
     name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  cli:
-    name: "4.17"
-    namespace: ocp
-    tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -72,20 +68,16 @@ images:
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
-  inputs:
-    cli:
-      as:
-      - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
     openshift_release_golang-1.20:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
-- dockerfile_path: ci-images/Dockerfile.code-generation
-  from: assisted-service-base
-  to: assisted-service-generate
 releases:
   latest:
     candidate:
@@ -267,14 +259,15 @@ tests:
       OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.16
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-        MASTER_MEMORY=17408
-        MASTER_CPU=8
+        MASTER_MEMORY=18700
+        MASTER_CPU=9
         WORKER_MEMORY=9216
-        WORKER_CPU=4
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=5
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$

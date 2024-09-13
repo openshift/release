@@ -69,6 +69,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
   target:
     candidate:
       architecture: multi
@@ -331,6 +337,103 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-hypershift-mce-guest-f7
+  cron: 30 9 1,8,15,24 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MCE_QE_CATALOG: "true"
+      MCE_VERSION: "2.7"
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-guest-f28-destructive
+  cron: 22 16 27 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MCE_QE_CATALOG: "true"
+      MCE_VERSION: "2.7"
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-guest-f28-longduration
+  cron: 38 1 26 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MCE_QE_CATALOG: "true"
+      MCE_VERSION: "2.7"
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mgmt-f7
+  cron: 58 16 2,9,16,25 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MCE_QE_CATALOG: "true"
+      MCE_VERSION: "2.7"
+      OCP_ARCH: arm64
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
+- as: aws-ipi-ovn-hypershift-mce-mgmt-f28-longduration
+  cron: 4 14 17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MCE_QE_CATALOG: "true"
+      MCE_VERSION: "2.7"
+      OCP_ARCH: arm64
+      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-private-f28-disasterrecovery
   cron: 11 11 19 * *
   steps:
@@ -372,8 +475,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -390,8 +491,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -407,8 +506,6 @@ tests:
       AZURE_VNET_TAGS: qekey1=qevalue1
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
@@ -426,8 +523,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
@@ -443,8 +538,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
       TEST_SCENARIOS_DISASTERRECOVERY: "67718"
       TEST_TIMEOUT_DISASTERRECOVERY: "900"
@@ -549,6 +642,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
@@ -567,6 +661,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
