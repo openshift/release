@@ -159,6 +159,43 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/image-mirroring-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ci-image-mirroring-config-validation
+    rerun_command: /test image-mirroring-config-validation
+    run_if_changed: ^core-services/image-mirroring/_config.yaml
+    spec:
+      containers:
+      - args:
+        - --release-repo-git-sync-path=.
+        - --registry-config=/etc/pull/.dockerconfigjson
+        - --config=./core-services/image-mirroring/_config.yaml
+        - --validate-config-only=true
+        command:
+        - /bin/ci-images-mirror
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        volumeMounts:
+        - mountPath: /etc/pull
+          name: pull-credentials
+          readOnly: true
+      volumes:
+      - name: pull-credentials
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )image-mirroring-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/prow/ci-secret-bootstrap-config-validation
     decorate: true
