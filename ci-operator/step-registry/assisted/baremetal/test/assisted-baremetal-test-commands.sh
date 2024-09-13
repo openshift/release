@@ -39,7 +39,7 @@ test_type="${TEST_TYPE:-"list"}"
 test_suite="${TEST_SUITE:-"openshift/conformance/parallel"}"
 test_provider="${TEST_PROVIDER:-"baremetal"}"
 test_list_file="/tmp/${test_list_file}"
-test_skips="/tmp/${test_skips_file}"
+test_skips_file="/tmp/${test_skips_file}"
 EOF
 
 timeout --kill-after 10m 120m scp "${SSHOPTS[@]}"   \
@@ -86,8 +86,8 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF
                 ;;
         esac
 
-        echo "${test_skips}" > "${test_skips_file}"
-        echo "${test_list}" | grep -v -F -f "${test_skips_file}" > "${test_list_file}"
+        mv "${test_list_file}" "${test_list_file}.bak"
+        cat "${test_list_file}.bak" | grep -v -F -f "${test_skips_file}" > "${test_list_file}"
 
         stderr=$(run_tests 2>&1)
         exit_code=$?
