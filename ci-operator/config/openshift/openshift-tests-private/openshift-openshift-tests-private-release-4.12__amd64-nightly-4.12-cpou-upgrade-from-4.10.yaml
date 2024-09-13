@@ -38,9 +38,10 @@ build_root:
     tag: golang-1.18
 releases:
   intermediate:
-    release:
+    candidate:
       architecture: amd64
-      channel: candidate
+      product: ocp
+      stream: nightly
       version: "4.11"
   latest:
     release:
@@ -48,9 +49,10 @@ releases:
       channel: candidate
       version: "4.10"
   target:
-    release:
+    candidate:
       architecture: amd64
-      channel: candidate
+      product: ocp
+      stream: nightly
       version: "4.12"
 resources:
   '*':
@@ -58,15 +60,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: gcp-ipi-ovn-ipsec-f28
-  cron: 33 1 21 * *
+- as: azure-ipi-f28
+  cron: 2 8 12 * *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: azure-qe
     env:
-      UPGRADE_CHECK_RUN_TAGS: '@4.10 and @upgrade-check and @gcp-ipi and @network-ovnkubernetes
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.10 and @upgrade-prepare and @gcp-ipi and @network-ovnkubernetes
-        and not @fips'
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-check and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-prepare and not @fips'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -80,10 +81,32 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: vsphere-ipi-f28
+  cron: 21 14 30 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-check and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-prepare and not @fips'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-stable-4.12-upgrade-from-eus-4.10
+  variant: amd64-nightly-4.12-cpou-upgrade-from-4.10
