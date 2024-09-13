@@ -18,4 +18,5 @@ ansible-playbook -v /tmp/tests/ansible-tests/test-ocp-ci-rhbk.yml --extra-vars "
 
 #copy junit results to artifacts dir
 mkdir -p $ARTIFACT_DIR/rhsso-tests
-cp -r /tmp/tests/ansible-tests/junit-results/test-ocp-ci-rhbk-*.xml $ARTIFACT_DIR/rhsso-tests/junit_rhsso_tests_results.xml
+cp -r /tmp/tests/ansible-tests/junit-results/test-ocp-ci-rhbk-*.xml  $ARTIFACT_DIR/rhsso-tests/junit_rhsso_tests_results.xml
+
