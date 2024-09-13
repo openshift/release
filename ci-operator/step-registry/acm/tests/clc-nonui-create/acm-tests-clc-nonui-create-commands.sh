@@ -39,6 +39,7 @@ export CLOUD_PROVIDERS
 GH_TOKEN=$(cat $SECRETS_DIR/clc/token)
 export GH_TOKEN 
 
+echo "TEST_STAGE = $TEST_STAGE"
 # run the test execution script
 bash +x ./execute_clc_nonui_interop_commands.sh
 
