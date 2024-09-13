@@ -45,7 +45,7 @@ scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.en
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" "'$(cat /tmp/prow.env)'" \
+  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
   "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
@@ -58,7 +58,6 @@ N_WORKERS="${3}"
 REQUEST_BOOTSTRAP_HOST="${4}"
 ARCH="${5}"
 JOB_URL="${6}"
-PROW_ENV="${7}"
 ADDITIONAL_WORKERS="${7:-}"
 ADDITIONAL_WORKER_ARCHITECTURE="${8:-}"
 VENDOR="${9:-}"
