@@ -12,6 +12,7 @@ INGRESS80=""
 INGRESS443=""
 IRONICSRV=""
 INSPECTORSRV=""
+SSH=""
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
@@ -34,6 +35,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     INGRESS443="$INGRESS443
       server $name $ip:443 check inter 1s"
   fi
+  SSH="$SSH
+    listen $name-ssh
+    bind :::$((13000 + "$host"))
+    mode tcp
+    balance source
+    server $name $ip:22 check inter 1s
+    server $name-v6 [$ipv6]:22 check inter 1s"
 done
 ### FIXME temporary
 MC="${MC}
@@ -107,6 +115,7 @@ listen inspector-api-5050
     mode tcp
     balance source
 $INSPECTORSRV
+$SSH
 EOF
 
 echo "Templating for HAProxy done..."

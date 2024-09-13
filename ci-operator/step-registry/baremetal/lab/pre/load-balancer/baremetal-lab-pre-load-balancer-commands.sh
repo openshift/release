@@ -10,6 +10,7 @@ MC=""
 APISRV=""
 INGRESS80=""
 INGRESS443=""
+SSH=""
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
@@ -43,6 +44,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       server $name $ip:443 check inter 1s
       server $name-v6 [$ipv6]:443 check inter 1s"
   fi
+  SSH="$SSH
+    listen $name-ssh
+    bind :::$((13000 + "$host"))
+    mode tcp
+    balance source
+    server $name $ip:22 check inter 1s
+    server $name-v6 [$ipv6]:22 check inter 1s"
 done
 echo "Generating the template..."
 
@@ -97,6 +105,7 @@ listen ingress-router-443
     mode tcp
     balance source
 $INGRESS443
+$SSH
 EOF
 
 echo "Templating for HAProxy done..."
