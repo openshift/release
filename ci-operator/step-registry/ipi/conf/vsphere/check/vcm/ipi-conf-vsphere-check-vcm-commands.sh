@@ -299,7 +299,7 @@ if [ "$n" -ge 5 ]; then
   exit 1
 fi
 
-oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
+# oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
 
@@ -368,7 +368,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
   PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
 
-  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then    
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
     log "storing primary lease as LEASE_single"
     cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
@@ -417,7 +417,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
     platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
-  fi  
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
