@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-sleep 45m
-
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi

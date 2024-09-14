@@ -9,8 +9,8 @@ export HOSTED_CLUSTER_NAME
 # VPC VSI(Virtual Server Instance) configs
 VPC_VSI_NAME="x86-${HOSTED_CLUSTER_NAME}-worker"
 PROFILE_NAME="bx2-2x8"
-IMAGE_ID="r006-cf915612-e159-4f82-b871-34f6eabfe05c"
-SSH_KEY_ID="r006-ec6cabbc-7bdf-4bcd-b561-3f32bf2b365e"
+IMAGE_ID="r034-33250be2-61bb-4837-9cd5-6ef83c2ccb2c"
+SSH_KEY_ID="r034-55ccc38b-cad7-4244-bad0-6bb4c25cf0e7"
 
 # Installing required tools
 echo "$(date) Installing required tools"
