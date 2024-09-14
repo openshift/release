@@ -18,7 +18,7 @@ log "INFO: Generate report portal report ..."
 rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filter "e2e-report"
 log "\nTest results:"
 cat "$ARTIFACT_DIR/e2e-test-results.json"
-# Remove the old junit.xml file
+# Remove the old junit.xml file from SHARED_DIR in case of secret upload issue
 rm -rf ${SHARED_DIR}/*.xml
 
 failures=$(cat $ARTIFACT_DIR/e2e-test-results.json | jq -r '.failures')
