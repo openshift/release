@@ -6,7 +6,7 @@ set -o pipefail
 
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
-day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64')"
+day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
 
 # Create an agent-config file containing only the minimum required configuration
 ntp_host=$(< "${CLUSTER_PROFILE_DIR}/aux-host-internal-name")
