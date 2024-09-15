@@ -6,13 +6,12 @@ set -o pipefail
 ~/fix_uid.sh
 
 SSH_KEY_PATH=/var/run/ssh-key/ssh-key
-SSH_KEY=~/ssh_key
 BASTION_IP_ADDR="$(cat /var/run/bastion-ip-addr/address)"
 JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
 JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
 
-cp $SSH_KEY_PATH $SSH_KEY
-chmod 600 $SSH_KEY
+cp $SSH_KEY_PATH $SHARED_DIR
+chmod 600 $SHARED_DIR/ssh-key
 
 PARAMS=$(cat <<END_CAT
 HOST=$LOCK_LBL_HOST&\
