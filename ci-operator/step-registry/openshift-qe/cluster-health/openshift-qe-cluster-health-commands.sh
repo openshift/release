@@ -15,8 +15,9 @@ if  [ ${BAREMETAL} == "true" ]; then
   export http_proxy=socks5://localhost:12345
   oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
   cd /tmp
-fi 
+fi
 
+# shellcheck disable=SC2034
 for i in {1..10}; do
   if /tmp/kube-burner-ocp cluster-health; then
     break
