@@ -101,7 +101,7 @@ fi
 # Create a bastion node in the same VPC for configuring proxy server
 set -e
 echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
-ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bz2-1x4 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
 sleep 60
 set +e
 bvsi_state=$(ibmcloud is instance $infra_name-bastion | awk '/Status/{print $2}')
