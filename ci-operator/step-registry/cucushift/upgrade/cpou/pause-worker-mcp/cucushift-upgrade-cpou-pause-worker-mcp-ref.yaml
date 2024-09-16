@@ -1,0 +1,25 @@
+ref:
+  as: cucushift-upgrade-cpou-pause-worker-mcp
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  timeout: 1h10m
+  grace_period: 10m
+  commands: cucushift-upgrade-cpou-pause-worker-mcp-commands.sh
+  cli: latest
+  env:
+  - name: MCO_CONF_DAY2_CUSTOM_MCP
+    default: ""
+    documentation: |
+      A json format of list string to define multiple custom MCPs. For example, '[{"mcp_name": "infra", "mcp_node_num": "1", "mcp_node_label": "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'. 'mcp_name' element is required; 'mcp_node_num' element is '1' by default; 'mcp_node_label' element is 'node-role.kubernetes.io/worker' by default.
+      If the name is empty, then no custom MCP will be created and this step will be skipped
+  - name: PAUSED_MCP_NAME
+    default: "worker"
+    documentation: "mcp which will be paused"
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 350m
+      memory: 1Gi

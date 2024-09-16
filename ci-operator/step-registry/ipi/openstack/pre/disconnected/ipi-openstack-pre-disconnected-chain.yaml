@@ -1,0 +1,33 @@
+chain:
+  as: ipi-openstack-pre-disconnected
+  steps:
+  - chain: ipi-conf-openstack
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: mirror-images-by-oc-adm
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - as: disable-default-sources
+    from: openstack-installer
+    commands: |-
+      set -exuo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"
+      then
+              # shellcheck disable=SC1090
+              source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+  - ref: nodes-readiness
+  documentation: |-
+    The ipi-openstack-pre-disconnected chain contains the necessary refs
+    and chains to run ipi install on OpenStack in disconnected environment.
+    Because we need RBAC to be configured before populating the mirror,
+    we can't re-use the `ipi-install` chain and had to add the refs from there.
