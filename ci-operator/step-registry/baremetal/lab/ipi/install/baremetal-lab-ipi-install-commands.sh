@@ -83,9 +83,6 @@ yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -171,6 +168,12 @@ for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
 do
   echo "[INFO] Applying patch file: $f"
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
+
+for f in "${SHARED_DIR}"/*_append.patch_install_config.yaml;
+do
+  echo "[INFO] Appending patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) *+ select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
 done
 
 mkdir -p "${INSTALL_DIR}"
