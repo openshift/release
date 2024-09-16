@@ -202,13 +202,13 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.opensh
   | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
 EOF
 )")
-
-echo "Cluster type is ${CLUSTER_TYPE}"
+CLUSTER_TYPE=${CLUSTER_TYPE:-$CLOUD_TYPE}
+REGION=${LEASED_RESOURCE:-$REGION}
+echo -e "Cluster type is ${CLUSTER_TYPE}\nRegion is ${REGION}"
 # AMI for AWS ARM
 case $CLUSTER_TYPE in
 *aws*)
   echo "Extracting AMI..."
-  REGION=${LEASED_RESOURCE}
   amiid_workers_additional=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
     yq-v4 ".data.stream
       | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.aws.regions.\"${REGION}\".image")
@@ -292,7 +292,6 @@ case $CLUSTER_TYPE in
 ;;
 *ibmcloud*)
   FULL_CLUSTER_NAME=$(yq-v4 '.metadata.labels."machine.openshift.io/cluster-api-cluster"' <<< $MACHINE_SET)
-  REGION="${LEASED_RESOURCE}"
   RESOURCE_GROUP=$(yq-v4 ".spec.template.spec.providerSpec.value.resourceGroup" <<< $MACHINE_SET)
 
   IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud

@@ -104,8 +104,6 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V4}\"
 			| .platform.openstack.controlPlanePort.fixedIPs[1].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
 			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
-			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
-			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
 		" "$INSTALL_CONFIG"
 
 		if [[ "${CONFIG_TYPE}" == "dualstack-v6primary" ]]; then
@@ -117,6 +115,22 @@ case "$CONFIG_TYPE" in
 				| .networking.serviceNetwork = (.networking.serviceNetwork | reverse)
 			" "$INSTALL_CONFIG"
 		fi
+		;;
+	singlestackv6*)
+		source "${SHARED_DIR}/VIPS"
+		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
+		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
+		yq --yaml-output --in-place ".
+			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
+			| .networking.clusterNetwork[0].cidr = \"fd01::/48\"
+			| .networking.clusterNetwork[0].hostPrefix = 64
+			| .networking.serviceNetwork = [\"fd02::/112\"]
+			| .platform.openstack.cloud = \"${OS_CLOUD}-ipv6\"
+			| .platform.openstack.apiVIPs = $API_VIPS
+			| .platform.openstack.ingressVIPs = $INGRESS_VIPS
+			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+		" "$INSTALL_CONFIG"
 		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"
@@ -201,6 +215,17 @@ if test -f "${SHARED_DIR}/securitygroups"; then
 	yq --yaml-output --in-place ".
 		| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"${SHARED_DIR}"/securitygroups)\" ]
 	" "$INSTALL_CONFIG"
+fi
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the OpenStack endpoint. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Regenerate install-config.yaml to fill in unset values with default values.

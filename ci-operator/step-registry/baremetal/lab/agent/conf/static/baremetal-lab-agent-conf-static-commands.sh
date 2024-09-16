@@ -7,13 +7,13 @@ set -o pipefail
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
 # Create an agent-config file containing only the minimum required configuration
-
+ntp_host=$(< "${CLUSTER_PROFILE_DIR}/aux-host-internal-name")
 cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
 apiVersion: v1beta1
 kind: AgentConfig
 rendezvousIP: ${RENDEZVOUS_IP}
 additionalNTPSources:
-- ${AUX_HOST}
+- ${ntp_host}
 EOF
 
 # https://issues.redhat.com/browse/AGENT-677 - Pass BMC details to cluster if provided
@@ -26,7 +26,7 @@ apiVersion: v1beta1
 kind: AgentConfig
 rendezvousIP: ${RENDEZVOUS_IP}
 additionalNTPSources:
-- ${AUX_HOST}
+- ${ntp_host}
 hosts: []
 EOF
 
