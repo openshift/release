@@ -54,17 +54,19 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF
 
     source /tmp/test-env
 
+    test_list_filtered_file="/tmp/test-list-filtered
+
     function get_baremetal_test_list() {
         podman run --network host --rm -i \
             -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run "${test_type}" \
+            openshift-tests run "${test_suite}" \
             --dry-run \
-            --provider "{\"type\": \"${test_suite}\"}"
+            --provider "{\"type\": \"${test_provider}\"}"
     }
 
     function run_tests() {
         podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_list_file}"
+            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_list_filtered_file}"
     }
     
     # prepending each printed line with a timestamp
@@ -86,8 +88,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF
                 ;;
         esac
 
-        mv "${test_list_file}" "${test_list_file}.bak"
-        cat "${test_list_file}.bak" | grep -v -F -f "${test_skips_file}" > "${test_list_file}"
+        cat "${test_list_file}" | grep -v -F -f "${test_skips_file}" > "${test_list_filtered_file}"
 
         stderr=$(run_tests 2>&1)
         exit_code=$?
