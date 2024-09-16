@@ -5,10 +5,23 @@ base_images:
     tag: base
 build_root:
   project_image:
-    dockerfile_literal: |-
-      FROM registry.ci.openshift.org/ci/telco-bastion
-      RUN  ~/fix_uid.sh 
-           ansible-galaxy collection install redhatci.ocp --ignore-certs
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:golang-1.19
+      ENV HOME /output
+      RUN yum install -y ansible openconnect && \
+          yum clean all && \
+          rm -rf /var/cache/yum/* && \
+          wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.11.9/openshift-client-linux.tar.gz && \
+          tar -zxvf openshift-client-linux.tar.gz && \
+          mv oc /usr/local/bin/ && \
+          mv kubectl /usr/local/bin/ && \
+          rm -f openshift-client-linux.tar.gz && \
+          mkdir /output && \
+          chmod -R g+rwx /output && \
+          chmod g+w /etc/passwd && \
+          echo 'echo default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin\ >> /etc/passwd' > /output/fix_uid.sh && \
+          chmod g+rwx /output/fix_uid.sh
+          ansible-galaxy collection install redhatci.ocp --ignore-certs
 resources:
   '*':
     limits:
