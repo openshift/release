@@ -100,6 +100,8 @@ export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
+export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
+export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -127,6 +129,11 @@ done;
 
 t_seed_create=\$SECONDS
 echo "Seed creation took \${t_seed_create} seconds"
+
+if [[ ! -z "\${SEED_FLOATING_TAG}" ]]; then
+  echo "Adding floating tag '${SEED_FLOATING_TAG}' to the seed image"
+  skopeo copy "docker://${SEED_IMAGE}:${SEED_IMAGE_TAG}" "docker://${SEED_IMAGE}:${SEED_FLOATING_TAG}"
+fi
 
 EOF
 
