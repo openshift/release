@@ -272,7 +272,7 @@ scp "${ssh_options[@]}" $HOME/rootfs.img root@$bvsi_fip:/var/www/html/rootfs.img
 ssh "${ssh_options[@]}" root@$bvsi_fip "chmod 644 /var/www/html/rootfs.img"
 
 echo "Downloading the setup script for pxeboot of agents"
-git clone -c "core.sshCommand=ssh -i ~/${tmp_ssh_key}" git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git
+git clone -c "core.sshCommand=ssh -i ${tmp_ssh_key}" git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git
 cp $HOME/hosted-control-plane/.archive/trigger_pxeboot.sh $HOME/trigger_pxeboot.sh
 
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
