@@ -37,6 +37,12 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 #setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then

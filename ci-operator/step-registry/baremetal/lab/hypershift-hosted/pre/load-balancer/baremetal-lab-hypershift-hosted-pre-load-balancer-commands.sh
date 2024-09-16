@@ -12,6 +12,7 @@ INGRESS80=""
 INGRESS443=""
 KONNECTIVITY=""
 OAUTH_SERVER=""
+SSH=""
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 KUBE_API_PORT=$(<"$SHARED_DIR/hosted_kube-apiserver_port")
@@ -51,6 +52,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
        server $name $ip:${OAUTH_PORT} check inter 1s
        server $name-v6 [$ipv6]:${OAUTH_PORT} check inter 1s"
   fi
+  SSH="$SSH
+    listen $name-ssh
+    bind :::$((13000 + "$host"))
+    mode tcp
+    balance source
+    server $name $ip:22 check inter 1s
+    server $name-v6 [$ipv6]:22 check inter 1s"
 done
 echo "Generating the template..."
 
@@ -113,6 +121,7 @@ listen konnectivity-${KONNECTIVITY_PORT}
     bind :::${KONNECTIVITY_PORT}
     mode tcp
 ${KONNECTIVITY}
+$SSH
 EOF
 
 echo "Templating for HAProxy done..."
