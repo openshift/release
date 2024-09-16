@@ -17,15 +17,16 @@ CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 CONTROL_PLANE_NETWORK="${CONTROL_PLANE_NETWORK:-$(<"${SHARED_DIR}/CONTROL_PLANE_NETWORK")}"
 CONTROL_PLANE_SUBNET_V6="${CONTROL_PLANE_SUBNET_V6:-$(<"${SHARED_DIR}/CONTROL_PLANE_SUBNET_V6")}"
 
+NET_ARGS="--network $CONTROL_PLANE_NETWORK"
 if [[ "${CONFIG_TYPE}" == *"singlestackv6"* ]]; then
-    PORT_ARGS="--fixed-ip subnet=${CONTROL_PLANE_SUBNET_V6}"
+    NET_ARGS+=" --fixed-ip subnet=${CONTROL_PLANE_SUBNET_V6}"
 fi
 
-API_VIPS_PORT_FIXED_IPS="$(openstack port create $PORT_ARGS --network $CONTROL_PLANE_NETWORK ${CLUSTER_NAME}-${CONFIG_TYPE}-api -f json)"
+API_VIPS_PORT_FIXED_IPS="$(openstack port create $NET_ARGS ${CLUSTER_NAME}-${CONFIG_TYPE}-api -f json)"
 mapfile API_VIPS < <(echo -e $API_VIPS_PORT_FIXED_IPS  | jq  -rM .fixed_ips[].ip_address)
 >&2 echo "Created port ${CLUSTER_NAME}-${CONFIG_TYPE}-api: ${API_VIPS[*]}"
 
-INGRESS_VIPS_PORT_FIXED_IPS="$(openstack port create $PORT_ARGS --network $CONTROL_PLANE_NETWORK ${CLUSTER_NAME}-${CONFIG_TYPE}-ingress -f json)"
+INGRESS_VIPS_PORT_FIXED_IPS="$(openstack port create $NET_ARGS ${CLUSTER_NAME}-${CONFIG_TYPE}-ingress -f json)"
 mapfile INGRESS_VIPS < <(echo -e $INGRESS_VIPS_PORT_FIXED_IPS  | jq  -rM .fixed_ips[].ip_address)
 >&2 echo "Created port ${CLUSTER_NAME}-${CONFIG_TYPE}-ingress: ${INGRESS_VIPS[*]}"
 
