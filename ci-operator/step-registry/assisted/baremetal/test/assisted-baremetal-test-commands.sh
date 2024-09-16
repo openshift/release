@@ -54,7 +54,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF
 
     source /tmp/test-env
 
-    test_list_filtered_file="/tmp/test-list-filtered
+    test_list_filtered_file="/tmp/test-list-filtered"
 
     function get_baremetal_test_list() {
         podman run --network host --rm -i \
