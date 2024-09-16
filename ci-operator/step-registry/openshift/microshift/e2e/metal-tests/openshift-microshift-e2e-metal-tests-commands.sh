@@ -49,9 +49,18 @@ EOF
     cat >>${REPORT} <<EOF
     <p>${testname}:&nbsp;
     <a target="_blank" href="${URL}/${testname}">directory</a>
+EOF
+    if [ -f "${test}/boot_and_run.log" ]; then
+      cat >>${REPORT} <<EOF
+    &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/boot_and_run.log">boot_and_run.log</a>
+EOF
+    else
+      cat >>${REPORT} <<EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/boot.log">boot.log</a>
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/run.log">run.log</a>
 EOF
+    fi
+    
   for vm in ${test}/vms/*; do
       if [ "${vm: -4}" == ".xml" ]; then
         continue
