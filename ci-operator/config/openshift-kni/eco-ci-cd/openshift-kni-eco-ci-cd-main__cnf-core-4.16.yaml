@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: ci
+    namespace: openshift
+    tag: golang-1.20
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  cron: 00 13 * * 1
+  steps:
+    env:
+      BAREMETAL_NET_IPV4: "true"
+      BAREMETAL_NET_IPV6: "false"
+      BASE_DOMAIN: lab.eng.tlv2.redhat.com
+      BYPASS_OLM_SYNC: "true"
+      CLUSTER_NAME: hlxcl14
+      CNF_NODES_NUMBER: "3"
+      CNF_POLARION_REPORTING: "false"
+      CNF_TEST_FEATURES_LIST: sctp,sriov,dpdk,vrf,ovs_qos,metallb,fec,multinetworkpolicy
+      CNF_TEST_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/openshift4-cnf-tests:v4.16.0-1
+      DISCONNECTED_INSTALL: "true"
+      DISCOVERY_MODE: "false"
+      DPDK_TEST_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/dpdk-base:v4.16.0-1
+      FULL_VERSION: 4.16.3
+      GINKGO_ARGS: -e%20ECO_TEST_FEATURES%3Dcore%0A-e%20ECO_TEST_LABELS%3Dnet%0A-e%20ECO_TEST_VERBOSE%3D%27true%27%0A-e%20ECO_VERBOSE_LEVEL%3D100%0A-e%20ECO_DUMP_FAILED_TESTS%3Dtrue%0A-e%20ECO_REPORTS_DUMP_DIR%3D/tmp/reports%0A-e%20ECO_CNF_CORE_NET_VLAN%3D116%0A-e%20ECO_CNF_CORE_NET_SRIOV_INTERFACE_LIST%3D%27ens3f0np0%2Cens3f1np1%27%0A-e%20ECO_CNF_CORE_NET_MLB_ADDR_LIST%3D%2710.46.186.109%2C10.46.186.110%2C10.46.186.111%2C2620%3A52%3A0%3A2e51%3A%3A109%2C2620%3A52%3A0%3A2e51%3A%3A110%2C2620%3A52%3A0%3A2e51%3A%3A111%27%0A-e%20ECO_WORKER_LABEL%3Dworkercnf%0A-e%20ECO_CNF_CORE_NET_TEST_CONTAINER%3Dquay.io/ocp-edge-qe/eco-gotests-network-client%40sha256%3Ad4e52aa43f3095e3ee5cf216afedc79997082924d497de14458367af370f4d73%0A-e%20ECO_CNF_CORE_NET_DPDK_TEST_CONTAINER%3Dquay.io/ocp-edge-qe/eco-gotests-rootless-dpdk%40sha256%3Af35513c7c0778779e2cc71745070e50093a05f22355dfac9bf312bdf6bf22310%0A-e%20ECO_CNF_CORE_NET_FRR_IMAGE%3Dquay.io/ocp-edge-qe/frr%40sha256%3Ae0d0cdc2012f93cf21260d0be6f6c5857523b9649df3c487e63980b564b8e4b3%0A-e%20ECO_CNF_CORE_NET_SWITCH_IP%3D%2210.46.61.153%22%0A-e%20ECO_CNF_CORE_NET_SWITCH_INTERFACES%3D%27et-1/0/10%2Cet-1/0/11%2Cet-1/0/12%2Cet-1/0/13%27%0A-e%20ECO_CNF_CORE_NET_SWITCH_USER%3D%22root%22%0A-e%20ECO_CNF_CORE_NET_SWITCH_PASS%3D%27Qum%218netd%27%0A--timeout%3D12h
+      LOCK_LBL_HOST: registry.hlxcl14.lab.eng.tlv2.redhat.com
+      MANAGEMENT_INTERFACE_TYPE: RedFish-VirtualMedia
+      OCP_MAJOR_VERSION: "4"
+      OCP_MINOR_VERSION: "16"
+      OLM_ANSIBLE_EXTRA_ARGS: ocp_dev_version%3A%20%224.16%22%0Aversion_intel_acc100%3A%20%222.7.2%22%0Aose_sriov_network_device_plugin_version%3A%20%224.14%22
+      OLM_CATALOG_SOURCE: redhat-operators-brew
+      OLM_USE_NEXUS: "true"
+      OPENSHIFT_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.3-x86_64
+      OPERATORS_LIST: ptp-operator, sriov-network-operator, metallb-operator, sriov-fec-operator,
+        kubernetes-nmstate-operator
+      PREDEPLOY_VALIDATE: "false"
+      PROVISIONING_NET_IPV6: "false"
+      PROVISIONING_NETWORK_STATE: Disabled
+      PULL_SPEC: quay.io/openshift-release-dev/ocp-release:4.16.3-x86_64
+      SCTPTEST_HAS_NON_CNF_WORKERS: "false"
+      VERSION: "4.16"
+      WORKER_ROOT_DISK_HINT_VALUE: /dev/sda
+    test:
+    - ref: telcov10n-functional-ocp-cnf-tests
+    - ref: telcov10n-functional-ocp-eco-gotests
+    - ref: telcov10n-functional-ocp-cnf-core-tests
+    workflow: telcov10n-functional-cnf-core
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-core-4.16

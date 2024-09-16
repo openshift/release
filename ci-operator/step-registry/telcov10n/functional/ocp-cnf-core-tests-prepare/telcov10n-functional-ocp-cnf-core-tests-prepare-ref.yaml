@@ -1,0 +1,90 @@
+ref:
+  as: telcov10n-functional-ocp-cnf-core-tests-prepare
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  commands: telcov10n-functional-ocp-cnf-core-tests-prepare-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: kni-qe-41
+    mount_path: /var/run/ssh-key
+  - namespace: test-credentials
+    name: bastion-ip-addr
+    mount_path: /var/run/bastion-ip-addr
+  - namespace: test-credentials
+    name: jenkins-credentials
+    mount_path: /var/run/jenkins-credentials
+  env:
+    - name: LOCK_LBL_HOST
+      documentation: "Jenkins Agent Label"
+
+    - name: CLUSTER_NAME
+      default: "hlxcl2"
+      documentation: "Cluster name"
+
+    - name: RUN_CNF_GOTESTS
+      default: "false"
+      documentation: "Run cnf-gotests"
+
+    - name: RUN_METRIC_TESTS
+      default: "false"
+      documentation: "Run metric tests"
+
+    - name: RUN_PERFORMANCE_TESTS
+      default: "false"
+      documentation: "Run performance tests"
+
+    - name: RUN_CNF_TESTS_DISCOVERY_MODE
+      default: "false"
+      documentation: "Run cnf-tests in discovery mode"
+
+    - name: UPLOAD_REPORTS
+      default: "false"
+      documentation: "Upload tests report to Polarion"
+
+    - name: PREPARE_CLUSTER
+      default: "true"
+      documentation: "Prepare helix cluster for tests"
+
+    - name: DPDK_TEST_IMAGE
+      default: "registry-proxy.engineering.redhat.com/rh-osbs/dpdk-base:latest"
+      documentation: "dpdk container image for cnf-tests"
+
+    - name: CNF_TEST_IMAGE
+      default: "registry-proxy.engineering.redhat.com/rh-osbs/openshift4-cnf-tests:latest"
+      documentation: "cnf container image for cnf-tests"
+
+    - name: CNF_TEST_FEATURES_LIST
+      default: "sriov|sctp|dpdk|performance|ptp|vrf|xt_u32|ovs_qos|fec|gatekeeper|metallb"
+      documentation: "CNF Features to test Discovery mode in format \"feauture1|feature2|...|featureN\""
+
+    - name: CNF_TEST_ROLE
+      default: "workercnf"
+      documentation: "Node role that should be used by cnf-tests"
+
+    - name: VERSION
+      default: "4.10.3"
+      documentation: "OCP version, e.g.: 4.10.3"
+
+    - name: KUBECONFIG_PATH
+      default: "/home/kni/clusterconfigs/auth/kubeconfig"
+      documentation: "kubeconfig file location"
+
+    - name: CNF_GOTESTS_SRIOV_SMOKE
+      default: "false"
+      documentation: "Run cnf-gotests in smoke mode"
+
+    - name: OCP_EDGE_REPO
+      default: "https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+      documentation: "Repo to clone containing deployment and other automation,
+       e.g https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git"
+
+    - name: OCP_EDGE_BRANCH
+      default: "master"
+      documentation: "Branch to use for deployment and other automation, e.g master"

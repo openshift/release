@@ -1,0 +1,44 @@
+ref:
+  as: telcov10n-functional-ocp-eco-gotests
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  commands: telcov10n-functional-ocp-eco-gotests-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: kni-qe-41
+    mount_path: /var/run/ssh-key
+  - namespace: test-credentials
+    name: bastion-ip-addr
+    mount_path: /var/run/bastion-ip-addr
+  - namespace: test-credentials
+    name: jenkins-credentials
+    mount_path: /var/run/jenkins-credentials
+  env:
+  - name: LOCK_LBL_HOST
+    documentation: "Hypervisor/Provisioning machine"
+
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: "cluster name"
+
+  - name: ECO_GOTESTS_IMAGE
+    default: "quay.io/ocp-edge-qe/eco-gotests:latest"
+    documentation: "container image name of eco-gotests"
+
+  - name: GINKGO_ARGS
+    default: "
+-e ECO_TEST_FEATURES = all
+--timeout = 12h
+--keep-going"
+    documentation: "additional args / env_vars to ginkgo example: -e <envX>=<value> and/or --<argX>=<value>"
+
+  - name: JENKINS_AGENT
+    default: ""
+    documentation: "Jenkins Agent Label to run this job.  if null HOST will be used"
