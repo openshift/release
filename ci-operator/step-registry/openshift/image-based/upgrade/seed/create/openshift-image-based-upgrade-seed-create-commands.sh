@@ -108,16 +108,20 @@ fi
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
+SECONDS=0
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting 10 minutes for seed creation to finish"
+echo "Waiting 5 minutes for seed creation to finish"
 # These timings are specific to this CI setup and subvert a bug that causes oc wait to never return
 # This results in a timeout on the job even though the process may finish successfully
-sleep 10m
+sleep 5m
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
   echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
   sleep 1m; \
 done;
+
+t_seed_create=\$SECONDS
+echo "Seed creation took \${t_seed_create} seconds"
 
 EOF
 

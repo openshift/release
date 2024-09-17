@@ -46,7 +46,13 @@ echo "Making a target cluster..."
 make target
 
 echo "Upgrading target cluster from ${TARGET_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
+
+SECONDS=0
 make sno-upgrade SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG} IBU_ROLLBACK=Disabled
+t_upgrade_duration=\$SECONDS
+
+echo "Image based upgrade took \${t_upgrade_duration} seconds"
+
 EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh

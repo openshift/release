@@ -19,7 +19,7 @@ rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filt
 log "\nTest results:"
 cat "$ARTIFACT_DIR/e2e-test-results.json"
 # Remove the old junit.xml file
-rm -rf ${ARTIFACT_DIR}/*.xml
+rm -rf ${SHARED_DIR}/*.xml
 
 failures=$(cat $ARTIFACT_DIR/e2e-test-results.json | jq -r '.failures')
 if [[ $failures -gt 0 ]]; then
