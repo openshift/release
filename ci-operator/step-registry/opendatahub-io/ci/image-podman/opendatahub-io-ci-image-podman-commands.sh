@@ -31,7 +31,7 @@ POWERVS_IP=odh-power-node.ecosystemci.cis.ibm.net
 
 
 echo "Get Shafi Quay Creds from PowerVS"
-scp $SSH_ARGS root@POWERVS_IP:/root/shafi_podman_login.sh /tmp/
+scp $SSH_ARGS root@$POWERVS_IP:/root/shafi_podman_login.sh /tmp/
 . /tmp/shafi_podman_login.sh
 
 echo "Check Quay Login"
