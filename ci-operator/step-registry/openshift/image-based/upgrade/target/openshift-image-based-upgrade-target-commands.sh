@@ -46,7 +46,34 @@ echo "Making a target cluster..."
 make target
 
 echo "Upgrading target cluster from ${TARGET_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
+
+SECONDS=0
 make sno-upgrade SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG} IBU_ROLLBACK=Disabled
+t_upgrade_duration=\$SECONDS
+
+echo "Image based upgrade took \${t_upgrade_duration} seconds"
+
+echo "Verifying Rollouts in Target Cluster..."
+export KUBECONFIG="./bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
+echo "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
+declare -a COMPONENTS=(
+  "openshift-etcd-operator etcd-operator"
+  "openshift-kube-apiserver-operator kube-apiserver-operator"
+  "openshift-kube-controller-manager-operator kube-controller-manager-operator"
+  "openshift-kube-scheduler-operator openshift-kube-scheduler-operator"
+)
+for COMPONENT in "\${COMPONENTS[@]}"
+do
+  read -a TUPLE <<< "\${COMPONENT}"
+  NAMESPACE="\${TUPLE[0]}"
+  APP="\${TUPLE[1]}"
+  if oc logs --namespace "\${NAMESPACE}" --selector app="\${APP}" --tail=-1 |grep --quiet "RevisionTriggered"
+  then
+      echo "\${APP} had additional rollouts after recert. Please check the respective cluster operator's logs for details."
+      exit 1
+  fi
+done
+echo "No control-plane component revision triggers logged."
 EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh

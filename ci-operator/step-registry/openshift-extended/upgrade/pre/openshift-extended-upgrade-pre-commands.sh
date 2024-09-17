@@ -38,7 +38,7 @@ then
 fi
 
 #set env for kubeadmin
-if [ -f "${SHARED_DIR}/kubeadmin-password" ] && [ "$KUBEADMIN_REMOVED" != "true" ]; then
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
     QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
     export QE_KUBEADMIN_PASSWORD
 fi

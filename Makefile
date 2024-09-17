@@ -275,12 +275,18 @@ build_farm_credentials_folder:
 cluster_install_yaml?= /tmp/cluster-install.yaml
 
 cluster-install-yaml: build_farm_credentials_folder
-	printf 'onboard:\n  releaseRepo: %s\n  kubeconfigDir: %s\n  kubeconfigSuffix: config\n' "$(CURDIR)" "$(build_farm_credentials_folder)" >$(cluster_install_yaml)
+	printf 'onboard:\n  releaseRepo: %s\n  kubeconfigDir: %s\n  kubeconfigSuffix: config\n' "/release" "$(build_farm_credentials_folder)" >$(cluster_install_yaml)
 .PHONY: cluster-install-yaml
 
 update-ci-build-clusters: cluster-install-yaml
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_cluster-init_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" -v "$(cluster_install_yaml):/etc/cluster-install.yaml$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_cluster-init_latest onboard config generate --cluster-install=/etc/cluster-install.yaml --create-pr=false --update=true
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm \
+		-v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(cluster_install_yaml):/etc/cluster-install.yaml$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(build_farm_credentials_folder):$(build_farm_credentials_folder)$(VOLUME_MOUNT_FLAGS)" \
+		quay.io/openshift/ci-public:ci_cluster-init_latest \
+		onboard config generate \
+		--cluster-install=/etc/cluster-install.yaml --create-pr=false --update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:
