@@ -89,6 +89,12 @@ if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-file
     oc whoami
 fi
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 # setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
@@ -255,6 +261,8 @@ fi
 function remove_kubeadmin_user() {
     if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
         ret_delete_admin=0
+        unset QE_KUBEADMIN_PASSWORD 
+        # remove kubeadmin password so that golang code get empty because kubeadmin user is removed
 
         ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
         ## it means you only see hosted cluster in testing

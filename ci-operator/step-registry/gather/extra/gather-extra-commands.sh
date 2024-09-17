@@ -224,8 +224,12 @@ done < /tmp/pods-api
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+  options=""
+  if [[ $i == *"dns-default"* ]]; then
+      options="--timestamps"
+  fi
+  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs ${options} --request-timeout=20s $i
+  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs ${options} --request-timeout=20s -p $i
 done < /tmp/containers
 
 prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )"

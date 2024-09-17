@@ -159,7 +159,7 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'southcentralus': 10,
+        'westus2': 10,
         'centralus': 10
     },
     'azure-autorelease-qe-quota-slice': {
