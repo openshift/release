@@ -40,23 +40,22 @@ ES_USERNAME=$(cat "/secret/username")
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
-pushd e2e-benchmarking/workloads/network-perf-v2
-
-# Clean up resources from possible previous tests.
-oc delete ns netperf --wait=true --ignore-not-found=true
-
-# Only store the results from the full run versus the smoke test.
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-
-rm -f ${SHARED_DIR}/index.json
-
-WORKLOAD=full-run.yaml ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
 
 if [ ${BAREMETAL} == "true" ]; then
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/bm/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "export ALL_SCENARIOS=false;export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com";cd /tmp/e2e-benchmarking/workloads/network-perf-v2; sed -i s/--retry-all-errors//g run.sh;VIRT=true WORKLOAD=full-run.yaml ./run.sh"
+
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   # kill the ssh tunnel so the job completes
   pkill ssh
+else 
+  git clone $REPO_URL $TAG_OPTION --depth 1
+  pushd e2e-benchmarking/workloads/network-perf-v2
+  # Clean up resources from possible previous tests.
+  oc delete ns netperf --wait=true --ignore-not-found=true
+  # Only store the results from the full run versus the smoke test.
+  export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+  WORKLOAD=full-run.yaml ./run.sh
 fi

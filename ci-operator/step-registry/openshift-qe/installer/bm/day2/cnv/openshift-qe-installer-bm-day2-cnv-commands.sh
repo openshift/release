@@ -88,6 +88,7 @@ EOF
 sleep 20
 
 oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
