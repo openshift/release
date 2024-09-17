@@ -7,7 +7,6 @@ set -o pipefail
 
 SSH_KEY_PATH=/var/run/ssh-key/ssh-key
 SSH_KEY=~/key
-BASTION_IP_ADDR="$(cat /var/run/bastion-ip-addr/address)"
 JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
 JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
 
