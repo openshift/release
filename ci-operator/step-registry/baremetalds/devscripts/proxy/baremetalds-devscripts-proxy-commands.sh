@@ -26,25 +26,6 @@ if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
 fi
 set +x
 
-# Read the host's /etc/hosts, and create podman --add-host entries for
-# each metalkube.org entry. This lets the squid container know all the
-# DNS records for things like the local registry. A simple bind mount
-# of /etc/hosts doesn't work because docker/podman adds entries for the
-# container itself too.
-generate_add_hosts() {
-  local hosts_file="/etc/hosts"
-
-  while read -r ip domain; do
-    # Skip comments and blank lines
-    [[ "\$ip" =~ ^#.*$ || -z "\$ip" ]] && continue
-
-    # Check if the domain contains "metalkube.org"
-    if [[ "\$domain" == *"metalkube.org"* ]]; then
-      echo "--add-host \$domain:\$ip"
-    fi
-  done < "\$hosts_file"
-}
-
 sudo dnf install -y podman firewalld
 
 # The default "10:30:100" results in connections being rejected
@@ -79,7 +60,8 @@ sudo podman run -d --rm \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \$EXTRAVOLUMES \
      --name external-squid \
      --dns 127.0.0.1 \
-     \$(generate_add_hosts) quay.io/openshifttest/squid-proxy:multiarch
+     --mount type=bind,source=/etc/hosts,target=/etc/hosts,readonly \
+     quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
 CIRFILE=$SHARED_DIR/cir
