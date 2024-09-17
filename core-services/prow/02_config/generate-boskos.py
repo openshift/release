@@ -359,6 +359,9 @@ CONFIG = {
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'aws-kubevirt-quota-slice': {
+        'us-west-2': 10,
+    },
     'hypershift-powervs-quota-slice': {
         'default': 3,
     },
