@@ -340,7 +340,7 @@ echo "Getting management cluster basedomain to allow traffic to proxy server"
 mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
 echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/trigger_pxeboot.sh $HOME/setup_proxy.sh
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
 
 sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
 sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
