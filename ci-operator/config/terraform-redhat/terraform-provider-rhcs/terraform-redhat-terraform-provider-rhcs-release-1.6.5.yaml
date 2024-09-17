@@ -1,0 +1,418 @@
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- dockerfile_path: build/ci-tf-e2e.Dockerfile
+  to: rhcs-tf-e2e
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |-
+    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@v2.20.1
+    unset GOFLAGS
+    make unit-test
+  container:
+    from: src
+- as: rosa-sts-advanced-critical-high-f3
+  cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      QE_USAGE: rosa-sts-advanced-critical-high-f3
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-private-critical-high-f3
+  cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      QE_USAGE: rosa-sts-private-critical-high-f3
+      REGION: us-east-1
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-shared-vpc-critical-high-f3
+  cron: 26 8 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-sv
+      ENABLE_SHARED_VPC: "yes"
+      QE_USAGE: rosa-sts-shared-vpc-critical-high-f3
+      REGION: us-east-1
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-advanced-medium-low-f7
+  cron: 38 17 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      QE_USAGE: rosa-sts-advanced-medium-low-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-private-medium-low-f7
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      QE_USAGE: rosa-sts-private-medium-low-f7
+      REGION: us-east-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-advanced-day1-negative-f7
+  cron: 38 6 1,8,15,22,29 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      QE_USAGE: rosa-sts-advanced-day1-negative-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-general-tests
+- as: rosa-sts-private-day1-negative-f7
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      QE_USAGE: rosa-sts-private-day1-negative-f7
+      REGION: us-east-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-general-tests
+- as: rosa-sts-upgrade-y-f7
+  cron: 38 8 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-up-y
+      QE_USAGE: rosa-sts-upgrade-y-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      VERSION: ""
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-upgrade-z-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-up-z
+      QE_USAGE: rosa-sts-upgrade-z-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      VERSION: ""
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-classic-full-resource-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-classic-full
+      QE_USAGE: rosa-classic-full-f7
+      REGION: ap-northeast-1
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-full-resource-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-hcp-full
+      QE_USAGE: rosa-hcp-full-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-advanced-critical-high-f3
+  cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      QE_USAGE: rosa-hcp-advanced-critical-high-f3
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-advanced-medium-low-f7
+  cron: 38 17 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      QE_USAGE: rosa-hcp-advanced-medium-low-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-private-critical-high-f3
+  cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-pl
+      QE_USAGE: rosa-hcp-private-critical-high-f3
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-private-medium-low-f7
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-pl
+      QE_USAGE: rosa-hcp-private-medium-low-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-arm-f7
+  cron: 38 17 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-ad
+      COMPUTE_MACHINE_TYPE: m6g.xlarge
+      QE_USAGE: rosa-hcp-arm-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-network-f7
+  cron: 38 2 3,10,17,20,31 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-network
+      QE_USAGE: rosa-hcp-network-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-encryption-f7
+  cron: 38 2 3,10,17,20,31 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-hcp-encryption
+      QE_USAGE: rosa-hcp-encryption-f7
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f7
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-upgrade-y-f7
+  cron: 38 8 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-hcp-up-y
+      QE_USAGE: rosa-hcp-upgrade-y-f7
+      REGION: us-west-2
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      VERSION: ""
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-hcp-upgrade-z-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-hcp-up-z
+      QE_USAGE: rosa-hcp-upgrade-z-f7
+      REGION: us-west-2
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      TIMEOUT: 4h
+      VERSION: ""
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-day1-supplemental-f3
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-supplemental&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: ""
+      QE_USAGE: rosa-day1-supplemental-f3
+      REGION: us-west-2
+      RHCS_CLUSTER_NAME_SUFFIX: f3
+      RHCS_SOURCE: terraform-redhat/rhcs
+      RHCS_URL: https://api.stage.openshift.com
+      RHCS_VERSION: 1.6.5-prerelease.1
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-general-tests
+zz_generated_metadata:
+  branch: release-1.6.5
+  org: terraform-redhat
+  repo: terraform-provider-rhcs
