@@ -1,0 +1,67 @@
+base_images:
+  go-builder-base:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+  ubi9-minimal-base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  web-builder-base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+images:
+- dockerfile_path: Dockerfile.cypress
+  to: plugin-test
+- dockerfile_path: Dockerfile.ci
+  from: ubi9-minimal-base
+  inputs:
+    go-builder-base:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
+    web-builder-base:
+      as:
+      - registry.redhat.io/ubi9/ubi-minimal
+  to: logging-view-plugin
+promotion:
+  to:
+  - name: "6.0"
+    namespace: logging
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    npm run lint
+  container:
+    from: plugin-test
+- as: test-unit
+  commands: |
+    npm run test:unit
+  container:
+    from: plugin-test
+- as: test-e2e
+  commands: |
+    npm run test:e2e
+  container:
+    from: plugin-test
+zz_generated_metadata:
+  branch: release-6.0
+  org: openshift
+  repo: logging-view-plugin
