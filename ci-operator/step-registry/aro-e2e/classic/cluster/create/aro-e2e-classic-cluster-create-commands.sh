@@ -46,8 +46,8 @@ function verify {
       exit 1
   fi
 
-  if [[ -z "${ARO_VERSION_OPENSHIFT_PULLSPEC}" ]]; then
-      echo ">> ARO_VERSION_OPENSHIFT_PULLSPEC is not set"
+  if [[ -z "${RELEASE_IMAGE_LATEST}" ]]; then
+      echo ">> RELEASE_IMAGE_LATEST is not set"
       exit 1
   fi
 
@@ -95,7 +95,7 @@ function create-cluster {
     "properties": {
         "version": "${ARO_VERSION}",
         "enabled": true,
-        "openShiftPullspec": "${ARO_VERSION_OPENSHIFT_PULLSPEC}",
+        "openShiftPullspec": "${RELEASE_IMAGE_LATEST}",
         "installerPullspec": "${ARO_VERSION_INSTALLER_PULLSPEC}"
     }
 }
