@@ -65,11 +65,18 @@ function login {
 function create-cluster {
   echo "Create ARO cluster with RP"
   echo "Creating cluster service principal with name ${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}"
-  az ad sp create-for-rbac --name "${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}" > cluster-service-principal.json
-  CSP_CLIENTID=$(jq -r '.appId' cluster-service-principal.json)
-  CSP_CLIENTSECRET=$(jq -r '.password' cluster-service-principal.json)
-  CSP_OBJECTID=$(az ad sp show --id ${CSP_CLIENTID} -o json | jq -r '.id')
-  rm cluster-service-principal.json
+
+  # We currently can't create a new service principal, use the CI sp...
+  # TODO figure out how to allow sp creation, and revert this, and delete sp_password and sp_objectid from vault
+  #az ad sp create-for-rbac --name "${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}" > cluster-service-principal.json
+  #CSP_CLIENTID=$(jq -r '.appId' cluster-service-principal.json)
+  #CSP_CLIENTSECRET=$(jq -r '.password' cluster-service-principal.json)
+  #CSP_OBJECTID=$(az ad sp show --id ${CSP_CLIENTID} -o json | jq -r '.id')
+  #rm cluster-service-principal.json
+
+  CSP_CLIENTID="$(<"${CLUSTER_PROFILE_DIR}/sp_id")"
+  CSP_CLIENTSECRET="$(<"${CLUSTER_PROFILE_DIR}/sp_password")"
+  CSP_OBJECTID="$(<"${CLUSTER_PROFILE_DIR}/sp_objectid")"
 
   echo "Creating role assignments for cluster service principal"
   SCOPE="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_CLUSTER_RESOURCE_GROUP}"
