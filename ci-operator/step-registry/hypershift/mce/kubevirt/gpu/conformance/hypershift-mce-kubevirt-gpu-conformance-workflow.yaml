@@ -1,0 +1,35 @@
+workflow:
+  as: hypershift-mce-kubevirt-gpu-conformance
+  documentation: |-
+    The HyperShift mce kubevirt gpu conformance workflow executes tests against a new ephemeral
+  steps:
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: g4dn.metal
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
+      ZONES_COUNT: "3"
+      SKIP_MONITOR_TEST: "true"
+      ENABLE_ICSP: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      TEST_SKIPS: etcd leader changes are not excessive \|
+        migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers \|
+        when installed on the cluster should start and expose a secured proxy and unsecured metrics
+    pre:
+      - chain: ipi-aws-ovn-pre
+      - chain: ipi-install
+      - ref: hypershift-kubevirt-install-odf
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-mce-kubevirt-gpu-pci-passthrough
+      - ref: hypershift-mce-install
+      - ref: hypershift-kubevirt-create
+      - ref: hypershift-kubevirt-health-check
+      - ref: hypershift-mce-kubevirt-gpu-nfd-operator
+      - ref: hypershift-mce-kubevirt-gpu-nvidia-operator
+    test:
+    - chain: hypershift-conformance
+    post:
+      - ref: wait
+      - ref: hypershift-mce-dump
+      - chain: gather-core-dump
+      - chain: hypershift-mce-kubevirt-destroy
+      - chain: ipi-aws-post
