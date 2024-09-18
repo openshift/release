@@ -422,6 +422,9 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+    },
+    'aro-redhat-tenant-quota-slice': {
+        'default': 1,
     }
 }
 
