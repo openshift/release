@@ -159,10 +159,14 @@ EOF
   fi
 fi
 
+if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --annotations hypershift.openshift.io/kubevirt-vm-jsonpatch='[{\"op\":\"add\",\"path\":\"/spec/template/spec/domain/devices/gpus/-\",\"value\":{\"deviceName\":\"$(cat "${SHARED_DIR}/GPU_DEVICE_NAME")\",\"name\":\"gpu1\"}}]'"
+fi
+
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # shellcheck disable=SC2086
-"${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+eval "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
   --name "${CLUSTER_NAME}" \
   --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
