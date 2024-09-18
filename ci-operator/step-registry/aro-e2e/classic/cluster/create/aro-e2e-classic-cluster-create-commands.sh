@@ -93,7 +93,7 @@ function create-cluster {
       --assignee-principal-type 'ServicePrincipal'
 
   echo "Registering cluster version ${ARO_VERSION} to the RP"
-  curl -X PUT "${CURL_ADDITIONAL_ARGS}" \
+  curl -X PUT -x "${CURL_PROXY}" \
       -k "${RP_ENDPOINT}/admin/versions" \
       --cert ${CERT} \
       --header "Content-Type: application/json" \
@@ -116,7 +116,7 @@ EOF
   MASTER_SUBNET_ID="${VNET_ID}/subnets/master"
   WORKER_SUBNET_ID="${VNET_ID}/subnets/worker"
 
-  curl -X PUT "${CURL_ADDITIONAL_ARGS}" \
+  curl -X PUT -x "${CURL_PROXY}" \
       -k "${RP_ENDPOINT}${RESOURCE_ID}?api-version=2023-11-22" \
       --cert ${CERT} \
       --header "Content-Type: application/json" \
@@ -146,7 +146,7 @@ EOF
   echo "Waiting for cluster creation to complete..."
   while true
   do
-      STATE=$(curl -X GET "${CURL_ADDITIONAL_ARGS}" \
+      STATE=$(curl -X GET -x "${CURL_PROXY}" \
           -k "${RP_ENDPOINT}${RESOURCE_ID}?api-version=2023-11-22" \
           --cert ${CERT} \
           --silent | jq -r '.properties.provisioningState')
@@ -164,7 +164,7 @@ EOF
               echo "Cluster creation failed"
               echo "Getting install logs"
 
-              curl -X GET "${CURL_ADDITIONAL_ARGS}" \
+              curl -X GET -x "${CURL_PROXY}" \
                   -k "${RP_ENDPOINT}/admin${RESOURCE_ID}/clusterdeployment?api-version=2023-11-22" \
                   --cert ${CERT} \
                   --silent \
@@ -184,7 +184,7 @@ EOF
 function get-kubeconfig {
     echo "Getting cluster kubeconfig"
     RESOURCE_ID="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_CLUSTER_RESOURCE_GROUP}/providers/Microsoft.RedHatOpenShift/openShiftClusters/${ARO_CLUSTER_NAME}"
-    curl -X POST "${CURL_ADDITIONAL_ARGS}" \
+    curl -X POST -x "${CURL_PROXY}" \
         -k "${RP_ENDPOINT}${RESOURCE_ID}/listadmincredentials?api-version=2023-11-22" \
         --cert ${CERT} \
         --header "Content-Type: application/json" \
