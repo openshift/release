@@ -2,7 +2,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -15,8 +15,8 @@ declare primaryrouterhostname
 declare vsphere_datacenter
 declare vsphere_portgroup
 declare dns_server
-declare vsphere_datastore
-declare vsphere_resource_pool
+#declare vsphere_datastore
+#declare vsphere_resource_pool
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
@@ -223,7 +223,7 @@ export GOVC_NETWORK="${vsphere_portgroup}"
 # Make sure we are only grabbing the networks that are ci-vlan-#### and not -1 -2 or -test
 vsphere_portgroup_path=$(govc ls /${vsphere_datacenter}/network | grep "${vlanid}$")
 
-govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/${vsphere_datastore} -pool=${vsphere_resource_pool} -vm="${vm_template}" "${LB_VMNAME}"
+govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" "${LB_VMNAME}"
 
 govc vm.network.change -dc=/${vsphere_datacenter} -vm "${LB_VMNAME}" -net "${vsphere_portgroup_path}" ethernet-0
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
