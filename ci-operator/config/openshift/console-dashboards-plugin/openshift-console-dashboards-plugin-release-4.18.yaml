@@ -1,3 +1,8 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
@@ -6,10 +11,17 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.test
   to: console-dashboards-plugin-test
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+  to: console-dashboards-plugin
 promotion:
   to:
   - disabled: true
     excluded_images:
+    - console-dashboards-plugin
     - console-dashboards-plugin-test
     name: "4.18"
     namespace: ocp
@@ -35,6 +47,12 @@ tests:
   commands: make lint-frontend
   container:
     from: console-dashboards-plugin-test
+- as: fips-image-scan
+  steps:
+    dependencies:
+      SCAN_IMAGE: console-dashboards-plugin
+    test:
+    - ref: fips-check-image-scan
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

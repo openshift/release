@@ -1,22 +1,35 @@
 #!/bin/bash
 set -xeuo pipefail
 
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
+trap_install_status_exit_code $EXIT_CODE_CONFORMANCE_SETUP_FAILURE
 
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+if "${SRC_FROM_GIT}"; then
+  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+  # MicroShift repo is recent enough to use main instead of master.
+  if [ "${branch}" == "master" ]; then
+    branch="main"
+  fi
+  CLONEREFS_OPTIONS=$(jq -n --arg branch "${branch}" '{
+    "src_root": "/go",
+    "log":"/dev/null",
+    "git_user_name": "ci-robot",
+    "git_user_email": "ci-robot@openshift.io",
+    "fail": true,
+    "refs": [
+      {
+        "org": "openshift",
+        "repo": "microshift",
+        "base_ref": $branch,
+        "workdir": true
+      }
+    ]
+  }')
+  export CLONEREFS_OPTIONS
+fi
+ci_clone_src
 
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"

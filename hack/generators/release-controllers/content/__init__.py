@@ -2,6 +2,7 @@
 
 from content.art_namespaces_config_updater import add_art_namespace_config_updater_rbac
 from content.art_namespaces_rbac import add_imagestream_namespace_rbac
+from content.art_namespaces_rbac import add_ocp_priv_puller_token
 from content.art_publish_permissions import add_art_publish
 from content.ibm_managed_control_plane_testing_permissions import add_ibm_managed_control_plane_testing
 from content.art_rpm_mirroring_services import add_rpm_mirror_service

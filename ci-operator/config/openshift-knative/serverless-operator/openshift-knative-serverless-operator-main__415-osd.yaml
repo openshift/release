@@ -11,6 +11,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
   openshift_eventing-istio-src_knative-v1.14:
     name: eventing-istio-src
     namespace: openshift
@@ -23,10 +27,10 @@ base_images:
     name: knative-eventing-src
     namespace: openshift
     tag: knative-v1.14
-  openshift_knative-serving-src_knative-v1.14:
+  openshift_knative-serving-src_knative-v1.15:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.14
+    tag: knative-v1.15
   openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
@@ -43,15 +47,18 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
     openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+      - $GO_BUILDER
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal
     origin_4.15_operator-registry:
       as:
       - registry.ci.openshift.org/origin/4.15:operator-registry
@@ -60,10 +67,10 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
     openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+      - $GO_BUILDER
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -80,18 +87,18 @@ images:
     openshift_knative-eventing-src_knative-v1.14:
       as:
       - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.14
-    openshift_knative-serving-src_knative-v1.14:
+    openshift_knative-serving-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.14
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
     openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+      - $GO_BUILDER
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:

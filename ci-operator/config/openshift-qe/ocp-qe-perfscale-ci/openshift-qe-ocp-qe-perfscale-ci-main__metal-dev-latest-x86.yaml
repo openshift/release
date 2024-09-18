@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal-dev
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -24,11 +17,13 @@ resources:
 tests:
 - as: weekly-6nodes
   cluster: build05
-  cron: 0 8 * * 3
+  cron: 0 0 * * 4
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
@@ -47,13 +42,29 @@ tests:
 - always_run: false
   as: deploy-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: deploy-sno
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+      TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
@@ -61,6 +72,7 @@ tests:
 - always_run: false
   as: node-density-heavy-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -69,7 +81,7 @@ tests:
       KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -79,15 +91,17 @@ tests:
 - always_run: false
   as: data-path-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
@@ -99,6 +113,7 @@ tests:
 - always_run: false
   as: web-burner-node-density-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -107,7 +122,7 @@ tests:
       KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
@@ -117,6 +132,7 @@ tests:
 - always_run: false
   as: web-burner-cluster-density-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -126,7 +142,7 @@ tests:
       LIMIT_COUNT: "1"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest
       WORKLOAD: web-burner-cluster-density
     test:
     - chain: openshift-qe-installer-bm-ping

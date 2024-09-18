@@ -83,6 +83,11 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
+# Determine if we should replace the LCA version
+if [[ ! -z "${LCA_PULL_REF_OVERRIDE}" ]]; then
+  LCA_PULL_REF=$LCA_PULL_REF_OVERRIDE
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
@@ -95,6 +100,8 @@ export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
+export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
+export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -108,16 +115,25 @@ fi
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
+SECONDS=0
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting 10 minutes for seed creation to finish"
+echo "Waiting 5 minutes for seed creation to finish"
 # These timings are specific to this CI setup and subvert a bug that causes oc wait to never return
 # This results in a timeout on the job even though the process may finish successfully
-sleep 10m
+sleep 5m
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
   echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
   sleep 1m; \
 done;
+
+t_seed_create=\$SECONDS
+echo "Seed creation took \${t_seed_create} seconds"
+
+if [[ ! -z "\${SEED_FLOATING_TAG}" ]]; then
+  echo "Adding floating tag '${SEED_FLOATING_TAG}' to the seed image"
+  skopeo copy "docker://${SEED_IMAGE}:${SEED_IMAGE_TAG}" "docker://${SEED_IMAGE}:${SEED_FLOATING_TAG}"
+fi
 
 EOF
 

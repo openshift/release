@@ -63,7 +63,7 @@ function add_iam_policy_binding()
   # login to the service project
   gcloud_auth
 
-  local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin")
+  local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin" "projects/${vpc_project_id}/roles/resourcemanager.projects.get_set_IamPolicy")
   local cmd
   for role in "${interested_roles[@]}"; do
     cmd="gcloud projects add-iam-policy-binding ${vpc_project_id} --member \"serviceAccount:${sa_email}\" --role ${role} 1>/dev/null"
@@ -177,8 +177,10 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
 fi
 
 default_compute_nodes=2
+MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   default_compute_nodes=3
+  MULTI_AZ_SWITCH="--multi-az"
 fi
 COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
@@ -238,7 +240,9 @@ cmd="ocm create cluster ${CLUSTER_NAME} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--compute-nodes ${COMPUTE_NODES} \
 --subscription-type ${SUBSCRIPTION_TYPE} \
+${MULTI_AZ_SWITCH} \
 ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \

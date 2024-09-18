@@ -229,34 +229,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: cloud-provider-alibaba-cloud
-  cron: 00 13 * * Mon,Thu
-  steps:
-    test:
-    - as: cloud-provider-alibaba-cloud
-      commands: |
-        rebasebot --source https://github.com/kubernetes/cloud-provider-alibaba-cloud:master \
-                  --dest openshift/cloud-provider-alibaba-cloud:master \
-                  --rebase openshift-cloud-team/cloud-provider-alibaba-cloud:rebase-bot-master \
-                  --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
-                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
-                  --git-username cloud-team-rebase-bot \
-                  --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
-                  --tag-policy=strict
-      credentials:
-      - mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
-        namespace: test-credentials
-      from: rebasebot
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: cloud-provider-nutanix
   cron: 10 13 * * Mon,Thu
   steps:
@@ -577,6 +549,33 @@ tests:
         namespace: test-credentials
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: topolvm
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: topolvm
+      commands: |
+        rebasebot --source https://github.com/topolvm/topolvm:main \
+                  --dest openshift/topolvm:main \
+                  --rebase openshift/topolvm-rebase:rebase-bot-main \
+                  --github-app-id 966050 \
+                  --github-app-key /secrets/lvms/rebase-bot/edge-enablement-team-rebase-bot-key \
+                  --github-cloner-key /secrets/lvms/rebase-bot/edge-enablement-team-cloner-bot-key \
+                  --github-cloner-id 966053 \
+                  --git-username edge-enablement-team-rebase-bot \
+                  --git-email openshift-edge-enablement@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/lvms/rebase-bot
+        name: lvms-rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
       resources:
