@@ -159,7 +159,7 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'southcentralus': 10,
+        'westus2': 10,
         'centralus': 10
     },
     'azure-autorelease-qe-quota-slice': {
@@ -357,6 +357,9 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-chaos-quota-slice': {
+        'us-west-2': 10,
+    },
+    'aws-kubevirt-quota-slice': {
         'us-west-2': 10,
     },
     'hypershift-powervs-quota-slice': {

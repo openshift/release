@@ -63,6 +63,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
+- context_dir: images/check-cluster-profiles-config/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-cluster-profiles-config
+  to: check-cluster-profiles-config
 - context_dir: images/gh-pull-through-cache/
   inputs:
     ci_nginx-unprivileged_stable:
@@ -901,11 +909,24 @@ tests:
           memory: 200Mi
 - as: breaking-changes
   cluster: build10
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
   node_architecture: arm64
   optional: true
+  steps:
+    test:
+    - as: breaking-changes
+      commands: |
+        export KUBECONFIG_DIR=/etc/kubeconfigs
+        export KUBECONFIG_SUFFIX=config
+        make check-breaking-changes
+      credentials:
+      - mount_path: /etc/kubeconfigs
+        name: cluster-init
+        namespace: ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
   cluster: build10
   commands: make validate-checkconfig

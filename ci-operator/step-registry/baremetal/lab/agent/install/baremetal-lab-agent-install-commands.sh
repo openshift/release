@@ -70,6 +70,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
@@ -233,7 +234,6 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
-  # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
 fi
@@ -244,6 +244,5 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
-  # TODO: gather logs??
   exit 1
 fi

@@ -8,32 +8,13 @@ echo "************ baremetals agentserviceconfig config command ************"
 
 source "${SHARED_DIR}/packet-conf.sh"
 
-echo "Creating Ansible inventory file"
-cat > "${SHARED_DIR}/inventory" <<-EOF
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/default_os_images.json" "root@${IP}:/root/default_os_images.json"
+CLUSTER_VERSION=$(oc adm release info "$RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
-[primary]
-${IP} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file=${CLUSTER_PROFILE_DIR}/packet-ssh-key ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
-
-EOF
-
-echo "Creating Ansible configuration file"
-cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
-
-[defaults]
-callback_whitelist = profile_tasks
-host_key_checking = False
-
-verbosity = 2
-stdout_callback = yaml
-bin_ansible_callbacks = True
-
-EOF
-
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
-
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$DISCONNECTED" "$IP_STACK" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$DISCONNECTED" "$IP_STACK" "$CLUSTER_VERSION" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 DISCONNECTED="${1}"
 IP_STACK="${2}"
+CLUSTER_VERSION="${3}"
 
 function registry_config() {
   src_image=${1}
@@ -145,26 +126,17 @@ function mirror_rhcos() {
     done
 }
 
+function wrap_if_ipv6(){
+    [[ $1 =~ : ]] && echo "[$1]" || echo "$1"
+}
+
 set -xeo pipefail
 
 cd /root/dev-scripts
 source common.sh
-source utils.sh
 source network.sh
-export -f wrap_if_ipv6 ipversion
 
-REPO_DIR="/home/assisted-service"
-if [ ! -d "${REPO_DIR}" ]; then
-  mkdir -p "${REPO_DIR}"
-
-  echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "${REPO_DIR}"
-fi
-
-cd "${REPO_DIR}/deploy/operator"
-
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
-OS_IMAGES=$(jq --arg CLUSTER_VERSION "$CLUSTER_VERSION" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' ../../data/default_os_images.json)
+OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' /root/default_os_images.json)
 ASSISTED_NAMESPACE="multicluster-engine"
 STORAGE_CLASS_NAME=$(oc get storageclass -o=jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
 

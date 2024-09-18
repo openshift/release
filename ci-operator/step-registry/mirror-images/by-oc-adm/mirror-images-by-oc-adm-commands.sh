@@ -39,6 +39,11 @@ fi
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
+# unset KUBECONFIG to ensure this step always interact with the build farm.
+unset KUBECONFIG
+oc registry login
+
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"
 
@@ -51,11 +56,6 @@ target_release_image="${target_release_image_repo}:${readable_version}"
 
 echo "target_release_image: $target_release_image"
 echo "target_release_image_repo: $target_release_image_repo"
-
-# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
-# unset KUBECONFIG to ensure this step always interact with the build farm.
-unset KUBECONFIG
-oc registry login
 
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
@@ -94,6 +94,17 @@ if oc adm release mirror -h | grep -q -- --print-mirror-instructions; then
     args+=(--print-mirror-instructions="${mirror_crd_type}")
 else
     echo "This version of oc does not support --print-mirror-instructions=, skip it."
+fi
+
+# For disconnected or otherwise unreachable mirrors, we want to
+# have steps use an HTTP(S) proxy to reach the registry. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # execute the mirror command

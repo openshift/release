@@ -80,6 +80,21 @@ tests:
   cron: 0 4 * * 1-5
   steps:
     workflow: openshift-microshift-rebase
+- as: microshift-metal-cache-nightly
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-nightly-arm
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
@@ -180,6 +195,14 @@ tests:
     cluster_profile: aws
     env:
       MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-serial-rhel-eus
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/serial
     workflow: openshift-microshift-e2e-origin-conformance
 - as: footprint-and-performance
   run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$

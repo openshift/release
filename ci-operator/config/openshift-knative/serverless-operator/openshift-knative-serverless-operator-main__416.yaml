@@ -23,14 +23,14 @@ base_images:
     name: knative-eventing-src
     namespace: openshift
     tag: knative-v1.14
-  openshift_knative-serving-src_knative-v1.14:
+  openshift_knative-serving-src_knative-v1.15:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    tag: knative-v1.15
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.17
+    tag: rhel-8-release-golang-1.22-openshift-4.17
   origin_4.15_operator-registry:
     name: "4.15"
     namespace: origin
@@ -44,7 +44,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
       - $GO_BUILDER
   to: serverless-knative-operator
@@ -64,7 +64,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
       - $GO_BUILDER
   to: serverless-openshift-knative-operator
@@ -83,16 +83,16 @@ images:
     openshift_knative-eventing-src_knative-v1.14:
       as:
       - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.14
-    openshift_knative-serving-src_knative-v1.14:
+    openshift_knative-serving-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.14
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
       - $GO_BUILDER
   to: serverless-ingress
@@ -165,7 +165,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make kitchensink-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make kitchensink-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -236,7 +237,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make kitchensink-upgrade
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make kitchensink-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -307,7 +309,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make mesh-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -379,7 +382,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-upgrade
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make mesh-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -449,7 +453,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make operator-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make operator-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -519,7 +524,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-upgrade
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -591,7 +597,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make ui-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make ui-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -662,7 +669,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make upstream-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make upstream-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -733,7 +741,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make upstream-e2e-kafka
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make upstream-e2e-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
