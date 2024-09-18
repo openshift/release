@@ -440,7 +440,7 @@ EOF
 
 sleep 3600
 
-VCENTERS_JSON=$(cat "${install_config}" | yq -o json | jq -c '.platform.vsphere.vcenters')
+VCENTERS_JSON=$(cat "${install_config}" | yq-go -o json | jq -c '.platform.vsphere.vcenters')
 
 if [[ "$VCENTERS_JSON" != "null" ]]; then
     echo "Generating vcenters for variables.ps1"
