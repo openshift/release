@@ -21,28 +21,21 @@ lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
 sno_node_count: $NUM_SNO_NODES
-public_vlan: false
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
-public_vlan: $PUBLIC_VLAN
+public_vlan: true
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 smcipmitool_url:
-bastion_lab_interface: $BASTION_LAB_INTERFACE
-bastion_controlplane_interface: $BASTION_CP_INTERFACE
-controlplane_network: 192.168.216.1/21
-controlplane_network_prefix: 21
-bastion_vlaned_interface: $BASTION_VLANED_INTERFACE
+bastion_lab_interface: $LAB_INTERFACE
+controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-controlplane_lab_interface: $CONTROLPLANE_LAB_INTERFACE
-controlplane_pub_network_cidr:
-controlplane_pub_network_gateway:
 jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
