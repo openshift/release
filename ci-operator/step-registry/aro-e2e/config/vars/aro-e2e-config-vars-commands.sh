@@ -14,7 +14,7 @@ fi
 echo "job specific name of resources: ${ID}"
 
 # read CURL_ADDITIONAL_ARGS from cluster profile secret
-CURL_ADDITIONAL_ARGS="$(<{CLUSTER_PROFILE_DIR}/curl_additional_args)"
+CURL_ADDITIONAL_ARGS="$(<"${CLUSTER_PROFILE_DIR}/curl_additional_args")"
 
 cat >> "${SHARED_DIR}/vars.sh" << EOF
 export AZURE_CLUSTER_RESOURCE_GROUP="${ID}"

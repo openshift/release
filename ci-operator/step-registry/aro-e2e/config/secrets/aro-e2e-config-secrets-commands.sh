@@ -12,7 +12,7 @@ function login {
 function secrets {
 
   test -f "${CLUSTER_PROFILE_DIR}/secret_sa_account_name" || echo "secret_sa_account_name is missing in cluster profile"
-  SECRET_SA_ACCOUNT_NAME="$(<{CLUSTER_PROFILE_DIR}/secret_sa_account_name)"
+  SECRET_SA_ACCOUNT_NAME="$(<"${CLUSTER_PROFILE_DIR}/secret_sa_account_name")"
 
   az storage blob download -n secrets.tar.gz -c secrets -f secrets.tar.gz --account-name ${SECRET_SA_ACCOUNT_NAME} >/dev/null
   tar -xzf secrets.tar.gz
