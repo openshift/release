@@ -73,6 +73,9 @@ function bootstrap {
       --template-file ./bootstrap.bicep
 }
 
+# for saving files...
+cd /tmp
+
 vars
 verify
 login

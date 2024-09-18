@@ -184,6 +184,9 @@ function get-kubeconfig {
         --silent | jq -r .kubeconfig | base64 -d > ${SHARED_DIR}/kubeconfig
 }
 
+# for saving files...
+cd /tmp
+
 vars
 verify
 login
