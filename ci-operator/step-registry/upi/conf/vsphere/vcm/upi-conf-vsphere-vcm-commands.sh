@@ -438,6 +438,8 @@ compute_count = ${COMPUTE_NODE_REPLICAS}
 failure_domains = $(cat $FAILURE_DOMAIN_PATH)
 EOF
 
+sleep 3600
+
 VCENTERS_JSON=$(cat "${install_config}" | yq -o json | jq -c '.platform.vsphere.vcenters')
 
 if [[ "$VCENTERS_JSON" != "null" ]]; then
