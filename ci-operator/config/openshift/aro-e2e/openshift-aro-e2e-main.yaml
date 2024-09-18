@@ -10,6 +10,11 @@ promotion:
   to:
   - name: main
     namespace: aro
+releases:
+  latest:
+    release:
+      channel: stable
+      version: 4.14.33
 resources:
   '*':
     limits:
@@ -17,6 +22,23 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e
+  cluster: build10
+  restrict_network_access: false
+  steps:
+    cluster_profile: aro-redhat-tenant
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        oc --insecure-skip-tls-verify get nodes -o wide
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: aro-e2e-classic
 zz_generated_metadata:
   branch: main
   org: openshift
