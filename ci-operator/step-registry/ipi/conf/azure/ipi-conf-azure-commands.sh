@@ -37,6 +37,8 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
+minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 echo "get ocp version: ${version}"
 rm pull-secret
 popd
@@ -107,6 +109,13 @@ EOF
   else
     echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
   fi
+fi
+
+# User tags went GA in 4.14. In 4.14+, tag resources with an expiration date to facilitate cleanup.
+if (( minor_version > 13 && major_version == 4 )); then
+  expiration_date=$(date -d '8 hours' --iso=minutes --utc)
+  printf 'Setting user tag expirationDate: %s\n' "${expiration_date}"
+  yq-go write -i "${CONFIG}" "platform.azure.userTags.expiration_date" "${expiration_date}"
 fi
 
 printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
