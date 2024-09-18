@@ -69,11 +69,11 @@ function getFailureDomainsWithDSwitch() {
     echo "+getFailureDomainsWithDSwitch"
 
     FAILURE_DOMAIN_OUT="[]"
-    
+
     echo "[" > ${FAILURE_DOMAIN_PATH}
-    
-    for LEASE in "${SHARED_DIR}"/LEASE*; do      
-      if [[ $LEASE =~ "single" ]]; then 
+
+    for LEASE in "${SHARED_DIR}"/LEASE*; do
+      if [[ $LEASE =~ "single" ]]; then
         continue
       fi
 
@@ -90,7 +90,7 @@ function getFailureDomainsWithDSwitch() {
       FIRST=0
 
       jq -r .status.envVars "${LEASE}" > /tmp/envvars
-      
+
       # shellcheck source=/dev/null
       source /tmp/envvars
 
@@ -108,17 +108,17 @@ function getFailureDomainsWithDSwitch() {
       datastoreName=$(basename "${GOVC_DATASTORE}")
 
       {
-        echo "        server = \"${GOVC_URL}\"" 
+        echo "        server = \"${GOVC_URL}\""
         echo "        datacenter = \"${GOVC_DATACENTER}\""
         echo "        cluster = \"${CLUSTER}\""
         echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
-        echo "        network = \"${GOVC_NETWORK}\"" 
+        echo "        network = \"${GOVC_NETWORK}\""
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
-      
+
       FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
     done
-    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"
     echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
     echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
@@ -286,7 +286,7 @@ if command -v pwsh &> /dev/null
 then
   ROUTE53_CREATE_JSON='{"Comment": "Create public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
   ROUTE53_DELETE_JSON='{"Comment": "Delete public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
-  
+
   # shellcheck disable=SC2016
   DNS_RECORD='{
   "Action": "${ACTION}",
@@ -438,7 +438,7 @@ compute_count = ${COMPUTE_NODE_REPLICAS}
 failure_domains = $(cat $FAILURE_DOMAIN_PATH)
 EOF
 
-VCENTERS_JSON=$(cat "${install_config}" | yq-v4 -o json | jq -c '.platform.vsphere.vcenters')
+VCENTERS_JSON=$(cat "${install_config}" | yq -o json | jq -c '.platform.vsphere.vcenters')
 
 if [[ "$VCENTERS_JSON" != "null" ]]; then
     echo "Generating vcenters for variables.ps1"
