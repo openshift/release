@@ -36,6 +36,9 @@ case "${SIZE_VARIANT}" in
 	exit 1
 	;;
 esac
+if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
+    master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
+fi
 
 # Select zone(s) based on REGION and ZONE_COUNT
 REGION="${LEASED_RESOURCE}"
