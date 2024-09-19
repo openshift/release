@@ -36,7 +36,8 @@ if [ "$platform" = "AWS" ]; then
     mkdir -p $HOME/.aws
     cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-    export AWS_DEFAULT_REGION=us-west-2
+    aws_region=${REGION:-$LEASED_RESOURCE}
+    export AWS_DEFAULT_REGION=$aws_region
 elif [ "$platform" = "GCP" ]; then
     export CLOUD_TYPE="gcp"
     export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
