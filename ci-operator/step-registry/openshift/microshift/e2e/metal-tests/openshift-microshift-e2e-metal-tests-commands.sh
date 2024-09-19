@@ -10,14 +10,14 @@ finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
   set +x
-  STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
+  STEP_NAME="${HOSTNAME##"${JOB_NAME_SAFE}"-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
   if [ "${JOB_TYPE}" == "presubmit" ]; then
     JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
   fi
   URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
-  cat >>${REPORT} <<EOF
+  cat >>"${REPORT}" <<EOF
 <html>
 <head>
   <title>Test logs</title>
@@ -44,42 +44,42 @@ finalize() {
 </head>
 <body>
 EOF
-  for test in ${ARTIFACT_DIR}/scenario-info/*; do
+  for test in "${ARTIFACT_DIR}"/scenario-info/*; do
     testname=$(basename "${test}")
-    cat >>${REPORT} <<EOF
+    cat >>"${REPORT}" <<EOF
     <p>${testname}:&nbsp;
     <a target="_blank" href="${URL}/${testname}">directory</a>
 EOF
     if [ -f "${test}/boot_and_run.log" ]; then
-      cat >>${REPORT} <<EOF
+      cat >>"${REPORT}" <<EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/boot_and_run.log">boot_and_run.log</a>
 EOF
     else
-      cat >>${REPORT} <<EOF
+      cat >>"${REPORT}" <<EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/boot.log">boot.log</a>
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/run.log">run.log</a>
 EOF
     fi
     
-  for vm in ${test}/vms/*; do
+  for vm in "${test}"/vms/*; do
       if [ "${vm: -4}" == ".xml" ]; then
         continue
       fi
-      vmname=$(basename ${vm})
-      cat >>${REPORT} <<EOF
+      vmname=$(basename "${vm}")
+      cat >>"${REPORT}" <<EOF
       &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
 EOF
     done
-    if [ -f ${test}/log.html ]; then
-      cat >>${REPORT} <<EOF
+    if [ -f "${test}/log.html" ]; then
+      cat >>"${REPORT}" <<EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/log.html">RF log</a>
 EOF
     fi
-    cat >>${REPORT} <<EOF
+    cat >>"${REPORT}" <<EOF
     </p>
 EOF
   done
-  cat >>${REPORT} <<EOF
+  cat >>"${REPORT}" <<EOF
 </body>
 </html>
 EOF
@@ -120,6 +120,7 @@ fi
 # Run in background to allow trapping signals before the command ends. If running in foreground
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
 # and get abruptly killed, which prevents gathering logs.
+# shellcheck disable=SC2029
 ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh" &
 # Run wait -n since we only have one background command. Should this change, please update the exit
 # status handling.
