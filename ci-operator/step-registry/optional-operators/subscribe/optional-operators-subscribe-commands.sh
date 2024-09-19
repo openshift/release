@@ -286,17 +286,7 @@ fi
 # So, add "securityContextConfig: restricted" since OCP 4.12
 CS_PODCONFIG=""
 OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
-# add "extractContent" object to use binaryless images since OCP v4.15 so that opm version is used from the cluster
-if [ "$OCP_MINOR_VERSION" -ge "15" ]; then
-  CS_PODCONFIG=$(cat <<EOF
-  grpcPodConfig:
-    securityContextConfig: restricted
-    extractContent:
-      catalogDir: /configs
-      cacheDir: /tmp/cache
-EOF
-)
-elif [ "$OCP_MINOR_VERSION" -gt "11" ]; then
+if [ "$OCP_MINOR_VERSION" -gt "11" ]; then
   CS_PODCONFIG=$(cat <<EOF
   grpcPodConfig:
     securityContextConfig: restricted
