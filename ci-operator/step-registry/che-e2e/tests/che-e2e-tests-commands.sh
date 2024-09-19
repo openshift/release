@@ -15,8 +15,8 @@ IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
 export IDP_PASSWD
 export CHE_NAMESPACE
 export TEST_POD_NAME
+export SAVE_JUNIT_DATA
 
-oc delete project $CHE_NAMESPACE || true
 oc new-project $CHE_NAMESPACE
 oc project $CHE_NAMESPACE
 
