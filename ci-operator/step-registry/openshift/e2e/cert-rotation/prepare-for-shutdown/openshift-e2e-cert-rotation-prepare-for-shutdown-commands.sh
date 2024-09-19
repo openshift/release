@@ -42,6 +42,10 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-long {
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+}
+
 function run-on-first-master-silent {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
@@ -96,7 +100,9 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     echo "Waiting for ${nodename} to send heartbeat"
     while true; do
       STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-      TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
+      NODE_HEARTBEAT_TIME=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
+      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then sleep 5; fi
+      TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
       if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
         break
       fi
@@ -108,7 +114,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
         sleep 10
       fi
     done
-    echo
+    echo "${nodename} is sending heartbeats"
   done
   echo "All nodes are ready"
   oc get nodes
@@ -118,7 +124,7 @@ timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-silent-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master-long "bash -x /usr/local/bin/ensure-nodes-are-ready.sh"
   run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig && ls -la /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
