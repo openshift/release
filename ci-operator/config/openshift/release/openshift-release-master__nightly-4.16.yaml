@@ -826,6 +826,29 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-hcp-cnf
+- as: commatrix-e2e-tests
+  cron: 0 23 * * 1
+  steps:
+    cluster_profile: aws
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch master
+        ci-job-fullname openshift-kni-commatrix-e2e-tests-master
+        ci-job-type commatrix-e2e-tests
+        ci-repo-name commatrix
+        ci-org-name openshift-kni
+    test:
+    - as: commatrix-e2e-tests
+      commands: go mod vendor && make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-alibaba-ovn
   cron: '@weekly'
   steps:
