@@ -33,18 +33,6 @@ iso_name = "assisted-test-infra-machine-template"
 build_id = "${BUILD_ID}"
 EOF
 
-# Terraform Params
-# move to new ENV value with auto load
-export CI_CREDENTIALS_DIR=/var/run/vault/assisted-ci-vault
-
-for file in $CI_CREDENTIALS_DIR/TF_VAR_*; do
-   if [[  "$file" == *"TF_VAR_"* ]]; then
-     key=$(basename -- $file)
-     export $key="$(cat $file)"
-   fi
-done
-
-
 terraform init -input=false
 terraform apply -var-file=nutanix-params.hcl -input=false -auto-approve
 IP=$(terraform output ip_address)
