@@ -9,7 +9,6 @@ trap_subprocesses_on_term
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
-  set +x
   STEP_NAME="${HOSTNAME##"${JOB_NAME_SAFE}"-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
@@ -17,6 +16,8 @@ finalize() {
     JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
   fi
   URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
+
+  set +x
   cat >>"${REPORT}" <<EOF
 <html>
 <head>
