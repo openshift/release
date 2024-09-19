@@ -12,6 +12,15 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+# Terraform Params
+# move to new ENV value with auto load
+export CI_CREDENTIALS_DIR=/var/run/vault/assisted-ci-vault
+
+for file in $CI_CREDENTIALS_DIR/TF_VAR_*; do
+     key=$(basename -- $file)
+     echo "export $key=$(cat $file)" >>  $SHARED_DIR/nutanix_context.sh
+done
+
 # shellcheck source=/dev/random
 source $SHARED_DIR/nutanix_context.sh
 
