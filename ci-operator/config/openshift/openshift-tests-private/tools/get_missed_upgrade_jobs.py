@@ -78,6 +78,15 @@ def get_jobs(yaml_file, mode='y'):
     
         for test in tests:
             job = test.get("as")
+            
+            if "-disc" in job and "-mixarch" in job:
+                # it's better to skip the jobs which is a combination of disconnected and mixarch
+                # for example: aws-ipi-disc-priv-arm-mixarch-f7
+                continue
+            
+            if test.get("steps", {}).get("env", {}).get("FEATURE_SET", "") == "CustomNoUpgrade":
+                continue
+            
             match = re.search(skipped_profiles, job) 
             if not match:
                 filtered_jobs.append(job)
@@ -121,29 +130,7 @@ def addtional_check(e2e_yaml_file, upgrade_yaml_file, missed_jobs):
             vsphere-upi-platform-none-f28
             vsphere-upi-zones-f28
     """
-    jobs = []
-    if "multi" in upgrade_yaml_file:
-        for job in missed_jobs:
-            if "-disc" in job and "-mixarch" in job:
-                # it's better to skip the jobs which is a combination of disconnected and mixarch
-                # for example: aws-ipi-disc-priv-arm-mixarch-f7
-                continue
-            
-            jobs.append(job)
-    else:
-        jobs = missed_jobs[:]
-    
-    with open(e2e_yaml_file, 'r') as file:
-        e2e_config = yaml.safe_load(file)
-        tests = e2e_config["tests"]
-    
-    for job in jobs:
-        filtered_job = list(filter(lambda x: x.get('as') == job, tests))[0]
-        steps = filtered_job.get("steps")
-        if steps.get("env") and \
-            steps.get("env").get("FEATURE_SET") and \
-            steps.get("env").get("FEATURE_SET") == "CustomNoUpgrade":
-            jobs.remove(job)
+    jobs = missed_jobs[:]
             
     minor_version = int(upgrade_yaml_file.split("__")[0].split("openshift-openshift-tests-private-release-")[1].split(".")[1])
     if minor_version > 15:
