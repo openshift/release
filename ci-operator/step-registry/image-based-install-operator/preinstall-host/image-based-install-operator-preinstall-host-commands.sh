@@ -113,8 +113,12 @@ sleep 60
 export IBI_MACS=$(virsh --connect=${LIBVIRT_DEFAULT_URI} domiflist ${IBI_VM_NAME} | sed 1,2d | awk '{print $5}')
 export IBI_VM_IP=$(for MAC in ${IBI_MACS}; do arp -n | grep -i ${MAC} | awk '{print $1}'; done | cut --delimiter " " --fields 1)
 echo ${IBI_VM_IP} > ibi-vm-ip
-export SSH_FLAGS="-o IdentityFile=/home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+export SSH_FLAGS="-n -o IdentityFile=/home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 until nc -zv ${IBI_VM_IP} 22; do sleep 5; done
 ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sudo journalctl -flu install-rhcos-and-restore-seed.service | stdbuf -o0 -e0 awk '{print \$0 } /Finished SNO Image-based Installation./ { exit }'"
+
+ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sleep 60 && sudo shutdown now" &
+sleep 70
+until [[ $(virsh --connect=${LIBVIRT_DEFAULT_URI} domstate ${IBI_VM_NAME}) = "shut off" ]]; do sleep 5; done
 
 EOF
