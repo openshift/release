@@ -170,6 +170,89 @@ function ci_clone_src() {
     find /go/src -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod g+xw
 }
 
+function ci_custom_link_report() {
+    local -r report_title="$1"
+    local -r step_name="$2"
+    local -r report_html="${ARTIFACT_DIR}/custom-link-tools.html"
+
+    # Build the URL prefix
+    local job_url_path
+    job_url_path="logs"
+    if [ "${JOB_TYPE}" == "presubmit" ]; then
+        job_url_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+    fi
+    local -r url_prefix="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
+
+    # Disable tracing and glob expansion
+    set +x
+    shopt -s nullglob
+
+    cat >>"${report_html}" <<EOF
+<html>
+<head>
+  <title>${report_title}</title>
+  <meta name="description" content="Links to relevant logs">
+  <link rel="stylesheet" type="text/css" href="/static/style.css">
+  <link rel="stylesheet" type="text/css" href="/static/extensions/style.css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+  <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
+  <style>
+    body {
+      background-color: #303030;
+    }
+    a {
+        color: #FFFFFF;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    p {
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+EOF
+
+    for test in "${ARTIFACT_DIR}"/scenario-info/*; do
+        testname=$(basename "${test}")
+        cat >>"${report_html}" <<EOF
+<p>${testname}:&nbsp;
+<a target="_blank" href="${url_prefix}/${testname}">directory</a>
+EOF
+
+        for file in boot_and_run.log boot.log run.log log.html ; do
+            if [ -f "${test}/${file}" ]; then
+                cat >>"${report_html}" <<EOF
+&nbsp;/&nbsp;<a target="_blank" href="${url_prefix}/${testname}/${file}">${file}</a>
+EOF
+            fi
+        done
+
+        for vm in "${test}"/vms/*; do
+            if [ "${vm: -4}" == ".xml" ]; then
+                continue
+            fi
+            vmname=$(basename "${vm}")
+            cat >>"${report_html}" <<EOF
+&nbsp;/&nbsp;<a target="_blank" href="${url_prefix}/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
+EOF
+        done
+
+        echo '</p>' >>"${report_html}"
+    done
+
+    cat >>"${report_html}" <<EOF
+</body>
+</html>
+EOF
+
+    # Re-enable tracing and glob expansion
+    set -x
+    shopt -u nullglob
+}
+
 #
 # Enable tracing with the following format after loading the functions:
 # - Time in hh:mm:ss.ns
