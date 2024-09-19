@@ -87,10 +87,12 @@ spec:
   restartPolicy: Never
 EOF
 
-oc wait --for=condition=ContainersReady=true pod/${TEST_POD_NAME} -n $CHE_NAMESPACE --timeout=300s || true
-echo "Extracting logs into artifact dir"
-oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
+trap 'sleep 2h' EXIT TERM
 
 # Try to collect logs with rsync command
 mkdir -p "${ARTIFACT_DIR}"/tests/debug
-oc -n $CHE_NAMESPACE rsync TEST_POD_NAME:/tmp/e2e/report/ -c download-reports "${ARTIFACT_DIR}/tests/debug" || true
+oc rsync -n $CHE_NAMESPACE ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports ${ARTIFACT_DIR}/tests/debug || true
+
+oc wait --for=condition=ContainersReady=true pod/${TEST_POD_NAME} -n $CHE_NAMESPACE --timeout=300s || true
+echo "Extracting logs into artifact dir"
+oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
