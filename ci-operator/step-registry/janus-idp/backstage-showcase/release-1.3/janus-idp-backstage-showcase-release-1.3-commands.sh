@@ -17,7 +17,7 @@ QUAY_REPO="janus-idp/backstage-showcase"
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
-git checkout "1.3.x" || exit
+git checkout "release-1.3" || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
@@ -26,7 +26,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
-    git merge origin/1.3.x --no-edit
+    git merge origin/release-1.3 --no-edit
     GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
@@ -35,7 +35,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
 fi
 
-PR_CHANGESET=$(git diff --name-only 1.3.x)
+PR_CHANGESET=$(git diff --name-only release-1.3)
 echo "Changeset: $PR_CHANGESET"
 
 # Directories to check if changes are exclusively within the specified directories
