@@ -9,7 +9,18 @@ trap_subprocesses_on_term
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
-  STEP_NAME="${HOSTNAME##"${JOB_NAME_SAFE}"-}"
+  case "${HOSTNAME}" in
+    *microshift-infra-iso*)
+      STEP_NAME="openshift-microshift-infra-iso-boot"
+      ;;
+    *microshift-e2e-metal*)
+      STEP_NAME="openshift-microshift-e2e-metal-test"
+      ;;
+    *)
+      echo "ERROR: Unsupported step for generating log links"
+      exit 1
+      ;;
+  esac
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
   if [ "${JOB_TYPE}" == "presubmit" ]; then
@@ -61,7 +72,7 @@ EOF
     &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/run.log">run.log</a>
 EOF
     fi
-    
+
   for vm in "${test}"/vms/*; do
       if [ "${vm: -4}" == ".xml" ]; then
         continue

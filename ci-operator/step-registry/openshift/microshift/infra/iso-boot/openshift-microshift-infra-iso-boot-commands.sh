@@ -11,14 +11,25 @@ finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
 
-  STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
+  case "${HOSTNAME}" in
+    *microshift-infra-iso*)
+      STEP_NAME="openshift-microshift-infra-iso-boot"
+      ;;
+    *microshift-e2e-metal*)
+      STEP_NAME="openshift-microshift-e2e-metal-test"
+      ;;
+    *)
+      echo "ERROR: Unsupported step for generating log links"
+      exit 1
+      ;;
+  esac
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
   if [ "${JOB_TYPE}" == "presubmit" ]; then
     JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
   fi
   URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
-  cat >>${REPORT} <<EOF
+  cat >>"${REPORT}" <<EOF
 <html>
 <head>
   <title>VM logs</title>
@@ -46,26 +57,26 @@ finalize() {
 <body>
 EOF
 
-  for test in ${ARTIFACT_DIR}/scenario-info/*; do
+  for test in "${ARTIFACT_DIR}"/scenario-info/*; do
     testname=$(basename "${test}")
-    cat >>${REPORT} <<EOF
+    cat >>"${REPORT}" <<EOF
     <p>${testname}:&nbsp;
     <a target="_blank" href="${URL}/${testname}/boot.log">boot.log</a>
 EOF
-    for vm in ${test}/vms/*; do
+    for vm in "${test}"/vms/*; do
       if [ "${vm: -4}" == ".xml" ]; then
         continue
       fi
-      vmname=$(basename ${vm})
-      cat >>${REPORT} <<EOF
+      vmname=$(basename "${vm}")
+      cat >>"${REPORT}" <<EOF
       &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
 EOF
     done
-    cat >>${REPORT} <<EOF
+    cat >>"${REPORT}" <<EOF
     </p>
 EOF
   done
-  cat >>${REPORT} <<EOF
+  cat >>"${REPORT}" <<EOF
 </body>
 </html>
 EOF
