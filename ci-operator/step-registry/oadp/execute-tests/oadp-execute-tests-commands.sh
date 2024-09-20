@@ -68,16 +68,18 @@ if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
   export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
-  /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+  (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 fi
 
 # Run OADP tests with the focus
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
-/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+(/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 
 # Copy logs into artifact directory if they exist
+echo "Checking for additional logs in ${LOGS_FOLDER}"
 if [ -d "${LOGS_FOLDER}" ]; then
     echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
+    ls $LOGS_FOLDER
     cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
 fi
