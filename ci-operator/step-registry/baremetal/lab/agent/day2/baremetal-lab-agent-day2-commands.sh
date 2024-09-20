@@ -87,10 +87,15 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
-oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
+
+echo "Extract the latest oc client..."
+oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+   --command=oc --to=/tmp --insecure=true
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+  oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
 fi
 
 DAY2_INSTALL_DIR="${DAY2_INSTALL_DIR:-/tmp/installer_day2}"
@@ -99,7 +104,7 @@ cp "${SHARED_DIR}/nodes-config.yaml" "${DAY2_INSTALL_DIR}/"
 cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 echo "Create node.iso for day2 worker nodes..."
-/cli/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+/tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
@@ -164,7 +169,7 @@ touch /tmp/output.txt
 
 echo "Monitoring day2 workers and pending CSRs..."
 
-/cli/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
+/tmp/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
   tee /tmp/output.txt | while IFS= read -r line; do
   echo "$line"
   if [[ "$line" = *"with signerName kubernetes.io/kube-apiserver-client-kubelet and username system:serviceaccount:openshift-machine-config-operator:node-bootstrapper is Pending and awaiting approval"* ]] || [[ "$line" = *"with signerName kubernetes.io/kubelet-serving and username "*" is Pending and awaiting approval"* ]]; then
