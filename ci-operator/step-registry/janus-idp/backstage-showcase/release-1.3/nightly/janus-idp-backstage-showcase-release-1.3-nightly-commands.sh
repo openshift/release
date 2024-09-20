@@ -23,6 +23,6 @@ TAG_NAME="1.3"
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
-git checkout "1.3.x" || exit
+git checkout "release-1.3" || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
