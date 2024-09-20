@@ -7,6 +7,10 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'rm -f /tmp/aws_cred_output /tmp/pull-secret' EXIT TERM INT
 
+if [[ "${USE_RESTRICTED_IAM}" != "true" ]]; then
+  exit 0
+fi
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
@@ -53,15 +57,14 @@ function aws_create_user()
     return 0
 }
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+function create_profile_default() {
+  cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+  oc registry login --to /tmp/pull-secret
+  ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+  ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
-
-cat <<EOF > "${PERMISION_LIST}"
+  cat <<EOF > "${PERMISION_LIST}"
 autoscaling:DescribeAutoScalingGroups
 ec2:AllocateAddress
 ec2:AssociateAddress
@@ -246,33 +249,167 @@ servicequotas:ListAWSDefaultServiceQuotas
 tag:GetResources
 EOF
 
-# additional permisions for 4.11+
-if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
-  echo "ec2:DeletePlacementGroup" >> "${PERMISION_LIST}"
-  echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
-fi
+  # additional permisions for 4.11+
+  if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
+    echo "ec2:DeletePlacementGroup" >> "${PERMISION_LIST}"
+    echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
+  fi
 
-# additional permisions for 4.14+
-if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
-  echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
+  # additional permisions for 4.14+
+  if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+    echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
 
-  # sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
-  echo "sts:AssumeRole" >> "${PERMISION_LIST}"
-fi
+    # sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
+    echo "sts:AssumeRole" >> "${PERMISION_LIST}"
+  fi
 
-# additional permisions for 4.15+
-if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
-  echo "iam:TagInstanceProfile" >> "${PERMISION_LIST}"
-fi
+  # additional permisions for 4.15+
+  if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
+    echo "iam:TagInstanceProfile" >> "${PERMISION_LIST}"
+  fi
 
-# additional permisions for 4.16+
-if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
-  echo "ec2:DisassociateAddress" >> "${PERMISION_LIST}"
-  echo "elasticloadbalancing:SetSecurityGroups" >> "${PERMISION_LIST}"
-  echo "s3:PutBucketPolicy" >> "${PERMISION_LIST}"
-fi
+  # additional permisions for 4.16+
+  if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
+    echo "ec2:DisassociateAddress" >> "${PERMISION_LIST}"
+    echo "elasticloadbalancing:SetSecurityGroups" >> "${PERMISION_LIST}"
+    echo "s3:PutBucketPolicy" >> "${PERMISION_LIST}"
+  fi
+}
 
-# generte policy file
+function create_profile_INSTALLER_417_IPI_FULL_MINT() {
+  cat <<EOF > "${PERMISION_LIST}"
+ec2:AllocateAddress
+ec2:AssociateRouteTable
+ec2:AttachInternetGateway
+ec2:AuthorizeSecurityGroupIngress
+ec2:CreateInternetGateway
+ec2:CreateNatGateway
+ec2:CreateRoute
+ec2:CreateRouteTable
+ec2:CreateSecurityGroup
+ec2:CreateSubnet
+ec2:CreateTags
+ec2:CreateVpc
+ec2:CreateVpcEndpoint
+ec2:DeleteInternetGateway
+ec2:DeleteNatGateway
+ec2:DeleteNetworkInterface
+ec2:DeleteRouteTable
+ec2:DeleteSecurityGroup
+ec2:DeleteSubnet
+ec2:DeleteVolume
+ec2:DeleteVpc
+ec2:DeleteVpcEndpoints
+ec2:DescribeAddresses
+ec2:DescribeAvailabilityZones
+ec2:DescribeDhcpOptions
+ec2:DescribeImages
+ec2:DescribeInstanceTypeOfferings
+ec2:DescribeInstanceTypes
+ec2:DescribeInstances
+ec2:DescribeInternetGateways
+ec2:DescribeNatGateways
+ec2:DescribeNetworkInterfaces
+ec2:DescribeRouteTables
+ec2:DescribeSecurityGroups
+ec2:DescribeSubnets
+ec2:DescribeVpcAttribute
+ec2:DescribeVpcEndpoints
+ec2:DescribeVpcs
+ec2:DetachInternetGateway
+ec2:DisassociateRouteTable
+ec2:ModifySubnetAttribute
+ec2:ModifyVpcAttribute
+ec2:ReleaseAddress
+ec2:RevokeSecurityGroupEgress
+ec2:RevokeSecurityGroupIngress
+ec2:RunInstances
+ec2:TerminateInstances
+elasticloadbalancing:CreateListener
+elasticloadbalancing:CreateLoadBalancer
+elasticloadbalancing:CreateTargetGroup
+elasticloadbalancing:DeleteListener
+elasticloadbalancing:DeleteLoadBalancer
+elasticloadbalancing:DeleteTargetGroup
+elasticloadbalancing:DeregisterTargets
+elasticloadbalancing:DescribeListeners
+elasticloadbalancing:DescribeLoadBalancerAttributes
+elasticloadbalancing:DescribeLoadBalancers
+elasticloadbalancing:DescribeTags
+elasticloadbalancing:DescribeTargetGroups
+elasticloadbalancing:DescribeTargetHealth
+elasticloadbalancing:ModifyLoadBalancerAttributes
+elasticloadbalancing:ModifyTargetGroupAttributes
+elasticloadbalancing:RegisterTargets
+elasticloadbalancing:SetSecurityGroups
+iam:AddRoleToInstanceProfile
+iam:CreateAccessKey
+iam:CreateInstanceProfile
+iam:CreateRole
+iam:CreateUser
+iam:DeleteAccessKey
+iam:DeleteInstanceProfile
+iam:DeleteRole
+iam:DeleteRolePolicy
+iam:DeleteUser
+iam:DeleteUserPolicy
+iam:GetInstanceProfile
+iam:GetRole
+iam:GetUser
+iam:GetUserPolicy
+iam:ListAccessKeys
+iam:ListAttachedRolePolicies
+iam:ListInstanceProfilesForRole
+iam:ListRolePolicies
+iam:ListRoles
+iam:ListUserPolicies
+iam:ListUsers
+iam:PutRolePolicy
+iam:PutUserPolicy
+iam:RemoveRoleFromInstanceProfile
+iam:SimulatePrincipalPolicy
+iam:TagUser
+kms:CreateGrant
+kms:Decrypt
+kms:GenerateDataKey
+kms:GenerateDataKeyWithoutPlaintext
+route53:ChangeResourceRecordSets
+route53:ChangeTagsForResource
+route53:CreateHostedZone
+route53:DeleteHostedZone
+route53:GetChange
+route53:GetHostedZone
+route53:ListHostedZones
+route53:ListHostedZonesByName
+route53:ListResourceRecordSets
+s3:CreateBucket
+s3:DeleteBucket
+s3:PutBucketPolicy
+s3:PutBucketTagging
+servicequotas:ListAWSDefaultServiceQuotas
+servicequotas:ListServiceQuotas
+tagging:GetResources
+EOF
+}
+
+#
+# Setup profile
+# The variable INSTALLER_IAM_PROFILE sets the profile according to the variant, otherwise
+# default 'minimum' profile is used.
+#
+PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
+
+case ${INSTALLER_IAM_PROFILE:-} in
+  INSTALLER_* )
+      echo "Setting up IAM Profile ${INSTALLER_IAM_PROFILE}"
+      create_profile_"${INSTALLER_IAM_PROFILE}"
+    ;;
+  * )
+      create_profile_default
+    ;;
+esac
+
+# generate policy file
 
 PERMISION_JSON="${ARTIFACT_DIR}/permision_list.json"
 jq --raw-input . "${PERMISION_LIST}" | jq -sc > "${PERMISION_JSON}"

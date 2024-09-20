@@ -546,6 +546,43 @@ function get_arch() {
   echo "${ARCH}"
 }
 
+# create_aws_iam creates custom IAM user and overrides the credentials used in this step.
+# Problem: there is another AWS calls in this step, that will fall into the new user.
+# If the intention of new user isolate the credentials used by installer, those calls
+# should inject unexpected calls to the logs, generating wrong compiled permissions.
+# function create_aws_iam() {
+#   # WIP
+#   export AWS_PROFILE=default
+#   export INSTALL_USER="${NAMESPACE}-${UNIQUE_HASH}"
+#   if [ "${USE_RESTRICTED_IAM:-}" == "true" ]; then
+#     echo "Creating user $INSTALL_USER"
+#     echo "${INSTALL_USER}" > "${SHARED_DIR}/install-user-name"
+
+#     # Step 1: Create the IAM user
+#     aws iam create-user --user-name ${INSTALL_USER}
+
+#     # Step 2: Attach the AdministratorAccess policy to the user
+#     # TODO: This should be replaced with a more restrictive policy
+#     aws iam attach-user-policy --user-name ${INSTALL_USER} --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+
+#     # Step 3: Create an access key for the user
+#     credsFile="/tmp/.aws-credentials"
+#     aws iam create-access-key --user-name ${INSTALL_USER} > ${credsFile}
+
+#     # Step 4: Create a profile to be used by this user
+#     # Override the default credentials file
+#     cat << EOF > ${SHARED_DIR}/.aws-credentials
+#     [default]
+#     region = ${LEASED_RESOURCE}
+#     aws_access_key_id = $(jq -r .AccessKey.AccessKeyId ${credsFile})
+#     aws_secret_access_key = $(jq -r .AccessKey.SecretAccessKey ${credsFile})
+# EOF
+#     export AWS_SHARED_CREDENTIALS_FILE_DEFAULT=${AWS_SHARED_CREDENTIALS_FILE}
+#     export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/.aws-credentials
+#     #export AWS_PROFILE=${INSTALL_USER}
+#   fi
+# }
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM INT
 

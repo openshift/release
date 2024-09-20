@@ -21,7 +21,7 @@ trap 'save_logs' EXIT TERM
 
 export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
-  echo "Setting AWS credential with minimal permision for installer"
+  echo "Using AWS credential with minimal permision for installer"
   export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
 else
   export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
@@ -116,6 +116,13 @@ set -e
 
 if [[ -s /tmp/installer/quota.json ]]; then
         cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
+fi
+
+if [[ -f "${SHARED_DIR}/install-user-name" ]]; then
+  # switch to default permissions and delete the user
+  echo "Deleting user $INSTALL_USER"
+  export AWS_SHARED_CREDENTIALS_FILE=$AWS_SHARED_CREDENTIALS_FILE_DEFAULT
+  aws iam delete-user --user-name "$(cat "${SHARED_DIR}"/install-user-name)"
 fi
 
 exit "$ret"

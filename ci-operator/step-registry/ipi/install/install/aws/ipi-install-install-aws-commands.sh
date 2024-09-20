@@ -168,6 +168,8 @@ EOF
   echo 'Patched efa pg into 99_openshift-cluster-api_worker-machineset-0.yaml'
 }
 
+
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 

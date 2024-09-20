@@ -4,7 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+  echo "Using AWS credential with minimal permision for installer"
+  export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+else
+  export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
+fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
