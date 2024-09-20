@@ -15,27 +15,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: payload-control-plane-6nodes
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "6"
-      ENABLE_LOCAL_INDEX: "true"
-      ES_TYPE: qe
-      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
-      ITERATION_MULTIPLIER_ENV: "15"
-      JUNIT: "true"
-      RUN_ORION: "true"
-      VERSION: "4.17"
-      ZONES_COUNT: "3"
-    test:
-    - chain: openshift-qe-control-plane
-    - chain: openshift-qe-orion-consolidated
-    workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 - as: control-plane-120nodes
   cron: 0 2 4,11,18,25 * *
   steps:
@@ -55,6 +34,46 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
+- always_run: false
+  as: control-plane-249nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "249"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      PROFILE_TYPE: reporting
+      SIZE_VARIANT: large
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: payload-node-density-cni-249nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "249"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      POD_READY_THRESHOLD: 4s
+      PROFILE_TYPE: reporting
+      SIZE_VARIANT: large
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
 - as: control-plane-24nodes
   cron: 0 5 2,9,16,23 * *
   steps:
