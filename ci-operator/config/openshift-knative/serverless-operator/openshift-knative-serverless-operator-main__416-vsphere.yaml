@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: "4.15"
-    namespace: ocp
-    tag: hypershift-operator
   ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
@@ -40,7 +36,7 @@ base_images:
     namespace: origin
     tag: operator-registry
   upi-installer:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -112,10 +108,9 @@ images:
   to: serverless-metadata-webhook
 releases:
   latest:
-    integration:
-      include_built_images: true
-      name: "4.15"
-      namespace: ocp
+    release:
+      channel: fast
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -124,17 +119,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-hypershift-continuous
-  cron: 43 20 * * 6
+- as: e2e-vsphere-continuous
+  cron: 35 17 * * 0
   steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_NODE_COUNT: "6"
+    cluster_profile: vsphere-elastic
     test:
     - as: operator-e2e
-      commands: make USER_MANAGEMENT_ALLOWED=false test-e2e-with-kafka
+      commands: make HA=false test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -157,58 +148,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        limits:
-          memory: 8Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-  timeout: 8h0m0s
+    workflow: openshift-e2e-vsphere-upi
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 415-hypershift
+  variant: 416-vsphere
