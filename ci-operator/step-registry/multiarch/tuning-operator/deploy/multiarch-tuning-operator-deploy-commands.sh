@@ -91,6 +91,21 @@ patches:
         value: ${CATALOG_IMAGE_OVERRIDE}
 EOF
     fi
+    if [[ -n "$SUBSCRIPTION_CHANNEL_OVERRIDE" ]]; then
+        cat <<EOF >> /tmp/kustomization/kustomization.yaml
+patches:
+  - target:
+      group: operators.coreos.com
+      version: v1alpha1
+      kind: Subscription
+      name: openshift-multiarch-tuning-operator
+      namespace: openshift-multiarch-tuning-operator
+    patch: |-
+      - op: replace
+        path: /spec/channel
+        value: ${SUBSCRIPTION_CHANNEL_OVERRIDE}
+EOF
+    fi
     oc apply -k /tmp/kustomization
 fi
 if [[ "$MTO_OPERATOR_INSTALL_METHOD" == "bundle" ]]; then 
