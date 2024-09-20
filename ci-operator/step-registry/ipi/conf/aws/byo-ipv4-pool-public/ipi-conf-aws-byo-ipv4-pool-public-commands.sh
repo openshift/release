@@ -92,4 +92,61 @@ cat ${CONFIG_PATCH}
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
 # save pool id for post-check
-echo ${pool_id} > ${SHARED_DIR}/ipv4_pool_id
+echo "${pool_id}" > ${SHARED_DIR}/ipv4_pool_id
+
+if [[ "${USE_PUBLIC_IPV4_POOL_INGRESS-}" != "yes" ]]; then
+  echo "USE_PUBLIC_IPV4_POOL_INGRESS(${USE_PUBLIC_IPV4_POOL_INGRESS-}) is not enabled, skipping Ingress configuration"
+  exit 0
+fi
+
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
+TAGS="{Key=Name,Value=${CLUSTER_NAME}-eip-lb-ingress}"
+TAGS+=",{Key=expirationDate,Value=${EXPIRATION_DATE}}"
+TAGS+=",{Key=kubernetes.io/cluster/${CLUSTER_NAME},Value=shared}"
+TAGS+=",{Key=sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME},Value=shared}"
+TAGS+=",{Key=sigs.k8s.io/cluster-api-provider-aws/role,Value=none}"
+
+RESOURCE_TAGS="ResourceType=elastic-ip,Tags=[${TAGS}]"
+
+echo "Creating Elastic IPs for each zone..."
+# Create a new Elastic IP for each zones
+for i in $(seq 0 $((zone_count - 1))); do
+  aws ec2 allocate-address \
+    --domain vpc \
+    --region "${AWS_REGION}" \
+    --tag-specifications "${RESOURCE_TAGS}" \
+    --public-ipv4-pool "${pool_id}" > /tmp/eip-"${i}".json
+done
+
+eip_allocation_ids=$(jq -r '.AllocationId' /tmp/eip-*.json | paste -sd "," -)
+
+## Create Ingress manifest to use the custom pool
+# Open question:
+# - should we skip changing the LB type to NLB? Looks like the EP is limited to NLB:
+# https://github.com/openshift/enhancements/blob/0c90e8e306581c80ca66a29ad5f56351f0ae8bcd/enhancements/ingress/set_eip_nlb_ingress.md
+# ^-> need to confirm with NE team.
+cat > "${SHARED_DIR}/manifest_cluster-ingress-default-ingresscontroller.yaml" << EOF
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+spec:
+   endpointPublishingStrategy:
+     loadBalancer:
+       scope: External
+       providerParameters:
+         type: AWS
+         aws:
+           type: NLB
+           networkLoadBalancer:
+             eipAllocations: [${eip_allocation_ids}]
+     type: LoadBalancerService
+EOF
+
+# Saving the EIP allocation IDs for deprovision
+echo "${eip_allocation_ids}" > "${SHARED_DIR}/eip_allocation_ids"
+
+# Saving the EIP allocation IDs for post-check
+echo "${eip_allocation_ids}" > "${ARTIFACT_DIR}/eip_allocation_ids"
