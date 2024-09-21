@@ -116,3 +116,4 @@ export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
 check_marketplace
 create_catalog_sources
+sleep 28800
