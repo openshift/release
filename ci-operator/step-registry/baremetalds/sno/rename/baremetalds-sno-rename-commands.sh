@@ -228,6 +228,9 @@ then
 
   delete_crts_keys
 
+  echo "Removing previous OVN dbs..."
+  rm -rf /var/lib/ovn-ic/etc/ovn*.db
+
   stable_period_minutes=5
   start=\$(date +%s)
   start_containers
