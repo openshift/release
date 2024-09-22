@@ -23,8 +23,7 @@ source network.sh
 export HUB_DIR=/ibio-gather/hub
 mkdir -p ${HUB_DIR}
 oc get baremetalhost ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/baremetalhost.yaml
-# older versions of ibio might not use dataimage, so we don't want to fail if it doesn't exist
-oc get dataimage ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/dataimage.yaml || true
+oc get dataimage ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/dataimage.yaml
 oc get clusterdeployment ibi-cluster -n ibi-cluster -o yaml > ${HUB_DIR}/clusterdeployment.yaml
 oc get imageclusterinstall ibi-cluster -n ibi-cluster -o yaml > ${HUB_DIR}/imageclusterinstall.yaml
 oc logs --tail=-1 -l app=image-based-install-operator -n image-based-install-operator -c manager > ${HUB_DIR}/image-based-install-operator-manager.log
