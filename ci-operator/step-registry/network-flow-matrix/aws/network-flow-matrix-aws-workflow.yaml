@@ -1,0 +1,20 @@
+workflow:
+  as: network-flow-matrix-aws
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-multi-network-policy-manifest
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    - ref: network-flow-matrix-tests
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      TEST_SUITE: openshift/conformance/serial
+  documentation: |-
+    Install a cluster through an ssh and run network-flow-matrix related tests on it.
