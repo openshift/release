@@ -3,61 +3,61 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
-  ci_tests-private-base_4.17:
+  ci_tests-private-base_4.18:
     name: tests-private-base
     namespace: ci
-    tag: "4.17"
-  ci_tests-private-baseui_4.17:
+    tag: "4.18"
+  ci_tests-private-baseui_4.18:
     name: tests-private-baseui
     namespace: ci
-    tag: "4.17"
-  ci_tests-private-builder_4.17:
+    tag: "4.18"
+  ci_tests-private-builder_4.18:
     name: tests-private-builder
     namespace: ci
-    tag: "4.17"
+    tag: "4.18"
   netobserv_network-observability-cli_ci:
     name: network-observability-cli
     namespace: netobserv
     tag: ci
-  ocp_4.17_tools:
-    name: "4.17"
+  ocp_4.18_tools:
+    name: "4.18"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.17
+  from: ci_tests-private-base_4.18
   inputs:
     ci_rosa-aws-cli_latest:
       as:
       - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_4.17:
+    ci_tests-private-builder_4.18:
       as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.17
+      - registry.ci.openshift.org/ci/tests-private-builder:4.18
     netobserv_network-observability-cli_ci:
       as:
       - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.17
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.18
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && \
         mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.17:
+    ci_tests-private-baseui_4.18:
       as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.17
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.18
     src:
       as:
       - src
@@ -82,31 +82,31 @@ images:
   optional: true
   to: tests-private-baseui
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.17
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.18
     RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4 && CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/candidate && \
         curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp-dev-preview/ -o pre.html && \
-        ecver=$(grep -E "<a href=\"candidate-4\.17" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V" && \
+        ecver=$(grep -E "<a href=\"candidate-4\.18" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V" && \
         if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRRORURL}/x86_64/clients/ocp-dev-preview/${ecver}; fi && \
-        rcgaver=$(grep -E "<a href=\"4\.17" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V" && \
+        rcgaver=$(grep -E "<a href=\"4\.18" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V" && \
         if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/${rcgaver}; fi && \
         curl -s -k -L ${CLIENTURL}/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
         tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
         oc-mirror version && skopeo --version && rm -rf /usr/bin/oc
-  from: ci_tests-private-base_4.17
+  from: ci_tests-private-base_4.18
   optional: true
   to: tests-private-tools
 - dockerfile_path: images/Dockerfile.base
   inputs:
-    ocp_4.17_tools:
+    ocp_4.18_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.17:tools
+      - registry.ci.openshift.org/ocp/4.18:tools
   optional: true
   to: tests-private-base
 - dockerfile_path: images/Dockerfile.builder
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   optional: true
   to: tests-private-builder
 promotion:

@@ -159,7 +159,7 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'southcentralus': 10,
+        'westus2': 10,
         'centralus': 10
     },
     'azure-autorelease-qe-quota-slice': {
@@ -359,6 +359,9 @@ CONFIG = {
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'aws-kubevirt-quota-slice': {
+        'us-west-2': 10,
+    },
     'hypershift-powervs-quota-slice': {
         'default': 3,
     },
@@ -419,6 +422,9 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+    },
+    'aro-redhat-tenant-quota-slice': {
+        'default': 1,
     }
 }
 

@@ -64,7 +64,7 @@ go mod tidy
 # Run OADP Kubevirt tests if configured
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
-  oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true &&\
+  oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true &&\
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
   export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\

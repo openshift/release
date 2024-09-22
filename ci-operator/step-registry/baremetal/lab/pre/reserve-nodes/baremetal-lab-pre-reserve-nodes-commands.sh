@@ -29,9 +29,23 @@ echo "$HYPERSHIFT_HOSTED_CLUSTER_NAME" > "$SHARED_DIR"/hostedcluster_name
 
 [ "${HYPERSHIFT}" == "true" ] && touch "$SHARED_DIR/deploy_hypershift_hosted"
 
+env > /tmp/prow.env
+JOB_URL=$(echo "$JOB_SPEC" |  yq \
+  '.decoration_config.gcs_configuration.job_url_prefix, "gs/", .decoration_config.gcs_configuration.bucket' | \
+  tr -d '\n')
+
+if [ -n "${PULL_NUMBER:-}" ]; then
+  JOB_URL=${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}
+else
+  JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
+fi
+echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
+echo "Copying the env to the bastion host"
+scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
+
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" \
+  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
   "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
@@ -43,15 +57,18 @@ N_MASTERS="${2}"
 N_WORKERS="${3}"
 REQUEST_BOOTSTRAP_HOST="${4}"
 ARCH="${5}"
-ADDITIONAL_WORKERS="${6:-}"
-ADDITIONAL_WORKER_ARCHITECTURE="${7:-}"
-VENDOR="${8:-}"
+JOB_URL="${6}"
+ADDITIONAL_WORKERS="${7:-}"
+ADDITIONAL_WORKER_ARCHITECTURE="${8:-}"
+VENDOR="${9:-}"
 
+systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/dnsmasq/tftpboot,/opt/html}/${BUILD_ID}
 mkdir -m 777 -p /opt/nfs/${BUILD_ID}
 touch /etc/hosts_pool_reserved
-
+mv /tmp/${BUILD_ID}.prow.env /var/builds/${BUILD_ID}/prow.env
+systemd-cat -t "${BUILD_ID}" -p7 cat /var/builds/${BUILD_ID}/prow.env
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
 N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
@@ -69,21 +86,6 @@ more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 
 echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
 echo "root" > "${SHARED_DIR}/bastion_ssh_user"
-
-echo "Copying the env result to the bastion host"
-env > /tmp/prow.env
-JOB_URL=$(echo "$JOB_SPEC" |  yq \
-  '.decoration_config.gcs_configuration.job_url_prefix, "gs/", .decoration_config.gcs_configuration.bucket' | \
-  tr -d '\n')
-
-if [ -n "${PULL_NUMBER:-}" ]; then
-  JOB_URL=${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}
-else
-  JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
-fi
-echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
-
-scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/prow.env"
 
 # We set the MAC Address and IP for a possible bootstrap VM to be used for IPI installations.
 VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")

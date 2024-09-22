@@ -15,6 +15,10 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: cli
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   upi-installer:
     name: 4.13-priv
     namespace: ocp-private
@@ -33,6 +37,9 @@ images:
     ci_tests-private-builder_4.13:
       as:
       - registry.ci.openshift.org/ci/tests-private-builder:4.13
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -127,7 +134,6 @@ tests:
     fi
   container:
     from: src
-  optional: true
 - as: code-check
   commands: |
     unset GOFLAGS
@@ -136,10 +142,9 @@ tests:
     make check-code
   container:
     from: src
-  optional: true
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
+  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
   steps:
     cluster_profile: aws
     test:

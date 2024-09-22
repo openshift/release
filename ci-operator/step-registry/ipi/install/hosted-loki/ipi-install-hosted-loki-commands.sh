@@ -384,6 +384,8 @@ spec:
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
         app.kubernetes.io/version: ${PROMTAIL_VERSION}
+      annotations:
+        openshift.io/required-scc: privileged
     spec:
       nodeSelector:
         kubernetes.io/os: linux
@@ -732,6 +734,8 @@ spec:
     metadata:
       labels:
         app: event-exporter
+      annotations:
+        openshift.io/required-scc: restricted-v2
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: event-exporter
