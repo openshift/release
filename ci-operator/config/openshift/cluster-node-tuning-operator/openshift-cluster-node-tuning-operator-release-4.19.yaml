@@ -86,6 +86,25 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: hypershift-aws-e2e-cluster
+- always_run: false
+  as: e2e-pao-updating-profile-hypershift
+  steps:
+    cluster_profile: hypershift
+    test:
+    - as: e2e-pao-updating-profile-hypershift
+      cli: latest
+      commands: |-
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        make pao-functests-update-only-hypershift
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-aws-e2e-cluster
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
