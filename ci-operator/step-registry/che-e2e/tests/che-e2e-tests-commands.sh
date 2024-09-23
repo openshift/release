@@ -20,8 +20,6 @@ export SAVE_JUNIT_DATA
 oc new-project $CHE_NAMESPACE
 oc project $CHE_NAMESPACE
 
-mkdir -p "${ARTIFACT_DIR}"/tests
-
 echo "Creating test Pod: interop-wto"
 cat <<EOF | oc create -f -
 apiVersion: v1
@@ -59,6 +57,8 @@ spec:
           value: "true"
         - name: TS_OCP_LOGIN_PAGE_PROVIDER_TITLE
           value: "rosa-htpasswd"
+        - name: SAVE_JUNIT_DATA
+          value: "${SAVE_JUNIT_DATA}"
       volumeMounts:
         - name: test-run-results
           mountPath: /tmp/e2e/report/
@@ -82,17 +82,19 @@ spec:
       args:
         [
           "-c",
-          "sleep 240",
+          "sleep 400",
         ]
   restartPolicy: Never
 EOF
 
-trap 'sleep 2h' EXIT TERM
-
-# Try to collect logs with rsync command
-mkdir -p "${ARTIFACT_DIR}"/tests/debug
-oc rsync -n $CHE_NAMESPACE ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports ${ARTIFACT_DIR}/tests/debug || true
-
-oc wait --for=condition=ContainersReady=true pod/${TEST_POD_NAME} -n $CHE_NAMESPACE --timeout=300s || true
+mkdir -p "${ARTIFACT_DIR}"/tests
+echo "Waiting for copy synchronization between shared volumes"
+sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
+cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/tests
+
+## Collect logs with rsync command
+#mkdir -p "${ARTIFACT_DIR}"/tests/container-download-reports
+#oc rsync ${CHE_NAMESPACE}/${TEST_POD_NAME}:/tmp/e2e/report -c download-reports ${ARTIFACT_DIR}/tests/container-download-reports || true
+#sleep 180
