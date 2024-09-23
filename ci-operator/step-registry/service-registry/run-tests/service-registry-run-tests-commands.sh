@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# WIP
+
 function copyArtifacts() {
   echo "Rename JUnit files"
   rename TEST junit_TEST target/surefire-reports/*.xml
