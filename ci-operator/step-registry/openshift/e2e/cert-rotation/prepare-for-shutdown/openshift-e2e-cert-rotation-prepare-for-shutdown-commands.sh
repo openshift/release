@@ -171,7 +171,7 @@ function wait-for-operators-to-stabilize {
   export KUBECONFIG=/tmp/lb-ext.kubeconfig
   # Wait for operators to stabilize
   if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m; then
+    ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
       oc get nodes
       oc get co | grep -v "True\s\+False\s\+False"
       exit 1
