@@ -146,12 +146,13 @@ function pod-restart-workarounds {
   export KUBECONFIG=/tmp/lb-ext.kubeconfig
   ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
-  if ocp_minor_version <=15; then
-    # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
-    # Restart OVN / Multus before proceeding
-    oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
-    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
-    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
+  # Restart OVN / Multus before proceeding
+  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+
+  if [[ ${ocp_minor_version} -le 15 ]]; then
     # Workaround for https://issues.redhat.com/browse/OCPBUGS-15827
     # Restart console and console-operator pods
     oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
