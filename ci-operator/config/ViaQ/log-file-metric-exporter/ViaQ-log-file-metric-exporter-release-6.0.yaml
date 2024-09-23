@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -11,24 +7,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
+    tag: rhel-9-release-golang-1.20-openshift-4.16
 images:
 - from: ubi9-minimal
-  inputs:
-    base:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
-  to: logging-eventrouter
+  to: log-file-metric-exporter
 promotion:
   to:
-  - name: 6.y
+  - name: "6.0"
     namespace: logging
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -41,7 +32,8 @@ tests:
   commands: make test
   container:
     from: src
+  timeout: 10m0s
 zz_generated_metadata:
-  branch: master
-  org: openshift
-  repo: eventrouter
+  branch: release-6.0
+  org: ViaQ
+  repo: log-file-metric-exporter
