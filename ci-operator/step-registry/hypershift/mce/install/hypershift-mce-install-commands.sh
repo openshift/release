@@ -248,4 +248,4 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.5)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.4)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
