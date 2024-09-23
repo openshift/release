@@ -61,8 +61,7 @@ export -f install_jq
 function install_yq3() {
   log "Checking/installing yq3..."
   if ! command -v yq3; then
-    wget -qO /tmp/yq3 https://github.com/mikefarah/yq/releases/download/3.4.0/yq_linux_amd64
-    chmod u+x /tmp/yq3
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.4.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq3 && chmod u+x /tmp/yq3
   fi
   log "Installing yq3 done:"
   which yq3
@@ -72,8 +71,7 @@ export -f install_yq3
 function install_yq4() {
   log "Checking/installing yq..."
   if ! [ -x "\$(command -v yq4)" ]; then
-    wget -q -O /tmp/yq4 https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64
-    chmod u+x /tmp/yq4
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq4 && chmod u+x /tmp/yq4
   fi
   log "Installing yq4 done:"
   which yq4
