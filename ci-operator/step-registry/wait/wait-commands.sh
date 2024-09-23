@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SLEEP_DURATION="72"
+SLEEP_DURATION="72h"
 
 # Get the suffix of the SLEEP_DURATION, if any.
 SLEEP_DURATION_SUFFIX="${SLEEP_DURATION//[0-9]/}"
