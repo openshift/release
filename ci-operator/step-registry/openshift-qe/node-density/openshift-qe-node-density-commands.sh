@@ -40,6 +40,7 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
 fi
 
 export EXTRA_FLAGS
+export GC=false
 
 rm -f ${SHARED_DIR}/index.json
 
