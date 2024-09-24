@@ -16,10 +16,10 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 35,
-        'us-west-2': 40,
+        'us-east-1': 60,
+        'us-east-2': 60,
+        'us-west-1': 55,
+        'us-west-2': 60,
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
