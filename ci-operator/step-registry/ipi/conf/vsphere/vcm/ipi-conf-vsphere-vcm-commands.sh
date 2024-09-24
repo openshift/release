@@ -37,6 +37,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
+DISKS=""
 
 set +o errexit
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
@@ -120,6 +121,15 @@ else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
 fi
 
+if [ -n "${ADDITIONAL_DISK}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
+  DISKS="platform:
+    vsphere:
+      additionalDisks:
+      - diskSizeGiB: 20
+        name: Disk1"
+fi
+
 if [ ${Z_VERSION} -gt 9 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
   RESOURCE_POOL_DEF="resourcePool: ${vsphere_cluster}/Resources/ipi-ci-clusters"
@@ -146,9 +156,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
+  ${DISKS}
 compute:
 - name: worker
-  replicas: ${COMPUTE_NODE_REPLICAS}"
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  ${DISKS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
