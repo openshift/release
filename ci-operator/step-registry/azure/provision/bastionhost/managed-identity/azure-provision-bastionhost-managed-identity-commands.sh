@@ -95,8 +95,6 @@ if [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "user-defined" ]]; then
     run_command "az role assignment create --role 'Storage Blob Data Contributor' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
     # save role assignment id for destroy
     az role assignment list --assignee ${user_identity_id} --query '[].id' -otsv >> ${azure_role_assignment_file}
-    echo "Debug: "
-    cat ${azure_role_assignment_file}
     
 
     # save azure auth json file
@@ -117,8 +115,6 @@ elif [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "system" ]]; then
     run_command "az role assignment create --role 'Storage Blob Data Contributor' --assignee ${system_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
     # save role assignment id for destroy
     az role assignment list --assignee ${system_identity_id} --query '[].id' -otsv >> ${azure_role_assignment_file}
-    echo "Debug: "
-    cat ${azure_role_assignment_file}
 
     # save azure auth json file
     cat > "${azure_identity_auth_file}" << EOF

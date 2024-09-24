@@ -733,7 +733,7 @@ case $JOB_NAME in
     max=1
     ;;
   *)
-    max=1
+    max=3
     ;;
 esac
 ret=4
