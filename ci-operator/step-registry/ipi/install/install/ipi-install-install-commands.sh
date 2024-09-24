@@ -351,7 +351,7 @@ scrape_configs:
       - invoker
       - systemd_unit
   - static_labels:
-      type: systemd-journal
+      type: journal
   relabel_configs:
   - action: labelmap
     regex: __journal__(.+)
