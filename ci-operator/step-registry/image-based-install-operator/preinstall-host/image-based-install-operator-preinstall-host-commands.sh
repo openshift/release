@@ -10,6 +10,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 echo "export INSTALLER_PULL_REF=${INSTALLER_PULL_REF}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 echo "export SEED_IMAGE=${SEED_IMAGE}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export SEED_IMAGE_TAG=${SEED_IMAGE_TAG}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
@@ -49,6 +50,7 @@ set +x
 export PULL_SECRET=$(cat ${PULL_SECRET_FILE} | jq -c .)
 set -x
 
+export SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 podman pull ${SEED_IMAGE}
 export SEED_VERSION=$(podman inspect ${SEED_IMAGE} | jq '.[0].Labels."com.openshift.lifecycle-agent.seed_cluster_info"' | jq -R -s 'split(",")' | grep seed_cluster_ocp_version | jq -R -s 'split(":")'[1] | jq -R -s 'split(",")'[0] | sed -E 's/(\\|,|\")//g')
 echo ${SEED_VERSION} > seed-version

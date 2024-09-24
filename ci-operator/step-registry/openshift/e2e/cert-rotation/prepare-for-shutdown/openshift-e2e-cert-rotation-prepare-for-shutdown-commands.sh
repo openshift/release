@@ -20,6 +20,7 @@ SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'Stri
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
+LONG_COMMAND_TIMEOUT=30m
 
 mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
@@ -41,9 +42,18 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-long {
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+}
+
 function run-on-first-master-silent {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
+
+function run-on-first-master-silent-long {
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
+}
+
 
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
@@ -81,44 +91,72 @@ timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${cont
 run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
-  set -x
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   echo "Waiting for API server to come up"
   until oc get nodes; do sleep 10; done
   mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+  RAN_CSR_APPROVAL=""
   for nodename in ${nodes[@]}; do
-    echo -n "Waiting for ${nodename} to become Ready"
+    echo "Waiting for ${nodename} to send heartbeat"
     while true; do
       STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-      TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
+      NODE_HEARTBEAT_TIME=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
+      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then sleep 5; fi
+      TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
       if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
         break
       fi
-      bash /usr/local/bin/approve-csrs-with-timeout.sh
+      if [[ -z ${RAN_CSR_APPROVAL} ]]; then
+        bash /usr/local/bin/approve-csrs-with-timeout.sh
+        RAN_CSR_APPROVAL=1
+      else
+        echo -n "."
+        sleep 10
+      fi
     done
-    echo
+    echo "${nodename} is sending heartbeats"
   done
+  echo "All nodes are ready"
   oc get nodes
-  bash /usr/local/bin/approve-csrs-with-timeout.sh
 EOZ
 chmod a+x /tmp/ensure-nodes-are-ready.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-silent "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master-long "bash -x /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig && ls -la /tmp/lb-ext.kubeconfig"
+  copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
+}
+
+cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+  echo "Waiting for lb-ext kubeconfig to be valid"
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  until oc get nodes; do sleep 10; done
+EOZ
+chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
+run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh && chmod a+x /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
+
+function wait-for-valid-lb-ext-kubeconfig {
+  run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
 
 function pod-restart-workarounds {
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
-  # Restart OVN / Multus before proceeding
-  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
-  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
-  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-15827
-  # Restart console and console-operator pods
-  oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
-  oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
+  export KUBECONFIG=/tmp/lb-ext.kubeconfig
+  ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+
+  if ocp_minor_version <=15; then
+    # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
+    # Restart OVN / Multus before proceeding
+    oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+    # Workaround for https://issues.redhat.com/browse/OCPBUGS-15827
+    # Restart console and console-operator pods
+    oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
+    oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
+  fi
 }
 
 function prepull-tools-image-for-gather-step {
@@ -129,6 +167,7 @@ function prepull-tools-image-for-gather-step {
 }
 
 function wait-for-operators-to-stabilize {
+  export KUBECONFIG=/tmp/lb-ext.kubeconfig
   # Wait for operators to stabilize
   if
     ! oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m; then

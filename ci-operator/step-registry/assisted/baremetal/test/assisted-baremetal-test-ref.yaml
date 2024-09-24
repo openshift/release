@@ -15,17 +15,23 @@ ref:
     default: "false"
     documentation: If the value is equal to "true", run only the upgrade tests
   - name: TEST_TYPE
-    default: "list"
+    default: minimal
     documentation: |-
       Specifies the type of test to run:
       * 'suite' - Run a full test suite. If chosen, 'TEST_SUITE' and 'TEST_PROVIDER' can be specified.
-      * 'list' - Run a specific list of tests. 'TEST_LIST' specified.
+      * 'custom' - Run a custom list of tests. If chosen, 'CUSTOM_TEST_LIST' must be specified.
+      * 'minimal' - Run the minimal test list.
+      * 'extensive' - Run the extensive test list.
       * 'none' - Don't run any tests.
   - name: TEST_SUITE
     default: "openshift/conformance/parallel"
     documentation: |-
       The test suite to run. This will be considered only if 'TEST_TYPE' is set to 'suite'.
-  - name: TEST_LIST
+  - name: CUSTOM_TEST_LIST
+    default: ""
+    documentation: |-
+      The test list to run. This will be considered only if 'TEST_TYPE' is set to 'custom'.
+  - name: EXTENSIVE_TEST_LIST
     default: |-
       "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition creating/deleting custom resource definition objects works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
       "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition getting/updating/patching custom resource definition status sub-resource works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
@@ -134,11 +140,11 @@ ref:
       "[sig-node] Secrets should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
       "[sig-scheduling] LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
     documentation: |-
-      The specific list of tests to run. This will be considered only if 'TEST_TYPE' is set to 'list'.
+      Extensive test list. will be considered if 'TEST_TYPE' is set to 'fixed' and 'FIXED_TEST_LIST' is set to 'extensive'.
   - name: TEST_PROVIDER
     default: "baremetal"
     documentation: |-
-      The test provider for the test suite. This will be considered only if 'TEST_TYPE' is set to 'suite'
+      The test provider for the test suite. This will be considered only if 'TEST_TYPE' is set to 'suite'.
   - name: TEST_SKIPS
     default: |-
       [sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server
@@ -155,6 +161,11 @@ ref:
       [sig-network] DNS should resolve DNS of partial qualified names for the cluster
       [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options
       [sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it
+  - name: MINIMAL_TEST_LIST
+    default: |-
+      "[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+    documentation: |-
+      Minimal test list. This will be considered if 'TEST_TYPE' is se to 'fixed' and 'FIXED_TEST_LIST' is set to 'minimal'.
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_UPGRADE_RELEASE_IMAGE

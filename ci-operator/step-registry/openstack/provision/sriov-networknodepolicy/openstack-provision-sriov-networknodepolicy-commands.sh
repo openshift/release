@@ -118,20 +118,6 @@ wait_for_injector_webhook() {
   fi
 }
 
-create_default_sriov_operator_config() {
-    oc apply -f - <<EOF
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovOperatorConfig
-metadata:
-  name: default
-  namespace: openshift-sriov-network-operator
-spec:
-  enableInjector: true
-  enableOperatorWebhook: true
-  logLevel: 2
-EOF
-}
-
 create_sriov_networknodepolicy() {
     local name="${1}"
     local network="${2}"
@@ -185,11 +171,6 @@ then
 fi
 
 wait_for_sriov_pods
-
-# This is only needed on ocp 4.16+
-# introduced https://github.com/openshift/sriov-network-operator/pull/887
-# u/s https://github.com/k8snetworkplumbingwg/sriov-network-operator/pull/617
-create_default_sriov_operator_config
 
 WEBHOOK_ENABLED=$(oc get sriovoperatorconfig/default -n openshift-sriov-network-operator -o jsonpath='{.spec.enableOperatorWebhook}')
 if [ "${WEBHOOK_ENABLED}" == true ]; then
