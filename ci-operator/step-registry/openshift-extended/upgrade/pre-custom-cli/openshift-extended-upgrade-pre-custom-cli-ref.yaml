@@ -1,0 +1,65 @@
+ref:
+  as: openshift-extended-upgrade-pre-custom-cli
+  from: tests-private-preupg
+  grace_period: 10m
+  commands: openshift-extended-upgrade-pre-custom-cli-commands.sh
+  cli: custom
+  timeout: 4h0m0s
+  env:
+  - name: TEST_SCENARIOS_PREUPG
+    default: |
+        MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
+        Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK
+        Workloads|Image_Registry|Container_Engine_Tools
+        NODE|OTA|PerfScale|Cluster_Observability|CFE
+    documentation: |-
+      Select the test case for pre-upgrade. It's a RE pattern and is passed to the 'grep -E'
+  - name: TEST_ADDITIONAL_PREUPG
+    default: ""
+    documentation: |
+      It is additional scenario to combine the TEST_SCENARIOS_PREUPG to make final scenarios.
+  - name: TEST_FILTERS
+    default: "~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&"
+    documentation: |
+      It is filters to select case based on some case attribution which is in case title.
+  - name: FILTERS_ADDITIONAL
+    default: "~StressTest&"
+    documentation: |
+      It is additional filters to combine the TEST_FILTERS to make final filters.
+  - name: MODULE_FILTERS_TEST_PREUPG
+    default: ""
+    documentation: |
+      After test filsters are executed, it is filters to select case for certain moudle.
+      the formart: <moudle_name1>:<filters1>#<moudle_name2>:<fitlers2>#<moudle_nameN>:<fitlersN>
+      the example: OLM:V1&;~Catalog&#Operator_SDK:~opm&;Cve&
+  - name: TEST_FILTERS_PREUPG
+    default: ""
+    documentation: |
+      It is filters to select case specific to pre-upgrade based on some case attribution which is in case title.
+  - name: TEST_IMPORTANCE
+    default: ""
+    documentation: it means case IMPORTANCE.
+  - name: TEST_TIMEOUT
+    default: "30"
+    documentation: it means the duration of one case execution.
+  - name: TEST_PARALLEL
+    default: "5"
+    documentation: it means the number of case execution in parallel.
+  - name: TEST_ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging].
+  - name: FORCE_SUCCESS_EXIT
+    default: "yes"
+    documentation: |-
+      Setting this to 'yes' will allow some statements in the scripts not to let the step fail, and further steps can
+      run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements 
+      to stop the job and trigger the deprovisioning steps. Default: yes.
+      See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 6Gi
+  documentation: |-
+    The openshift-extended-upgrade-pre extended step executes the common extended test for pre-upgrade.
