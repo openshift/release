@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # TODO:
@@ -71,6 +71,7 @@ cp -t "${installer_dir}/auth" \
 
 if command -v pwsh &> /dev/null
 then
+  echo "cp secrets file"
   cp -t "${installer_dir}/secrets" \
       "${SHARED_DIR}/vcenter-creds.xml"
 fi
@@ -92,7 +93,9 @@ then
   terraform destroy -refresh=false -auto-approve -no-color &
   wait "$!"
 else
+  echo "exec upi-destroy.ps1"
   pwsh -file powercli/upi-destroy.ps1 &
   wait "$!"
 fi
 
+sleep 7200

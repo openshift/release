@@ -31,19 +31,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-debug
+- as: installer-rehearse-debug-vsphere
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: vsphere-connected-2
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
       SLEEP_DURATION: 10m
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - chain: cucushift-installer-rehearse-vsphere-upi-disconnected-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot-provision
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
