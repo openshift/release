@@ -120,6 +120,13 @@ else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
 fi
 
+if [ -n "${ADDITIONAL_DISK}" ]; then
+  DISKS="platform:
+    vsphere:
+      additionalDisks:
+      - diskSizeGB: 20"
+fi
+
 if [ ${Z_VERSION} -gt 9 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
   RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
@@ -146,9 +153,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
+  ${DISKS}
 compute:
 - name: worker
-  replicas: ${COMPUTE_NODE_REPLICAS}"
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  ${DISKS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
