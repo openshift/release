@@ -355,6 +355,19 @@ scrape_configs:
   relabel_configs:
   - action: labelmap
     regex: __journal__(.+)
+- job_name: kube-apiserver-audit
+  static_configs:
+  - labels:
+      type: static-pod
+      __path__: /var/log/kube-apiserver/**.log
+  pipeline_stages:
+  - labeldrop:
+    - stream
+  - labelallow:
+    - invoker
+    - filename
+  - static_labels:
+      type: audit-log
 server:
   http_listen_port: 3101
 target_config:
