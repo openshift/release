@@ -34,8 +34,6 @@ kind: PerformanceProfile
 metadata:
   name: openshift-single-node-cpu-rt-master
 spec:
-  realTimeKernel:
-    enabled: true
   cpu:
     reserved: 0-$((RESERVED_CPU_COUNT - 1))
     isolated: $RESERVED_CPU_COUNT-$((max_cpus - 1))
@@ -43,9 +41,6 @@ spec:
     pools.operator.machineconfiguration.openshift.io/master: ""
   nodeSelector:
     node-role.kubernetes.io/master: ""
-  workloadHints:
-    highPowerConsumption: true
-    realTime: true
 EOF
 
 # Wait for the node restart to trigger, this can take a few minutes
