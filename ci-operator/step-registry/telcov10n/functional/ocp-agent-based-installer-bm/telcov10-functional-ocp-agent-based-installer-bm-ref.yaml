@@ -1,0 +1,90 @@
+ref:
+  as: telcov10n-functional-ocp-agent-based-installer-bm
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  commands: telcov10n-functional-ocp-agent-based-installer-bm-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    # @natifridman - is this per setup specific?
+    name: kni-qe-41
+    mount_path: /var/run/ssh-key
+  - namespace: test-credentials
+    name: bastion-ip-addr
+    mount_path: /var/run/bastion-ip-addr
+  - namespace: test-credentials
+    name: jenkins-credentials
+    mount_path: /var/run/jenkins-credentials
+  env:
+    - name: HOST
+      documentation: Jenkins Agent Label
+
+    - name: OCP_MAJOR_VERSION
+      documentation: Major OCP version
+
+    - name: OCP_MINOR_VERSION
+      documentation: Minor OCP version
+
+    - name: OPENSHIFT_RELEASE_IMAGE
+      documentation: |
+        OCP image used for deployment.
+        Format: registry.ci.openshift.org/ocp/release:IMAGE_ID.
+
+    - name: DEPLOY
+      default: "true"
+      documentation: Run Deploy stage
+
+    - name: DISCONNECTED_INSTALL
+      default: "true"
+      documentation: Perform installation in disconnected environment
+
+    - name: OCP_EDGE_REPO
+      default: https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git
+      documentation: ocp-edge repository location
+
+    - name: OCP_EDGE_BRANCH
+      default: master
+      documentation: Branch to use for ocp-edge repository, e.g master
+
+    - name: PROFILE_NAME
+      default: ""
+      documentation: Profile to read environment specification from
+
+    - name: PROFILE_OVERRIDE
+      default: ""
+      documentation: Values from profile to override params
+
+    - name: REUSE_DISCONNECTED_REGISTRY
+      default: "false"
+      documentation: |
+        Perform installation in previously disconnected environment. DISCONNECTED_INSTALL should be false
+
+    - name: USE_NEXUS_CACHE
+      default: "true"
+      documentation: |
+        false --> force clone images --> dry_run=false
+
+    - name: CLUSTER_NAME
+      default: "ocp-edge-cluster"
+      documentation: "OpenShift Cluster Name"
+
+    - name: BASE_DOMAIN
+      default: "qe.lab.redhat.com"
+      documentation: OpenShift Cluster Base Domain Name
+
+    - name: PRECLEAN_LOCAL_REGISTRY
+      default: "false"
+      documentation: |
+        Completely remove local image registry cache prior to deploying the cluster
+
+    - name: OVERRIDE_CLUSTERCONFIGS
+      default: "false"
+      documentation: |
+        This will override clusterconfigs default by appending cluster_name in
+          clusterconfigs path ( ~/clusterconfigs/CLUSTER_NAME )
