@@ -33,7 +33,10 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     export SMALL_SCALE_ROUTES='5'
     export SMALL_SCALE_CLIENTS='1 5'
     export SMALL_SCALE_CLIENTS_MIX='1 5'
-    
+    ES_PASSWORD=$(cat "/secret/perfscale-prod/password")
+    ES_USERNAME=$(cat "/secret/perfscale-prod/username")
+    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
+
     ./ingress-performance.sh 
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
