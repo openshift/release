@@ -261,13 +261,12 @@ promotion:
   to:
   - additional_images:
       knative-eventing-src: src
+    name: knative-v1.10
     namespace: openshift
-    tag: knative-v1.10
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.16"
 resources:
   '*':
@@ -276,14 +275,16 @@ resources:
       memory: 1Gi
 tests:
 - as: test-conformance-aws-416
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -319,11 +320,11 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-conformance
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-conformance
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -386,16 +387,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-e2e-aws-416
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -431,11 +434,11 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -498,16 +501,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-reconciler-aws-416
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -543,11 +548,11 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-reconciler
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -610,7 +615,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-v1.10
   org: openshift-knative

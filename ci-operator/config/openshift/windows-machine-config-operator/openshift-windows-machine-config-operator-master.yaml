@@ -11,6 +11,14 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
+  previous-eus-bundle:
+    name: "4.16"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  previous-eus-wmco:
+    name: "4.16"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
   previous-wmco:
     name: "4.17"
     namespace: ocp
@@ -137,6 +145,90 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
+- as: azure-e2e-upgrade-from-eus-4.16
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
+        # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "PREVIOUS_EUS_BUNDLE" \
+        || oc get csv -n $WMCO_NS |awk {'print $1'} | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"PREVIOUS_EUS_OPERATOR\"}]"
+        sleep 10
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: PREVIOUS_EUS_BUNDLE
+        name: previous-eus-bundle
+      - env: PREVIOUS_EUS_OPERATOR
+        name: previous-eus-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: azure-e2e-upgrade
   steps:

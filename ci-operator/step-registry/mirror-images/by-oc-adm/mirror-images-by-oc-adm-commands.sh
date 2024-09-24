@@ -13,6 +13,11 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
+if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
+  echo "users specifically do not use oc-adm to run mirror"
+  exit 0
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -97,14 +102,14 @@ else
 fi
 
 # For disconnected or otherwise unreachable mirrors, we want to
-# have steps use an HTTP(S) proxy to reach the registry. This proxy
+# have steps use an HTTP(S) proxy to reach the mirror. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
+if test -f "${SHARED_DIR}/mirror-proxy-conf.sh"
 then
         # shellcheck disable=SC1090
-        source "${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/mirror-proxy-conf.sh"
 fi
 
 # execute the mirror command

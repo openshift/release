@@ -47,11 +47,13 @@ tests:
     HOME=/tmp make build
   container:
     from: src
+  restrict_network_access: false
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: unit-test
   commands: HOME=/tmp make test
   container:
     from: src
+  restrict_network_access: false
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -60,6 +62,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
+  restrict_network_access: false
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -77,7 +80,6 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ibio
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -85,6 +87,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       PACKET_PLAN: c3.medium.x86
+      SEED_IMAGE_TAG: "4.17"
     workflow: image-based-install-operator
 - as: e2e-ibio-periodic
   cron: 00 00 * * 0-5
@@ -95,6 +98,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       PACKET_PLAN: c3.medium.x86
+      SEED_IMAGE_TAG: "4.17"
     workflow: image-based-install-operator
 zz_generated_metadata:
   branch: main
