@@ -17,6 +17,7 @@ IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
 export IDP_PASSWD
 export CHE_NAMESPACE
 export TEST_POD_NAME
+export SAVE_JUNIT_DATA
 
 oc delete project $CHE_NAMESPACE || true
 oc new-project $CHE_NAMESPACE
@@ -62,7 +63,7 @@ spec:
         - name: TS_OCP_LOGIN_PAGE_PROVIDER_TITLE
           value: "rosa-htpasswd"
         - name: SAVE_JUNIT_DATA
-          value: true
+          value: "${SAVE_JUNIT_DATA}"
       volumeMounts:
         - name: test-run-results
           mountPath: /tmp/e2e/report
@@ -91,10 +92,18 @@ spec:
   restartPolicy: Never
 EOF
 
-oc wait --for=condition=ContainersReady=true pod/${TEST_POD_NAME} -n $CHE_NAMESPACE --timeout=300s || true
+# oc wait --for=condition=ContainersReady=true pod/${TEST_POD_NAME} -n $CHE_NAMESPACE --timeout=300s || true
+# echo "Extracting logs into artifact dir"
+# oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
+
+# # Try to collect logs with rsync command
+# mkdir -p "${ARTIFACT_DIR}"/tests/debug
+# oc -n $CHE_NAMESPACE rsync TEST_POD_NAME:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests/debug" || true
+
+
+mkdir -p "${ARTIFACT_DIR}"/tests
+echo "Waiting for copy synchronization between shared volumes"
+sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
-
-# Try to collect logs with rsync command
-mkdir -p "${ARTIFACT_DIR}"/tests/debug
-oc -n $CHE_NAMESPACE rsync TEST_POD_NAME:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests/debug" || true
+cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/tests
