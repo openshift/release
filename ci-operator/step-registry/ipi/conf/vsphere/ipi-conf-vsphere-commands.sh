@@ -100,6 +100,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
+DISKS=""
 set +o errexit
 # After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
@@ -121,6 +122,7 @@ else
 fi
 
 if [ -n "${ADDITIONAL_DISK}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
   DISKS="platform:
     vsphere:
       additionalDisks:
