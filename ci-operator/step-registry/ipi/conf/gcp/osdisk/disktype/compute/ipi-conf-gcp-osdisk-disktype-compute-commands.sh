@@ -10,20 +10,20 @@ echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # release:initial image, once that, use 'oc get istag release:inital' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
-    tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
-    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+  tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+  echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
 elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
-    tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
-    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+  tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+  echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
 # For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
 # RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
-    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+  TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
 else
-    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+  TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
@@ -88,12 +88,12 @@ fi
 # otherwise, update the install-config
 if [[ "${disk_type}" != "pd-ssd" ]]; then
   cat > "${PATCH}" << EOF
-  compute:
-  - name: worker
-    platform:
-      gcp:
-        osDisk: 
-          diskType: ${disk_type}
+compute:
+- name: worker
+  platform:
+    gcp:
+      osDisk: 
+        diskType: ${disk_type}
 EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
   echo "Updated compute.platform.gcp.osDisk.diskType in '${CONFIG}'."
