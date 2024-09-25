@@ -3,16 +3,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/assisted-operator-catalog-publish-verify
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-assisted-operator-catalog-publish-verify
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-assisted-operator-catalog-publish-verify
     rerun_command: /test assisted-operator-catalog-publish-verify
     run_if_changed: ^(deploy/olm-catalog/.*)$
     spec:
@@ -65,16 +65,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/ci-index
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-ci-index
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-ci-index
     rerun_command: /test ci-index
     spec:
       containers:
@@ -119,18 +119,99 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
+    context: ci/prow/e2e-ai-operator-disconnected-capi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-disconnected-capi
+    optional: true
+    rerun_command: /test e2e-ai-operator-disconnected-capi
+    run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-ai-operator-disconnected-capi-cluster-profile
+        - --target=e2e-ai-operator-disconnected-capi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-ai-operator-disconnected-capi-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ai-operator-disconnected-capi,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp
     rerun_command: /test e2e-ai-operator-ztp
     run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
     spec:
@@ -199,18 +280,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-3masters
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-3masters
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-3masters
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-3masters
     run_if_changed: ^(deploy/operator/.*)$
@@ -280,18 +361,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-capi
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-capi
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-capi
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-capi
     run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
@@ -361,18 +442,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-compact-day2-masters
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-compact-day2-masters
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-compact-day2-masters
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-compact-day2-masters
     spec:
@@ -441,18 +522,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-compact-day2-workers
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-compact-day2-workers
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-compact-day2-workers
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-compact-day2-workers
     spec:
@@ -521,18 +602,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-disconnected
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-disconnected
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-disconnected
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-disconnected
     run_if_changed: ^(deploy/operator/.*)$
@@ -602,18 +683,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-hypershift-zero-nodes
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-hypershift-zero-nodes
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-hypershift-zero-nodes
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-hypershift-zero-nodes
     spec:
@@ -682,20 +763,20 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
-    context: ci/prow/e2e-ai-operator-ztp-multiarch-3masters
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
+    context: ci/prow/e2e-ai-operator-ztp-multiarch-3masters-ocp
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-multiarch-3masters
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-multiarch-3masters-ocp
     optional: true
-    rerun_command: /test e2e-ai-operator-ztp-multiarch-3masters
+    rerun_command: /test e2e-ai-operator-ztp-multiarch-3masters-ocp
     spec:
       containers:
       - args:
@@ -704,8 +785,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-3masters-cluster-profile
-        - --target=e2e-ai-operator-ztp-multiarch-3masters
+        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-3masters-ocp-cluster-profile
+        - --target=e2e-ai-operator-ztp-multiarch-3masters-ocp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -721,7 +802,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-3masters-cluster-profile
+        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-3masters-ocp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -758,24 +839,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-multiarch-3masters,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-multiarch-3masters-ocp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
-    context: ci/prow/e2e-ai-operator-ztp-multiarch-sno
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
+    context: ci/prow/e2e-ai-operator-ztp-multiarch-sno-ocp
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-multiarch-sno
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-multiarch-sno-ocp
     optional: true
-    rerun_command: /test e2e-ai-operator-ztp-multiarch-sno
+    rerun_command: /test e2e-ai-operator-ztp-multiarch-sno-ocp
     spec:
       containers:
       - args:
@@ -784,8 +865,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-sno-cluster-profile
-        - --target=e2e-ai-operator-ztp-multiarch-sno
+        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-sno-ocp-cluster-profile
+        - --target=e2e-ai-operator-ztp-multiarch-sno-ocp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -801,7 +882,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-sno-cluster-profile
+        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-sno-ocp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -838,22 +919,102 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-multiarch-sno,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-multiarch-sno-ocp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
+    context: ci/prow/e2e-ai-operator-ztp-node-labels
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-node-labels
+    optional: true
+    rerun_command: /test e2e-ai-operator-ztp-node-labels
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-ai-operator-ztp-node-labels-cluster-profile
+        - --target=e2e-ai-operator-ztp-node-labels
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-ai-operator-ztp-node-labels-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-node-labels,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-sno-day2-masters
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-sno-day2-masters
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-sno-day2-masters
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-sno-day2-masters
     spec:
@@ -920,21 +1081,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-sno-day2-masters,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-sno-day2-workers
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-sno-day2-workers
-    optional: true
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-sno-day2-workers
     rerun_command: /test e2e-ai-operator-ztp-sno-day2-workers
     spec:
       containers:
@@ -1002,18 +1162,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
     optional: true
     rerun_command: /test e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
     spec:
@@ -1080,21 +1240,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/e2e-ai-operator-ztp-sno-day2-workers-late-binding
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-e2e-ai-operator-ztp-sno-day2-workers-late-binding
-    optional: true
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-e2e-ai-operator-ztp-sno-day2-workers-late-binding
     rerun_command: /test e2e-ai-operator-ztp-sno-day2-workers-late-binding
     spec:
       containers:
@@ -1162,16 +1321,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-images
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-images
     rerun_command: /test images
     spec:
       containers:
@@ -1216,18 +1375,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-lint
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-lint
     rerun_command: /test lint
-    skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+    skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:
@@ -1271,9 +1430,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/mce-images
     decorate: true
     decoration_config:
@@ -1282,7 +1441,7 @@ presubmits:
       ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-mce-images
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-mce-images
     rerun_command: /test mce-images
     spec:
       containers:
@@ -1328,16 +1487,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/subsystem-aws
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-subsystem-aws
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-subsystem-aws
     rerun_command: /test subsystem-aws
     run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
     spec:
@@ -1397,16 +1556,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/subsystem-kubeapi-aws
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-subsystem-kubeapi-aws
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-subsystem-kubeapi-aws
     rerun_command: /test subsystem-kubeapi-aws
     run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
     spec:
@@ -1466,18 +1625,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/unit-test
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-unit-test
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-unit-test
     rerun_command: /test unit-test
-    skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+    skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:
@@ -1528,18 +1687,18 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-ocm-2\.8$
-    - ^release-ocm-2\.8-
-    cluster: build01
+    - ^release-ocm-2\.12$
+    - ^release-ocm-2\.12-
+    cluster: build03
     context: ci/prow/verify-generated-code
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.8-verify-generated-code
+    name: pull-ci-openshift-assisted-service-release-ocm-2.12-verify-generated-code
     rerun_command: /test verify-generated-code
-    skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+    skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:
