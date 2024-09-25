@@ -22,7 +22,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
 
-cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
+cr_url=${CR_URL:-https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common}
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
@@ -235,22 +235,27 @@ function wait_pods_running() {
 }
 
 
-install_operator
-wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
-wait_created crd centrals.platform.stackrox.io
+for (( i=0; i<3; i++ )); do
+  install_operator
+  wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
+  wait_created crd centrals.platform.stackrox.io
+  
+  oc new-project stackrox >/dev/null || true
+  create_cr central
+  wait_deploy central
+  
+  get_init_bundle
+  wait_created crd securedclusters.platform.stackrox.io
+  create_cr secured-cluster
+  
+  echo ">>> Wait for deployments"
+  wait_deploy central-db
+  wait_deploy scanner
+  wait_deploy scanner-db
+  wait_deploy sensor
+  wait_deploy admission-control
 
-oc new-project stackrox >/dev/null || true
-create_cr central
-wait_deploy central
-
-get_init_bundle
-wait_created crd securedclusters.platform.stackrox.io
-create_cr secured-cluster
-
-echo ">>> Wait for deployments"
-wait_deploy central-db
-wait_deploy scanner
-wait_deploy scanner-db
-wait_deploy sensor
-wait_deploy admission-control
-oc get deployments -n stackrox
+  oc get deployments -n stackrox && break
+  echo ">>> Retry $i"
+  sleep 30
+done
