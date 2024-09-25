@@ -205,7 +205,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 6 5 * * 1,5
+  cron: 1 3 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -351,7 +351,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 1 3 * * 1,5
+  cron: 18 3 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -498,7 +498,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 18 3 * * 1,5
+  cron: 44 2 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -717,7 +717,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 44 2 * * 1,5
+  cron: 57 0 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -761,6 +761,153 @@ tests:
       cli: latest
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
         make operator-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-soak-aws-416
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
+  optional: true
+  run_if_changed: test/soak
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: serverless-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-soak
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-soak-aws-416-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
+  cron: 45 5 * * 1,5
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: serverless-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: serverless-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: serverless-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-soak
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -862,7 +1009,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 57 0 * * 1,5
+  cron: 32 2 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1009,7 +1156,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 45 5 * * 1,5
+  cron: 36 4 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1228,7 +1375,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.16"
-  cron: 32 2 * * 1,5
+  cron: 58 2 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
