@@ -1,0 +1,62 @@
+ref:
+  as: openshift-qe-udn-density-l3-pods
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.2.3"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: ITERATIONS
+    default: "50"
+    documentation: |-
+      Overrides the ITERATIONS, set to default of 50
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is false for udn-density-l3-pods workload
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Default EXTRA_FLAGS for udn-density-l3-pods workload is disabled
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  commands: udn-density-l3-pods-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale udn-density-l3-pods workload in the deployed cluster
