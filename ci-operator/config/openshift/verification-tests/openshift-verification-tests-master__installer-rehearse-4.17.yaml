@@ -31,19 +31,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-debug
+- as: installer-rehearse-debug-vsphere
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: vsphere-elastic
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 36h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-multi-vcenter-provision
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
