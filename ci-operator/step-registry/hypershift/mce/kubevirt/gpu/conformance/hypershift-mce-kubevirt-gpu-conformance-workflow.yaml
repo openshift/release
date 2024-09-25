@@ -8,25 +8,23 @@ workflow:
       COMPUTE_NODE_TYPE: g4dn.metal
       CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
       ZONES_COUNT: "3"
-      SKIP_MONITOR_TEST: "true"
-      ENABLE_ICSP: "true"
       ETCD_STORAGE_CLASS: gp3-csi
-      TEST_SKIPS: etcd leader changes are not excessive \|
-        migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers
+      SKIP_MONITOR_TEST: "true"
     pre:
       - chain: ipi-aws-ovn-pre
       - chain: ipi-install
       - ref: hypershift-kubevirt-install
       - ref: hypershift-mce-kubevirt-gpu-pci-passthrough
       - ref: hypershift-kubevirt-install-odf
-      - ref: hypershift-mce-install
+      - ref: hypershift-install
       - ref: hypershift-kubevirt-create
       - ref: hypershift-kubevirt-health-check
       - ref: hypershift-mce-kubevirt-gpu-nvidia-operator
     test:
     - chain: hypershift-conformance
     post:
-      - ref: hypershift-mce-dump
+      - chain: hypershift-dump
       - chain: gather-core-dump
-      - chain: hypershift-mce-kubevirt-destroy
+      - ref: hypershift-kubevirt-gather
+      - chain: hypershift-kubevirt-destroy
       - chain: ipi-aws-post
