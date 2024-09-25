@@ -94,7 +94,7 @@ elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
-     cat > "${SHARED_DIR}/excluded_tests" << EOF
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
@@ -137,7 +137,7 @@ elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
-     cat > "${SHARED_DIR}/excluded_tests" << EOF
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
 "[sig-arch] Managed cluster should have no crashlooping pods in core namespaces over four minutes [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
@@ -204,7 +204,7 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
 "[sig-network][Feature:Router] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Suite:openshift/conformance/parallel]"
 EOF
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
-     cat > "${SHARED_DIR}/excluded_tests" << EOF
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the Deployment gets the resolve-names annotation later [Suite:openshift/conformance/parallel]"
 "[sig-cli] Kubectl client Kubectl copy should copy a file from a running Pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Suite:openshift/conformance/parallel]"
@@ -270,14 +270,14 @@ EOF
 # Skip the following network tests in 4.13 to 4.15 jobs until the below defect is fixed
 # https://issues.redhat.com/browse/OCPBUGS-12841
 # The underlying issue is same for below mentioned sig-network tests
-elif [[ "${BRANCH#4.}" -ge 13 ]] && [ "${ARCH}" == "ppc64le" ]; then
-      cat > "${SHARED_DIR}/excluded_tests" << EOF
+elif [[ ( "${BRANCH}" == "master" ) || ( "${BRANCH#4.}" -ge 13 ) ]] && [ "${ARCH}" == "ppc64le" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
 EOF
-  	if [ "${INSTALLER}" == "powervs" ]; then
-  	    cat >> "${SHARED_DIR}/excluded_tests" << EOF
+    if [ "${INSTALLER}" == "powervs" ]; then
+        cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"

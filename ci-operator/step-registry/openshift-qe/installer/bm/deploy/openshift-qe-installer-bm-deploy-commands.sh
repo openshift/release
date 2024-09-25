@@ -12,15 +12,16 @@ CRUCIBLE_URL=$(cat "/secret/crucible_url")
 
 cat <<EOF >>/tmp/all.yml
 ---
-lab: scalelab
-lab_cloud:
+lab: $LAB
+lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-sno_node_count:
+sno_node_count: $NUM_SNO_NODES
 public_vlan: false
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
+public_vlan: $PUBLIC_VLAN
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
@@ -48,7 +49,6 @@ EOF
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory root@${bastion}:~/jetlag/ansible/inventory/telco.inv
 
 # Clean up previous attempts
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
@@ -60,15 +60,19 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    cd jetlag
    if [[ -n '$JETLAG_PR' ]]; then
      git checkout main
-     git branch -D dev
+     git branch -D dev || echo 'No dev branch exists'
      git fetch origin pull/$JETLAG_PR/head:dev
      git checkout dev
-   else
+   elif [[ ${JETLAG_LATEST} == 'true' ]]; then
      git checkout main
+     git pull
+   else
+     git pull origin $JETLAG_BRANCH
    fi
    git branch
    source bootstrap.sh
-   ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+   ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
@@ -77,4 +81,4 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    cd jetlag
    git branch
    source bootstrap.sh
-   ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"

@@ -1,2 +1,2 @@
-MKPJ_IMG=gcr.io/k8s-prow/mkpj:v20240723-dbbd2d86b
-MKPOD_IMG=gcr.io/k8s-prow/mkpod:v20240723-dbbd2d86b
+MKPJ_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpj:v20240917-0ac691ea5
+MKPOD_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpod:v20240917-0ac691ea5

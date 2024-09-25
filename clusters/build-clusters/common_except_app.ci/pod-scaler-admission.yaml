@@ -79,7 +79,7 @@ spec:
         name: pod-scaler
         args:
         - --loglevel=debug
-        - --cache-bucket=origin-ci-resource-usage-data
+        - --cache-bucket=origin-ci-resource-usage-data-v2
         - --gcs-credentials-file=/etc/gcs/service-account.json
         - --mode=consumer.admission
         - --serving-cert-dir=/etc/pki/tls/certs/admission
@@ -87,7 +87,7 @@ spec:
         - --cpu-cap=10
         - --memory-cap=20Gi
         - --report-credentials-file=/etc/report/credentials
-        - --profile-memory-usage=true
+        - --mutate-resource-limits=true
         ports:
           - name: main
             containerPort: 8080
@@ -103,7 +103,7 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
-          initialDelaySeconds: 1200
+          initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 1200
         volumeMounts:
@@ -118,8 +118,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "30Gi"
+            memory: "8Gi"
             cpu: "250m"
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
       volumes:
       - name: gcs-credentials
         secret:
@@ -131,3 +134,17 @@ spec:
       - name: report-credentials
         secret:
           secretName: result-aggregator
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: pod-scaler
+  namespace: ci
+spec:
+  tags:
+  - from:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_pod-scaler_latest
+    name: latest
+    importPolicy:
+      scheduled: true

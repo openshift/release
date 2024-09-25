@@ -27,6 +27,15 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+      default: ""
+      documentation: "Specifies the type of storage account for storing diagnostics data."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
+      default: ""
+      documentation: "The Azure Marketplace image offer."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+      default: ""
+      documentation: "The Azure Marketplace image publisher."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -48,9 +57,27 @@ chain:
     - name: HYPERSHIFT_CUSTOM_NSG
       default: "false"
       documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for hosted cluster components"
+    - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for infrastructure services in guest cluster"
     - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
       default: ""
       documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ""
+      documentation: "Specifies the cluster SDN provider."
+    - name: HYPERSHIFT_NODE_DRAIN_TIMEOUT
+      default: ""
+      documentation: "The NodeDrainTimeout on the NodePool created with the hosted cluster."
+    - name: HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT
+      default: ""
+      documentation: "The NodeVolumeDetachTimeout on any created NodePools."
+    - name: HYPERSHIFT_NP_AUTOREPAIR
+      default: "false"
+      documentation: "Enables machine autorepair with machine health checks."
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra arguments to pass to the hypershift create cluster azure command."
@@ -69,6 +96,10 @@ chain:
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
       
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+      if [[ -f "${SHARED_DIR}/hypershift-pull-secret" ]]; then
+        PULL_SECRET_PATH="${SHARED_DIR}/hypershift-pull-secret"
+      fi
+      
       ICSP_COMMAND=""
       if [[ $ENABLE_ICSP == "true" ]]; then
         ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
@@ -117,6 +148,44 @@ chain:
         EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
       fi
       
+      if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+        EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+        EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+        EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}"/azure-marketplace-image-sku)"
+        EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}"/azure-marketplace-image-version)"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
+        EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+      fi
+
+      if [[ -n $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE ]]; then
+        EXTRA_ARGS+=" --diagnostics-storage-account-type=${HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE}"
+        if [[ $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE == "UserManaged" ]]; then
+          EXTRA_ARGS+=" --diagnostics-storage-account-uri=$(cat "${SHARED_DIR}"/azure_storage_account_blob_endpoint)"
+        fi
+      fi
+      
+      if [[ -n $HYPERSHIFT_CP_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --control-plane-availability-policy=${HYPERSHIFT_CP_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_INFRA_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --infra-availability-policy=${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
+        EXTRA_ARGS+=" --auto-repair"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NODE_DRAIN_TIMEOUT ]]; then
+        EXTRA_ARGS+=" --node-drain-timeout=${HYPERSHIFT_NODE_DRAIN_TIMEOUT}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT ]]; then
+        EXTRA_ARGS+=" --node-volume-detach-timeout=${HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT}"
+      fi
+      
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
@@ -138,6 +207,25 @@ chain:
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      
+      # In case of BYO CNI, the HC will never be ready before CNI components are up and running
+      if [[ $HYPERSHIFT_NETWORK_TYPE == "Other" || $HYPERSHIFT_NETWORK_TYPE == "Calico" ]]; then
+        echo "Waiting for nodes to join the hosted cluster"
+        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        set +e
+        while true; do
+          num_nodes=$(oc get nodes --no-headers | wc -l | xargs)
+          if (( num_nodes == num_nodes_expected )); then
+            break
+          fi
+          
+          echo "$num_nodes/$num_nodes_expected have joined the HC"
+          sleep 15s
+        done
+        exit 0
+      fi
+      
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       until \

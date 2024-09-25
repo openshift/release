@@ -22,33 +22,32 @@ ssh_host_ip="$host@$instance_ip"
 
 seed_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${SEED_VM_NAME}/auth/kubeconfig
 
-seed_base_info=""
-release_base_info=""
+base_info=""
 
-case $OCP_IMAGE_SOURCE in
-  "ci")
-  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n1)"
-  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n2 | head -1)"
-  ;;
-  "release")
-  seed_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
-  release_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n2 | head -1)"
-  ;;
-  *)
-  echo "Unknown OCP image source '${OCP_IMAGE_SOURCE}'"
-  exit 1
-  ;;
-esac
+findImage() {
+    case ${2} in
+      "ci")
+      base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F "${1}" | tail -n1)"
+      ;;
+      "release")
+      base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${1}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
+      ;;
+      *)
+      echo "Unknown OCP image source '${2}'"
+      exit 1
+      ;;
+    esac
+}
 
-SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
-RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
-
+findImage ${OCP_BASE_VERSION} ${OCP_BASE_IMAGE_SOURCE}
+SEED_VERSION="$(echo ${base_info} | cut -d " " -f 1)"
+RELEASE_IMAGE="$(echo ${base_info} | cut -d " " -f 2)"
 # Save off the seed version and the target version for upgrades
 echo "${SEED_VERSION}" > "${SHARED_DIR}/seed_version"
 
-target_version="$(echo ${release_base_info} | cut -d " " -f 1)"
-target_image="$(echo ${release_base_info} | cut -d " " -f 2)"
-
+findImage ${OCP_TARGET_VERSION} ${OCP_TARGET_IMAGE_SOURCE}
+target_version="$(echo ${base_info} | cut -d " " -f 1)"
+target_image="$(echo ${base_info} | cut -d " " -f 2)"
 echo "${target_version}" > "${SHARED_DIR}/target_version"
 echo "${target_image}" > "${SHARED_DIR}/target_image"
 
@@ -84,6 +83,11 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
+# Determine if we should replace the LCA version
+if [[ ! -z "${LCA_PULL_REF_OVERRIDE}" ]]; then
+  LCA_PULL_REF=$LCA_PULL_REF_OVERRIDE
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
@@ -96,6 +100,8 @@ export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
+export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
+export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -109,16 +115,25 @@ fi
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
+SECONDS=0
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting 10 minutes for seed creation to finish"
+echo "Waiting 5 minutes for seed creation to finish"
 # These timings are specific to this CI setup and subvert a bug that causes oc wait to never return
 # This results in a timeout on the job even though the process may finish successfully
-sleep 10m
+sleep 5m
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
   echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
   sleep 1m; \
 done;
+
+t_seed_create=\$SECONDS
+echo "Seed creation took \${t_seed_create} seconds"
+
+if [[ ! -z "\${SEED_FLOATING_TAG}" ]]; then
+  echo "Adding floating tag '${SEED_FLOATING_TAG}' to the seed image"
+  skopeo copy "docker://${SEED_IMAGE}:${SEED_IMAGE_TAG}" "docker://${SEED_IMAGE}:${SEED_FLOATING_TAG}"
+fi
 
 EOF
 

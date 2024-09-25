@@ -5,13 +5,18 @@ workflow:
     pre:
     - chain: ipi-conf-azure
     - ref: openshift-manifests-cgroupsv1
+    - ref: ovn-conf
     - chain: ipi-install
     - ref: ipi-azure-rbac
     test:
     - ref: openshift-e2e-test
     post:
+    - chain: gather-network
     - chain: gather-core-dump
-    - chain: ipi-azure-post
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
   documentation: |-
     The Openshift E2E Azure workflow executes the common end-to-end test suite on Azure
     with a default cluster configuration and with cgroups v1.
+

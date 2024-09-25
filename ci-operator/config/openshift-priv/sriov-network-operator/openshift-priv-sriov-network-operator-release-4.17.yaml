@@ -35,6 +35,10 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: sriov-network-device-plugin
+  sriov-network-metrics-exporter:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: sriov-network-metrics-exporter
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sriov-network-operator
@@ -66,9 +70,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: sriov-network-webhook
+- dockerfile_path: bundleci.Dockerfile
+  to: sriov-network-operator-bundle
 operator:
   bundles:
-  - as: sriov-network-operator-bundle
+  - as: operator-bundle
     base_index: operator-index
     dockerfile_path: bundleci.Dockerfile
     update_graph: replaces
@@ -89,10 +95,14 @@ operator:
     with: pipeline:sriov-network-operator
   - pullspec: quay.io/openshift/origin-rdma-cni:.*
     with: pipeline:rdma-cni
+  - pullspec: quay.io/openshift/origin-sriov-network-metrics-exporter:.*
+    with: pipeline:sriov-network-metrics-exporter
 promotion:
   to:
   - disabled: true
-    name: 4.17-priv
+    name: sriov-4.17
+    namespace: origin
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -130,7 +140,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -169,19 +179,19 @@ tests:
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
-- as: e2e-openstack-nfv-hwoffload
+- as: e2e-openstack-nfv-config-drive
   optional: true
   steps:
-    cluster_profile: openstack-hwoffload
+    cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
-      ADDITIONAL_WORKERS_NETWORKS: ""
-      OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
+      CONFIG_DRIVE: "true"
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - as: security
   optional: true
@@ -191,18 +201,62 @@ tests:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
 - always_run: false
-  as: e2e-telco5g-cnftests
+  as: e2e-telco5g-sriov
   cluster: build05
   optional: true
   steps:
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
     env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.16"
-      TEST_RUN_FEATURES: dpdk sriov multinetworkpolicy sctp vrf tuningcni bondcni
-    workflow: telco5g-cnf
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      T5CI_JOB_TYPE: sriov
+      T5CI_VERSION: "4.17"
+    test:
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e-validation
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-conformance
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: telco5g-sriov
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17

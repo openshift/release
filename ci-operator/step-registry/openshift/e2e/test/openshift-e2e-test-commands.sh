@@ -25,14 +25,6 @@ if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
     echo "Overriding 'hypershift' cluster type to be 'aws'"
 fi
 
-# OpenShift clusters intalled with platform type External is handled as 'None'
-# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
-# integrated by OpenShift (like AWS).
-STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
-if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
-    export CLUSTER_TYPE="external"
-fi
-
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -44,8 +36,19 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# OpenShift clusters intalled with platform type External is handled as 'None'
+# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
+# integrated by OpenShift (like AWS).
+STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
+    export CLUSTER_TYPE="external"
+fi
+
 if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
     export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+fi
+if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]] && [[ -e "${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}" ]]; then
+    export TEST_OCP_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
 fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -107,6 +110,10 @@ if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
     export KUBE_SSH_BASTION="${BASTION_HOST}:22"
 fi
 
+if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
+    TEST_ARGS="${TEST_ARGS:-}"
+    TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
+fi
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
@@ -459,7 +466,7 @@ do
   for imagestream in $non_imported_imagestreams
   do
       echo "[$(date)] Retrying image import $imagestream"
-      oc import-image -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
+      oc import-image --insecure=true -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
   done
   set -e
 done

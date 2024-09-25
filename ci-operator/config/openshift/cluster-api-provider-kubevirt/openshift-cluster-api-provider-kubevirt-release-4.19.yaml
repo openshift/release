@@ -1,0 +1,105 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  openshift_release_golang-1.22:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+  test-bin:
+    name: "4.19"
+    namespace: ocp
+    tag: hypershift-tests
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+images:
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17 as toolchain
+
+    # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+    ARG goproxy=https://proxy.golang.org
+    ENV GOPROXY=$goproxy
+    ENV GOFLAGS="-mod=readonly"
+
+    FROM toolchain as builder
+    WORKDIR /workspace
+
+    # Copy the sources
+    COPY ./ ./
+    RUN go mod download
+
+    # Build
+    ARG package=.
+    ARG ARCH
+    ARG LDFLAGS
+    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags "${LDFLAGS} -extldflags '-static'"  -o manager ${package}
+    ENTRYPOINT [ "/start.sh", "/workspace/manager" ]
+
+    # Copy the controller-manager into a thin image
+    FROM gcr.io/distroless/static:nonroot
+    WORKDIR /
+    COPY --from=builder /workspace/manager .
+    # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
+    USER 65532
+    ENTRYPOINT ["/manager"]
+  from: base
+  inputs:
+    openshift_release_golang-1.22:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+  to: cluster-api-provider-kubevirt
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: src
+- as: e2e-hypershift-kubevirt
+  steps:
+    cluster_profile: aws-virtualization
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+    workflow: hypershift-kubevirt-e2e-aws-capk
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-api-provider-kubevirt

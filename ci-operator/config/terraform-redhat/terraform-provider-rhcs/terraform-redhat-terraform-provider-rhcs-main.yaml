@@ -27,7 +27,7 @@ resources:
 tests:
 - as: unit
   commands: |-
-    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@latest
+    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@v2.20.1
     unset GOFLAGS
     make unit-test
   container:
@@ -376,7 +376,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-critical-high-presubmit
@@ -392,7 +392,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-critical-high-presubmit
@@ -438,6 +438,24 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - always_run: false
+  as: rosa-sts-shared-vpc-optional-presubmit
+  optional: true
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-sv
+      ENABLE_SHARED_VPC: "yes"
+      QE_USAGE: rosa-sts-shared-vpc-optional-presubmit
+      REGION: us-east-1
+      RHCS_CLUSTER_NAME_SUFFIX: pr
+      RHCS_URL: https://api.stage.openshift.com
+      WAIT_OPERATORS: "false"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
   as: rosa-sts-advanced-day1-negative-optional-presubmit
   optional: true
   steps:
@@ -475,7 +493,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-ad
       QE_USAGE: rosa-hcp-advanced-critical-high-presubmit
@@ -491,7 +509,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-hcp-pl
       QE_USAGE: rosa-hcp-private-critical-high-presubmit
@@ -503,6 +521,7 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-hcp-arm-critical-high-presubmit
+  optional: true
   steps:
     cluster_profile: aws-terraform-qe
     env:

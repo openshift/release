@@ -28,25 +28,25 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-tests
-  ocp_4.17_base-rhel9:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    tag: rhel-8-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
   ocp_os:
     name: "4.18"
     namespace: ocp
@@ -56,15 +56,15 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -80,7 +80,8 @@ images:
   to: custom-os-image
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
     name: "4.18"
     namespace: ocp
@@ -430,6 +431,12 @@ tests:
   steps:
     cluster_profile: openstack-hwoffload
     workflow: openshift-e2e-openstack-dualstack
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
 - as: security
   optional: true
   steps:

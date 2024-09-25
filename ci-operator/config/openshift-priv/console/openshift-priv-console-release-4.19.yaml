@@ -1,0 +1,114 @@
+base_images:
+  nodejs-10:
+    name: nodejs-10-rhel7
+    namespace: openshift
+    tag: latest
+  ocp_4.17_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-base-nodejs-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/console
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-base-nodejs-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: console
+- dockerfile_path: Dockerfile.plugins.demo
+  from: nodejs-10
+  to: console-plugin-demo
+promotion:
+  to:
+  - additional_images:
+      console-tests: src
+    name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  analyze:
+    requests:
+      cpu: "1"
+      memory: 14Gi
+  console:
+    requests:
+      cpu: "1"
+      memory: 8Gi
+  frontend:
+    requests:
+      cpu: "1"
+      memory: 10Gi
+  test-bin:
+    requests:
+      cpu: "1"
+      memory: 10Gi
+test_binary_build_commands: ./build.sh
+tests:
+- as: backend
+  commands: ./test-backend.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- as: frontend
+  commands: |
+    git config --global --add safe.directory /go/src/github.com/openshift/console
+    ./test-frontend.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- as: analyze
+  commands: ./analyze.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e-gcp-console
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: CYPRESS_PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 6h0m0s
+    workflow: ipi-gcp
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: console

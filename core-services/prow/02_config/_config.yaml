@@ -117,8 +117,22 @@ deck:
         slug: redhat-chaos
   - repo: openshift/operator-framework-operator-controller
     rerun_auth_configs:
-      github_users:
-      - m1kola
+      github_team_slugs:
+      - org: openshift
+        slug: openshift-team-operator-framework
+      - org: openshift
+        slug: openshift-team-operator-runtime
+      - org: openshift
+        slug: openshift-team-operator-ecosystem
+  - repo: openshift/operator-framework-olm
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: openshift-team-operator-framework
+      - org: openshift
+        slug: openshift-team-operator-runtime
+      - org: openshift
+        slug: openshift-team-operator-ecosystem
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -128,6 +142,7 @@ deck:
       origin-ci-test: test-platform-results
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-kni/eco-ci-cd: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/distributed-tracing-qe: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -198,8 +213,6 @@ deck:
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
-disabled_clusters:
-- build04
 gangway:
   allowed_api_clients:
   - allowed_jobs_filters:
@@ -290,10 +303,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20240723-dbbd2d86b
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20240723-dbbd2d86b
-        initupload: gcr.io/k8s-prow/initupload:v20240723-dbbd2d86b
-        sidecar: gcr.io/k8s-prow/sidecar:v20240723-dbbd2d86b
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20240917-0ac691ea5
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20240917-0ac691ea5
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20240917-0ac691ea5
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20240917-0ac691ea5
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -314,6 +327,7 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+      grace_period: 2h0m0s
       timeout: 22h0m0s
     repo: openshift/openshift-tests-private
   - config:
@@ -354,8 +368,16 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+      grace_period: 2h0m0s
       timeout: 22h0m0s
     repo: openshift/verification-tests
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-kni/eco-ci-cd
   - config:
       timeout: 6h0m0s
     repo: openshift/osde2e
@@ -364,6 +386,7 @@ plank:
     repo: openshift/svt
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
+    openshift-kni/eco-ci-cd: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -390,6 +413,9 @@ plank:
     integr8ly/integreatly-operator: |-
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
+    openshift-kni/eco-ci-cd: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
@@ -444,13 +470,21 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift/verification-tests
+- cluster: '*'
+  config:
+    tenant_id: qe-private
+  repo: openshift-kni/eco-ci-cd
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
   serve_metrics: false
 scheduler:
   enabled: true
-  failover: {}
+  external:
+    cache:
+      cleanup_interval: 1h0m0s
+      entry_timeout_interval: 10m0s
+    url: http://prowjob-dispatcher.ci.svc.cluster.local:8080
 sinker:
   max_pod_age: 6h0m0s
   max_prowjob_age: 24h0m0s
@@ -566,6 +600,7 @@ tide:
   merge_label: tide/merge-method-merge
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
+    openshift-kni/eco-ci-cd: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

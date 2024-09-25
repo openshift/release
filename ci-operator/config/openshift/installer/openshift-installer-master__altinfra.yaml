@@ -1,24 +1,24 @@
 base_images:
   ocp_4.10_cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
-  ocp_4.17_base-rhel9:
-    name: "4.17"
+  ocp_4.18_base-rhel9:
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_4.17_installer-etcd-artifacts:
-    name: "4.17"
+  ocp_4.18_installer-etcd-artifacts:
+    name: "4.18"
     namespace: ocp
     tag: installer-etcd-artifacts
-  ocp_4.17_installer-kube-apiserver-artifacts:
-    name: "4.17"
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: "4.18"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
@@ -27,18 +27,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_4.17_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    ocp_4.17_installer-kube-apiserver-artifacts:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -61,24 +61,18 @@ promotion:
     excluded_images:
     - installer
     - src-oc
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
-  ppc64le-latest:
-    candidate:
-      architecture: ppc64le
-      product: ocp
-      stream: nightly
-      version: "4.16"
 resources:
   '*':
     requests:
@@ -151,23 +145,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-public-ipv4-pool
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
-    workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
@@ -302,24 +279,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-ibmcloud
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-powervs-capi-ovn
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: powervs-5
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.16"
-      CLUSTER_NAME_MODIFIER: capi-416
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      INSTALLER: powervs
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-powervs-ipi
   timeout: 6h0m0s
 - always_run: false
   as: e2e-nutanix-capi-ovn

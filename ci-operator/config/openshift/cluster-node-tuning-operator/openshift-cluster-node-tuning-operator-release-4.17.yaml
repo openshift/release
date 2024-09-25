@@ -1,12 +1,12 @@
 base_images:
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -29,8 +29,7 @@ images:
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - cluster-node-tuning-operator-us-tuned
     name: "4.17"
     namespace: ocp
@@ -80,9 +79,7 @@ tests:
       commands: |-
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
-        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-        export HYPERSHIFT_HOSTED_CLUSTER_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         make pao-functests-hypershift
       from: src
@@ -111,6 +108,20 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: e2e-nightly
+  cron: 0 23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws

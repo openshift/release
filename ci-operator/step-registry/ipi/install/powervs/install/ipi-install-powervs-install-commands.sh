@@ -493,9 +493,12 @@ function dump_resources() {
   ibmcloud tg connections ${GATEWAY_ID}
 )
 
-# "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
+  echo "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
 (
+  echo "NOTE: There should be three LBs found"
+  ibmcloud is load-balancers --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
+
   LB_INT_FILE=$(mktemp)
   LB_MCS_POOL_FILE=$(mktemp)
   trap '/bin/rm "${LB_INT_FILE}" "${LB_MCS_POOL_FILE}"' EXIT
@@ -505,6 +508,7 @@ function dump_resources() {
   if [ -z "${LB_INT_ID}" ]
   then
     echo "Error: LB_INT_ID is empty"
+    echo "Error: The internal load balancer was not found!"
     exit
   fi
 
@@ -518,6 +522,7 @@ function dump_resources() {
     if [ -z "${LB_MCS_ID}" ]
     then
       echo "Error: LB_MCS_ID is empty"
+      echo "Error: The machine config server pool under the internal LB was not found!"
       exit
     fi
   fi

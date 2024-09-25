@@ -5,6 +5,18 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
+  echo "users specifically do not use oc-mirror to run mirror"
+  exit 0
+fi
 
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
@@ -74,18 +86,10 @@ echo "target_release_image_repo: $target_release_image_repo"
 unset KUBECONFIG
 oc registry login
 
-readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
-echo "readable_version: $readable_version"
-ocp_major_minor=$(echo "${readable_version}" | cut -d '.' -f1,2)
-ocp_image_arch=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.config.architecture}')
-channel_name="${CHANNEL}-${ocp_major_minor}"
-echo "channel_name: $channel_name"
-
 run_command "which oc"
 run_command "oc version --client"
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
-mirror_output="${oc_mirror_dir}/mirror_output"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
 
@@ -98,27 +102,15 @@ extract_oc_mirror "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRI
 oc_mirror_bin="${oc_mirror_dir}/oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
-# pre-check the expected image exists in official channel
-if "${oc_mirror_bin}" list releases --filter-by-archs ${ocp_image_arch} --channel=${channel_name} | grep -q "^${readable_version}$"; then
-    echo "${readable_version} is found in ${channel_name} on ${ocp_image_arch} arch"
-else
-    echo "${readable_version} is NOT found in ${channel_name} on ${ocp_image_arch} arch, exit..."
-    exit 1
-fi
 
 # set the imagesetconfigure
 image_set_config="image_set_config.yaml"
 cat <<END | tee "${image_set_config}"
 kind: ImageSetConfiguration
-apiVersion: mirror.openshift.io/v1alpha2
+apiVersion: mirror.openshift.io/v2alpha1
 mirror:
   platform:
-    architectures:
-      - "${ocp_image_arch}"
-    channels:
-      - name: ${channel_name}
-        minVersion: ${readable_version}
-        maxVersion: ${readable_version}
+    release: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
 END
 
 # https://github.com/openshift/oc-mirror/blob/main/docs/usage.md#authentication
@@ -126,25 +118,33 @@ END
 mkdir -p "${XDG_RUNTIME_DIR}/containers/"
 cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 
+unset REGISTRY_AUTH_PREFERENCE
+
 # execute the oc-mirror command
-cmd="'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-skip-tls"
-echo "Command: $cmd"
-eval "$cmd" | tee "${mirror_output}"
+run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
 
 # Get mirror setting for install-config.yaml
-result_folder=$(cat "${mirror_output}" | tail -n 1 | awk  '{print $NF}')
-icsp_file="${result_folder}/imageContentSourcePolicy.yaml"
-mapping_file="${result_folder}/mapping.txt"
-if [ ! -f "${icsp_file}" ]; then
-    echo "${icsp_file} not found, exit..."
+result_folder="${oc_mirror_dir}/working-dir"
+idms_file="${result_folder}/cluster-resources/idms-oc-mirror.yaml"
+itms_file="${result_folder}/cluster-resources/itms-oc-mirror.yaml"
+if [ ! -s "${idms_file}" ]; then
+    echo "${idms_file} not found, exit..."
     exit 1
+else
+    run_command "cat '$idms_file'"
 fi
+
 key_name="imageContentSources"
 if [[ "${ENABLE_IDMS}" == "yes" ]]; then
     key_name="imageDigestSources"
 fi
-yq-v4 --prettyPrint eval-all "{\"$key_name\": .spec.repositoryDigestMirrors}" "${icsp_file}" > "${install_config_mirror_patch}" || exit 1
-run_command "cp ${mapping_file} ${ARTIFACT_DIR}/mapping.txt"
+yq-v4 --prettyPrint eval-all "{\"$key_name\": .spec.imageDigestMirrors}" "${idms_file}" > "${install_config_mirror_patch}" || exit 1
+
+if [ -s "${itms_file}" ]; then
+    echo "${itms_file} found"
+    run_command "cat '$itms_file'"
+    new_data=$(yq-v4 eval-all '.spec.imageTagMirrors' "${itms_file}") yq-v4 eval-all  ".$key_name += env(new_data)" -i "${install_config_mirror_patch}" || exit 1
+fi
 
 # Ending
 run_command "cat '${install_config_mirror_patch}'"

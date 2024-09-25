@@ -144,15 +144,6 @@ export NUM_WORKERS=2
 export PROV_BM_MAC=$(getExtraVal PROV_BM_MAC '')
 EOF
 
-    # FIXME: Workaround to increase the WORKER_DISK for e2e-metal-ipi-ovn-upgrade
-    if [ "${JOB_NAME}" = "periodic-ci-openshift-release-master-nightly-4.17-upgrade-from-stable-4.16-e2e-metal-ipi-ovn-upgrade" ]
-    then
-        cat - <<EOF >> "${SHARED_DIR}//dev-scripts-additional-config"
-export WORKER_DISK=60        
-EOF
-    fi
-
-
     scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" $NODESFILE "root@${IP}:"
     if [ "$(cat $CIRFILE | jq -r .type)" == "cluster_moc" ] ; then
         scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/esi_cloud_yaml" "root@${IP}:esi_cloud_yaml"

@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  operator-sdk:
-    name: "4.14"
-    namespace: origin
-    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
@@ -18,19 +14,14 @@ images:
   from: src
   to: securesign-operator
 - dockerfile_literal: |
-    FROM operator-sdk
+    FROM src
     COPY oc /usr/bin/oc
-    COPY src /src
-  from: operator-sdk
+  from: src
   inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/securesign/secure-sign-operator/.
   to: src-cli
 operator:
   bundles:
@@ -66,43 +57,44 @@ tests:
       cli: latest
       commands: |
         set -x
-        cat > image_config.patch <<EOF
+        cd /go/src/github.com/securesign/secure-sign-operator
+        make dev-images
+        cat > /tmp/image_config.patch <<EOF
         {"spec": {"config":{"env": [
-        {"name": "TRILLIAN_LOG_SIGNER_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/trillian/logsigner$(cat /src/internal/controller/constants/images.go | grep "TrillianLogSignerImage" | grep -o '@sha.*')},
-        {"name": "TRILLIAN_LOG_SERVER_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/trillian/logserver$(cat /src/internal/controller/constants/images.go | grep "TrillianServerImage" | grep -o '@sha.*')},
-        {"name": "TRILLIAN_DB_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/trillian/database$(cat /src/internal/controller/constants/images.go | grep "TrillianDbImage" | grep -o '@sha.*')},
-
-        {"name": "FULCIO_SERVER_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/fulcio/fulcio-server$(cat /src/internal/controller/constants/images.go | grep "FulcioServerImage" | grep -o '@sha.*')},
-
-        {"name": "REKOR_REDIS_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/trillian/redis$(cat /src/internal/controller/constants/images.go | grep "RekorRedisImage" | grep -o '@sha.*')},
-        {"name": "REKOR_SERVER_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/rekor/rekor-server$(cat /src/internal/controller/constants/images.go | grep "RekorServerImage" | grep -o '@sha.*')},
-        {"name": "REKOR_SEARCH_UI_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/rekor-search/rekor-search$(cat /src/internal/controller/constants/images.go | grep "RekorSearchUiImage" | grep -o '@sha.*')},
-        {"name": "BACKFILL_REDIS_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/rekor/backfill-redis$(cat /src/internal/controller/constants/images.go | grep "BackfillRedisImage" | grep -o '@sha.*')},
-
-        {"name": "TUF_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/scaffold/tuf-server$(cat /src/internal/controller/constants/images.go | grep "TufImage" | grep -o '@sha.*')},
-
-        {"name": "CTLOG_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/certificate-transparency-go/certificate-transparency-go$(cat /src/internal/controller/constants/images.go | grep "CTLogImage" | grep -o '@sha.*')},
-
-        {"name": "CLIENT_SERVER_CG_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/cli/client-server-cg$(cat /src/internal/controller/constants/images.go | grep "ClientServerImage_cg" | grep -o '@sha.*')},
-        {"name": "CLIENT_SERVER_RE_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/cli/client-server-re$(cat /src/internal/controller/constants/images.go | grep "ClientServerImage_re" | grep -o '@sha.*')},
-        {"name": "SEGMENT_BACKUP_JOB_IMAGE", "value": "quay.io/redhat-user-workloads/rhtas-tenant/segment-backup-job/segment-backup-job$(cat /src/internal/controller/constants/images.go | grep "SegmentBackupImage" | grep -o '@sha.*')}
+        {"name": "TRILLIAN_LOG_SIGNER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianLogSignerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TRILLIAN_LOG_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TRILLIAN_DB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianDbImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "FULCIO_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "FulcioServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorRedisImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "REKOR_SEARCH_UI_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorSearchUiImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "BACKFILL_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "BackfillRedisImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TUF_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TufImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "CTLOG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CTLogImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "CLIENT_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "SEGMENT_BACKUP_JOB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "SegmentBackupImage" | grep -o '[^[:space:]]*@sha.*')},
+        {"name": "TIMESTAMP_AUTHORITY_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TimestampAuthorityImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")},
+        {"name": "CREATE_TREE_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CreateTreeImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")}
         ]}}}
         EOF
+        cat /tmp/image_config.patch
         oc create ns openshift-rhtas-operator
-        operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
-        oc get subscription -n openshift-rhtas-operator -o name | xargs oc patch --type=merge -n openshift-rhtas-operator --patch-file image_config.patch
+        make operator-sdk
+        ./bin/operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
+        oc get subscription -n openshift-rhtas-operator -o name | xargs oc patch --type=merge -n openshift-rhtas-operator --patch-file /tmp/image_config.patch
+        sleep 5
         oc get deployments -n openshift-rhtas-operator -o yaml
         oc wait --for condition=Available -n openshift-rhtas-operator deployment rhtas-operator-controller-manager
 
          # install RH SSO
-        oc create -k /src/ci/keycloak/operator/base
+        oc create -k ci/keycloak/operator/base
         until [ ! -z "$(oc get pod -l name=rhsso-operator -n keycloak-system 2>/dev/null)" ]
         do
           echo "Waiting for rhsso-operator operator. Pods in keycloak-system namespace:"
           oc get pods -n keycloak-system
           sleep 10
         done
-        oc create --kustomize /src/ci/keycloak/resources/base
+        oc create --kustomize ci/keycloak/resources/base
         until [[ $( oc get keycloak keycloak -o jsonpath='{.status.ready}' -n keycloak-system 2>/dev/null) == "true" ]]
         do
           printf "Waiting for keycloak deployment. \n Keycloak ready: %s\n" $(oc get keycloak keycloak -o jsonpath='{.status.ready}' -n keycloak-system)
@@ -149,7 +141,9 @@ tests:
         export  SSL_CERT_FILE=$(pwd)/cert.crt
         export OIDC_ISSUER_URL=https://$(oc get route -n keycloak-system keycloak -o jsonpath='{.status.ingress[0].host}')/auth/realms/trusted-artifact-signer
         export TEST_IMAGE=ttl.sh/$PROW_JOB_ID:1h
-        go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.2
+        go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.4
+        export OPENSHIFT=true
+        make dev-images
         make test-e2e
       from: src
       resources:

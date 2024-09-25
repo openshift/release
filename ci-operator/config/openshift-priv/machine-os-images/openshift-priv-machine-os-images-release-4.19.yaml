@@ -1,0 +1,72 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.17_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.17_installer:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: installer
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/machine-os-images
+images:
+- build_args:
+  - name: DIRECT_DOWNLOAD
+    value: "true"
+  dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.17_installer:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:installer
+  to: machine-os-images
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: find . -type f -path "./scripts/*" -o -name "*.sh" -exec shellcheck -s
+    bash {} \+
+  container:
+    from: src
+  run_if_changed: (^scripts/)|(\.sh$)|(^\.ci-operator\.yaml$)
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: machine-os-images

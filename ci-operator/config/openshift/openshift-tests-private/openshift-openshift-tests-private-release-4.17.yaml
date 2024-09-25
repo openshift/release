@@ -19,6 +19,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   upi-installer:
     name: "4.17"
     namespace: ocp
@@ -39,6 +43,9 @@ images:
     ci_tests-private-builder_4.17:
       as:
       - registry.ci.openshift.org/ci/tests-private-builder:4.17
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -86,8 +93,7 @@ images:
   to: tests-private-pr
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - tests-private
     - tests-private-ui
     - tests-private-pr
@@ -150,7 +156,7 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
+  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
   steps:
     cluster_profile: aws
     test:
@@ -184,7 +190,7 @@ tests:
         curl -s -k -L ${SDKURL}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
         tar -C ${HOME} -xzvf opt-sdk.tar.gz && mv ${HOME}/x86_64/operator-sdk ${HOME} && rm -fr opt-sdk.tar.gz ${HOME}/x86_64
 
-        oc image extract quay.io/hypershift/hypershift-operator:latest --file=/usr/bin/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
+        oc image extract quay.io/hypershift/hypershift-operator:4.17 --file=/usr/bin/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
         oc image extract quay.io/openshifttest/openshift4-tools:v2 --file=/tmp/OpenShift4-tools.tar && tar -C "${HOME}" -xf OpenShift4-tools.tar && rm -fr OpenShift4-tools.tar
 
         export PATH=$PATH:$HOME:${HOME}/OpenShift4-tools
@@ -206,7 +212,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-console
   optional: true
-  run_if_changed: frontend/
+  run_if_changed: frontend/tests/.*.cy.ts
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     test:

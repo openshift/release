@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.12-stage-images
     decorate: true
     decoration_config:
@@ -64,7 +64,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.13-stage-images
     decorate: true
     decoration_config:
@@ -123,7 +123,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.14-arm-stage-images
     decorate: true
     decoration_config:
@@ -182,7 +182,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.14-lp-interop-images
     decorate: true
     decoration_config:
@@ -240,7 +240,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.14-lp-rosa-classic-images
     decorate: true
     decoration_config:
@@ -299,7 +299,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.14-stage-images
     decorate: true
     decoration_config:
@@ -358,7 +358,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-ibm-p-stage-images
     decorate: true
     decoration_config:
@@ -417,7 +417,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-ibm-z-stage-images
     decorate: true
     decoration_config:
@@ -476,7 +476,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-lp-interop-images
     decorate: true
     decoration_config:
@@ -534,7 +534,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-lp-rosa-classic-images
     decorate: true
     decoration_config:
@@ -593,7 +593,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-stage-images
     decorate: true
     decoration_config:
@@ -652,7 +652,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.16-lp-interop-images
     decorate: true
     decoration_config:
@@ -660,7 +660,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: tempo-product-ocp-4.16-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-lp-interop-images
     path_alias: github.com/grafana/tempo-operator
@@ -711,7 +710,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.16-lp-rosa-classic-images
     decorate: true
     decoration_config:
@@ -770,7 +769,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.16-stage-images
     decorate: true
     decoration_config:
@@ -829,7 +828,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.17-lp-interop-images
     decorate: true
     decoration_config:
@@ -888,7 +887,66 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
+    context: ci/prow/tempo-product-ocp-4.17-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-stage-images
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test tempo-product-ocp-4.17-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=tempo-product-ocp-4.17-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.17-stage-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/upstream-ocp-4.13-amd64-aws-ipi-ovn-hypershift-ci-index-tempo-bundle
     decorate: true
     decoration_config:
@@ -947,7 +1005,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.13-amd64-aws-ipi-ovn-hypershift-images
     decorate: true
     decoration_config:
@@ -1006,7 +1064,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-ci-index-tempo-bundle
     decorate: true
     decoration_config:
@@ -1065,7 +1123,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-images
     decorate: true
     decoration_config:
@@ -1124,7 +1182,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.15-amd64-aws-ci-index-tempo-bundle
     decorate: true
     decoration_config:
@@ -1183,7 +1241,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.15-amd64-aws-images
     decorate: true
     decoration_config:
@@ -1242,7 +1300,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.15-amd64-aws-tempo-e2e-tests
     decorate: true
     decoration_config:
@@ -1315,7 +1373,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-ci-index-tempo-bundle
     decorate: true
     decoration_config:
@@ -1374,7 +1432,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-images
     decorate: true
     decoration_config:
@@ -1433,7 +1491,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-upgrade-ocp-4.17-amd64-azure-ci-index-tempo-bundle
     decorate: true
     decoration_config:
@@ -1492,7 +1550,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/upstream-upgrade-ocp-4.17-amd64-azure-images
     decorate: true
     decoration_config:

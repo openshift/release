@@ -1,0 +1,71 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: go build -o ./bin/nfsplugin ./cmd/nfsplugin
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
+images:
+- dockerfile_path: images/Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-driver-nfs
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: go-fmt
+  commands: make test-fmt
+  container:
+    from: src
+- as: go-vet
+  commands: make test-vet
+  container:
+    from: src
+- as: vendor
+  commands: make test-vendor
+  container:
+    from: src
+- as: e2e-openstack-csi
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: csi-driver-nfs

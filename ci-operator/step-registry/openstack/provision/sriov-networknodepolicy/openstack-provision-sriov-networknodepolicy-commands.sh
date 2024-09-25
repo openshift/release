@@ -60,6 +60,21 @@ wait_for_sriov_pods() {
 }
 
 wait_for_operator_webhook() {
+  for _ in $(seq 1 60); do
+      if oc get DaemonSet operator-webhook -n openshift-sriov-network-operator >/dev/null 2>&1; then
+          OPERATOR_WEBHOOK_EXIST=true
+          break
+      fi
+      echo "Waiting for operator webhook DaemonSet to exist"
+      sleep 2
+  done
+  if [ -n "${OPERATOR_WEBHOOK_EXIST:-}" ] ; then
+      echo "operator webhook DaemonSet exists"
+  else
+      echo "operator webhook DaemonSet does not exist"
+      exit 1
+  fi
+
   # Even if the pods are ready, we need to wait for the webhook server to be
   # actually started, which usually takes a few seconds.
   for _ in $(seq 1 30); do
@@ -101,20 +116,6 @@ wait_for_injector_webhook() {
       echo "injector webhook did not start succesfully"
       exit 1
   fi
-}
-
-create_default_sriov_operator_config() {
-    oc apply -f - <<EOF
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovOperatorConfig
-metadata:
-  name: default
-  namespace: openshift-sriov-network-operator
-spec:
-  enableInjector: true
-  enableOperatorWebhook: true
-  logLevel: 2
-EOF
 }
 
 create_sriov_networknodepolicy() {
@@ -170,11 +171,6 @@ then
 fi
 
 wait_for_sriov_pods
-
-# This is only needed on ocp 4.16+
-# introduced https://github.com/openshift/sriov-network-operator/pull/887
-# u/s https://github.com/k8snetworkplumbingwg/sriov-network-operator/pull/617
-create_default_sriov_operator_config
 
 WEBHOOK_ENABLED=$(oc get sriovoperatorconfig/default -n openshift-sriov-network-operator -o jsonpath='{.spec.enableOperatorWebhook}')
 if [ "${WEBHOOK_ENABLED}" == true ]; then

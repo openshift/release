@@ -51,62 +51,25 @@ function aws_create_user()
     return 0
 }
 
+function b64() { echo -n "${1}" | base64 ; }
+
 function create_secret_file_for_aws()
 {
-    local data_type=$1
-    local ns=$2
-    local name=$3
-    local key_id=$4
-    local key_sec=$5
-    local output_file=$6
-
-    if [[ ${data_type} != "access_and_secret_key" ]] && [[ ${data_type} != "credentials" ]] && [[ ${data_type} != "both" ]]; then
-        echo "Error: \"${data_type}\" is not a valid type"
-        return 1
-    fi
+    local ns=$1
+    local name=$2
+    local b64_key_id=$3
+    local b64_key_sec=$4
+    local output_file=$5
     cat <<EOF >${output_file}
 apiVersion: v1
 kind: Secret
 metadata:
   name: ${name}
   namespace: ${ns}
-EOF
-
-    local patch
-    patch=$(mktemp)
-
-    if [[ ${data_type} == "access_and_secret_key" ]] || [[ ${data_type} == "both" ]]; then
-        cat <<EOF >${patch}
 data:
-  aws_access_key_id: $(echo -n "${key_id}" | base64)
-  aws_secret_access_key: $(echo -n "${key_sec}" | base64)
+  aws_access_key_id: ${b64_key_id}
+  aws_secret_access_key: ${b64_key_sec}
 EOF
-        yq-go m -x -i "${output_file}" "${patch}"
-
-    fi
-
-    if [[ ${data_type} == "credentials" ]] || [[ ${data_type} == "both" ]]; then
-
-        local tmp_awscred
-        tmp_awscred=$(mktemp)
-        cat <<EOF >${tmp_awscred}
-[default]
-aws_access_key_id = ${key_id}
-aws_secret_access_key = ${key_sec}
-EOF
-
-
-        cat <<EOF >${patch}
-data:
-  credentials: $(cat ${tmp_awscred} | base64 -w0)
-EOF
-        yq-go m -x -i "${output_file}" "${patch}"
-
-        rm -f ${tmp_awscred}
-    fi
-
-    rm -f ${patch}
-
 }
 
 function remove_tech_preview_feature_from_manifests()
@@ -179,11 +142,6 @@ cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 cmd="oc adm release extract --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --credentials-requests --cloud=aws --to '$cr_yaml_d' ${ADDITIONAL_OC_EXTRACT_ARGS}"
 run_command "${cmd}" || exit 1
-
-ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
 rm pull-secret
 popd
 
@@ -220,7 +178,7 @@ do
         | jq '{Version: "2012-10-17", Statement: .spec.providerSpec.statementEntries}' > "${policy_json}"
     policy_doc=$(cat "${policy_json}" | jq -c .)
     echo "policy_doc: $policy_doc"
-
+    
     #  Create policy
     # 
     policy_name="${prefix}_policy_${ns}_${name}"
@@ -248,15 +206,7 @@ do
     # Generate users manifests
     user_manifest="${SHARED_DIR}/manifest_user-${ns}-${name}-secret.yaml"
     echo "Generate users manifest file ${user_manifest}"
-    if [[ ${ns} == "openshift-cluster-csi-drivers" ]] && [[ ${name} == "ebs-cloud-credentials" ]]; then
-        if (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
-            create_secret_file_for_aws "credentials" "$ns" "$name" "${key_id}" "${key_sec}" "${user_manifest}"
-        else
-            create_secret_file_for_aws "access_and_secret_key" "$ns" "$name" "${key_id}" "${key_sec}" "${user_manifest}"
-        fi
-    else
-        create_secret_file_for_aws "access_and_secret_key" "$ns" "$name" "${key_id}" "${key_sec}" "${user_manifest}"
-    fi
+    create_secret_file_for_aws "$ns" "$name" "$(b64 ${key_id})" "$(b64 ${key_sec})" "${user_manifest}"
 done < "${credentials_requests_files}"
 
 exit 0

@@ -15,6 +15,10 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.17"
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   ocp_4.17_tools:
     name: "4.17"
     namespace: ocp
@@ -38,6 +42,9 @@ images:
     ci_tests-private-builder_4.17:
       as:
       - registry.ci.openshift.org/ci/tests-private-builder:4.17
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -74,20 +81,6 @@ images:
   from: root
   optional: true
   to: tests-private-baseui
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.17
-    RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4 && CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/candidate && \
-        curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp-dev-preview/ -o pre.html && \
-        ecver=$(grep -E "<a href=\"candidate-4\.17" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V" && \
-        if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRRORURL}/x86_64/clients/ocp-dev-preview/${ecver}; fi && \
-        rcgaver=$(grep -E "<a href=\"4\.17" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V" && \
-        if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/${rcgaver}; fi && \
-        curl -s -k -L ${CLIENTURL}/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
-        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
-        oc-mirror version && skopeo --version && rm -rf /usr/bin/oc
-  from: ci_tests-private-base_4.17
-  optional: true
-  to: tests-private-tools
 - dockerfile_path: images/Dockerfile.base
   inputs:
     ocp_4.17_tools:
@@ -106,8 +99,6 @@ promotion:
   to:
   - namespace: ci
     tag: "4.17"
-  - namespace: ci
-    tag: latest
 resources:
   '*':
     limits:

@@ -3,14 +3,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
   tests-private:
     name: tests-private
     namespace: ci
@@ -22,16 +22,17 @@ canonical_go_repository: github.com/kubernetes/cloud-provider-vsphere
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: vsphere-cloud-controller-manager
 promotion:
   to:
-  - name: 4.18-priv
+  - disabled: true
+    name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -95,6 +96,11 @@ tests:
   container:
     from: commitchecker
   optional: true
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: cluster-provider-vsphere
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

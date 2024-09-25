@@ -23,7 +23,22 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.14"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
   intermediate415:
     candidate:
       architecture: arm64
@@ -38,12 +53,12 @@ releases:
       version: "4.16"
   latest:
     release:
-      architecture: arm64
+      architecture: amd64
       channel: fast
       version: "4.14"
   target:
     candidate:
-      architecture: arm64
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.17"
@@ -58,6 +73,9 @@ tests:
   cron: 27 19 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       architecture: arm64
@@ -73,7 +91,7 @@ tests:
       - env: RELEASE_IMAGE_INTERMEDIATE415
         name: release:intermediate415
       - env: RELEASE_IMAGE_TARGET
-        name: release:target
+        name: release:arm64-target
       from: cli
       resources:
         requests:

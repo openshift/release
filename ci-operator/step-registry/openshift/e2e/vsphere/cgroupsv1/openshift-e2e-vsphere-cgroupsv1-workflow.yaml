@@ -2,12 +2,18 @@ workflow:
   as: openshift-e2e-vsphere-cgroupsv1
   steps:
     pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-conf-vsphere
     - ref: openshift-manifests-cgroupsv1
-    - chain: ipi-vsphere-pre
+    - ref: ovn-conf
+    - chain: ipi-install-vsphere
     test:
     - ref: openshift-e2e-test
     post:
+    - chain: gather-network
     - chain: gather-core-dump
     - chain: ipi-vsphere-post
+    env:
+      PULL_THROUGH_CACHE: enabled
   documentation: |-
     VSphere E2E wraps the Openshift E2E workflow and executes the common end-to-end test suite using cgroups v1.

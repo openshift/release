@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build09
   cron: 0 2 * * *
   decorate: true
   decoration_config:
@@ -13,6 +13,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-clusterbot
   reporter_config:
@@ -86,179 +87,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 0 1 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.15
-    org: openshift
-    repo: microshift
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.15-microshift-metal-cache-nightly
-  reporter_config:
-    slack:
-      channel: '#microshift-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/microshift-metal-cache-nightly-cluster-profile
-      - --target=microshift-metal-cache-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/microshift-metal-cache-nightly-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 0 1 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.15
-    org: openshift
-    repo: microshift
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.15-microshift-metal-cache-nightly-arm
-  reporter_config:
-    slack:
-      channel: '#microshift-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/microshift-metal-cache-nightly-arm-cluster-profile
-      - --target=microshift-metal-cache-nightly-arm
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/microshift-metal-cache-nightly-arm-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
+  cluster: build09
   cron: 0 12 * * *
   decorate: true
   decoration_config:
@@ -271,6 +100,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-ocp-conformance-rhel-eus-nightly
   reporter_config:
@@ -279,7 +109,7 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+      report_template: '@here :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
         *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
@@ -344,7 +174,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build09
   cron: 30 12 * * *
   decorate: true
   decoration_config:
@@ -357,6 +187,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-ocp-conformance-rhel-eus-nightly-arm
   reporter_config:
@@ -365,7 +196,7 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+      report_template: '@here :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
         *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
@@ -430,7 +261,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build09
   cron: 30 3 * * *
   decorate: true
   decoration_config:
@@ -443,6 +274,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-ocp-metal-nightly
   reporter_config:
@@ -516,7 +348,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build09
   cron: 30 3 * * *
   decorate: true
   decoration_config:
@@ -529,6 +361,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-ocp-metal-nightly-arm
   reporter_config:
@@ -613,6 +446,7 @@ periodics:
     repo: microshift
   labels:
     ci.openshift.io/generator: prowgen
+    job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-microshift-release-4.15-rebase-on-nightlies
   reporter_config:
@@ -621,7 +455,7 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+      report_template: '@here :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
         *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:

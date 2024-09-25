@@ -1,0 +1,251 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2a
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: build11-vxs6g
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build11-vxs6g
+      machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build11-vxs6g
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2a
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-builds-worker
+          value: ci-builds-worker
+      providerSpec:
+        value:
+          userDataSecret:
+            name: worker-user-data
+          placement:
+            availabilityZone: us-east-2a
+            region: us-east-2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          instanceType: m6g.4xlarge
+          metadata:
+            creationTimestamp: null
+          publicIp: true
+          blockDevices:
+            - ebs:
+                encrypted: true
+                iops: 5000
+                kmsKey:
+                  arn: ''
+                volumeSize: 800
+                volumeType: gp3
+          securityGroups:
+            - filters:
+                - name: 'tag:Name'
+                  values:
+                    - build11-vxs6g-node
+            - filters:
+              - name: tag:Name
+                values:
+                - build11-vxs6g-lb
+          kind: AWSMachineProviderConfig
+          metadataServiceOptions: {}
+          tags:
+            - name: kubernetes.io/cluster/build11-vxs6g
+              value: owned
+          deviceIndex: 0
+          ami:
+            id: ami-0e9cdc0e85e0a6aeb
+          subnet:
+            id: subnet-0a06dfcedffc29e0d
+          apiVersion: machine.openshift.io/v1beta1
+          iamInstanceProfile:
+            id: build11-vxs6g-worker-profile
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 40
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build11-vxs6g-ci-builds-worker-us-east-2a
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2b
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: build11-vxs6g
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build11-vxs6g
+      machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2b
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build11-vxs6g
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2b
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-builds-worker
+          value: ci-builds-worker
+      providerSpec:
+        value:
+          userDataSecret:
+            name: worker-user-data
+          placement:
+            availabilityZone: us-east-2b
+            region: us-east-2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          instanceType: m6g.4xlarge
+          metadata:
+            creationTimestamp: null
+          publicIp: true
+          blockDevices:
+            - ebs:
+                encrypted: true
+                iops: 5000
+                kmsKey:
+                  arn: ''
+                volumeSize: 800
+                volumeType: gp3
+          securityGroups:
+            - filters:
+                - name: 'tag:Name'
+                  values:
+                    - build11-vxs6g-node
+            - filters:
+              - name: tag:Name
+                values:
+                - build11-vxs6g-lb
+          kind: AWSMachineProviderConfig
+          metadataServiceOptions: {}
+          tags:
+            - name: kubernetes.io/cluster/build11-vxs6g
+              value: owned
+          deviceIndex: 0
+          ami:
+            id: ami-0e9cdc0e85e0a6aeb
+          subnet:
+            id: subnet-01ed09ec9e0f87aac
+          apiVersion: machine.openshift.io/v1beta1
+          iamInstanceProfile:
+            id: build11-vxs6g-worker-profile
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2b
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 40
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build11-vxs6g-ci-builds-worker-us-east-2b
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2c
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: build11-vxs6g
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build11-vxs6g
+      machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2c
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build11-vxs6g
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build11-vxs6g-ci-builds-worker-us-east-2c
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-builds-worker
+          value: ci-builds-worker
+      providerSpec:
+        value:
+          userDataSecret:
+            name: worker-user-data
+          placement:
+            availabilityZone: us-east-2c
+            region: us-east-2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          instanceType: m6g.4xlarge
+          metadata:
+            creationTimestamp: null
+          publicIp: true
+          blockDevices:
+            - ebs:
+                encrypted: true
+                iops: 5000
+                kmsKey:
+                  arn: ''
+                volumeSize: 800
+                volumeType: gp3
+          securityGroups:
+            - filters:
+                - name: 'tag:Name'
+                  values:
+                    - build11-vxs6g-node
+            - filters:
+              - name: tag:Name
+                values:
+                - build11-vxs6g-lb
+          kind: AWSMachineProviderConfig
+          metadataServiceOptions: {}
+          tags:
+            - name: kubernetes.io/cluster/build11-vxs6g
+              value: owned
+          deviceIndex: 0
+          ami:
+            id: ami-0e9cdc0e85e0a6aeb
+          subnet:
+            id: subnet-03722d13a538d7062
+          apiVersion: machine.openshift.io/v1beta1
+          iamInstanceProfile:
+            id: build11-vxs6g-worker-profile
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build11-vxs6g-ci-builds-worker-us-east-2c
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 40
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build11-vxs6g-ci-builds-worker-us-east-2c

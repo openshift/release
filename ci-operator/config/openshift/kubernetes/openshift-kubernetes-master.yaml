@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base
   base-machine:
@@ -8,19 +8,19 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
   cloud-provider-aws-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-aws-rpms
   cloud-provider-azure-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-azure-rpms
   cloud-provider-gcp-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cloud-provider-gcp-rpms
   commitchecker:
@@ -32,15 +32,15 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   oc-rpms:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: oc-rpms
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_4.17_tools:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tools
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -48,11 +48,11 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
   rhel-coreos-base:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: rhel-coreos
   tools:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -129,7 +129,7 @@ promotion:
       artifacts: artifacts
     excluded_images:
     - rhel-coreos
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
   - additional_images:
       artifacts: artifacts
@@ -190,12 +190,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -478,6 +478,24 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun-wasm
+- always_run: false
+  as: perfscale-control-plane-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift

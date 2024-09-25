@@ -21,6 +21,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+function get_arch() {
+  ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+  echo "${ARCH}"
+}
+
 set +o errexit
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
@@ -60,10 +65,8 @@ popd
 FAILURE_DOMAIN_PATH=$SHARED_DIR/fds.txt
 FAILURE_DOMAIN_JSON=$SHARED_DIR/fds.json
 FIRST=1
-function getFailureDomainsWithDSwitchForVCenter() {
-    echo "+getFailureDomainsWithDSwitchForVCenter"
-
-    vcenter=$1
+function getFailureDomainsWithDSwitch() {
+    echo "+getFailureDomainsWithDSwitch"
 
     FAILURE_DOMAIN_OUT="[]"
     
@@ -77,14 +80,11 @@ function getFailureDomainsWithDSwitchForVCenter() {
       echo "checking lease ${LEASE} for failure domains"
 
       server=$(jq -r .status.server "$LEASE")
-      if [ "$server" != "$vcenter" ]; then
-        continue
-      fi      
 
       echo "server is ${server}"
 
       if [ ${FIRST} == 0 ]; then
-      echo "    }," >> ${FAILURE_DOMAIN_PATH}  
+          echo "    }," >> ${FAILURE_DOMAIN_PATH}
       fi
       echo "    {" >> ${FAILURE_DOMAIN_PATH}
       FIRST=0
@@ -116,14 +116,14 @@ function getFailureDomainsWithDSwitchForVCenter() {
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
       
-      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
     done
     echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
     echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
     echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
     cat "${FAILURE_DOMAIN_JSON}"
-    echo "-getFailureDomainsWithDSwitchForVCenter"
+    echo "-getFailureDomainsWithDSwitch"
 }
 
 declare vsphere_url
@@ -385,6 +385,7 @@ platform:
     network: "${vsphere_portgroup}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
+    folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 else
 ${platform_required} && cat >>"${install_config}" <<EOF
@@ -406,7 +407,7 @@ fi
 echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
 
 echo "$(date -u --rfc-3339=seconds) - Getting failure domains ..."
-getFailureDomainsWithDSwitchForVCenter "${vsphere_url}"
+getFailureDomainsWithDSwitch
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
@@ -436,6 +437,16 @@ control_plane_count = ${CONTROL_PLANE_REPLICAS}
 compute_count = ${COMPUTE_NODE_REPLICAS}
 failure_domains = $(cat $FAILURE_DOMAIN_PATH)
 EOF
+
+VCENTERS_JSON=$(cat "${install_config}" | yq-v4 -o json | jq -c '.platform.vsphere.vcenters')
+
+if [[ "$VCENTERS_JSON" != "null" ]]; then
+    echo "Generating vcenters for variables.ps1"
+    VCENTERS_JSON=$'$vcenters = \''${VCENTERS_JSON}$'\''
+else
+    echo "vCenters definition not found in install-config.  Skipping setting for variables.ps1"
+    VCENTERS_JSON=""
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
 cat >"${SHARED_DIR}/variables.ps1" <<-EOF
@@ -480,6 +491,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$failure_domains = @"
 $(cat ${FAILURE_DOMAIN_JSON})
 "@
+
+$(echo ${VCENTERS_JSON})
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."

@@ -1,0 +1,75 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+- context_dir: .
+  dockerfile_path: ./tests/e2e-openshift/Dockerfile
+  to: opentelemetry-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opentelemetry-stage-tests
+  cron: 0 6 1 10 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-downstream
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: opentelemetry-stage-tests-fips
+  cron: 0 6 1 10 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-downstream
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: opentelemetry-product-ocp-4.17-stage

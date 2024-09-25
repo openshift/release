@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/api
     decorate: true
     decoration_config:
@@ -68,8 +68,8 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
-    context: ci/prow/ci-index-sriov-network-operator-bundle
+    cluster: build01
+    context: ci/prow/ci-index-operator-bundle
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -79,9 +79,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-ci-index-sriov-network-operator-bundle
+    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-ci-index-operator-bundle
     path_alias: github.com/openshift/sriov-network-operator
-    rerun_command: /test ci-index-sriov-network-operator-bundle
+    rerun_command: /test ci-index-operator-bundle
     spec:
       containers:
       - args:
@@ -89,7 +89,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-sriov-network-operator-bundle
+        - --target=ci-index-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -125,13 +125,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-sriov-network-operator-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/controllers
     decorate: true
     decoration_config:
@@ -194,7 +194,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-nfv
     decorate: true
     decoration_config:
@@ -283,8 +283,8 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
-    context: ci/prow/e2e-openstack-nfv-hwoffload
+    cluster: build01
+    context: ci/prow/e2e-openstack-nfv-config-drive
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -292,14 +292,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: openstack-hwoffload
-      ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
+      ci-operator.openshift.io/cloud: openstack-nfv
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-nfv
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-e2e-openstack-nfv-hwoffload
+    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-e2e-openstack-nfv-config-drive
     optional: true
     path_alias: github.com/openshift/sriov-network-operator
-    rerun_command: /test e2e-openstack-nfv-hwoffload
+    rerun_command: /test e2e-openstack-nfv-config-drive
     spec:
       containers:
       - args:
@@ -309,8 +309,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-openstack-nfv-hwoffload-cluster-profile
-        - --target=e2e-openstack-nfv-hwoffload
+        - --secret-dir=/usr/local/e2e-openstack-nfv-config-drive-cluster-profile
+        - --target=e2e-openstack-nfv-config-drive
         command:
         - ci-operator
         image: ci-operator:latest
@@ -326,7 +326,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-nfv-hwoffload-cluster-profile
+        - mountPath: /usr/local/e2e-openstack-nfv-config-drive-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -356,7 +356,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-openstack-hwoffload
+          secretName: cluster-secrets-openstack-nfv
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -366,14 +366,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-nfv-hwoffload,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-nfv-config-drive,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build05
-    context: ci/prow/e2e-telco5g-cnftests
+    context: ci/prow/e2e-telco5g-sriov
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -385,10 +385,10 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-e2e-telco5g-cnftests
+    name: pull-ci-openshift-priv-sriov-network-operator-release-4.16-e2e-telco5g-sriov
     optional: true
     path_alias: github.com/openshift/sriov-network-operator
-    rerun_command: /test e2e-telco5g-cnftests
+    rerun_command: /test e2e-telco5g-sriov
     spec:
       containers:
       - args:
@@ -397,7 +397,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-telco5g-cnftests
+        - --target=e2e-telco5g-sriov
         command:
         - ci-operator
         image: ci-operator:latest
@@ -439,13 +439,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-telco5g-cnftests,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-telco5g-sriov,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -508,7 +508,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -571,7 +571,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build03
     context: ci/prow/operator-e2e
     decorate: true
     decoration_config:
@@ -659,7 +659,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/pkg
     decorate: true
     decoration_config:
@@ -722,7 +722,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build01
     context: ci/prow/security
     decorate: true
     decoration_config:
