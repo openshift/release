@@ -54,6 +54,16 @@ fi
 
 EXTRA_ARGS=""
 
+if [[ -n ${MCE} ]] ; then
+  # test https://issues.redhat.com/browse/OCPSTRAT-1391
+  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )); then
+    while read -r name _ _ _; do
+      oc adm taint node "$name" taint-test=Exists:NoSchedule
+    done < <(oc get node --no-headers)
+  fi
+  EXTRA_ARGS="${EXTRA_ARGS} --toleration=key=taint-test,operator=Exists,effect=NoSchedule"
+fi
+
 if [ -n "${KUBEVIRT_CSI_INFRA}" ]
 then
   EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=${KUBEVIRT_CSI_INFRA}/${KUBEVIRT_CSI_INFRA}"
