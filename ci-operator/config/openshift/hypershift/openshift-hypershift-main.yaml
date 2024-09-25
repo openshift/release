@@ -37,11 +37,17 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
+- dockerfile_path: Dockerfile.e2e
+  inputs:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+  to: hypershift-tests
 promotion:
   to:
   - additional_images:
       hypershift-operator: hypershift-operator
-      hypershift-tests: test-bin
+      hypershift-tests: hypershift-tests
     excluded_images:
     - '*'
     namespace: hypershift
@@ -81,7 +87,6 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
-test_binary_build_commands: make e2e
 tests:
 - as: verify
   commands: make verify
@@ -107,7 +112,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-4-17
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
@@ -118,7 +123,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -199,7 +204,7 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: main
   org: openshift
