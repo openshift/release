@@ -141,7 +141,7 @@ function download_microshift_scripts() {
     chmod 755 "${DNF_RETRY}"
 }
 
-function ci_clone_src() {
+function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
     if (( go_version < 22 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
@@ -157,6 +157,22 @@ function ci_clone_src() {
         cd /tmp/prow
     fi
     go build -mod=mod -o /tmp/clonerefs ./cmd/clonerefs
+}
+
+function ci_clone_src() {
+    fails=0
+    for _ in $(seq 3) ; do
+        if ci_get_clonerefs; then
+            break
+        else
+            fails=$((fails + 1))
+            if [[ "${fails}" -ge 3 ]]; then
+                echo "Failed to download and compile clonerefs"
+                exit 1
+            fi
+            sleep 10
+        fi
+    done
 
     if [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
