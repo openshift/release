@@ -18,9 +18,9 @@ spec:
   restartPolicy: Never
   containers:
   - name: run-nfd
-    image: quay.io/ocp-edge-qe/eco-gotests:v4.15.0
+    image: quay.io/ocp-edge-qe/eco-gotests:latest
     command: [ "/bin/bash", "-c", "--" ]
-    args: [ "scripts/test-runner.sh && sleep 120" ]
+    args: [ "scripts/test-runner.sh && sleep 500" ]
     env:
     - name: KUBECONFIG
       value: "/kubeconfig/kubeconfig"
