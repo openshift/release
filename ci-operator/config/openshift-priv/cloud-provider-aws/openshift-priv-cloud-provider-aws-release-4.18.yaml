@@ -7,6 +7,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
@@ -104,6 +112,11 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}
