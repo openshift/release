@@ -53,8 +53,6 @@ spec:
           value: "${IDP_USER}"
         - name: TS_SELENIUM_OCP_PASSWORD
           value: "${IDP_PASSWD}"
-        - name: DELETE_WORKSPACE_ON_FAILED_TEST
-          value: "true"
         - name: TS_OCP_LOGIN_PAGE_PROVIDER_TITLE
           value: "rosa-htpasswd"
         - name: SAVE_JUNIT_DATA
