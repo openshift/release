@@ -53,8 +53,10 @@ t_upgrade_duration=\$SECONDS
 
 echo "Image based upgrade took \${t_upgrade_duration} seconds"
 
-echo "Verifying Rollouts in Target Cluster..."
 export KUBECONFIG="./bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
+oc adm wait-for-stable-cluster --minimum-stable-period=4m --timeout=30m
+
+echo "Verifying Rollouts in Target Cluster..."
 echo "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a COMPONENTS=(
   "openshift-etcd-operator etcd-operator"
