@@ -143,6 +143,27 @@ tests:
     test:
     - ref: redhat-chaos-node-disruptions-master-outage
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- as: krkn-hub-tests-aro
+  cron: 0 8 * * 1
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      ARO_MASTER_VM_SIZE: Standard_D16s_v3
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "4"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-aro-4.17
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - chain: redhat-chaos-hog-scenarios
+    workflow: openshift-qe-installer-azure-aro-upi
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

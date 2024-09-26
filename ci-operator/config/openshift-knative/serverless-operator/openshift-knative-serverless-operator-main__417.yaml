@@ -11,18 +11,18 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  openshift_eventing-istio-src_knative-v1.14:
+  openshift_eventing-istio-src_knative-v1.15:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_eventing-kafka-broker-src_knative-v1.14:
+    tag: knative-v1.15
+  openshift_eventing-kafka-broker-src_knative-v1.15:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_knative-eventing-src_knative-v1.14:
+    tag: knative-v1.15
+  openshift_knative-eventing-src_knative-v1.15:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.14
+    tag: knative-v1.15
   openshift_knative-serving-src_knative-v1.15:
     name: knative-serving-src
     namespace: openshift
@@ -74,15 +74,15 @@ images:
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
-    openshift_eventing-istio-src_knative-v1.14:
+    openshift_eventing-istio-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.14
-    openshift_eventing-kafka-broker-src_knative-v1.14:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.15
+    openshift_eventing-kafka-broker-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.14
-    openshift_knative-eventing-src_knative-v1.14:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.15
+    openshift_knative-eventing-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.14
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.15
     openshift_knative-serving-src_knative-v1.15:
       as:
       - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
@@ -100,7 +100,10 @@ images:
   inputs:
     ocp_ubi-minimal_8:
       as:
-      - registry.access.redhat.com/ubi8-minimal:latest
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -455,6 +458,79 @@ tests:
       cli: latest
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
         make operator-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+- as: test-soak-aws-417
+  optional: true
+  run_if_changed: test/soak
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: serverless-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-soak
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
