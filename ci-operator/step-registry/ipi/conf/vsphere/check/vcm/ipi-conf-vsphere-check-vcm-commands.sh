@@ -315,7 +315,7 @@ for LEASE in $LEASES; do
   NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
 
   log "got lease ${LEASE}"
-
+  slepp 3600
   portgroup_name=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
   log "portgroup ${portgroup_name}"
 
