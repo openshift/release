@@ -102,6 +102,9 @@ wait-for-valid-lb-ext-kubeconfig
 
 pod-restart-workarounds
 
+# Additional sleep for operators to start updating their status
+sleep 300
+
 wait-for-operators-to-stabilize
 EOF
 chmod +x "${SHARED_DIR}"/time-skew-test.sh
