@@ -38,5 +38,5 @@ Please see the [`firewatch-rosa-aws-sts`](https://steps.ci.openshift.org/workflo
 
 ### Reporting Results
 
-- Tests results will be saved under the artifact dir as `test-results.xml` file.
+- Tests results will be saved under the artifact dir as `test-results.xml`.
 - The weekly runs will be automatically reported to the `#wt-ci` Slack channel.
