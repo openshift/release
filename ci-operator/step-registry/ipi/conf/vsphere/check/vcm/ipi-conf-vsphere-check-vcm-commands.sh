@@ -312,24 +312,25 @@ for LEASE in $LEASES; do
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${LEASE}" -o json > /tmp/lease.json
   VCENTER=$(jq -r '.status.server' < /tmp/lease.json )
   NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
-  NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+  NETWORK_RESOURCES=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
 
   log "got lease ${LEASE}"
-  sleep 3600
   portgroup_name=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
   log "portgroup ${portgroup_name}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
   extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
-  NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
+  for network_resource in $NETWORK_RESOURCES; do
+    NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${network_resource}.json"
+    echo "GGGGGGGGGGG$network_resource"
+    if [ ! -f "$NETWORK_CACHE_PATH" ]; then
+      log caching network resource "${network_resource}"
+      oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${network_resource}" -o json > "${NETWORK_CACHE_PATH}"
+    fi
 
-  if [ ! -f "$NETWORK_CACHE_PATH" ]; then
-    log caching network resource "${NETWORK_RESOURCE}"
-    oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${NETWORK_RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
-  fi
-
-  networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${NETWORK_RESOURCE}"
+    networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${network_resource}"
+  done
 
   if [ "${bastion_leased_resource}" != "null" ]; then
     log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"
@@ -337,9 +338,9 @@ for LEASE in $LEASES; do
 export vsphere_bastion_portgroup="${portgroup_name}"
 EOF
 
-  elif [ "${extra_leased_resource}" != "null" ]; then
-    log "setting extra leased network ${portgroup_name} in vsphere_context.sh"
-    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+elif [ "${extra_leased_resource}" != "null" ]; then
+  log "setting extra leased network ${portgroup_name} in vsphere_context.sh"
+  cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
   vsphere_extra_portgroup="${portgroup_name}"
