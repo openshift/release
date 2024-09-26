@@ -90,4 +90,4 @@ echo "Waiting for copy synchronization between shared volumes"
 sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
-cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/tests
+cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/
