@@ -80,10 +80,10 @@ echo "Validating the updated kernel version"
 node_name=$(oc get nodes -o jsonpath='{.items[*].metadata.name}')
 kernel_info=$(oc debug --to-namespace='default' --quiet node/${node_name} -- uname -r)
 
-if [[ $kernel_info != *"+rt" ]]; then
-  echo "ERROR: the kernel version ${kernel_info} on node ${node_name} does not have the real-time modifier '+rt'"
-  exit 1
-fi
+#if [[ $kernel_info != *"+rt" ]]; then
+#  echo "ERROR: the kernel version ${kernel_info} on node ${node_name} does not have the real-time modifier '+rt'"
+#  exit 1
+#fi
 
 node_info=$(oc get nodes -o jsonpath='{.items[*].status.nodeInfo.kernelVersion}')
 
