@@ -338,9 +338,9 @@ for LEASE in $LEASES; do
 export vsphere_bastion_portgroup="${portgroup_name}"
 EOF
 
-elif [ "${extra_leased_resource}" != "null" ]; then
-  log "setting extra leased network ${portgroup_name} in vsphere_context.sh"
-  cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+  elif [ "${extra_leased_resource}" != "null" ]; then
+    log "setting extra leased network ${portgroup_name} in vsphere_context.sh"
+    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
   vsphere_extra_portgroup="${portgroup_name}"
@@ -444,7 +444,7 @@ fi
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
+NETWORK_RESOURCE=$(jq -r '[.metadata.ownerReferences[] | select(.kind=="Network")][0] | .name' < "${SHARED_DIR}"/LEASE_single.json)
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
