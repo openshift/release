@@ -48,7 +48,7 @@ releases:
   latest:
     release:
       architecture: multi
-      channel: candidate
+      channel: fast
       version: "4.16"
   target:
     candidate:
@@ -422,23 +422,26 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      ENABLE_OTA_TEST: OCP-21588
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-canary-f28
   cron: 14 0 21 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "mcpfoo", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker="}]'
+      MCO_CONF_DAY2_CUSTOM_MCP_TO_BE_DELETED: mcpfoo
       OCP_ARCH: arm64
+      PAUSED_MCP_NAME: mcpfoo
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 - as: azure-ipi-private-spec-net-type-spec-perm-arm-f28
   cron: 51 21 7 * *
@@ -472,6 +475,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
@@ -633,17 +637,21 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: gcp-ipi-basecap-none-additionalcaps-arm-f28
+- as: gcp-ipi-basecap-none-additionalcaps-arm-canary-f28
   cron: 41 21 15 * *
   steps:
     cluster_profile: gcp-qe
     env:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: t2a-standard-4
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "mcpfoo", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker="}]'
+      MCO_CONF_DAY2_CUSTOM_MCP_TO_BE_DELETED: mcpfoo
       OCP_ARCH: arm64
+      PAUSED_MCP_NAME: mcpfoo
       PERSISTENT_MONITORING: "false"
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
 - as: gcp-ipi-compact-filestore-csi-arm-f28
   cron: 29 10 17 * *

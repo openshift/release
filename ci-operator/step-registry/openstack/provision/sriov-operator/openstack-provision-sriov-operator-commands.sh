@@ -178,6 +178,26 @@ EOF
         sleep 10
     done
 
+    # This is only needed on ocp 4.16+
+    # introduced https://github.com/openshift/sriov-network-operator/pull/887
+    # u/s https://github.com/k8snetworkplumbingwg/sriov-network-operator/pull/617
+    if (( $(echo "$oc_version >= 4.16" | bc -l) )); then
+        SRIOV_OPERATOR_CONFIG=$(
+            oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+    apiVersion: sriovnetwork.openshift.io/v1
+    kind: SriovOperatorConfig
+    metadata:
+      name: default
+      namespace: openshift-sriov-network-operator
+    spec:
+      enableInjector: true
+      enableOperatorWebhook: true
+      logLevel: 2
+EOF
+        )
+        echo "Created \"$SRIOV_OPERATOR_CONFIG\" SriovOperatorConfig"
+    fi
+
     if [ -n "${FOUND_SNO:-}" ] ; then
         wait_for_sriov_pods
         wait_for_sriov_network_node_state

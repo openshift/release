@@ -1,5 +1,15 @@
 build_root:
   from_repository: true
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -14,6 +24,28 @@ tests:
   commands: make lint
   container:
     from: src
+- as: commatrix-e2e-tests
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch master
+        ci-job-fullname openshift-kni-commatrix-e2e-tests-master
+        ci-job-type commatrix-e2e-tests
+        ci-repo-name commatrix
+        ci-org-name openshift-kni
+    test:
+    - as: commatrix-e2e-tests
+      commands: go mod vendor && make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-serial
 - as: security
   optional: true
   steps:

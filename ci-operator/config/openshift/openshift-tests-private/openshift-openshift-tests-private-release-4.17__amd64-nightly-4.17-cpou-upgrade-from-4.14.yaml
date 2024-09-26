@@ -18,7 +18,7 @@ base_images:
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.14"
   tools:
     name: "4.14"
     namespace: ocp
@@ -65,8 +65,6 @@ tests:
   cron: 27 4 7,22 * *
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      FILTERS_ADDITIONAL: ~TELCO&
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
@@ -83,7 +81,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
+    - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
@@ -91,7 +89,6 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     env:
-      FILTERS_ADDITIONAL: ~TELCO&
       FIPS_ENABLED: "true"
     test:
     - as: set-upgrade-releases
@@ -109,14 +106,12 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
+    - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-ovn-dualstack-f14
   cron: 33 12 9,24 * *
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      FILTERS_ADDITIONAL: ~TELCO&
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
@@ -133,7 +128,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
+    - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 zz_generated_metadata:
   branch: release-4.17

@@ -9,6 +9,8 @@ source "${SHARED_DIR}/vsphere_context.sh"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 declare vsphere_datacenter
 declare vsphere_datastore
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
 check_result=0
 disk_type="${DISK_TYPE:-thin}"

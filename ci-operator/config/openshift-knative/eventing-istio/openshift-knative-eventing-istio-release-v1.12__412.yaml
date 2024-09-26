@@ -1,4 +1,8 @@
 base_images:
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
@@ -9,6 +13,9 @@ build_root:
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -81,7 +88,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make e2e-tests
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make e2e-tests
       dependencies:
       - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
         name: knative-eventing-istio-controller
@@ -142,7 +150,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make e2e-tests
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make e2e-tests
       dependencies:
       - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
         name: knative-eventing-istio-controller

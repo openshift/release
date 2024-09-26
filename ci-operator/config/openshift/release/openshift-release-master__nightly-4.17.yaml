@@ -98,6 +98,8 @@ tests:
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
       ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      PACKET_PLAN: m3.large.x86
     observers:
       enable:
       - observers-resource-watch
@@ -112,6 +114,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-csi
+- as: e2e-aws-ovn-single-node-workers-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-workers
 - as: e2e-aws-ovn-single-node-workers
   interval: 168h
   steps:
@@ -122,17 +135,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-workers
-  timeout: 3h0m0s
-- as: openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-single-node-workers-upgrade-conformance
 - as: e2e-aws-ovn-single-node
   interval: 168h
   steps:
@@ -165,6 +167,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-metal-ovn-single-node-rt-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node-realtime
+  timeout: 5h0m0s
+- as: e2e-metal-ovn-single-node-rt-upgrade-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node-realtime
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-techpreview-serial
   interval: 168h
   steps:
@@ -492,6 +519,19 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
   timeout: 6h0m0s
+- as: e2e-external-vsphere-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: upi-vsphere-platform-external-ccm
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -512,14 +552,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-workers-rhel
-- as: e2e-gcp-libvirt-cert-rotation
-  cron: '@daily'
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-libvirt-cert-rotation
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -754,6 +786,28 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-hcp-cnf
+- as: metal-ovn-network-flow-matrix-bm
+  cluster: build05
+  cron: 0 23 * * 2
+  steps:
+    env:
+      T5CI_JOB_TYPE: network-flow-matrix-bm
+      T5CI_VERSION: "4.17"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: network-flow-matrix-bm
+- as: metal-ovn-network-flow-matrix-single-node-bm
+  cluster: build05
+  cron: 0 23 * * 2
+  steps:
+    env:
+      T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
+      T5CI_VERSION: "4.17"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: network-flow-matrix-single-node-bm
 - as: e2e-alibaba-ovn
   cron: '@weekly'
   steps:
@@ -865,6 +919,14 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
+- as: e2e-aws-ovn-single-node-one-core-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node-one-core
 - as: e2e-gcp-graceful-shutdown
   interval: 168h
   steps:
@@ -1095,6 +1157,7 @@ tests:
     cluster_profile: aws-2
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+        Ingress
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
@@ -1108,6 +1171,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
         FEATURE_SET=TechPreviewNoUpgrade
     observers:
       enable:

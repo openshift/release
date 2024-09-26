@@ -20,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -54,13 +58,10 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
+      channel: candidate
+      version: "4.17"
   target:
     candidate:
       architecture: amd64
@@ -291,12 +292,23 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: azure-aks-hypershift-byo-vnet-replace-guest-f28
+  cron: 16 16 6 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-ipi-confidential-trustedlaunch-f60
   cron: 28 19 1 1,3,5,7,9,11 *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_TRUSTEDLAUNCH_COMPUTE: "true"
+      ENABLE_TRUSTEDLAUNCH_CONTROL_PLANE: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
@@ -509,6 +521,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
@@ -611,7 +624,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: nutanix-ipi-compact-f60
+- as: nutanix-ipi-compact-image-registry-s3-f60
   cluster: build01
   cron: 18 12 25 1,3,5,7,9,11 *
   steps:
@@ -621,7 +634,17 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi
+    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
+- as: nutanix-ipi-data-disks-f60
+  cluster: build01
+  cron: 38 14 29 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
 - as: nutanix-ipi-disc-rt-f60
   cluster: build01
   cron: 32 1 25 2,4,6,8,10,12 *
@@ -633,16 +656,16 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-image-registry-s3-f60
+- as: nutanix-ipi-gpu-f60
   cluster: build01
-  cron: 4 1 5 1,3,5,7,9,11 *
+  cron: 30 14 10 2,4,6,8,10,12 *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix-qe-gpu
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
 - as: nutanix-ipi-proxy-fips-mini-perm-f60
   cluster: build01
   cron: 3 7 14 1,3,5,7,9,11 *

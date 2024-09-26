@@ -12,10 +12,20 @@ images:
   - name: TORCH_CUDA_ARCH_LIST
     value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
   - name: PYTHON_VERSION
-    value: "3.11"
+    value: "3.12"
   context_dir: .
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-main-cuda
+- build_args:
+  - name: max_jobs
+    value: "8"
+  - name: PYTORCH_ROCM_ARCH
+    value: gfx908;gfx90a;gfx942;gfx1100
+  - name: PYTHON_VERSION
+    value: "3.12"
+  context_dir: .
+  dockerfile_path: Dockerfile.rocm.ubi
+  to: vllm-build-main-rocm
 promotion:
   to:
   - namespace: opendatahub-io
@@ -47,6 +57,13 @@ resources:
     requests:
       cpu: "16"
       memory: 24Gi
+  vllm-build-main-rocm:
+    limits:
+      cpu: "16"
+      memory: 35Gi
+    requests:
+      cpu: "16"
+      memory: 35Gi
 tests:
 - always_run: true
   as: smoke-test
@@ -61,30 +78,39 @@ tests:
   container:
     clone: true
     from: vllm-build-main-cuda
-- as: pr-image-mirror
+- as: cuda-pr-image-mirror
   steps:
     dependencies:
       SOURCE_IMAGE_REF: vllm-build-main-cuda
     env:
       IMAGE_REPO: vllm
+      RELEASE_VERSION: cuda-pr
     workflow: opendatahub-io-ci-image-mirror
-- as: fast-image-mirror
+- as: rocm-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-rocm
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rocm-pr
+    workflow: opendatahub-io-ci-image-mirror
+- as: cuda-fast-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: vllm-build-main-cuda
     env:
       IMAGE_REPO: vllm
-      RELEASE_VERSION: fast
+      RELEASE_VERSION: cuda-fast
     workflow: opendatahub-io-ci-image-mirror
-- as: nightly-image-mirror
-  cron: 0 0 * * *
+- as: rocm-fast-image-mirror
+  postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-build-main-cuda
+      SOURCE_IMAGE_REF: vllm-build-main-rocm
     env:
       IMAGE_REPO: vllm
-      RELEASE_VERSION: fast
+      RELEASE_VERSION: rocm-fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main

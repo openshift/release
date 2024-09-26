@@ -20,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.16"
     namespace: ocp
@@ -66,16 +70,10 @@ releases:
       architecture: amd64
       channel: candidate
       version: "4.16"
-  multi-latest:
+  target:
     release:
       architecture: multi
       channel: candidate
-      version: "4.16"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
       version: "4.16"
 resources:
   '*':
@@ -469,6 +467,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
@@ -507,6 +506,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       CHANNEL_GROUP: candidate
+      COMPUTE_NODES: "3"
+      MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.16"
       SUBSCRIPTION_TYPE: marketplace-gcp
     test:

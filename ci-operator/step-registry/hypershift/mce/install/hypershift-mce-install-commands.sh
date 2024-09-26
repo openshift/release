@@ -2,6 +2,10 @@
 
 set -ex
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 MCE_VERSION=${MCE_VERSION:-"2.2"}
 if [[ $MCE_QE_CATALOG != "true" ]]; then
   _REPO="quay.io/acm-d/mce-custom-registry"
@@ -244,4 +248,4 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.4)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi

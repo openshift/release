@@ -1,0 +1,28 @@
+chain:
+  as: openshift-upgrade-qe-test-canary
+  steps:
+  - ref: idp-htpasswd
+  - ref: cucushift-pre
+  - ref: openshift-extended-upgrade-pre
+  - ref: cucushift-upgrade-prepare
+  - ref: mco-conf-day2-create-custom-mcp
+  - ref: cucushift-upgrade-prehealthcheck
+  - ref: cucushift-upgrade-cpou-pause-worker-mcp
+  - ref: cucushift-upgrade-toimage
+  - ref: cucushift-upgrade-cpou-unpause-worker-mcp
+  - ref: cucushift-upgrade-rhel-worker
+  - ref: mco-conf-day2-destroy-custom-mcp
+  - ref: cucushift-upgrade-healthcheck
+  - ref: cucushift-upgrade-check-capability
+  - ref: openshift-extended-upgrade-post
+  - ref: cucushift-upgrade-check
+  - ref: openshift-upgrade-qe-test-report
+  env:
+  - name: FILTERS_ADDITIONAL
+    default: "~TELCO&"
+    documentation: |
+      Addtional test case filter.
+  documentation: |-
+    The chain executes upgrade-prepare, which creates test data on a cluster;
+    then conduct paused upgrade;
+    then execute upgrade-check, which checks the prepared test data.
