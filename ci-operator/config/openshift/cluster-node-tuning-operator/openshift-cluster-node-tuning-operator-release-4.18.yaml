@@ -1,12 +1,12 @@
 base_images:
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
@@ -81,6 +81,25 @@ tests:
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         make pao-functests-hypershift
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-aws-e2e-cluster
+- always_run: false
+  as: e2e-pao-updating-profile-hypershift
+  steps:
+    cluster_profile: hypershift
+    test:
+    - as: e2e-pao-updating-profile-hypershift
+      cli: latest
+      commands: |-
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        make pao-functests-update-only-hypershift
       from: src
       resources:
         requests:

@@ -269,8 +269,22 @@ while true; do
   logger "INFO" "Cluster state: ${CLUSTER_STATE}"
   if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
     logger "INFO" "Granting the required permissions in the host project..."
-    ephemeral_sa_email=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "osd-managed-admin-[^\s\t]+")
-    add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    logger "INFO" "------------------------------"
+    ocm describe cluster "${CLUSTER_ID}"
+    logger "INFO" "------------------------------"
+    emails_str=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com(\s+[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com(\s+[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com)?)?")
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $1}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $2}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $3}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
     continue
   fi
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then

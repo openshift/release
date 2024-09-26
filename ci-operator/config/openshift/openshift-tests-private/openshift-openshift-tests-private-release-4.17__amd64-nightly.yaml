@@ -24,9 +24,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -157,7 +161,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-sts-basecap-none-f28-destructive
+- as: aws-ipi-disc-priv-sts-oc-mirror-basecap-none-f28-destructive
   cron: 26 5 3 * *
   steps:
     cluster_profile: aws-qe
@@ -168,6 +172,7 @@ tests:
       BASELINE_CAPABILITY_SET: None
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -505,7 +510,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "30"
     test:
@@ -598,7 +603,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
       TEST_TIMEOUT: "90"
@@ -614,7 +619,7 @@ tests:
       HYPERSHIFT_AWS_REGION: us-east-1
       HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
       HYPERSHIFT_NODE_COUNT: "1"
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "35"
     test:
@@ -680,7 +685,7 @@ tests:
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
       MCE_VERSION: "2.7"
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
       TEST_TIMEOUT: "90"
     test:
@@ -755,7 +760,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "30"
     test:
@@ -1370,7 +1375,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
-- as: azure-ipi-disc-oidc-f28-destructive
+- as: azure-ipi-disc-oidc-oc-mirror-f28-destructive
   cron: 34 4 5 * *
   steps:
     cluster_profile: azure-qe
@@ -1378,6 +1383,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1796,8 +1802,6 @@ tests:
       ipv6_enabled: "false"
       masters: "1"
       workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-day2
 - as: baremetal-ha-agent-ipv4-static-disc-day2-f14
   cluster: build05
@@ -2158,7 +2162,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-fips-f28-destructive
+- as: gcp-ipi-disc-priv-oidc-oc-mirror-fips-f28-destructive
   cron: 47 7 10 * *
   steps:
     cluster_profile: gcp-qe
@@ -2166,6 +2170,7 @@ tests:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      MIRROR_BIN: oc-mirror
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -2465,12 +2470,13 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: ibmcloud-ipi-disc-priv-f28-destructive
+- as: ibmcloud-ipi-disc-priv-oc-mirror-f28-destructive
   cron: 45 5 17 * *
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
       E2E_RUN_TAGS: '@disconnected'
+      MIRROR_BIN: oc-mirror
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
