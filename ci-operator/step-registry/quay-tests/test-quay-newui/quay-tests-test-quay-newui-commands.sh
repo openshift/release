@@ -101,8 +101,8 @@ echo "The Quay hostname is $quay_hostname"
 
 #curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' --data '{"username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
 
-quay_access_token=$(cat $SHARED_DIR/quay_oauth2_token|tr -d '\n')
-echo "The Quay super user access token is ${quay_access_token}" 
+#quay_access_token=$(cat $SHARED_DIR/quay_oauth2_token|tr -d '\n')
+#echo "The Quay super user access token is ${quay_access_token}" 
 
 ocp_endpoint=$(cat $SHARED_DIR/kubeconfig|grep "server:"|awk '{print $2}'|tr -d '\n')
 echo "The OCP cluster endpoint is ${ocp_endpoint}"
@@ -113,7 +113,7 @@ export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
 export CYPRESS_QUAY_ENDPOINT_PROTOCOL=https
 export CYPRESS_QUAY_SUPER_USER_NAME=${QUAY_USERNAME}
 export CYPRESS_QUAY_SUPER_USER_PASSWORD=${QUAY_PASSWORD}
-export CYPRESS_QUAY_SUPER_USER_TOKEN=${quay_access_token}
+#export CYPRESS_QUAY_SUPER_USER_TOKEN=${quay_access_token}
 export CYPRESS_OCP_ENDPOINT=${ocp_endpoint}
 export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
