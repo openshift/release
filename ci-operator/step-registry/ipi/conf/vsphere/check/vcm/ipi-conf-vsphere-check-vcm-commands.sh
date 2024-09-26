@@ -330,6 +330,8 @@ for LEASE in $LEASES; do
     fi
 
     networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${network_resource}"
+    cp /tmp/lease.json "${SHARED_DIR}/LEASE_${LEASE}_${network_resource}.json"
+
   done
 
   if [ "${bastion_leased_resource}" != "null" ]; then
@@ -350,7 +352,7 @@ EOF
     log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
   fi
 
-  cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
+  # cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
 done
 
 # debug, confirm correct subnets.json
