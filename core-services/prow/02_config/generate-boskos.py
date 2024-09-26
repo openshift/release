@@ -360,7 +360,7 @@ CONFIG = {
         'us-west-2': 10,
     },
     'aws-kubevirt-quota-slice': {
-        'us-west-2': 10,
+        'us-east-2': 10,
     },
     'hypershift-powervs-quota-slice': {
         'default': 3,
