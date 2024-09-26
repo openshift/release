@@ -368,7 +368,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
   PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
 
-  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then    
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
     log "storing primary lease as LEASE_single"
     cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
@@ -417,7 +417,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
     platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
-  fi  
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
@@ -523,3 +523,5 @@ done
 log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+
+sleep 3600
