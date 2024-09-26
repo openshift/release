@@ -20,8 +20,6 @@ export SAVE_JUNIT_DATA
 oc new-project $CHE_NAMESPACE
 oc project $CHE_NAMESPACE
 
-sleep 2h
-
 echo "Creating test Pod: interop-wto"
 cat <<EOF | oc create -f -
 apiVersion: v1
