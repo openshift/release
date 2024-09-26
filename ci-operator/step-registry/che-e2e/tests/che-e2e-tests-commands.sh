@@ -91,8 +91,3 @@ sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
 cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/tests
-
-## Collect logs with rsync command
-#mkdir -p "${ARTIFACT_DIR}"/tests/container-download-reports
-#oc rsync ${CHE_NAMESPACE}/${TEST_POD_NAME}:/tmp/e2e/report -c download-reports ${ARTIFACT_DIR}/tests/container-download-reports || true
-#sleep 180
