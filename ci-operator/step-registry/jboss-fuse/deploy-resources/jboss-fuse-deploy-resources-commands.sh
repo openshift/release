@@ -379,4 +379,4 @@ echo "Create nginx server"
 create_nginx jboss-fuse-interop
 
 echo "Create xpaas-qe image stream"
-oc import-image xpaas-qe:latest --from=quay.io/rh_integration/xpaas-qe:${FUSE_RELEASE}-openjdk1.8_local -n jboss-fuse-interop --confirm
+oc import-image xpaas-qe:latest --from=quay.io/rh_integration/xpaas-qe:${FUSE_RELEASE} -n jboss-fuse-interop --confirm
