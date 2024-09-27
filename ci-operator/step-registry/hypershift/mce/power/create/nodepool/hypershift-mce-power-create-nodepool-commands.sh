@@ -233,8 +233,6 @@ for instance in "${INSTANCE_ID[@]}"; do
     ibmcloud pi ins act $instance -o soft-reboot
 done
 
-sleep 3h
-
 # Wait and approve the agents as they appear
 echo "$(date) Approve the agents as they appear"
 instanceNameIndex=0
