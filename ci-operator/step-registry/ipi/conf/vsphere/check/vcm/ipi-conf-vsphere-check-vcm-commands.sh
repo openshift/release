@@ -182,6 +182,11 @@ if [[ -n "${MULTI_NIC_IPI}" ]]; then
   VSPHERE_EXTRA_LEASED_RESOURCE=1
 fi
 
+if [[ -n "${MULTI_NETWORKS}" ]]; then
+  echo "multi-networks is enabled ...................."
+  VSPHERE_EXTRA_LEASED_RESOURCE=1
+fi
+
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   log "creating extra lease resources"
 
