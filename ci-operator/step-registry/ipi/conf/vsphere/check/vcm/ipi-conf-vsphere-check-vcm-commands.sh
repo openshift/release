@@ -277,7 +277,7 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
-  networks: 2" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
+  networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
 
 log "waiting for lease to be fulfilled..."
