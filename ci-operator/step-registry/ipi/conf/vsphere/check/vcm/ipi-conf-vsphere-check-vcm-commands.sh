@@ -527,4 +527,6 @@ log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
 
+cat "${SHARED_DIR}"/platform.yaml
+
 sleep 3600
