@@ -182,11 +182,6 @@ if [[ -n "${MULTI_NIC_IPI}" ]]; then
   VSPHERE_EXTRA_LEASED_RESOURCE=1
 fi
 
-if [[ -n "${MULTI_NETWORKS}" ]]; then
-  echo "multi-networks is enabled ...................."
-  VSPHERE_EXTRA_LEASED_RESOURCE=1
-fi
-
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   log "creating extra lease resources"
 
@@ -237,6 +232,30 @@ spec:
   network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
+fi
+
+if [[ -n "${VSPHERE_MULTI_NETWORKS}" ]]; then
+  echo "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
+  log "creating extra lease resources with multi-networks"
+  # shellcheck disable=SC1078
+  echo "apiVersion: vspherecapacitymanager.splat.io/v1
+kind: Lease
+metadata:
+  generateName: \"${LEASED_RESOURCE}-\"
+  namespace: \"vsphere-infra-helpers\"
+  annotations: {}
+  labels:
+    vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
+    boskos-lease-id: \"${LEASED_RESOURCE}\"
+    job-name: \"${JOB_NAME_SAFE}\"
+    VSPHERE_MULTI_NETWORKS: \"1\"
+spec:
+  vcpus: 0
+  memory: 0
+  network-type: \"${NETWORK_TYPE}\"
+  networks: 2" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
+  echo "==========================="
+
 fi
 
 POOLS=${POOLS:-}
@@ -324,7 +343,11 @@ for LEASE in $LEASES; do
   log "portgroup ${portgroup_name}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
-  extra_leased_resource=$(jq -r .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+  extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+
+sleep 600
+
+  multi_networks_leased_resource=$(jq -r .metadata.labels.VSPHERE_MULTI_NETWORKS < /tmp/lease.json)
 
   for network_resource in $NETWORK_RESOURCES; do
     NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${network_resource}.json"
@@ -351,6 +374,13 @@ EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
   vsphere_extra_portgroup="${portgroup_name}"
+  elif [ "${multi_networks_leased_resource}" != "null" ]; then
+    log "setting multi networks ${portgroup_name} in vsphere_context.sh"
+    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
+EOF
+  vsphere_extra_portgroup="${portgroup_name}"
+
 
   else
     vcenter_portgroups[$VCENTER]=${portgroup_name}
@@ -372,6 +402,7 @@ platformSpec='{"vcenters": [],"failureDomains": []}'
 log "building local variables and failure domains"
 
 # Iterate through each lease and generate the failure domain and vcenters information
+sleep 600
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
   PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
