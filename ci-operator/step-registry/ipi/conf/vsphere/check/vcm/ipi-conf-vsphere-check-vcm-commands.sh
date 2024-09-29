@@ -60,7 +60,7 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
@@ -324,7 +324,7 @@ for LEASE in $LEASES; do
   log "portgroup ${portgroup_name}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
-  extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
+  extra_leased_resource=$(jq -r .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
   for network_resource in $NETWORK_RESOURCES; do
     NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${network_resource}.json"
