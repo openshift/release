@@ -89,6 +89,12 @@ if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-file
     oc whoami
 fi
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 # setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
@@ -207,6 +213,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
@@ -246,12 +253,16 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
-oc get clusterversion version -o yaml || true
+if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    oc get clusterversion version -o yaml || true
+fi
 
 function remove_kubeadmin_user() {
     if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
         ret_delete_admin=0
+        unset QE_KUBEADMIN_PASSWORD 
+        # remove kubeadmin password so that golang code get empty because kubeadmin user is removed
 
         ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
         ## it means you only see hosted cluster in testing

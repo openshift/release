@@ -2,6 +2,10 @@
 
 set -ex
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 MCE_VERSION=${MCE_VERSION:-"2.2"}
 if [[ $MCE_QE_CATALOG != "true" ]]; then
   _REPO="quay.io/acm-d/mce-custom-registry"
@@ -219,3 +223,29 @@ oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgm
 echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
+if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
+  oc apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hypershift-override-images
+  namespace: local-cluster
+data:
+  hypershift-operator: ${OVERRIDE_HO_IMAGE}
+EOF
+  while ! [ "$(oc get deployment operator -n hypershift -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}')" == NewReplicaSetAvailable ]; do
+      echo "wait override hypershift operator IMAGE..."
+      sleep 10
+  done
+fi
+
+# display HyperShift cli version
+HYPERSHIFT_NAME=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )) && echo "hypershift" || echo "hcp" )
+arch=$(arch)
+if [ "$arch" == "x86_64" ]; then
+  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+  cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+  chmod +x /tmp/${HYPERSHIFT_NAME}
+  cd -
+fi
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.4)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi

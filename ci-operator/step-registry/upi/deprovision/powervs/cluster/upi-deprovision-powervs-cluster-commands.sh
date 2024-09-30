@@ -3,7 +3,7 @@
 set -o nounset
 
 error_handler() {
-  echo "Error: ($1) occurred on $2"
+  echo "Error: (${1}) occurred on (${2})"
 }
 
 trap 'error_handler $? $LINENO' ERR
@@ -14,10 +14,6 @@ echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
 
-if [ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]; then
-  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
-  exit 1
-fi
 
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
@@ -53,14 +49,6 @@ function retry {
 
 function ic() {
   HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-}
-
-function setup_jq() {
-  if [ -z "$(command -v jq)" ]
-  then
-    echo "jq is not installed, proceed to installing jq"
-    curl -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux64" -o /tmp/jq && chmod +x /tmp/jq
-  fi
 }
 
 function setup_ibmcloud_cli() {
@@ -104,21 +92,21 @@ function clone_upi_artifacts(){
   PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
   echo "${PULL_SECRET}" > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/pull-secret.txt
 
-  if [ -f "${SHARED_DIR}"/var-mac-upi.tfvars ]
+  if [ -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
   then
-    cp "${SHARED_DIR}"/var-mac-upi.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
-    cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
+    cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars
+    cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars
   fi
 
-  if [ -f "${SHARED_DIR}"/terraform-mac-upi.tfstate ]
+  if [ -f "${SHARED_DIR}"/terraform-multi-arch-upi.tfstate ]
   then
-    cp "${SHARED_DIR}"/terraform-mac-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform-multi-arch-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
   fi
 }
 
 function destroy_upi_powervs_cluster() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-mac-upi.tfvars -force-destroy || true
+  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-multi-arch-upi.tfvars -force-destroy || true
 }
 
 function cleanup_ibmcloud_powervs() {
@@ -255,7 +243,6 @@ PATH=${PATH}:/tmp
 mkdir -p "${IBMCLOUD_HOME_FOLDER}"
 export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
 
-setup_jq
 setup_ibmcloud_cli
 
 IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
@@ -269,7 +256,7 @@ ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROU
 retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 
 # Delete the UPI PowerVS cluster created
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars ]
+if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars ]
 then
   echo "Starting the delete on the UPI PowerVS cluster resources"
   destroy_upi_powervs_cluster

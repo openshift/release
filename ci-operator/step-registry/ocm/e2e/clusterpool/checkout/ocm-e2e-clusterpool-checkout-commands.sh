@@ -1,5 +1,7 @@
 #!/bin/bash
 
+suffix=$(cat /dev/urandom | tr -dc "a-z0-9" | head -c 5)
+
 log() {
     echo "$(date --iso-8601=seconds)   ${1}"
 }
@@ -10,17 +12,21 @@ checkoutCluster() {
     local pool_filter="${3}"
 
     local cluster_claim=""
-    local tmp_claim="${cluster_type}-${cluster_idx}-$suffix"
+    local tmp_claim="${cluster_type}-${cluster_idx}-${suffix}"
     local filtered_pools=""
     filtered_pools="$(echo "${pools}" | grep -e "${pool_filter}")"
+    # Adding the claim name to the ClusterClaim file up front in case this
+    # script gets cancelled early so that the checkin job can handle cleanup.
+    echo "${tmp_claim}" >>"${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
 
     for pool in ${filtered_pools}; do
         log "Provisioning claim ${tmp_claim} from ClusterPool ${pool} ..."
+
         make clusterpool/checkout \
-            CLUSTERPOOL_NAME=${pool} \
-            CLUSTERPOOL_CLUSTER_CLAIM=${tmp_claim} 2>&1 |
+            CLUSTERPOOL_NAME="${pool}" \
+            CLUSTERPOOL_CLUSTER_CLAIM="${tmp_claim}" 2>&1 |
             sed -u "s/^/${tmp_claim}   /" |
-            tee ${ARTIFACT_DIR}/${pool}_${tmp_claim}-.log
+            tee "${ARTIFACT_DIR}/${pool}_${tmp_claim}.log"
 
         if [[ "${PIPESTATUS[0]}" == 0 ]]; then
             cluster_claim="${tmp_claim}"
@@ -35,14 +41,12 @@ checkoutCluster() {
         echo "${filtered_pools}"
         return 1
     fi
-
-    echo "${cluster_claim}" >>"${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
 }
 
 temp=$(mktemp -d -t ocm-XXXXX)
-cd $temp || exit 1
+cd "${temp}" || exit 1
 
-cp "$MAKEFILE" ./Makefile
+cp "${MAKEFILE}" ./Makefile
 
 log "Starting cluster provisioning ..."
 
@@ -59,7 +63,6 @@ if [[ -z "$pools" ]]; then
 fi
 
 pids=()
-suffix=$(cat /dev/urandom | tr -dc "a-z0-9" | head -c 5)
 
 # Checkout hub clusters
 log "Provisioning ${CLUSTERPOOL_HUB_COUNT} hub clusters ..."
@@ -89,7 +92,7 @@ done
 exit_code=0
 
 for pid in "${pids[@]}"; do
-  wait ${pid} || exit_code=$?
+    wait ${pid} || exit_code=$?
 done
 
 if [[ "${exit_code}" != 0 ]]; then

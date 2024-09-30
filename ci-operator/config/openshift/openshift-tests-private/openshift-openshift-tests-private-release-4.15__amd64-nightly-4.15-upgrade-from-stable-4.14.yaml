@@ -7,6 +7,10 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
+  aws-efs-csi-operator-create-efs:
+    name: "4.14"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.14"
     namespace: ocp
@@ -16,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.15"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -110,19 +118,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-priv-sno-f28
-  cron: 12 0 11 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected and not @console'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected and not @console'
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
 - as: aws-ipi-disc-priv-sts-basecap-none-fips-f28
   cron: 45 9 10 * *
   steps:
@@ -146,6 +141,21 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: aws-ipi-disc-priv-sts-efs-f28
+  cron: 13 23 7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f28
   cron: 11 3 26 * *
   steps:
@@ -160,19 +170,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disc-priv-sts-f28
-  cron: 13 23 7 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-localzone-f28
   cron: 44 21 11 * *
   steps:
@@ -432,12 +429,13 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disc-priv-oidc-f14
-  cron: 33 21 2,16 * *
+- as: gcp-ipi-disc-priv-oidc-fips-f28
+  cron: 53 7 3 * *
   steps:
     cluster_profile: gcp-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@disconnected'
       UPGRADE_PRE_RUN_TAGS: '@disconnected'

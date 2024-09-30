@@ -114,7 +114,7 @@ for index in $(seq 0 ${last_mcp_index}); do
     custom_mcp_node_label=$(echo "${MCO_CONF_DAY2_CUSTOM_MCP}" | jq -r ".[$index].mcp_node_label")
     if [[ -z "$custom_mcp_node_label" ]]; then
         echo "No mcp_node_num input, set it to 'node-role.kubernetes.io/worker' by default"
-        custom_mcp_node_num="node-role.kubernetes.io/worker"
+        custom_mcp_node_label="node-role.kubernetes.io/worker="
     fi
     create_custom_mcp "$custom_mcp_name" "$custom_mcp_node_num" "$custom_mcp_node_label"
     wait_for_config_to_be_applied "$custom_mcp_name" "$MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT"

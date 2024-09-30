@@ -1,0 +1,186 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+  to: special-resource-rhel8-operator
+- dockerfile_literal: |
+    FROM src
+    RUN export VERSION="stable" && \
+        URL="https://github.com/koalaman/shellcheck/releases/download" && \
+        export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+        wget -q -O - "${URL}" | tar -xJv && \
+        cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+        rm -rf "shellcheck-${VERSION}"
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
+  from: src
+  to: test-bin
+promotion:
+  to:
+  - excluded_images:
+    - test-bin
+    name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 300m
+      memory: 500Mi
+tests:
+- as: lint
+  commands: GOFLAGS= XDG_CACHE_HOME=/tmp/.cache make lint
+  container:
+    clone: true
+    from: test-bin
+- as: kube-lint
+  commands: GOFLAGS= make kube-lint
+  container:
+    from: src
+- as: unit
+  steps:
+    test:
+    - as: unit-test
+      commands: make unit-test
+      from: src
+      resources:
+        requests:
+          memory: 1Gi
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: disconnected-build
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^Dockerfile$
+  steps:
+    test:
+    - as: create-podman-container
+      cli: latest
+      commands: |
+        oc -n openshift-config  get secret/pull-secret -o yaml | sed 's/openshift-config/default/' | sed 's/\.dockerconfigjson/auth.json/' | grep -v type: | oc apply -f -
+        oc -n default apply -f ci/podman.yaml
+        oc -n default wait pod/podman --for=condition=Ready
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: copy-sro-to-podman-container
+      cli: latest
+      commands: |
+        tar -cf sro.tar *
+        oc -n default exec pod/podman -- mkdir /tmp/sro
+        oc cp sro.tar default/podman:/tmp/sro/
+        oc -n default exec pod/podman -- tar -C /tmp/sro/ -xf /tmp/sro/sro.tar
+        oc -n default exec pod/podman -- rm /tmp/sro/sro.tar
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: build-sro-disconnected
+      cli: latest
+      commands: |
+        oc -n default exec pod/podman -- podman pull \
+            --authfile /run/user/0/containers/auth.json \
+            registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11 \
+            registry.ci.openshift.org/ocp/4.11:base
+        oc -n default exec pod/podman -- unshare -n podman build -t sro:disconnected --no-cache -f /tmp/sro/Dockerfile
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: deploy-nfd
+      cli: latest
+      commands: |
+        git clone --branch release-4.10 https://github.com/openshift/cluster-nfd-operator
+        cd cluster-nfd-operator
+        make deploy IMAGE_TAG=quay.io/openshift/origin-cluster-nfd-operator:4.10
+        oc apply -f config/samples/nfd.openshift.io_v1_nodefeaturediscovery.yaml
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: deploy-sro
+      cli: latest
+      commands: GOFLAGS= make deploy
+      dependencies:
+      - env: IMG
+        name: special-resource-rhel8-operator
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: test
+      cli: latest
+      commands: make e2e-test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: special-resource-operator

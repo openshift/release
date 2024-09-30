@@ -1,0 +1,72 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.16_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: ./Dockerfile.ocp
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: agent-installer-node-agent
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-agent-sno-ipv6
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: assisted-installer-agent

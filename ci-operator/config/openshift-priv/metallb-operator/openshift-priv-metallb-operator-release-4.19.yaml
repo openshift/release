@@ -1,0 +1,150 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  kube-rbac-proxy:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: kube-rbac-proxy
+  metallb:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: metallb
+  metallb-frr:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: metallb-frr
+  ocp_builder_rhel-9-base-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/metallb-operator
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: metallb-operator
+- dockerfile_path: bundleci.Dockerfile
+  to: metallb-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundleci.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-metallb:4.17
+    with: pipeline:metallb
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.17
+    with: pipeline:metallb-operator
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.17
+    with: pipeline:metallb-frr
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.17
+    with: pipeline:kube-rbac-proxy
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        PATH=$PATH:$(pwd)/_cache hack/ocp_run_e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: metallb-e2e-metal-frrk8s
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s
+    workflow: baremetalds-metallb-e2e
+- as: metallb-e2e-metal-ipi-ovn
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: metallb-operator

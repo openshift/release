@@ -1,0 +1,37 @@
+binary_build_commands: go build ./cmd/...
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: go test ./...
+tests:
+- as: unit
+  commands: go test -v ./...
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-pipelines
+  repo: manual-approval-gate

@@ -1,0 +1,41 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration-test-odh-dspo
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: integration-test-odh-dspo
+      cli: latest
+      commands: |
+        echo "Add tests"
+      from: src
+      resources:
+        requests:
+          cpu: 8000m
+          memory: 16Gi
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: data-science-pipelines-operator

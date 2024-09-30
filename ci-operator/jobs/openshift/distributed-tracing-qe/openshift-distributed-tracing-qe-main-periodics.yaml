@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build09
   cron: 0 6 * * 0
   decorate: true
   decoration_config:
@@ -10,11 +10,11 @@ periodics:
     org: openshift
     repo: distributed-tracing-qe
   labels:
-    ci-operator.openshift.io/variant: ocp4.14-dast
+    ci-operator.openshift.io/variant: ocp-4.14-dast
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp4.14-dast-distributed-tracing-tests-dast
+  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp-4.14-dast-distributed-tracing-tests-dast
   reporter_config:
     slack:
       channel: '#distributed-tracing-qe'
@@ -35,7 +35,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=distributed-tracing-tests-dast
-      - --variant=ocp4.14-dast
+      - --variant=ocp-4.14-dast
       command:
       - ci-operator
       image: ci-operator:latest
@@ -93,11 +93,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: ocp4.15-disconnected
+    ci-operator.openshift.io/variant: ocp-4.15-disconnected
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp4.15-disconnected-distributed-tracing-tests-disconnected
+  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp-4.15-disconnected-distributed-tracing-tests-disconnected
   reporter_config:
     slack:
       channel: '#distributed-tracing-qe'
@@ -119,7 +119,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/distributed-tracing-tests-disconnected-cluster-profile
       - --target=distributed-tracing-tests-disconnected
-      - --variant=ocp4.15-disconnected
+      - --variant=ocp-4.15-disconnected
       command:
       - ci-operator
       image: ci-operator:latest
@@ -163,6 +163,98 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-gcp-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 6 1 10 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: distributed-tracing-qe
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: ocp-4.16-fips-scan
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp-4.16-fips-scan-distributed-tracing-operators
+  reporter_config:
+    slack:
+      channel: '#distributed-tracing-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/distributed-tracing-operators-cluster-profile
+      - --target=distributed-tracing-operators
+      - --variant=ocp-4.16-fips-scan
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/distributed-tracing-operators-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

@@ -1,0 +1,131 @@
+base_images:
+  cli:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kubernetes-nmstate
+images:
+- dockerfile_path: build/Dockerfile.openshift
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: kubernetes-nmstate-handler
+- dockerfile_path: build/Dockerfile.operator.openshift
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: kubernetes-nmstate-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
+promotion:
+  to:
+  - excluded_images:
+    - kubernetes-nmstate-handler
+    - kubernetes-nmstate-operator
+    - src-with-oc-and-kubectl
+    name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+  nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  stable:
+    release:
+      channel: fast
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
+- as: unit
+  commands: make test/unit
+  container:
+    from: src
+- as: check-generate-bundle
+  commands: VERSION= make check-ocp-bundle
+  container:
+    from: src
+- as: e2e-handler-ovn-ipv4
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+    workflow: kubernetes-nmstate-e2e-handler
+- as: e2e-operator-ovn-ipv4
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+    workflow: kubernetes-nmstate-e2e-operator
+- always_run: false
+  as: e2e-handler-azure
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: kubernetes-nmstate-e2e-azure
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: kubernetes-nmstate

@@ -118,8 +118,25 @@ function update_image_registry() {
     sleep 15
   done
 
-  echo "$(date -u --rfc-3339=seconds) - Patching image registry configuration..."
+  echo "$(date -u --rfc-3339=seconds) - Configuring image registry with emptyDir..."
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to see that it has work to do..."
+  sleep 30
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait --all --for=condition=Available=True clusteroperators.config.openshift.io --timeout=10m
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry to rollout..."
+  oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
+
+  echo "$(date -u --rfc-3339=seconds) - Wait until imageregistry config changes are observed by kube-apiserver..."
+  sleep 60
+
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver to finish rolling out..."
+  oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
+
+  oc wait --all --for=condition=Degraded=False clusteroperators.config.openshift.io --timeout=1m
 }
 
 function setE2eMirror() {
@@ -243,9 +260,6 @@ fi
 ## Approving the CSR requests for nodes
 approve_csrs &
 
-## Configure image registry
-update_image_registry &
-
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
 
@@ -257,6 +271,10 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+
+## Configure image registry
+update_image_registry
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"

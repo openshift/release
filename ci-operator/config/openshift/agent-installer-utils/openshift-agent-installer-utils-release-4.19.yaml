@@ -1,0 +1,110 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.17_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/Dockerfile.ocp
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: agent-installer-utils
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: dnf install -y nmstate-devel
+tests:
+- as: e2e-agent-bad-dns
+  cluster: build05
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_TEST_CASES=bad_dns
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 6h0m0s
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: unit
+  commands: IS_CONTAINER=TRUE ./hack/go-test.sh ./...
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: agent-installer-utils

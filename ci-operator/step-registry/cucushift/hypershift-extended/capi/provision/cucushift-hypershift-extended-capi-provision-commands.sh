@@ -375,7 +375,7 @@ metadata:
   name: "${CLUSTER_NAME}-pool-0"
 spec:
   clusterName: "${CLUSTER_NAME}"
-  replicas: 1
+  replicas: ${MACHINEPOOL_REPLICAS}
   template:
     spec:
       clusterName: "${CLUSTER_NAME}"
@@ -413,6 +413,8 @@ CLUSTER_ID=$(rosa describe cluster -c ${CLUSTER_NAME} -o json | jq '.id' | cut -
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n $CLUSTER_ID > $SHARED_DIR/cluster-id
 echo "rosa" > $SHARED_DIR/cluster-type
+echo "${CLUSTER_NAME}-pool-0" > "${SHARED_DIR}/capi_machinepool"
+echo "${NODEPOOL_NAME}" > "${SHARED_DIR}/rosa_nodepool"
 
 # collect rosa hcp info
 rosa logs install -c ${CLUSTER_ID} --watch
@@ -429,6 +431,7 @@ while true; do
   fi
   if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
     echo "error: Timed out while waiting for cluster to be ready"
+    oc -n default get rosacontrolplane ${CLUSTER_NAME}-control-plane -oyaml > ${ARTIFACT_DIR}/${CLUSTER_NAME}-control-plane.yaml
     exit 1
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then

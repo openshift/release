@@ -4,7 +4,7 @@ base_images:
     namespace: openshift
     tag: latest
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-base-nodejs-openshift-4.17:
@@ -37,17 +37,17 @@ promotion:
   to:
   - additional_images:
       console-tests: src
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -76,17 +76,21 @@ tests:
   commands: ./test-backend.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
     git config --global --add safe.directory /go/src/github.com/openshift/console
     ./test-frontend.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: analyze
   commands: ./analyze.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: e2e-gcp-console
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     test:

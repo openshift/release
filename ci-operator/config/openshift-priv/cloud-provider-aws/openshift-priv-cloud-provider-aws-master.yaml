@@ -7,16 +7,24 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
   rhel-coreos-base:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: rhel-coreos
 binary_build_commands: make aws-cloud-controller-manager
@@ -26,12 +34,12 @@ canonical_go_repository: k8s.io/cloud-provider-aws
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-cloud-controller-manager
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -60,7 +68,7 @@ promotion:
       cloud-provider-aws-rpms: rpms
     excluded_images:
     - rhel-coreos
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
 raw_steps:
 - rpm_image_injection_step:
@@ -69,12 +77,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -103,6 +111,11 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

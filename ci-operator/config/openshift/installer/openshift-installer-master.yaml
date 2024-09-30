@@ -32,41 +32,69 @@ base_images:
     namespace: ci
     tag: v1.59.0
   ocp_4.10_cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_4.17_cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
   ocp_4.17_etcd:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: etcd
   ocp_4.17_hyperkube:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: hyperkube
   ocp_4.17_installer-etcd-artifacts:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: installer-etcd-artifacts
   ocp_4.17_installer-kube-apiserver-artifacts:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
   ocp_4.17_installer-terraform-providers:
-    name: "4.17"
+    name: "4.18"
+    namespace: ocp
+    tag: installer-terraform-providers
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.18_etcd:
+    name: "4.18"
+    namespace: ocp
+    tag: etcd
+  ocp_4.18_hyperkube:
+    name: "4.18"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.18_installer-etcd-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.18_installer-terraform-providers:
+    name: "4.18"
     namespace: ocp
     tag: installer-terraform-providers
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
   use_build_cache: true
@@ -85,28 +113,25 @@ images:
     ocp_4.17_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_4.18_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-terraform-providers
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer
-- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_4.17_installer-etcd-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    ocp_4.17_installer-kube-apiserver-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_4.17_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
     ocp_4.17_cli:
@@ -175,9 +200,21 @@ images:
     ocp_4.17_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.17:hyperkube
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:etcd
+    ocp_4.18_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:hyperkube
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: baremetal-installer
 - dockerfile_literal: |
     FROM src
@@ -197,24 +234,30 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -235,10 +278,6 @@ resources:
   installer:
     requests:
       cpu: "3"
-      memory: 5Gi
-  installer-artifacts:
-    requests:
-      cpu: "12"
       memory: 5Gi
   libvirt-installer:
     requests:
@@ -272,7 +311,7 @@ tests:
   commands: go test ./pkg/... -tags=aro
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^pkg/asset/agent/)
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
@@ -304,7 +343,7 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^terraform/providers)|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
     cluster_profile: aws
     env:
@@ -395,7 +434,7 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -440,6 +479,11 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - always_run: false
@@ -449,6 +493,10 @@ tests:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - as: e2e-azure-ovn-shared-vpc
@@ -602,6 +650,13 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
+  timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
   run_if_changed: openstack
@@ -692,6 +747,18 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
+- as: e2e-vsphere-ovn-multi-network
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
@@ -806,6 +873,22 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-powervs-capi-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: master
+      CLUSTER_NAME_MODIFIER: capi-master
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
   timeout: 6h0m0s
 - as: integration-tests
   run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
@@ -974,8 +1057,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_GATES: '["MultiArchInstallAWS=true"]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -999,8 +1080,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
-      FEATURE_SET: CustomNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -1013,6 +1092,27 @@ tests:
         pod should start\| pod sysctls\| build volumes should mount given secrets
         and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-public-ipv4-pool
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-public-ipv4-pool-disabled
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
+    workflow: openshift-e2e-aws
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master

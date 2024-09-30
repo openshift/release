@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/build
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-capi-techpreview
     decorate: true
     labels:
@@ -137,7 +137,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -216,7 +216,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -295,7 +295,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     labels:
@@ -373,7 +373,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-capi-techpreview
     decorate: true
     labels:
@@ -452,7 +452,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     labels:
@@ -698,7 +698,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-openstack-capi-techpreview
     decorate: true
     labels:
@@ -856,7 +856,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -910,7 +910,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     labels:
@@ -959,11 +959,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -973,6 +973,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-okd-scos-images
+    optional: true
     rerun_command: /test okd-scos-images
     spec:
       containers:
@@ -1021,7 +1022,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build05
     context: ci/prow/regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
     decorate: true
     decoration_config:
@@ -1102,7 +1103,68 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
+    context: ci/prow/security
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-capi-operator-main-security
+    optional: true
+    rerun_command: /test security
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1155,7 +1217,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/vendor
     decorate: true
     labels:

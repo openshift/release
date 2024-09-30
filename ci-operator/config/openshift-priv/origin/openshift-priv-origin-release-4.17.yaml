@@ -8,9 +8,9 @@ base_images:
     namespace: ci
     tag: v1.54.2
   hypershift-operator:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
@@ -46,8 +46,7 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -126,6 +125,15 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-kube-apiserver-rollout
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
     workflow: openshift-e2e-aws-ovn
 - as: e2e-azure
   optional: true
@@ -282,6 +290,16 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-kube-apiserver-rollout
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05

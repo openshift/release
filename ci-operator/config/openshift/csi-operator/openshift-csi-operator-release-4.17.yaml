@@ -144,8 +144,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -208,7 +207,7 @@ tests:
     env:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
-    workflow: openshift-e2e-aws-csi-efs-extended
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
 - as: e2e-azure
   steps:
     cluster_profile: azure4
@@ -221,6 +220,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
 - as: e2e-azure-csi-extended
   optional: true
   steps:
@@ -290,6 +290,33 @@ tests:
     env:
       PROJECT_NAME: csi-operator
     workflow: openshift-ci-security
+- as: periodic-e2e-aws-efs-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: periodic-e2e-smb-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: periodic-e2e-azure-file-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

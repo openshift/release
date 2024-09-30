@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aws-efs-operator-e2e
     decorate: true
     labels:
@@ -83,7 +83,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aws-efs-operator-e2e-extended
     decorate: true
     labels:
@@ -162,7 +162,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/ci-index-aws-efs-csi-driver-operator-bundle
     decorate: true
     labels:
@@ -215,7 +215,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/ci-index-smb-csi-driver-operator-bundle
     decorate: true
     labels:
@@ -268,7 +268,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-csi
     decorate: true
     labels:
@@ -346,7 +346,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-csi-extended
     decorate: true
     labels:
@@ -425,7 +425,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -503,7 +503,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
     labels:
@@ -581,7 +581,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-csi
     decorate: true
     labels:
@@ -659,7 +659,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-csi-extended
     decorate: true
     labels:
@@ -738,7 +738,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-file-csi
     decorate: true
     labels:
@@ -816,7 +816,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-file-csi-extended
     decorate: true
     labels:
@@ -895,7 +895,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-file-nfs-csi
     decorate: true
     labels:
@@ -973,7 +973,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     labels:
@@ -1052,9 +1052,11 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
+    decoration_config:
+      timeout: 5h30m0s
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -1130,7 +1132,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/e2e-azurestack-csi
     decorate: true
     labels:
@@ -1205,11 +1207,249 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azurestack-csi,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-openstack
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-csi-operator-master-e2e-openstack
+    optional: true
+    rerun_command: /test e2e-openstack
+    run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*|Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+        - --target=e2e-openstack
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-vexxhost
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-openstack-cinder-csi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-vh-mecha-central
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-csi-operator-master-e2e-openstack-cinder-csi
+    rerun_command: /test e2e-openstack-cinder-csi
+    run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-cinder-csi-cluster-profile
+        - --target=e2e-openstack-cinder-csi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-cinder-csi-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-vh-mecha-central
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-cinder-csi,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-openstack-manila-csi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-vh-mecha-central
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-csi-operator-master-e2e-openstack-manila-csi
+    rerun_command: /test e2e-openstack-manila-csi
+    run_if_changed: ^(Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-manila-csi-cluster-profile
+        - --target=e2e-openstack-manila-csi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-manila-csi-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-vh-mecha-central
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-manila-csi,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/hypershift-aws-e2e-external
     decorate: true
     labels:
@@ -1287,7 +1527,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -1341,7 +1581,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1400,7 +1640,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/security
     decorate: true
     labels:
@@ -1461,7 +1701,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/smb-operator-e2e
     decorate: true
     labels:
@@ -1540,7 +1780,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/smb-operator-e2e-extended
     decorate: true
     labels:
@@ -1619,7 +1859,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1672,7 +1912,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     labels:
@@ -1725,7 +1965,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build01
     context: ci/prow/verify-deps
     decorate: true
     labels:

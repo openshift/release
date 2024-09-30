@@ -20,12 +20,6 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
-  initial:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.15"
   latest:
     candidate:
       product: ocp
@@ -66,6 +60,14 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-day2
+- as: installer-rehearse-azure-aro
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: 4.15.27
+      ARO_FIPS: "true"
+    workflow: cucushift-installer-rehearse-azure-aro-private
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
@@ -80,11 +82,6 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
-- as: installer-rehearse-ibmcloud-disconnected
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe-2
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 zz_generated_metadata:
   branch: master
   org: openshift

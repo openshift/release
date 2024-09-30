@@ -1,0 +1,99 @@
+base_images:
+  lca-operator:
+    name: "4.18"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  tests:
+    name: "4.18"
+    namespace: ocp
+    tag: tests
+releases:
+  latest:
+    integration:
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: image-based-upgrade-e2e-serial-conformance
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lca-operator
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.18"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.17"
+      SEED_IMAGE_TAG_FORMAT: e2e
+    workflow: openshift-image-based-upgrade-e2e
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-serial-conformance-baseline
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lca-operator
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CREATE_CLUSTER_ONLY: "true"
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.18"
+      SEED_IMAGE_TAG_FORMAT: e2e
+      TEST_CLUSTER: seed
+      TEST_SKIPS: APIs for openshift.io must have stable versions
+    workflow: openshift-image-based-upgrade-e2e-baseline
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-parallel-conformance
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lca-operator
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CONFORMANCE_SUITE: openshift/conformance/parallel
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.18"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.17"
+      SEED_IMAGE_TAG_FORMAT: e2e
+    workflow: openshift-image-based-upgrade-e2e
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-parallel-conformance-baseline
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lca-operator
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CONFORMANCE_SUITE: openshift/conformance/parallel
+      CREATE_CLUSTER_ONLY: "true"
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.18"
+      SEED_IMAGE_TAG_FORMAT: e2e
+      TEST_CLUSTER: seed
+      TEST_SKIPS: APIs for openshift.io must have stable versions\| Kubectl delete
+        interactive based on user confirmation input\| CPU Partitioning cluster platform
+        workloads should be annotated correctly for Deployments\| Managed cluster
+        should set requests but not limits\| Managed cluster should ensure platform
+        components have system-\* priority class associated\| CPU Partitioning cluster
+        infrastructure should be configured correctly\| oc adm must-gather runs successfully
+        for audit logs
+    workflow: openshift-image-based-upgrade-e2e-baseline
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: lifecycle-agent
+  variant: nightly-4.18-upgrade-from-stable-4.17

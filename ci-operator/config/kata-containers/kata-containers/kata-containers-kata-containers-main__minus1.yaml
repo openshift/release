@@ -15,7 +15,7 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM bin
-    RUN dnf install -y --nobest gettext
+    RUN dnf install -y --nobest gettext jq
   from: bin
   to: with-deps
 - dockerfile_literal: |
@@ -50,17 +50,17 @@ tests:
     cluster_profile: azure4
     env:
       TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
-      TEST_SKIPS: \[sig-node\] Security Context should support seccomp runtime/default\|\[sig-node\]
-        Variable Expansion should allow substituting values in a volume subpath\|\[k8s.io\]
-        Probing container should be restarted with a docker exec liveness probe with
-        timeout\|\[sig-node\] Pods Extended Pod Container lifecycle evicted pods should
-        be terminal\|\[sig-node\] PodOSRejection \[NodeConformance\] Kubelet should
-        reject pod when the node OS doesn't match pod's OS\|\[sig-network\].*for evicted
-        pods\|\[sig-network\].*HAProxy router should override the route\|\[sig-network\].*HAProxy
-        router should serve a route\|\[sig-network\].*HAProxy router should serve
-        the correct\|\[sig-network\].*HAProxy router should run\|\[sig-network\].*when
-        FIPS.*the HAProxy router\|\[sig-network\].*bond\|\[sig-network\].*all sysctl
-        on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
+      TEST_SKIPS: \[sig-node\] Sysctls.*should support sysctls\|\[sig-node\] Security
+        Context should support seccomp runtime/default\|\[sig-node\] Variable Expansion
+        should allow substituting values in a volume subpath\|\[k8s.io\] Probing container
+        should be restarted with a docker exec liveness probe with timeout\|\[sig-node\]
+        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
+        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
+        OS doesn't match pod's OS\|\[sig-network\].*for evicted pods\|\[sig-network\].*HAProxy
+        router should override the route\|\[sig-network\].*HAProxy router should serve
+        a route\|\[sig-network\].*HAProxy router should serve the correct\|\[sig-network\].*HAProxy
+        router should run\|\[sig-network\].*when FIPS.*the HAProxy router\|\[sig-network\].*bond\|\[sig-network\].*all
+        sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
         pods should successfully create sandboxes by adding pod to network
     pre:
     - chain: ipi-azure-pre
@@ -78,6 +78,12 @@ tests:
         # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+
+        # Get the current latest kata-containers image
+        TAGS="$(curl https://quay.io/api/v1/repository/kata-containers/kata-deploy-ci/tag/?onlyActiveTags=true)"
+        DIGEST=$(echo "$TAGS" | jq -r '.tags[] | select(.name | contains("kata-containers-latest-amd64")) | .manifest_digest')
+        export KATA_DEPLOY_IMAGE="quay.io/kata-containers/kata-deploy-ci:$(echo "$TAGS" | jq -r '.tags[] | select(.manifest_digest | contains("'"$DIGEST"'")) | .name' | grep -v "kata-containers-latest-amd64")"
+        echo "KATA_DEPLOY_IMAGE=$KATA_DEPLOY_IMAGE"
 
         # The installer is instructed to configure kata containers to use
         # QEMU from the RHCOS extension and host's kernel.

@@ -1,0 +1,60 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.commitchecker
+  from: root
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: commitchecker
+promotion:
+  to:
+  - disabled: true
+    namespace: ci
+    tag: "4.18"
+  - disabled: true
+    excluded_images:
+    - commitchecker
+    namespace: ocp
+    tag: "4.18"
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 3Gi
+tests:
+- as: verify
+  commands: |
+    make verify --warn-undefined-variables
+  container:
+    from: src
+- as: verify-commitchecker
+  commands: |
+    make -C commitchecker verify
+  container:
+    from: src
+- as: test-commitchecker
+  commands: |
+    make -C commitchecker test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: build-machinery-go

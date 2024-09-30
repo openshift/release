@@ -2,24 +2,38 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  installer:
+    name: "4.17"
+    namespace: ocp
+    tag: installer
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.22
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: image-based-install-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -33,11 +47,13 @@ tests:
     HOME=/tmp make build
   container:
     from: src
+  restrict_network_access: false
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: unit-test
   commands: HOME=/tmp make test
   container:
     from: src
+  restrict_network_access: false
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -46,6 +62,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
+  restrict_network_access: false
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -62,6 +79,27 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: e2e-ibio
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+      SEED_IMAGE_TAG: "4.17"
+    workflow: image-based-install-operator
+- as: e2e-ibio-periodic
+  cron: 00 00 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+      SEED_IMAGE_TAG: "4.17"
+    workflow: image-based-install-operator
 zz_generated_metadata:
   branch: main
   org: openshift

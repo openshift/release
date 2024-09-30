@@ -1,17 +1,100 @@
 presubmits:
   openshift/microshift:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build10
+    context: ci/prow/footprint-and-performance
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.17-footprint-and-performance
+    rerun_command: /test footprint-and-performance
+    run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/footprint-and-performance-cluster-profile
+        - --target=footprint-and-performance
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/footprint-and-performance-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )footprint-and-performance,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-images
     rerun_command: /test images
@@ -22,6 +105,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -60,7 +144,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-bootc-periodic-test
     decorate: true
     decoration_config:
@@ -69,6 +153,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-periodic-test
     rerun_command: /test metal-bootc-periodic-test
@@ -141,7 +226,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-bootc-periodic-test-arm
     decorate: true
     decoration_config:
@@ -150,6 +235,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-periodic-test-arm
     rerun_command: /test metal-bootc-periodic-test-arm
@@ -222,7 +308,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-bootc-test
     decorate: true
     decoration_config:
@@ -231,6 +317,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-test
     rerun_command: /test metal-bootc-test
@@ -303,7 +390,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-bootc-test-arm
     decorate: true
     decoration_config:
@@ -312,6 +399,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-test-arm
     rerun_command: /test metal-bootc-test-arm
@@ -384,7 +472,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-periodic-test
     decorate: true
     decoration_config:
@@ -393,6 +481,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-periodic-test
     rerun_command: /test metal-periodic-test
@@ -465,7 +554,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/metal-periodic-test-arm
     decorate: true
     decoration_config:
@@ -474,6 +563,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-periodic-test-arm
     rerun_command: /test metal-periodic-test-arm
@@ -546,7 +636,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/microshift-metal-cache
     decorate: true
     decoration_config:
@@ -555,6 +645,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-cache
     rerun_command: /test microshift-metal-cache
@@ -627,7 +718,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/microshift-metal-cache-arm
     decorate: true
     decoration_config:
@@ -636,6 +727,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-cache-arm
     rerun_command: /test microshift-metal-cache-arm
@@ -708,7 +800,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/microshift-metal-tests
     decorate: true
     decoration_config:
@@ -717,6 +809,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-tests
     rerun_command: /test microshift-metal-tests
@@ -789,7 +882,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/microshift-metal-tests-arm
     decorate: true
     decoration_config:
@@ -798,6 +891,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-tests-arm
     rerun_command: /test microshift-metal-tests-arm
@@ -870,7 +964,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ocp-conformance-rhel-eus
     decorate: true
     decoration_config:
@@ -879,6 +973,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-rhel-eus
     rerun_command: /test ocp-conformance-rhel-eus
@@ -951,7 +1046,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ocp-conformance-rhel-eus-arm
     decorate: true
     decoration_config:
@@ -960,6 +1055,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-rhel-eus-arm
     rerun_command: /test ocp-conformance-rhel-eus-arm
@@ -1032,7 +1128,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ocp-full-conformance-rhel-eus
     decorate: true
     decoration_config:
@@ -1041,10 +1137,11 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-ocp-full-conformance-rhel-eus
     rerun_command: /test ocp-full-conformance-rhel-eus
-    run_if_changed: ^(origin/.*)$
+    run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
     spec:
       containers:
       - args:
@@ -1113,13 +1210,14 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build10
     context: ci/prow/test-rebase
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-test-rebase
     optional: true
@@ -1177,13 +1275,14 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build10
     context: ci/prow/test-rpm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-test-rpm
     rerun_command: /test test-rpm
@@ -1233,13 +1332,14 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build10
     context: ci/prow/test-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-test-unit
     rerun_command: /test test-unit
@@ -1288,13 +1388,14 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build10
     context: ci/prow/verify
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-verify
     rerun_command: /test verify

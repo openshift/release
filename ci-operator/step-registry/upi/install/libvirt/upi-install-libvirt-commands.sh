@@ -293,6 +293,24 @@ for i in {1..30}; do
   sleep 15
 done
 
+# Patch etcd for allowing slower disks
+if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
+  echo "Patching etcd cluster operator..."
+  oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+  for i in {1..30}; do
+    ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
+    if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
+      echo "Patched successfully!"
+      break
+    fi
+    sleep 15
+  done
+  if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
+    echo "Etcd patch failed..."
+    exit 1
+  fi
+fi
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 touch /tmp/install-complete

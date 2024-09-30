@@ -1,0 +1,179 @@
+base_images:
+  builder:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  cluster-logging-operator:
+    name: "6.0"
+    namespace: logging
+    tag: cluster-logging-operator
+  cluster-logging-operator-e2e:
+    name: "6.0"
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-registry:
+    name: "6.0"
+    namespace: logging
+    tag: cluster-logging-operator-registry
+  elasticsearch-operator:
+    name: "5.8"
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-registry:
+    name: "5.8"
+    namespace: logging
+    tag: elasticsearch-operator-registry
+  elasticsearch-proxy:
+    name: 5.y
+    namespace: logging
+    tag: elasticsearch-proxy
+  log-file-metric-exporter:
+    name: 6.y
+    namespace: logging
+    tag: log-file-metric-exporter
+  logging-elasticsearch6:
+    name: 5.y
+    namespace: logging
+    tag: logging-elasticsearch6
+  logging-eventrouter:
+    name: 5.y
+    namespace: logging
+    tag: logging-eventrouter
+  oauth-proxy:
+    name: "4.14"
+    namespace: ocp
+    tag: oauth-proxy
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Dockerfile
+  from: ubi9-minimal
+  to: vector
+- dockerfile_path: Dockerfile.unit
+  from: builder
+  to: logging-vector-test-unit
+promotion:
+  to:
+  - name: "6.1"
+    namespace: logging
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 20Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: logging-vector-test-unit
+- as: cargo-deny-check-bans
+  commands: cargo deny --no-default-features --features ocp-logging --offline check
+    bans
+  container:
+    from: logging-vector-test-unit
+- as: ldd-openssl
+  commands: ldd /usr/bin/vector | grep -E 'libcrypto|libssl'
+  container:
+    from: vector
+- as: cluster-logging-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:vector
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: clo-functional
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:vector
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-6.1
+  org: ViaQ
+  repo: vector

@@ -28,20 +28,10 @@ chain:
     - name: CLOUD_PROVIDER
       default: "AWS"
       documentation: "The cloud provider to use for the management cluster"
-    - name: HYPERSHIFT_AZURE_LOCATION
-      default: "eastus"
-      documentation: "The Azure location of the cluster."
     commands: |-
-      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
-        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
-        AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
-        DEFAULT_BASE_DOMAIN=hypershift.azure.devcluster.openshift.com
-        HYPERSHIFT_INSTANCE_TYPE=Standard_D4s_v4
-      else
-        AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-        DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      fi
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -53,42 +43,24 @@ chain:
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       
-      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
-         echo "Creating management cluster ${CLUSTER_NAME} with ${HYPERSHIFT_NODE_COUNT} nodes"
-         bin/hypershift create cluster azure \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-          --azure-creds ${AZURE_GUEST_INFRA_CREDENTIALS_FILE} \
-          --name=${CLUSTER_NAME} \
-          --location=${HYPERSHIFT_AZURE_LOCATION} \
-          --infra-id=${CLUSTER_NAME} \
-          --base-domain=${DOMAIN} \
-          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-          --service-cidr=172.29.0.0/16 \
-          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-          --node-selector=hypershift.openshift.io/control-plane=true \
-          --release-stream=${DEFAULT_RELEASE_STREAM} \
-          --namespace=${HYPERSHIFT_NAMESPACE} \
-          --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m
-      else 
-        echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
-        bin/hypershift create cluster aws \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --name=${CLUSTER_NAME} \
-          --region=us-east-1 \
-          --infra-id=${CLUSTER_NAME} \
-          --base-domain=${DOMAIN} \
-          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-          --zones=${HYPERSHIFT_ZONES} \
-          --service-cidr=172.29.0.0/16 \
-          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-          --node-selector=hypershift.openshift.io/control-plane=true \
-          --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-          --release-stream=${DEFAULT_RELEASE_STREAM} \
-          --namespace=${HYPERSHIFT_NAMESPACE} \
-          --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m
-      fi
+      echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
+      bin/hypershift create cluster aws \
+        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+        --name=${CLUSTER_NAME} \
+        --region=us-east-1 \
+        --infra-id=${CLUSTER_NAME} \
+        --base-domain=${DOMAIN} \
+        --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+        --zones=${HYPERSHIFT_ZONES} \
+        --service-cidr=172.29.0.0/16 \
+        --cluster-cidr=10.124.0.0/14 \
+        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+        --node-selector=hypershift.openshift.io/control-plane=true \
+        --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+        --release-stream=${DEFAULT_RELEASE_STREAM} \
+        --namespace=${HYPERSHIFT_NAMESPACE}
       
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
@@ -129,16 +101,10 @@ chain:
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2
       namespace: test-credentials
-    - mount_path: /etc/hypershift-ci-jobs-azurecreds
-      name: hypershift-ci-jobs-azurecreds
-      namespace: test-credentials
-    - mount_path: /etc/hypershift-kubeconfig-azure
-      name: azure-hypershift-ci
-      namespace: test-credentials
     from_image:
-      namespace: ocp
-      name: "4.17"
-      tag: hypershift-operator
+      namespace: hypershift
+      name: hypershift-operator
+      tag: latest
     grace_period: 1m0s
     resources:
       requests:

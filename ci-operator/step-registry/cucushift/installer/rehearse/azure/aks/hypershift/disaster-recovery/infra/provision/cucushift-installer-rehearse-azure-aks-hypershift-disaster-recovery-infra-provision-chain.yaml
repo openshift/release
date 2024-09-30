@@ -1,0 +1,49 @@
+chain:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-disaster-recovery-infra-provision
+  steps:
+  - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
+  - ref: cucushift-hypershift-extended-install-private
+  - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+  - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
+  - chain: hypershift-azure-create
+  - ref: disaster-recovery-hypershift-infrastructure-etcd-recovery
+  - ref: disaster-recovery-hypershift-infrastructure-nodepool-autorepair
+  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+  env:
+  - name: AKS_ZONES
+    default: "1 2 3"
+  - name: ENABLE_ICSP
+    default: "true"
+  - name: EXTRA_ARGS
+    default: "--fips"
+  - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+    default: "Managed"
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: "eastus"
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "false"
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: "qe1.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_MANAGED_SERVICE
+    default: "ARO-HCP"
+  - name: HYPERSHIFT_NODE_DRAIN_TIMEOUT
+    default: "60s"
+  - name: HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT
+    default: "60s"
+  - name: HYPERSHIFT_NP_AUTOREPAIR
+    default: "true"
+  - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  documentation: |-
+    Provisions an AKS management cluster and a highly available, public hosted cluster (HC). 
+    It then conducts infrastructure disaster recovery tests on the setup.
+    
+    # TODO: remove HYPERSHIFT_NODE_DRAIN_TIMEOUT once the downstream is bumped to include 
+    https://github.com/kubernetes-sigs/cluster-api/pull/10706. 

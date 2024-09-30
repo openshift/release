@@ -1,0 +1,94 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+  kube-rbac-proxy:
+    name: "4.19"
+    namespace: ocp
+    tag: kube-rbac-proxy
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel8
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: node-observability-operator
+operator:
+  bundles:
+  - as: node-observability-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/node-observability-operator:v0.0.1
+    with: pipeline:node-observability-operator
+  - pullspec: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+    with: pipeline:kube-rbac-proxy
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    export GOLANGCI_LINT_CACHE=$(mktemp -d)
+    make verify
+  container:
+    from: src
+- as: unit
+  commands: |
+    export XDG_CACHE_HOME=$(mktemp -d)
+    make test
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-node-observability-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: node-observability-operator
+      OO_PACKAGE: node-observability-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-gcp
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: node-observability-operator

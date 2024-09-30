@@ -1,0 +1,133 @@
+base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  intermediate415:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  intermediate416:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+  latest-arm64:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.14"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  target-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-ipi-fullyprivate-proxy-f14
+  cron: 54 18 2,17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE415},${RELEASE_IMAGE_ARM64_INTERMEDIATE416},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: baremetal-upi-ovn-ipv4-f14
+  cluster: build05
+  cron: 51 13 15,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE415},${RELEASE_IMAGE_ARM64_INTERMEDIATE416},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: baremetal-lab-upi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-4.17-cpou-upgrade-from-4.14

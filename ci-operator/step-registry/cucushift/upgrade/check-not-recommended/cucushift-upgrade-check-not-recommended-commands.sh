@@ -40,6 +40,27 @@ while (( retry > 0 )); do
         echo "No conditionalUpdates update available! Retry..."
     else
         #shellcheck disable=SC2076
+        if [[ "$unrecommended_conditional_updates" == *"failure determine thanos IP"* ]]; then
+            echo "Warning: Thanos IP is not ready, clearing CVO cache"
+            oc delete pod -n openshift-cluster-version -l k8s-app=cluster-version-operator
+            echo "Waiting for the CVO pod to restart..."
+            timeout=120
+            while (( timeout > 0 )); do
+                sleep 30
+                (( timeout -= 30 ))
+                # Check the status of the CVO pod
+                pod_status=$(oc get pods -n openshift-cluster-version -l k8s-app=cluster-version-operator -o jsonpath='{.items[0].status.phase}')               
+                if [ "$pod_status" == "Running" ]; then
+                    echo "CVO pod has restarted"
+                    break
+                fi
+            done
+            if (( timeout <= 0 )); then
+                echo "CVO pod did not restart within the 2 minutes, exit" && exit 1
+            fi
+            continue
+        fi
+        #shellcheck disable=SC2076
         if [[ " $unrecommended_conditional_updates " =~ " $TARGET_VERSION " ]]; then
             echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
             oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'

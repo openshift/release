@@ -37,6 +37,12 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 #setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
@@ -155,6 +161,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
