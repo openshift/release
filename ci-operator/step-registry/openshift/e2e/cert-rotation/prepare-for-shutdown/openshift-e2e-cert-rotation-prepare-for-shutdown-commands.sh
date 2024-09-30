@@ -54,78 +54,54 @@ function run-on-first-master-silent-long {
   timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
 
-
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
-cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
-  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
-  for field in ${fields[@]}; do
-    echo "Approving ${field} CSRs at $(date)"
-    (( required_csrs=${#control_nodes[@]} + ${#compute_nodes[@]} ))
-    approved_csrs=0
-    attempts=0
-    max_attempts=40
-    while (( required_csrs >= approved_csrs )); do
-      echo -n '.'
-      mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
-      if [[ ${#csrs[@]} -gt 0 ]]; then
-        echo ""
-        oc adm certificate approve ${csrs} && attempts=0 && (( approved_csrs=approved_csrs+${#csrs[@]} ))
-      else
-        (( attempts++ ))
-      fi
-      if (( attempts > max_attempts )); then
-        break
-      fi
-      sleep 10s
-    done
-    echo ""
-  done
-  echo "Finished CSR approval at $(date)"
-EOZ
-chmod a+x /tmp/approve-csrs-with-timeout.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
-run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
+run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  echo "Waiting for API server to come up"
-  until oc get nodes; do sleep 10; done
-  mapfile -d ' ' -t nodes < <( oc get nodes -o name )
-  RAN_CSR_APPROVAL=""
+  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  mapfile -t nodes < <( oc get nodes -o name )
+
+  echo "Approving CSRs at $(date)"
+  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
+  for field in ${fields[@]}; do
+    (( required_csrs=${#nodes[@]} ))
+    approved_csrs=0
+    until (( approved_csrs >= required_csrs )); do
+      mapfile -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      if [[ ${#csrs[@]} -gt 0 ]]; then
+        oc adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
+      fi
+      sleep 10
+    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
+  done
+  echo "All CSRs approved at $(date)"
+
   for nodename in ${nodes[@]}; do
-    echo "Waiting for ${nodename} to send heartbeat"
-    while true; do
+    STATUS="False"
+    TIME_DIFF="301"
+    until [[ ${TIME_DIFF} -le 300 ]] && [[ ${STATUS} == True ]]; do
       STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
       NODE_HEARTBEAT_TIME=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
-      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then sleep 5; fi
+      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then
+        continue
+      fi
       TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
-      if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
-        break
-      fi
-      if [[ -z ${RAN_CSR_APPROVAL} ]]; then
-        bash /usr/local/bin/approve-csrs-with-timeout.sh
-        RAN_CSR_APPROVAL=1
-      else
-        echo -n "."
-        sleep 10
-      fi
-    done
-    echo "${nodename} is sending heartbeats"
+      sleep 1
+    done 3> >(/usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null)
   done
-  echo "All nodes are ready"
-  oc get nodes
+  echo "All nodes are ready at $(date)"
 EOZ
 chmod a+x /tmp/ensure-nodes-are-ready.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-silent-long "bash -x /usr/local/bin/ensure-nodes-are-ready.sh"
-  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig && ls -la /tmp/lb-ext.kubeconfig"
+  run-on-first-master-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
 
