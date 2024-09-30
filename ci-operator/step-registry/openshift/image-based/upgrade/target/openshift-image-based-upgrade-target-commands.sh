@@ -39,6 +39,20 @@ export RELEASE_IMAGE="${TARGET_IMAGE}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export SEED_VERSION="${SEED_VERSION}"
 export UPGRADE_TIMEOUT="60m"
+export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
+
+# Sets oc and kubectl from the specified OCP release version.
+set_openshift_clients() {
+  local release_image=\${1}
+
+  mkdir tools && cd tools && oc adm release extract --tools \${release_image}
+  tar xzf openshift-client-linux-\$(oc adm release info \${release_image} -ojson | jq -r .metadata.version).tar.gz
+  sudo mv oc kubectl /usr/local/bin
+  cd -
+  rm -rf ./tools
+}
+
+set_openshift_clients \${RELEASE_IMAGE}
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -54,6 +68,8 @@ t_upgrade_duration=\$SECONDS
 echo "Image based upgrade took \${t_upgrade_duration} seconds"
 
 export KUBECONFIG="${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
+
+set_openshift_clients \$(oc adm release info -ojson |jq -r .image)
 
 echo "Verifying Rollouts in Target Cluster..."
 echo "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."

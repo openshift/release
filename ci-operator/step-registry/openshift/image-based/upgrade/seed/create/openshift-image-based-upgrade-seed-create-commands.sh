@@ -103,6 +103,20 @@ export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
 export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 
+# Sets oc and kubectl from the specified OCP release version.
+set_openshift_clients() {
+  local release_image=\${1}
+
+  mkdir tools && cd tools && echo \${PULL_SECRET} > ./auth.json
+  oc adm release -a ./auth.json extract --tools \${release_image}
+  tar xzf openshift-client-linux-\$(oc adm release -a ./auth.json info \${release_image} -ojson | jq -r .metadata.version).tar.gz
+  sudo mv oc kubectl /usr/local/bin
+  cd -
+  rm -rf ./tools
+}
+
+set_openshift_clients \${RELEASE_IMAGE}
+
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
