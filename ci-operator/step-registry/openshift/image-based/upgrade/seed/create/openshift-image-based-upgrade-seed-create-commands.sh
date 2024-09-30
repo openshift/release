@@ -138,6 +138,8 @@ if [[ ! -z "\${SEED_FLOATING_TAG}" ]]; then
   skopeo copy "docker://${SEED_IMAGE}:${SEED_IMAGE_TAG}" "docker://${SEED_IMAGE}:${SEED_FLOATING_TAG}"
 fi
 
+# Destroy seed VM after seed image creation to unallocated the hosts's respective resources
+make seed-vm-remove
 EOF
 
 chmod +x ${SHARED_DIR}/create_seed.sh
