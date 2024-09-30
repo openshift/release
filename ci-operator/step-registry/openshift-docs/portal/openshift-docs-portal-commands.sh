@@ -18,6 +18,9 @@ for DISTRO in "${DISTROS[@]}"; do
         "openshift-rosa")
             TOPICMAP="_topic_maps/_topic_map_rosa.yml"
             ;;
+        "openshift-rosa-hcp")
+            TOPICMAP="_topic_maps/_topic_map_rosa_hcp.yml"
+            ;;
         "openshift-dedicated")
             TOPICMAP="_topic_maps/_topic_map_osd.yml"
             ;;

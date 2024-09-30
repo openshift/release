@@ -39,15 +39,8 @@ fi
 
 source /usr/local/share/cert-rotation-functions.sh
 
-# Stop chrony service on all nodes
-run-on-all-nodes "systemctl disable chronyd --now"
-
-# Backup lb-ext kubeconfig so that it could be compared to a new one
-KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
-KUBECONFIG_LB_EXT="${KUBECONFIG_NODE_DIR}/lb-ext.kubeconfig"
-KUBECONFIG_REMOTE="/tmp/lb-ext.kubeconfig"
-run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
-copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
+# Mask chrony service on all nodes and set time on guests
+run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${SKEW}"
 
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
 # and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
@@ -56,13 +49,20 @@ run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/defau
 
 # Shutdown nodes
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
+set +x
 for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
   virsh shutdown ${vm}
+done
+for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
+  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo "${vm} still running"
+    echo -n "."
     sleep 10
   done
 done
@@ -78,11 +78,18 @@ for vm in ${VMS[@]}; do
     continue
   fi
   virsh start ${vm}
+done
+for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
+  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo "${vm} still not yet running"
+    echo -n "."
     sleep 10
   done
 done
+set -x
 
 # Check that time on nodes has been updated
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
@@ -90,17 +97,13 @@ until run-on-all-nodes "timedatectl status"; do sleep 30; done
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 wait-for-nodes-to-be-ready
 
-# Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
-run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
-
-# Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
-run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
-copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
-
-# Approve certificates for workers, so that all operators would complete
-wait-for-nodes-to-be-ready
+# Wait for kube-apiserver operator to generate new lb-ext kubeconfig
+wait-for-valid-lb-ext-kubeconfig
 
 pod-restart-workarounds
+
+# Additional sleep for operators to start updating their status
+sleep 300
 
 wait-for-operators-to-stabilize
 EOF

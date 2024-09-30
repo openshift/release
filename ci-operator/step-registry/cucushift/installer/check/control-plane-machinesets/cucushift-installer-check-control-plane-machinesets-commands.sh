@@ -4,20 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-KUBECONFIG="" oc registry login
-
-version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP version: ${version}"
-
 # check if controlplanemachinesets is supported by the IaaS and the OCP version
 # return 0 if controlplanemachinesets is supported, otherwise 1
 function hasCPMS() {
@@ -92,6 +78,9 @@ then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d. -f 1,2)
+echo "OCP version: ${version}"
 
 if ! isIPI; then
     echo "INFO: 'controlplanemachinesets' is not available on UPI cluster, skip."

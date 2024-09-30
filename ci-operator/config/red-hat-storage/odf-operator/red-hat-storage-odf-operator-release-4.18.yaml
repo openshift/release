@@ -1,0 +1,71 @@
+base_images:
+  golang-image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+images:
+- dockerfile_path: Dockerfile
+  from: golang-image
+  to: odf-operator
+- dockerfile_path: catalog.deps.Dockerfile
+  to: odf-operator-catalog-deps
+operator:
+  bundles:
+  - as: odf-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/ocs-dev/odf-operator:latest
+    with: pipeline:odf-operator
+releases:
+  latest:
+    integration:
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: odf-operator-e2e-aws
+  steps:
+    cluster_profile: odf-aws
+    env:
+      BASE_DOMAIN: makestoragegreatagain.com
+    test:
+    - as: unit-tests
+      cli: latest
+      commands: |
+        GOFLAGS='' make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-tests
+      cli: latest
+      commands: |
+        unset VERSION
+        BUNDLE_IMG="$OO_BUNDLE" CATALOG_DEPS_IMG="$OO_CATALOG" make install-odf
+        GOFLAGS='' ODF_OPERATOR_INSTALL=false ODF_OPERATOR_UNINSTALL=false make e2e-test
+      dependencies:
+      - env: OO_BUNDLE
+        name: odf-operator-bundle
+      - env: OO_CATALOG
+        name: pipeline:odf-operator-catalog-deps
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.18
+  org: red-hat-storage
+  repo: odf-operator

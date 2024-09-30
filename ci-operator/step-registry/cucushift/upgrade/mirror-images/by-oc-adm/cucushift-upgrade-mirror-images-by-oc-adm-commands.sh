@@ -78,7 +78,7 @@ function mirror_image(){
     cmd="oc adm release mirror -a ${PULL_SECRET} ${mirror_options} --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
     if [[ "${APPLY_SIG}" == "true" ]]; then
         cmd="${cmd} --release-image-signature-to-dir=${SAVE_SIG_TO_DIR}"
-        if [[ "${apply_sig_together=}" == "true" ]]; then
+        if [[ "${apply_sig_together}" == "true" ]]; then
             set_proxy_env
             cmd="${cmd} --apply-release-image-signature --overwrite"
         fi

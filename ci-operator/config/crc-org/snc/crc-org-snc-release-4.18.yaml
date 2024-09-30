@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: images/openshift-ci/Dockerfile
+  from: base
+  to: snc
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  crc:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: e2e-snc
+  steps:
+    cluster_profile: gcp
+    workflow: code-ready-snc-e2e
+- as: e2e-microshift
+  cluster: build01
+  steps:
+    cluster_profile: gcp
+    workflow: code-ready-snc-microshift
+zz_generated_metadata:
+  branch: release-4.18
+  org: crc-org
+  repo: snc

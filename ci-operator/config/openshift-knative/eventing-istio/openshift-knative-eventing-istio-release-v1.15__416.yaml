@@ -1,4 +1,8 @@
 base_images:
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
@@ -9,18 +13,26 @@ build_root:
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
     openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+      - $GO_BUILDER
   to: knative-eventing-istio-controller
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   to: knative-eventing-istio-source-image
+promotion:
+  to:
+  - additional_images:
+      eventing-istio-src: src
+    namespace: openshift
+    tag: knative-v1.15
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.16"
 resources:
   '*':
@@ -29,14 +41,16 @@ resources:
       memory: 1Gi
 tests:
 - as: e2e-tests-aws-416
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: knative-must-gather
       best_effort: true
@@ -72,11 +86,11 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make e2e-tests
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make e2e-tests
       dependencies:
       - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
         name: knative-eventing-istio-controller
@@ -87,7 +101,70 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
+- as: e2e-tests-aws-416-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.16"
+  cron: 6 5 * * 2,6
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-istio-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-istio-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-istio-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make e2e-tests
+      dependencies:
+      - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
+        name: knative-eventing-istio-controller
+      - env: KNATIVE_EVENTING_ISTIO_SOURCE_IMAGE
+        name: knative-eventing-istio-source-image
+      from: knative-eventing-istio-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-v1.15
   org: openshift-knative

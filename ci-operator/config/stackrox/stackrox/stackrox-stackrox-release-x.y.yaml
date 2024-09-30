@@ -18,7 +18,7 @@ base_images:
   rosa:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-0.10.23
+    tag: rosa-0.10.28
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.2
+    tag: stackrox-ui-test-0.4.4
 resources:
   '*':
     requests:
@@ -57,6 +57,13 @@ tests:
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
+  optional: true
+  skip_if_only_changed: ^ui/
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-nongroovy-compatibility-tests
   optional: true
   skip_if_only_changed: ^ui/
   steps:
@@ -168,6 +175,12 @@ tests:
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - as: merge-gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: merge-gke-nongroovy-compatibility-tests
   postsubmit: true
   steps:
     env:

@@ -1,8 +1,12 @@
 base_images:
-  base:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
@@ -15,7 +19,6 @@ build_root:
 canonical_go_repository: github.com/openshift/aws-encryption-provider
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
     openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
@@ -26,6 +29,12 @@ promotion:
   - name: 4.17-priv
     namespace: ocp-private
 releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.17"
   latest:
     integration:
       include_built_images: true
@@ -48,6 +57,10 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

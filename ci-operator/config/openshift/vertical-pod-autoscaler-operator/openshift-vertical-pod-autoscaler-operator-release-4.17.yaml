@@ -27,9 +27,21 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: vpa-operator-registry
+operator:
+  bundles:
+  - as: vertical-pod-autoscaler-operator-bundle
+    dockerfile_path: images/ci/bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler-operator.*
+    with: pipeline:vertical-pod-autoscaler-operator
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler.*
+    with: stable:vertical-pod-autoscaler
 promotion:
   to:
-  - name: "4.17"
+  - additional_images:
+      vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
+    name: "4.17"
     namespace: ocp
 releases:
   initial:

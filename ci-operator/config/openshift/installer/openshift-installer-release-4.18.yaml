@@ -63,10 +63,38 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: installer-terraform-providers
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.18_etcd:
+    name: "4.18"
+    namespace: ocp
+    tag: etcd
+  ocp_4.18_hyperkube:
+    name: "4.18"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.18_installer-etcd-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.18_installer-terraform-providers:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-terraform-providers
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
   use_build_cache: true
@@ -85,9 +113,24 @@ images:
     ocp_4.17_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_4.18_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-terraform-providers
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
@@ -157,9 +200,21 @@ images:
     ocp_4.17_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.17:hyperkube
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:etcd
+    ocp_4.18_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:hyperkube
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: baremetal-installer
 - dockerfile_literal: |
     FROM src
@@ -197,13 +252,13 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -425,6 +480,11 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - always_run: false
@@ -434,6 +494,10 @@ tests:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - as: e2e-azure-ovn-shared-vpc
@@ -586,6 +650,13 @@ tests:
         function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -987,7 +1058,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -1011,7 +1081,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build

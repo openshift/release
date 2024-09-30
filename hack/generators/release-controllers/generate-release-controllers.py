@@ -54,6 +54,9 @@ def generate_app_ci_content(config, git_clone_dir):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_ocp-priv-puller.yaml'), context=config) as gendoc:
+        content.add_ocp_priv_puller_token(gendoc)
+
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('ibm_managed_control_plane_testing.yaml'), context=config) as gendoc:
         content.add_ibm_managed_control_plane_testing(gendoc)
 
