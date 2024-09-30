@@ -12,9 +12,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -612,16 +616,18 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-marketplace-f28
-  cron: 31 16 2 * *
+- as: gcp-ipi-mini-perm-marketplace-f28
+  cron: 27 15 10 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace
 - as: gcp-ipi-mini-perm-custom-type-f28
   cron: 37 18 24 * *
   steps:
