@@ -55,13 +55,13 @@ run-on-all-nodes "timedatectl set-time +${SKEW} && timedatectl status"
 # Restart kubelet
 run-on-all-nodes "systemctl restart kubelet"
 
+pod-restart-workarounds
+
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 wait-for-nodes-to-be-ready
 
 # Wait for kube-apiserver operator to generate valid lb-ext kubeconfig
 wait-for-valid-lb-ext-kubeconfig
-
-pod-restart-workarounds
 
 wait-for-operators-to-stabilize
 exit 0
