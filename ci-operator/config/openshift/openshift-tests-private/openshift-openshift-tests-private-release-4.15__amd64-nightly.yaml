@@ -75,12 +75,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.15"
   target:
     candidate:
       architecture: multi
@@ -263,8 +257,6 @@ tests:
   cron: 44 15 24 * *
   steps:
     cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@disconnected'
@@ -449,56 +441,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
-- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14
-  cron: 17 23 14,30 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
-      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-efs
-- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14-destructive
-  cron: 56 13 9,25 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
-      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-efs
-- as: aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f7
-  cron: 58 18 6,15,22,29 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
-      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-fips-guest-f14
   cron: 8 21 3,19 * *
   steps:
