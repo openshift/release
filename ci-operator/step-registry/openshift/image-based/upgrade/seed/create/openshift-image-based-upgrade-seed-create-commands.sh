@@ -15,7 +15,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 BACKUP_SECRET_FILE=$(cat ${SHARED_DIR}/backup_secret_file)
-SEED_VM_NAME="seed"
+SEED_VM_NAME="seed-sno-node"
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
@@ -106,12 +106,15 @@ export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed
+make seed-vm-create wait-for-seed
 
 if [[ "${CREATE_CLUSTER_ONLY}" == "true" ]]; then
   echo "CREATE_CLUSTER_ONLY was specified, exiting"
   exit 0
 fi
+
+# Prepare the seed vm for seed image creation
+make seed-cluster-prepare
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"

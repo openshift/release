@@ -14,7 +14,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 BACKUP_SECRET_FILE=$(cat ${SHARED_DIR}/backup_secret_file)
-TARGET_VM_NAME="target"
+TARGET_VM_NAME="target-sno-node"
 remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
@@ -53,8 +53,9 @@ t_upgrade_duration=\$SECONDS
 
 echo "Image based upgrade took \${t_upgrade_duration} seconds"
 
+export KUBECONFIG="${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
+
 echo "Verifying Rollouts in Target Cluster..."
-export KUBECONFIG="./bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
 echo "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a COMPONENTS=(
   "openshift-etcd-operator etcd-operator"
@@ -74,6 +75,14 @@ do
   fi
 done
 echo "No control-plane component revision triggers logged."
+
+# Remove non OpenShift workloads after the upgrade
+echo "Removing the OADP operator..."
+oc delete -f oadp-operator.yaml
+oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io
+
+echo "Removing Lifecycle Agent operator..."
+make -C lifecycle-agent undeploy
 EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh
