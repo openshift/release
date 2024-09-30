@@ -107,13 +107,13 @@ echo "Create node.iso for day2 worker nodes..."
 /tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+arch=${ADDITIONAL_WORKER_ARCHITECTURE}
 
-gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 case "${BOOT_MODE}" in
 "iso")
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.${arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
@@ -121,10 +121,10 @@ case "${BOOT_MODE}" in
    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
    if [ "${transfer_protocol_type}" == "cifs" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-     iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.iso"
+     iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.${arch}.iso"
    else
      # Assuming HTTP or HTTPS
-     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.iso"
+     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.${arch}.iso"
    fi
    mount_virtual_media "${host}" "${iso_path}"
   done
@@ -142,11 +142,11 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}.img"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
-   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
+   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"
