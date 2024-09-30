@@ -7,23 +7,15 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: golang-1.21
 images:
 - context_dir: components
   dockerfile_path: notebook-controller/Dockerfile
   from: ubi_minimal
-  inputs:
-    root:
-      as:
-      - golang:${GOLANG_VERSION}
   to: kf-notebook-controller
 - context_dir: components
   dockerfile_path: odh-notebook-controller/Dockerfile
   from: ubi_minimal
-  inputs:
-    root:
-      as:
-      - golang:${GOLANG_VERSION}
   to: odh-notebook-controller
 promotion:
   to:
@@ -34,7 +26,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.10"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -83,16 +75,7 @@ tests:
       SOURCE_IMAGE_REF: kf-notebook-controller
     env:
       IMAGE_REPO: kubeflow-notebook-controller
-      RELEASE_VERSION: master
-    workflow: opendatahub-io-ci-image-mirror
-- as: kf-notebook-controller-image-mirror-latest
-  cron: 0 2 * * *
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: kf-notebook-controller
-    env:
-      IMAGE_REPO: kubeflow-notebook-controller
-      IMAGE_TAG: latest
+      RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-notebook-controller-pr-image-mirror
   steps:
@@ -108,16 +91,7 @@ tests:
       SOURCE_IMAGE_REF: odh-notebook-controller
     env:
       IMAGE_REPO: odh-notebook-controller
-      RELEASE_VERSION: master
-    workflow: opendatahub-io-ci-image-mirror
-- as: odh-notebook-controller-image-mirror-latest
-  cron: 0 2 * * *
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: odh-notebook-controller
-    env:
-      IMAGE_REPO: odh-notebook-controller
-      IMAGE_TAG: latest
+      RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-notebook-controller-e2e
   steps:
@@ -143,6 +117,6 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: opendatahub-io
   repo: kubeflow
