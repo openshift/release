@@ -135,9 +135,8 @@ spec:
         app: cuda-test-workload
     spec:
       containers:
-        - name: patch-container
-          image: ${TOOLS_IMAGE}
-          command: [ "sh", "-c", "while true; do sleep 3600; done" ]
+        - name: cuda-vectoradd
+          image: "nvidia/samples:vectoradd-cuda11.2.1"
           resources:
            limits:
               nvidia.com/gpu: 2
