@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# this is a copy of step-registry/gather/must-gather/gather-must-gather-commands.sh and symlink doesn't work
 set -o nounset
 set -o errexit
 set -o pipefail
