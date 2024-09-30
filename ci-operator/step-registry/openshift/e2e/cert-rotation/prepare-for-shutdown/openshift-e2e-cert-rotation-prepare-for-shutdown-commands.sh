@@ -118,8 +118,9 @@ function wait-for-valid-lb-ext-kubeconfig {
   run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
 
-function pod-restart-workarounds {
-  export KUBECONFIG=/tmp/lb-ext.kubeconfig
+cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
@@ -134,6 +135,13 @@ function pod-restart-workarounds {
     oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
     oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
   fi
+EOZ
+chmod a+x /tmp/pod-restart-workarounds.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
+run-on-first-master "mv /tmp/pod-restart-workarounds.sh /usr/local/bin/pod-restart-workarounds.sh && chmod a+x /usr/local/bin/pod-restart-workarounds.sh"
+
+function pod-restart-workarounds {
+  run-on-first-master-silent "bash /usr/local/bin/pod-restart-workarounds.sh"
 }
 
 function prepull-tools-image-for-gather-step {

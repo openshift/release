@@ -49,10 +49,10 @@ function emulate-cluster-age {
   # Restart kubelet
   run-on-all-nodes "systemctl restart kubelet"
 
+  pod-restart-workarounds
+
   # Wait for nodes to become unready and approve CSRs until nodes are ready again
   wait-for-nodes-to-be-ready
-
-  pod-restart-workarounds
 
   wait-for-operators-to-stabilize
 
