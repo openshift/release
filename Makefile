@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -58,11 +58,7 @@ update:
 	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
-	$(MAKE) template-allowlist
 	$(MAKE) release-controllers
-
-template-allowlist:
-	VOLUME_MOUNT_FLAGS="${VOLUME_MOUNT_FLAGS}" ./hack/generate-template-allowlist.sh
 
 release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
