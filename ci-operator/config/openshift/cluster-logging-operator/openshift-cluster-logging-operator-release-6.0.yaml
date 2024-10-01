@@ -2,13 +2,13 @@ base_images:
   base:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
+    tag: rhel-9-release-golang-1.21-openshift-4.16
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
     tag: elasticsearch-operator-src
   log-file-metric-exporter:
-    name: 6.y
+    name: "6.0"
     namespace: logging
     tag: log-file-metric-exporter
   logging-eventrouter:
@@ -16,7 +16,7 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-vector:
-    name: "6.1"
+    name: "6.0"
     namespace: logging
     tag: vector
   ubi9-minimal:
@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
+    tag: rhel-9-release-golang-1.21-openshift-4.16
 images:
 - from: ubi9-minimal
   inputs:
@@ -71,14 +71,13 @@ operator:
     with: pipeline:log-file-metric-exporter
 promotion:
   to:
-  - name: "6.1"
+  - name: "6.0"
     namespace: logging
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -162,43 +161,7 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: upgrade
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-logging
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
-  optional: true
-  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-upgrade
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:logging-vector
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: generic-claim
-  timeout: 5h0m0s
 zz_generated_metadata:
-  branch: master
+  branch: release-6.0
   org: openshift
   repo: cluster-logging-operator
