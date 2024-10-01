@@ -1,0 +1,128 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: max_jobs
+    value: "6"
+  - name: nvcc_threads
+    value: "2"
+  - name: TORCH_CUDA_ARCH_LIST
+    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: vllm_fa_cmake_gpu_arches
+    value: 80-real;90-real
+  - name: PYTHON_VERSION
+    value: "3.12"
+  context_dir: .
+  dockerfile_path: Dockerfile.ubi
+  to: vllm-build-release-cuda
+- build_args:
+  - name: max_jobs
+    value: "6"
+  - name: PYTORCH_ROCM_ARCH
+    value: gfx908;gfx90a;gfx942;gfx1100
+  - name: PYTHON_VERSION
+    value: "3.12"
+  context_dir: .
+  dockerfile_path: Dockerfile.rocm.ubi
+  to: vllm-build-release-rocm
+promotion:
+  to:
+  - namespace: red-hat-data-services
+    tag: rhoai-2.14
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  smoke-test:
+    limits:
+      cpu: "4"
+      memory: 24Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "4"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
+  vllm-build-main-cuda:
+    limits:
+      cpu: "16"
+      memory: 24Gi
+    requests:
+      cpu: "16"
+      memory: 24Gi
+  vllm-build-main-rocm:
+    limits:
+      cpu: "16"
+      memory: 35Gi
+    requests:
+      cpu: "16"
+      memory: 35Gi
+tests:
+- always_run: true
+  as: smoke-test
+  cluster: build05
+  commands: |
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
+
+    cd extras
+
+    bash smoke-test.sh
+  container:
+    clone: true
+    from: vllm-build-release-cuda
+- as: cuda-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: cuda-rhoai-2.14
+    workflow: opendatahub-io-ci-image-mirror
+- as: rocm-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-rocm
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rocm-rhoai-2.14
+    workflow: opendatahub-io-ci-image-mirror
+- as: cuda-stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: cuda-rhoai-2.14
+    workflow: opendatahub-io-ci-image-mirror
+- as: rocm-stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-rocm
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rocm-rhoai-2.14
+    workflow: opendatahub-io-ci-image-mirror
+- as: release-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rhoai-2.14
+zz_generated_metadata:
+  branch: rhoai-2.14
+  org: red-hat-data-services
+  repo: vllm
