@@ -42,7 +42,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --iterations=50 --churn=false --gc-metrics=true --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
