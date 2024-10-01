@@ -1,0 +1,69 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ci/telco-runner
+      RUN pip3 install --no-cache-dir "pytest==8.2.2" "pytest-shell==0.3.2" "requests==2.32.3"
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-sno-hub-ztp-f360
+  cluster: build05
+  cron: 0 7 * * 6
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "0"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      EXPIRATION_TIME: next friday 20:00 UTC
+      IMAGE_INDEX_OCP_VERSION: "4.17"
+      MCH_AVAILABILITY_CONFIG: Basic
+      MCH_CATALOG_ANNOTATION: '{"source": "redhat-operators", "channel": "stable-2.6"}'
+      MCH_NAMESPACE: open-cluster-management
+      OCP_HUB_VERSION: "4.17"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.11", "install_namespace": "open-cluster-management", "target_namespaces": "open-cluster-management", "operator_group": "acm-operator-group"},
+          {"name": "topology-aware-lifecycle-manager", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-talm", "target_namespaces": "", "operator_group": "topology-aware-lifecycle-manager"},
+          {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "gitops-operator-group"}
+        ]
+      PR_DEBUG_MODE_TIMEOUT: 10 hours
+      RESERVE_BOOTSTRAP: "false"
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: install-operators-verify
+    - ref: telcov10n-sno-hub-ztp-verify-hub
+    workflow: telcov10n-sno-hub-ztp
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: sno-hub-ztp-4.17-latest
