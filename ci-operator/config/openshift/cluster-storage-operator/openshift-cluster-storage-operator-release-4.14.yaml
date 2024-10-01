@@ -45,9 +45,15 @@ tests:
   container:
     from: src
 - as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
