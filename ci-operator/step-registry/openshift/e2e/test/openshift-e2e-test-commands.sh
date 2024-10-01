@@ -491,6 +491,7 @@ do
   set -e
 done
 
+sleep 8000s
 echo "[$(date)] All imagestreams are imported."
 
 case "${TEST_TYPE}" in
