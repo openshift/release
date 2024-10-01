@@ -23,9 +23,6 @@ chain:
     - name: ENDPOINT_ACCESS
       default: "Public"
       documentation: "Access for control plane endpoints (Public, PublicAndPrivate, Private)"
-    - name: CONTROLPLANE_OPERATOR_IMAGE
-      default: ""
-      documentation: "The CPO image to use. Set to LATEST to use the latest one"
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra args to pass to the create cluster aws command"
@@ -71,10 +68,6 @@ chain:
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
-      # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
-      # have to use a hack like this.
-      [[ ${CONTROLPLANE_OPERATOR_IMAGE} = "LATEST" ]] && CONTROLPLANE_OPERATOR_IMAGE="${HYPERSHIFT_RELEASE_LATEST}"
-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       COMMAND=(
@@ -92,7 +85,6 @@ chain:
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}
         --release-image ${RELEASE_IMAGE}
-        --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-}
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" 
       )

@@ -24,9 +24,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -506,7 +510,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "30"
     test:
@@ -599,7 +603,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
       TEST_TIMEOUT: "90"
@@ -615,7 +619,7 @@ tests:
       HYPERSHIFT_AWS_REGION: us-east-1
       HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
       HYPERSHIFT_NODE_COUNT: "1"
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "35"
     test:
@@ -681,7 +685,7 @@ tests:
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
       MCE_VERSION: "2.7"
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
       TEST_TIMEOUT: "90"
     test:
@@ -756,7 +760,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_ADDITIONAL: Hypershift
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_TIMEOUT: "30"
     test:
@@ -1093,6 +1097,7 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: rosa-hcp-auth
       OPENSHIFT_VERSION: "4.17"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_PROFILE: rosa-hcp-external-auth
@@ -2280,26 +2285,30 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-agent-vsphere-dualstack-install-sno
-- as: gcp-ipi-marketplace-f28
-  cron: 32 21 7 * *
+- as: gcp-ipi-mini-perm-marketplace-f28
+  cron: 42 23 1 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
-- as: gcp-ipi-marketplace-f28-destructive
-  cron: 45 5 24 * *
+    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace
+- as: gcp-ipi-mini-perm-marketplace-f28-destructive
+  cron: 41 19 17 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace
 - as: gcp-ipi-mini-perm-custom-type-f28
   cron: 15 22 13 * *
   steps:

@@ -78,11 +78,34 @@ EOF
 if [[ "$JOB_NAME" == *"4.6-e2e"* ]]; then
   echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
   setE2eMirror
-  
-elif [[ $JOB_NAME =~ .*okd-4.*-e2e-vsphere.* ]]; then
-  echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
-  setE2eMirror
 
-  echo "Patching cluster-samples-operator for OKD e2e vSphere jobs"
-  oc --type=merge patch configs.samples.operator.openshift.io cluster -p='{"spec":{"samplesRegistry":"e2e-cache.vmc-ci.devcluster.openshift.com:5000"}}' -n openshift-cluster-samples-operator
+elif [[ $JOB_NAME =~ .*okd-scos-4.*-e2e-vsphere.* ]]; then
+  echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
+
+  oc create -f - <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 98-e2e-registry-mirror
+spec:
+  config:
+    ignition:
+      version: 3.1.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,dW5xdWFsaWZpZWQtc2VhcmNoLXJlZ2lzdHJpZXMgPSBbInJlZ2lzdHJ5LmFjY2Vzcy5yZWRoYXQuY29tIiwgImRvY2tlci5pbyJdCgpbW3JlZ2lzdHJ5XV0KcHJlZml4ID0gImRvY2tlci5pby9vcGVubGliZXJ0eSIKbG9jYXRpb24gPSAicXVheS5pby9vY3Atc3BsYXQiCgo=
+        mode: 0544
+        overwrite: true
+        path: /etc/containers/registries.conf
+EOF
+
+  echo "Waiting for machineconfig to begin rolling out"
+  oc wait --for=condition=Updating mcp/worker --timeout=5m
+
+  echo "Waiting for machineconfig to finish rolling out"
+  oc wait --for=condition=Updated mcp/worker --timeout=30m
 fi
+

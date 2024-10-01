@@ -8,9 +8,9 @@ base_images:
     namespace: ci
     tag: v1.54.2
   hypershift-operator:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
@@ -265,6 +265,19 @@ tests:
     workflow: openshift-e2e-gcp-csi
 - as: e2e-aws-ovn-upgrade
   optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade-rollback
+  optional: true
+  run_if_changed: ^(test/e2e/upgrade)
   steps:
     cluster_profile: aws-2
     env:

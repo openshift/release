@@ -1,0 +1,132 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.17
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
+      as:
+      - golang:1.22
+  multi_arch: true
+  to: multiarch-tuning-operator
+- dockerfile_path: bundle.Dockerfile
+  multi_arch: true
+  to: multiarch-tuning-op-bundle
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+    FROM src
+    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+  from: src
+  multi_arch: true
+  to: operator-sdk-mto
+operator:
+  bundles:
+  - as: multiarch-tuning-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:main
+    with: pipeline:multiarch-tuning-operator
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  sast:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 300m
+      memory: 400Mi
+tests:
+- as: e2e-gcp
+  cluster: build10
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: multiarch-tuning-operator-e2e-olm-kustomize
+    workflow: ipi-gcp
+- as: e2e-aws-ovn-mto-origin-post
+  cluster: build10
+  postsubmit: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      MTO_OPERATOR_INSTALL_METHOD: catalog
+      OCP_ARCH: arm64
+      SUBSCRIPTION_CHANNEL_OVERRIDE: main
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\|APIs for openshift.io must have stable
+        versions
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: multiarch-tuning-operator
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: multiarch-tuning-operator
+  variant: ocp418

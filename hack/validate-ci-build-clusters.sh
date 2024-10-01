@@ -35,6 +35,19 @@ onboard:
   releaseRepo: "$releaserepo_workdir"
   kubeconfigDir: "$kubeconfig_dir"
   kubeconfigSuffix: "$kubeconfig_suffix"
+  certificate:
+    clusterIssuer:
+      build02:
+        apps-tls: cert-issuer-ci-build-farm
+        apiserver-tls: cert-issuer-ci-build-farm
+    projectLabel:
+      build02:
+        apiserver-tls:
+          key: gcp-project
+          value: openshift-ci-build-farm
+        apps-tls:
+          key: gcp-project
+          value: openshift-ci-build-farm
 EOF
 
 cluster-init onboard config generate \

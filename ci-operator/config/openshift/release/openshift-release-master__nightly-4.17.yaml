@@ -98,6 +98,8 @@ tests:
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
       ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      PACKET_PLAN: m3.large.x86
     observers:
       enable:
       - observers-resource-watch
@@ -719,6 +721,7 @@ tests:
 - as: e2e-telco5g
   cluster: build05
   cron: 00 02 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -733,6 +736,7 @@ tests:
 - as: e2e-telco5g-cnftests
   cluster: build05
   cron: 00 02 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -748,6 +752,7 @@ tests:
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 40 13 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -762,6 +767,7 @@ tests:
 - as: e2e-telco5g-ptp
   cluster: build05
   cron: 0 9 */1 * *
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -773,6 +779,7 @@ tests:
 - as: e2e-telco5g-hcp-cnftests
   cluster: build05
   cron: 00 20 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -787,6 +794,7 @@ tests:
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 2
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-bm
@@ -798,6 +806,7 @@ tests:
 - as: metal-ovn-network-flow-matrix-single-node-bm
   cluster: build05
   cron: 0 23 * * 2
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
@@ -806,6 +815,20 @@ tests:
       enable:
       - observers-resource-watch
     workflow: network-flow-matrix-single-node-bm
+- as: aws-ovn-network-flow-matrix
+  cron: 0 23 * * 2
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: network-flow-matrix-tests
+    workflow: openshift-e2e-aws-ovn-serial
+- as: aws-ovn-network-flow-matrix-single-node
+  cron: 0 23 * * 2
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: network-flow-matrix-tests
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-alibaba-ovn
   cron: '@weekly'
   steps:
