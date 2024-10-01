@@ -798,6 +798,7 @@ tests:
 - as: e2e-telco5g
   cluster: build05
   cron: 11 20 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -812,6 +813,7 @@ tests:
 - as: e2e-telco5g-cnftests
   cluster: build05
   cron: 00 18 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -827,6 +829,7 @@ tests:
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 00 18 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -841,6 +844,7 @@ tests:
 - as: e2e-telco5g-ptp
   cluster: build05
   cron: 0 18 * * 0
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -852,6 +856,7 @@ tests:
 - as: e2e-telco5g-hcp-cnftests
   cluster: build05
   cron: 00 10 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -866,6 +871,7 @@ tests:
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 3
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-bm
@@ -877,6 +883,7 @@ tests:
 - as: metal-ovn-network-flow-matrix-single-node-bm
   cluster: build05
   cron: 0 23 * * 3
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
@@ -885,6 +892,20 @@ tests:
       enable:
       - observers-resource-watch
     workflow: network-flow-matrix-single-node-bm
+- as: aws-ovn-network-flow-matrix
+  cron: 0 23 * * 3
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: network-flow-matrix-tests
+    workflow: openshift-e2e-aws-ovn-serial
+- as: aws-ovn-network-flow-matrix-single-node
+  cron: 0 23 * * 3
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: network-flow-matrix-tests
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-alibaba-ovn
   cron: '@weekly'
   steps:
@@ -1483,7 +1504,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-crun
 - as: e2e-azure-ovn-crun
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: azure4
     observers:
@@ -1491,7 +1512,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-crun
 - as: e2e-gcp-ovn-crun
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: gcp-3
     observers:
@@ -1509,7 +1530,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-crun
 - as: e2e-vsphere-ovn-serial-crun
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1644,7 +1665,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-crun
 - as: e2e-gcp-ovn-crun-techpreview
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: gcp-3
     env:
@@ -1678,7 +1699,7 @@ tests:
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-upgrade-crun
   cluster: build05
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
     env:
