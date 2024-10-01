@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
