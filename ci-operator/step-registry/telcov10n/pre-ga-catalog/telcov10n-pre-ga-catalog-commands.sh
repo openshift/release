@@ -20,8 +20,14 @@ function wait_until_command_is_ok {
     sleep ${sleep_for:='1m'}
     set +x
   done
+
   echo ${exit_non_ok_message:="[Fail] The exit condition was not met"}
-  exit 1
+  if [[ "${TENTATIVE_CREATION}" == "yes" ]] ; then
+    echo "However, since it was set as tentative creation, this failure won't cause the job to stop."
+    exit 0
+  else
+    exit 1
+  fi
 }
 
 function update_openshift_config_pull_secret {
