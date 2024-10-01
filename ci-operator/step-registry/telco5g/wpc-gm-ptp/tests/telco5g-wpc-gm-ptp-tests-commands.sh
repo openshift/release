@@ -340,10 +340,100 @@ sleep 60
 
 # get RTC logs
 print_time
-podman run \
-  -v $KUBECONFIG:/usr/vse/kubeconfig:Z \
-  -v $VSE_SYNC_TEST_OUTPUT_DIR:/usr/vse/data:Z \
-  quay.io/redhat-partner-solutions/vse-sync-test:latest || temp_status_vst=$?
+jobdefinition='---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: privileged-rights
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - privileged
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  managedFields:
+  name: privileged-rights
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: privileged-rights
+subjects:
+- kind: ServiceAccount
+  name: builder
+  namespace: openshift-ptp
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vse-sync-pod
+  namespace: openshift-ptp
+spec:
+  restartPolicy: Never
+  serviceAccountName: builder
+  containers:
+    - name: vse-sync-container
+      image: quay.io/podman/stable
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          podman run \
+            -v /var/.kubeconfig:/usr/vse/kubeconfig:Z \
+            -v /var/test-data:/usr/vse/data:Z \
+            quay.io/redhat-partner-solutions/vse-sync-test:latest
+          set -x
+      securityContext:
+              privileged: true
+      volumeMounts:
+        - mountPath: /var/test-data
+          name: output-dir-vol
+        - mountPath: /var/.kubeconfig
+          name: kubeconfig-vol
+  volumes:
+    - name: output-dir-vol
+      hostPath:
+        path: VSE_SYNC_TEST_OUTPUT_DIR
+    - name: kubeconfig-vol
+      hostPath:
+        path: KUBECONFIG
+      '
+jobdefinition=$(sed "s#VSE_SYNC_TEST_OUTPUT_DIR#${VSE_SYNC_TEST_OUTPUT_DIR}#" <<< "$jobdefinition")
+jobdefinition=$(sed "s#KUBECONFIG#${KUBECONFIG}#" <<< "$jobdefinition")
+echo "$jobdefinition" | oc apply -f -
+
+success=0
+iterations=0
+sleep_time=10
+max_iterations=72 # results in 12 minutes timeout
+until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
+do
+  run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
+   if [ "$run_status" == "Succeeded" ]; then
+          success=1
+          break
+   fi
+   iterations=$((iterations+1))
+   sleep $sleep_time
+done
+
+if [[ $success -eq 1 ]]; then
+  echo "[INFO] index build succeeded"
+else
+  echo "[ERROR] index build failed"
+  exit 1
+fi
+
+oc -n openshift-ptp logs vse-sync-pod
 # get RTC logs
 print_time
 
