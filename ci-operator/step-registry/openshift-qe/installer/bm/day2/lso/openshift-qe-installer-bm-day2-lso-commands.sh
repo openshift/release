@@ -21,12 +21,12 @@ oc config view
 oc projects
 
 # Disk cleaning
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
-  for i in $(oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'); do
-    for j in {0..7}; do
-      ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@${i} sudo sgdisk --zap-all /dev/nvme${j}\n1
-    done
-  done"
+#sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+#  for i in $(oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'); do
+#    for j in {0..7}; do
+#      ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@${i} sudo sgdisk --zap-all /dev/nvme${j}\n1
+#    done
+#  done"
 # sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in `oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'`; do for j in {0..7}; do ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@$i sudo wipefs -a /dev/nvme$j\n1; done; done
 
 # Install the LSO operator
@@ -72,7 +72,7 @@ kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshi
 sleep 60
 
 # Node labeling
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in $(oc get node -l node-role.kubernetes.io/worker -oname | grep -oP "^node/\K.*"); do oc label node $i openshift-storage='' --overwrite; done
+#sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in $(oc get node -l node-role.kubernetes.io/worker -oname | grep -oP "^node/\K.*"); do oc label node $i openshift-storage='' --overwrite; done
 
 # Auto Discovering Devices and creating Persistent Volumes
 
