@@ -168,3 +168,6 @@ ZONES: $ZONES
 BASTION_FLAVOR: $BASTION_FLAVOR
 PROW_JOB_ID: $PROW_JOB_ID
 EOF
+
+echo "Testing if servers are reachable"
+ping -c 5 titan20.lab.eng.tlv2.redhat.com
