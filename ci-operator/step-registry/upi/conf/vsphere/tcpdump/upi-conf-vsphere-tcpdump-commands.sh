@@ -46,6 +46,10 @@ spec:
     spec:
       containers:
       - name: tcpdump-dns
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
         image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
         envFrom:
         - secretRef:
