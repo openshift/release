@@ -679,7 +679,9 @@ aws|aws-arm64|aws-usgov)
     fi
     ;;
 vsphere*)
-  cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
 apiVersion: samples.operator.openshift.io/v1
 kind: Config
 metadata:
@@ -690,6 +692,7 @@ spec:
   skippedImagestreams:
   - openliberty
 EOF
+    fi
     ;;
 esac
 
