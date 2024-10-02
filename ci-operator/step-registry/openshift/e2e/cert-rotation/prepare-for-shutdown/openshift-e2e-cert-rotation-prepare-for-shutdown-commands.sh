@@ -153,6 +153,7 @@ function prepull-tools-image-for-gather-step {
 
 function wait-for-operators-to-stabilize {
   export KUBECONFIG=/tmp/lb-ext.kubeconfig
+  oc get nodes
   # Wait for operators to stabilize
   if
     ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
