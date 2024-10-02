@@ -26,4 +26,9 @@ for i in {1..10}; do
   rc=1
 done
 
+
+if [ ${BAREMETAL} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
+fi
 exit $rc
