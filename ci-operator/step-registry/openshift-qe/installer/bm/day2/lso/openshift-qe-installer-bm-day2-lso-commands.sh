@@ -21,12 +21,12 @@ oc config view
 oc projects
 
 # Disk cleaning
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} '
   for i in $(oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'); do
     for j in {0..7}; do
       ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@${i} sudo sgdisk --zap-all /dev/nvme${j}\n1
     done
-  done"
+  done'
 # sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in `oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'`; do for j in {0..7}; do ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@$i sudo wipefs -a /dev/nvme$j\n1; done; done
 
 # Install the LSO operator
