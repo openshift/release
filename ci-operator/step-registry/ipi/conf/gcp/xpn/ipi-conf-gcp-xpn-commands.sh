@@ -66,6 +66,9 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
        --network "${HOST_PROJECT_NETWORK}" \
        --allow tcp:22,icmp
 
+# TODO: Check that the service account has all of the correct permissions here. There
+# is still a failure occurring. 
+
 # associate the service account with the subnets
 # Bind the networkUser role to the service account
 cat << EOF > /tmp/subnet-policy.json
