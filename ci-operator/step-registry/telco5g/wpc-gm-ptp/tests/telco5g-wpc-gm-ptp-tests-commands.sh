@@ -314,6 +314,7 @@ EOF
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 export VSE_SYNC_TEST_OUTPUT_DIR=${ARTIFACT_DIR}/vse-sync-test
+mkdir $VSE_SYNC_TEST_OUTPUT_DIR
 
 temp_status_wpcgm=0
 temp_status_vst=0
