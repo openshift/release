@@ -63,6 +63,10 @@ wait-for-nodes-to-be-ready
 # Wait for kube-apiserver operator to generate valid lb-ext kubeconfig
 wait-for-valid-lb-ext-kubeconfig
 
+# Wait for kube-apiserver to become Progressing to avoid stale operator status
+wait-for-kubeapiserver-to-start-progressing
+
+# Wait for operators to finish updates
 wait-for-operators-to-stabilize
 exit 0
 
