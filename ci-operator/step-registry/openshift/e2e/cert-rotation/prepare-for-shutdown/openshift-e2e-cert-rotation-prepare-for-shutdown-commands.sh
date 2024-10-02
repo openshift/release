@@ -118,6 +118,19 @@ function wait-for-valid-lb-ext-kubeconfig {
   run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
 
+cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+  echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  oc wait --for=condition=Progressing clusteroperator/kube-apiserver --timeout=300s 
+EOZ
+chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
+run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh && chmod a+x /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+
+function wait-for-kubeapiserver-to-start-progressing {
+  run-on-first-master "bash /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+}
+
 cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
