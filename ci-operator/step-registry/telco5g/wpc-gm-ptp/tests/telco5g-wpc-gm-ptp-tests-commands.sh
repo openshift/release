@@ -341,35 +341,33 @@ sleep 60
 # get RTC logs
 print_time
 jobdefinition='---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+apiVersion: v1
+kind: PersistentVolume
 metadata:
-  name: privileged-rights
-  namespace: openshift-ptp
-rules:
-- apiGroups:
-  - security.openshift.io
-  resourceNames:
-  - privileged
-  resources:
-  - securitycontextconstraints
-  verbs:
-  - use
+  name: vse-sync-test-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 3Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: VSE_SYNC_TEST_OUTPUT_DIR
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  managedFields:
-  name: privileged-rights
+  name: vse-sync-test-pv-claim
   namespace: openshift-ptp
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: privileged-rights
-subjects:
-- kind: ServiceAccount
-  name: builder
-  namespace: openshift-ptp
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 3Gi
 ---
 apiVersion: v1
 kind: Pod
@@ -378,7 +376,6 @@ metadata:
   namespace: openshift-ptp
 spec:
   restartPolicy: Never
-  serviceAccountName: builder
   containers:
     - name: vse-sync-container
       image: quay.io/podman/stable
@@ -392,8 +389,6 @@ spec:
             -v /var/test-data:/usr/vse/data:Z \
             quay.io/redhat-partner-solutions/vse-sync-test:latest
           set -x
-      securityContext:
-              privileged: true
       volumeMounts:
         - mountPath: /var/test-data
           name: output-dir-vol
@@ -401,8 +396,8 @@ spec:
           name: kubeconfig-vol
   volumes:
     - name: output-dir-vol
-      hostPath:
-        path: VSE_SYNC_TEST_OUTPUT_DIR
+      persistentVolumeClaim:
+        claimName: vse-sync-test-pv-claim
     - name: kubeconfig-vol
       hostPath:
         path: KUBECONFIG
