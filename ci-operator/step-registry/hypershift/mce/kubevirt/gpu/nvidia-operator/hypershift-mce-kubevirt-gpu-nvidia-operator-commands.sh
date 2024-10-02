@@ -115,9 +115,6 @@ while read -r name _ _ _; do
 done < <(oc get node --no-headers)
 
 oc create namespace cuda-test
-IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-TOOLS_IMAGE=$(oc adm release info ${IMAGE} --image-for=tools)
-echo "$TOOLS_IMAGE"
 cat <<EOF | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -125,7 +122,7 @@ metadata:
   name: cuda-test-workload
   namespace: cuda-test
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
       app: cuda-test-workload
@@ -134,11 +131,18 @@ spec:
       labels:
         app: cuda-test-workload
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       containers:
-        - name: cuda-vectoradd
-          image: "nvidia/samples:vectoradd-cuda11.2.1"
+        - name: dcgmproftester12
+          image: nvcr.io/nvidia/cloud-native/dcgm:3.3.3-1-ubi9
+          command: ["/bin/sh", "-c"]
+          args:
+           - while true; do /usr/bin/dcgmproftester12 --no-dcgm-validation -t 1004 -d 300; sleep 30; done
           resources:
            limits:
-              nvidia.com/gpu: 2
+              nvidia.com/gpu: 1
 EOF
-oc wait deployment cuda-test-workload -n cuda-test --for condition=Available=True --timeout=5m
+oc wait deployment cuda-test-workload -n cuda-test --for condition=Available=True --timeout=15m
