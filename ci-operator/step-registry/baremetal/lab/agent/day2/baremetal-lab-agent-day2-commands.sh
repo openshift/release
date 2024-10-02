@@ -108,7 +108,7 @@ case "${BOOT_MODE}" in
 "iso")
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${gnu_arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
