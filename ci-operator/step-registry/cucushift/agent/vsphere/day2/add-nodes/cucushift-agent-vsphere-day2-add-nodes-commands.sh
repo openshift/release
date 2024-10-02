@@ -157,7 +157,7 @@ node_iso=$(<"${SHARED_DIR}"/node-iso.txt)
 echo "uploading ${node_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
-  if govc datastore.upload -ds "${vsphere_datastore}" node.iso agent-installer-isos/"${node_iso}"; then
+  if govc datastore.upload -ds "${vsphere_datastore}" node.x86_64.iso agent-installer-isos/"${node_iso}"; then
     echo "$(date -u --rfc-3339=seconds) - Agent node ISO has been uploaded successfully!!"
     status=0
     break
@@ -241,3 +241,7 @@ for ((i = 0; i < 20; i++)); do
   fi
   sleep 30
 done
+
+# Add operators status checking until monitoring enhanced to do this
+echo "Ensure that all the cluster operators remain stable and ready"
+oc adm wait-for-stable-cluster --minimum-stable-period=3m --timeout=15m

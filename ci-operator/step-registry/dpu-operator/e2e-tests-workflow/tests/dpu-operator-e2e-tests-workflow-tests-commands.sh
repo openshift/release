@@ -16,10 +16,15 @@ wait_for_job_to_run() {
 	do
 		JSON_FILE=$(mktemp /tmp/pullnumber.XXX)
 		curl -k --resolve "$endpoint_resolve" -X GET $1/api/json > $JSON_FILE
-		blocked=$(cat $JSON_FILE | jq .blocked)
-		if [[ "$blocked" == "true" ]]; then
+		blocked=$(cat $JSON_FILE | jq .why)
+
+                if [[ "$blocked" != "null" && "$blocked" =~ ^\"(.*)\"$ ]]; then
+    			blocked="${BASH_REMATCH[1]}"
+                fi
+
+		if [[ "$blocked" == "Waiting for next available executor on "* ]]; then
 			echo "Job is blocked, waiting for job to start"
-		elif [[ "$blocked" == "false" ]]; then
+		elif [[ "$blocked" == "null" ]]; then
 			cat $JSON_FILE | jq -r .executable.url
 			break
 		else
@@ -53,7 +58,7 @@ wait_for_job_to_finish_running() {
 		if [[ "$result" != "null" ]]; then
 			# Job has completed
 			echo "Job Result: $result"
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
+			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "$1/consoleText")
 			echo "$curl_info"
 			if [ "$result" == "SUCCESS" ]; then
 				exit 0

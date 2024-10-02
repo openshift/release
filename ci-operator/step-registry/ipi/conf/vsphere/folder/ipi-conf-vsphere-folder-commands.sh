@@ -3,6 +3,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [[ ${FOLDER} == "" ]]; then
+  echo "FOLDER is not defined, skip config it"
+  exit 0
+fi
+
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare vsphere_datacenter
@@ -15,18 +20,22 @@ source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-FOLDER="/$vsphere_datacenter/vm/$vsphere_datacenter"
-SUB_FOLDER="$FOLDER/${NAMESPACE}-${UNIQUE_HASH}"
-
-if govc folder.info "$SUB_FOLDER"; then
-  echo "$SUB_FOLDER already exist, no need to create"
-else
-  if govc folder.info "$FOLDER"; then
-    echo "$FOLDER already exist, no need to create"
+if [ "${FOLDER}" == "default" ]; then
+  DC_FOLDER="/$vsphere_datacenter/vm/$vsphere_datacenter"
+  if govc folder.info "$DC_FOLDER"; then
+    echo "$DC_FOLDER already exist, no need to create"
   else
-    govc folder.create "$FOLDER"
+    govc folder.create "$DC_FOLDER"
   fi
-  govc folder.create "$SUB_FOLDER"
+  FOLDER_PATH="$DC_FOLDER/ci-${UNIQUE_HASH}-cluster"
+else
+  FOLDER_PATH="/$vsphere_datacenter/vm/$FOLDER"
+fi
+
+if govc folder.info "$FOLDER_PATH"; then
+  echo "$FOLDER_PATH already exist, no need to create"
+else
+  govc folder.create "$FOLDER_PATH"
 fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -37,7 +46,7 @@ platform:
   vsphere:
     failureDomains:
     - topology:
-        folder: "$SUB_FOLDER"
+        folder: "$FOLDER_PATH"
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"

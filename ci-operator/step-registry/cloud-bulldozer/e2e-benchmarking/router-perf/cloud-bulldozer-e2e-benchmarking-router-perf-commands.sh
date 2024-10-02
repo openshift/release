@@ -36,6 +36,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     ES_PASSWORD=$(cat "/secret/perfscale-prod/password")
     ES_USERNAME=$(cat "/secret/perfscale-prod/username")
     export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
+    export ES_SERVER_BASELINE="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
 
     ./ingress-performance.sh 
 else
