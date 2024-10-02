@@ -1,0 +1,43 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  observability-operator-test-harness:
+    name: observability-operator-test-harness
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coo-e2e
+  cron: 0 6 1 10 *
+  steps:
+    env:
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: rhobs-obo-test-harness
+    workflow: distributed-tracing-install-ibm-z
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator
+  variant: ocp-4.16-ibm-z-stage
