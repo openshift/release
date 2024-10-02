@@ -18,7 +18,7 @@ export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE NAME_SPACE_RBAC
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 NAME_SPACE="showcase-operator-nightly"
-NAME_SPACE_RBAC="showcase-operator-rbac-nightly"
+NAME_SPACE_RBAC="showcase-op-rbac-nightly"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
