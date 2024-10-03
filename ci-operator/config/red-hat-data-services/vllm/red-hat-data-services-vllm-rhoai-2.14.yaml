@@ -55,7 +55,7 @@ resources:
   vllm-build-main-cuda:
     limits:
       cpu: "16"
-      memory: 24Gi
+      memory: 50Gi
     requests:
       cpu: "16"
       memory: 24Gi
@@ -80,41 +80,7 @@ tests:
   container:
     clone: true
     from: vllm-build-release-cuda
-- as: cuda-pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-cuda
-    env:
-      IMAGE_REPO: vllm
-      RELEASE_VERSION: cuda-rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror
-- as: rocm-pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-rocm
-    env:
-      IMAGE_REPO: vllm
-      RELEASE_VERSION: rocm-rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror
-- as: cuda-stable-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-cuda
-    env:
-      IMAGE_REPO: vllm
-      RELEASE_VERSION: cuda-rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror
-- as: rocm-stable-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-rocm
-    env:
-      IMAGE_REPO: vllm
-      RELEASE_VERSION: rocm-rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror
-- as: release-image-mirror
+- as: image-mirror-cuda
   postsubmit: true
   steps:
     dependencies:
@@ -122,6 +88,25 @@ tests:
     env:
       IMAGE_REPO: vllm
       RELEASE_VERSION: rhoai-2.14
+    workflow: opendatahub-io-ci-image-mirror
+- as: image-mirror-cuda-1
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rhoai-2.14-cuda
+    workflow: opendatahub-io-ci-image-mirror
+- as: image-mirror-rocm
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-release-rocm
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: rhoai-2.14-rocm
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: rhoai-2.14
   org: red-hat-data-services
