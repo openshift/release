@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -24,7 +24,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   upi-installer:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -39,20 +39,20 @@ images:
   to: assisted-test-infra-internal
 promotion:
   to:
-  - name: ocm-2.8
+  - name: ocm-2.12
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.17"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -71,20 +71,21 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-unbinding-single-node
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-unbinding-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -98,7 +99,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         NUM_MASTERS=1
@@ -109,12 +110,12 @@ tests:
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: 30 05 * * 2
+  cron: 30 02 * * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         NUM_MASTERS=1
@@ -124,13 +125,14 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         ISO_IMAGE_TYPE=minimal-iso
@@ -138,13 +140,14 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv4
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv4
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         IPv4=true
@@ -152,13 +155,14 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv6
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv6
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         IPv6=true
@@ -166,13 +170,14 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-vsphere-assisted-kube-api
+- always_run: false
+  as: e2e-vsphere-assisted-kube-api
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         KUBE_API=true
         ENABLE_KUBE_API=true
         NUM_WORKERS=0
@@ -182,22 +187,14 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-metal-assisted-ipxe
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
-        IPXE_BOOT=true
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-reclaim-single-node
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         RECLAIM_HOSTS=true
         ENABLE_KUBE_API=true
         TEST_FUNC=test_late_binding_kube_api_sno
@@ -205,13 +202,14 @@ tests:
         MAKEFILE_TARGET=test
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-reclaim
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
+        SERVICE_BASE_REF=release-ocm-2.12
         RECLAIM_HOSTS=true
         ENABLE_KUBE_API=true
         TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
@@ -220,6 +218,6 @@ tests:
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
 zz_generated_metadata:
-  branch: release-ocm-2.8
+  branch: release-ocm-2.12
   org: openshift
   repo: assisted-test-infra
