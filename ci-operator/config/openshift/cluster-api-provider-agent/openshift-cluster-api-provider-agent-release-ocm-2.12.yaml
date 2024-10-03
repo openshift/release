@@ -1,30 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: ocm-2.8
+    tag: ocm-2.12
   assisted-service-scripts:
-    name: ocm-2.8
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -32,26 +32,26 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.13"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.20
 images:
 - dockerfile_path: Dockerfile
   to: cluster-api-provider-agent
 promotion:
   to:
-  - name: ocm-2.8
+  - name: ocm-2.12
     namespace: edge-infrastructure
 releases:
   latest:
     integration:
-      name: "4.13"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -67,7 +67,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-api-provider-agent
     env:
-      RELEASE_TAG_PREFIX: ocm-2.8
+      RELEASE_TAG_PREFIX: ocm-2.12
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -76,7 +76,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-api-provider-agent
     env:
-      RELEASE_TAG_PREFIX: ocm-2.8
+      RELEASE_TAG_PREFIX: ocm-2.12
     test:
     - ref: assisted-baremetal-images-publish
 - as: build
@@ -103,7 +103,7 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 22 * * 2
+  cron: 00 21 * * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -114,6 +114,6 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 zz_generated_metadata:
-  branch: release-ocm-2.8
+  branch: release-ocm-2.12
   org: openshift
   repo: cluster-api-provider-agent
