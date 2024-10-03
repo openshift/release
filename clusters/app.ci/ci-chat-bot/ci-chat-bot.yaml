@@ -270,6 +270,14 @@ spec:
           items:
             - key: rosa-admin-ocm
               path: rosa-admin-ocm
+      - name: dpcr
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: sa.ci-chat-bot-mce.dpcr.config
+              path: sa.ci-chat-bot-mce.dpcr.config
+            - key: sa.ci-chat-bot-mce.dpcr.token.txt
+              path: sa.ci-chat-bot-mce.dpcr.token.txt
       - name: runtimedir
         emptyDir: {}
       initContainers:
@@ -331,7 +339,10 @@ spec:
         - name: release
           mountPath: /var/repo
         - name: build-cluster-kubeconfigs
-          mountPath: /var/build-cluster-kubeconfigs
+          mountPath: /var/kubeconfigs/build-cluster
+          readOnly: true
+        - name: dpcr
+          mountPath: /var/kubeconfigs/dpcr
           readOnly: true
         - name: workflows-config
           mountPath: /etc/workflows-config
@@ -397,7 +408,7 @@ spec:
         - --github-endpoint=https://api.github.com
         - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
         - --workflow-config-path=/etc/workflows-config/workflows-config.yaml
-        - --kubeconfig-dir=/var/build-cluster-kubeconfigs
+        - --kubeconfig-dir=/var/kubeconfigs
         - --kubeconfig-suffix=.config
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --jira-endpoint=https://issues.redhat.com
