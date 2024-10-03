@@ -1,0 +1,46 @@
+base_images:
+  centos9:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.0
+  hypershift:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
+  os:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make production-install
+build_root:
+  from_repository: true
+images:
+- context_dir: images/ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
+  multi_arch: true
+  to: ci-operator
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1Gi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ci-tools
+  variant: ci-operator
