@@ -46,6 +46,6 @@ spec:
 EOF
 
 echo "⏳ Wait for DataScientCluster to be deployed"
-oc wait --for=jsonpath='{.status.phase}'=Ready datasciencecluster/${DSC_NAME} --timeout=6000s 
+oc wait --for=jsonpath='{.status.phase}'=Ready datasciencecluster/${DSC_NAME} --timeout=9000s 
 
 echo "OpenShfit AI Operator is deployed successfully"
