@@ -40,6 +40,9 @@ export LCA_IMAGE="${LCA_PULL_REF}"
 export SEED_VERSION="${SEED_VERSION}"
 export UPGRADE_TIMEOUT="60m"
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
+# Default capacity is 140GB and disk pressure is observed, which leads to pods
+# pending, both during installation and e2e tests.
+export DISK_GB=200
 
 # Sets oc and kubectl from the specified OCP release version.
 set_openshift_clients() {
