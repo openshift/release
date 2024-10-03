@@ -28,21 +28,18 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=udn-density-l3-pods
 
-# current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-
-# Run a non-indexed warmup for scheduling inconsistencies
-# ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # The measurable run
-export ITERATIONS=50
-export CHURN=false
+iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --iterations=50 --churn=false --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
