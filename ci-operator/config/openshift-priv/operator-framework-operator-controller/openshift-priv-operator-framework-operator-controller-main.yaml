@@ -50,12 +50,8 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: vet
-  commands: make vet
-  container:
-    from: src
-- as: fmt
-  commands: make fmt
+- as: verify
+  commands: make -C openshift verify
   container:
     from: src
 - as: verify-deps
@@ -66,20 +62,24 @@ tests:
     cd openshift && make verify-deps
   container:
     from: src
-- as: verify-manifests
-  commands: make -f openshift/Makefile verify-manifests
-  container:
-    from: src
 - as: verify-commits
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
 - as: openshift-e2e-aws-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS|PROJECT)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: upstream-e2e
+      commands: make -C openshift test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
