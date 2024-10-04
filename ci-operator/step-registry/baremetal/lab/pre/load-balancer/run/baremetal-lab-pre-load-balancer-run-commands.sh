@@ -65,13 +65,8 @@ podman run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
 
 echo "Setting the network interfaces in the HAProxy container"
 
-# For the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interfaces.
-# eth2 will only get local routes configuration
-if [ x"${DISCONNECTED}" != x"true" ]; then
-  devices=( eth1.br-ext eth2.br-int )
-else
-  devices=( eth1.br-int )
-fi
+devices=( eth1.br-ext eth2.br-int )
+
 echo "${devices[@]}"
 for dev in "${devices[@]}"; do
   interface=${dev%%.*}
