@@ -171,7 +171,11 @@ echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
   --root-volume-size 64 \
   --release-image "${RELEASE_IMAGE}" \
   --pull-secret "${PULL_SECRET_PATH}" \
-  --generate-ssh
+  --generate-ssh \
+  --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
+  --infra-availability-policy "${INFRA_AVAILABILITY}" \
+  --service-cidr 172.32.0.0/16 \
+  --cluster-cidr 10.136.0.0/14
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
