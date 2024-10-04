@@ -66,9 +66,11 @@ images:
   to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
     FROM registry.ci.openshift.org/ci/tests-private-base:4.18
     RUN mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
@@ -79,6 +81,9 @@ images:
     ci_tests-private-base_4.18:
       as:
       - registry.ci.openshift.org/ci/tests-private-base:4.18
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private-newpr
 - dockerfile_literal: |
     FROM bin
@@ -158,7 +163,7 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
+  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
   steps:
     cluster_profile: aws
     test:

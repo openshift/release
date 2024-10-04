@@ -4,12 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# ensure hostname can be found
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
-if [[ -z "${HOSTNAME}" ]]; then
-  echo "Couldn't retrieve hostname from lease config"
-  exit 1
-fi
+INSTALL_DIR=/tmp
 
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -25,12 +20,21 @@ function leaseLookup () {
   echo "$lookup"
 }
 
+# ensure hostname can be found
+HOSTNAME="$(leaseLookup 'hostname')"
+if [[ -z "${HOSTNAME}" ]]; then
+  echo "Couldn't retrieve hostname from lease config"
+  exit 1
+fi
+
 function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
-  cp /tmp/metadata.json ${SHARED_DIR}
-  cp /tmp/auth/kubeconfig ${SHARED_DIR}
-  cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
+  if [ -f ${INSTALL_DIR}/metadata.json ]; then
+    cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}
+  fi
+  cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}
+  cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}
 }
 
 function prepare_next_steps () {
@@ -42,8 +46,8 @@ function prepare_next_steps () {
   set +e
   echo "Setup phase finished, prepare env for next steps"
   # Password for the cluster gets leaked in the installer logs and hence removing them.
-  sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
-  cp /tmp/.openshift_install.log "${ARTIFACT_DIR}"/.openshift_install.log
+  sed -i 's/password: .*/password: REDACTED"/g' "${INSTALL_DIR}/.openshift_install.log"
+  cp "${INSTALL_DIR}/.openshift_install.log" "${ARTIFACT_DIR}"/.openshift_install.log
   save_credentials
   set -e
 }
@@ -56,13 +60,10 @@ fi
 # download the correct openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
-  --command=openshift-install --to=/tmp
+  --command=openshift-install --to="${INSTALL_DIR}"
 
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-OCPINSTALL='/tmp/openshift-install'
-RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
-QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
@@ -81,91 +82,225 @@ else
   ${VIRSH} pool-start ${POOL_NAME}
 fi
 
-# Check if we need to update the source volume
-CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
-if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
-  # Delete the old source volume
-  if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
-    echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
-    ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
-  fi
-
-  # Download the new rhcos image
-  echo "Downloading new rhcos image..."
-  curl -L "${QCOW_URL}" | gunzip -c > /tmp/${VOLUME_NAME} || true
-
-  # Resize the rhcos image to match the volume capacity
-  echo "Resizing rhcos image to match volume capacity..."
-  qemu-img resize /tmp/${VOLUME_NAME} ${VOLUME_CAPACITY}
-
-  # Create the new source volume
-  echo "Creating source volume..."
-  ${VIRSH} vol-create-as \
-    --name ${VOLUME_NAME} \
-    --pool ${POOL_NAME} \
-    --format qcow2 \
-    --capacity ${VOLUME_CAPACITY}
-
-  # Upload the rhcos image to the source volume
-  echo "Uploading rhcos image to source volume..."
-  ${VIRSH} vol-upload \
-    --vol ${VOLUME_NAME} \
-    --pool ${POOL_NAME} \
-    /tmp/${VOLUME_NAME}
-fi
-
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
-cp ${SHARED_DIR}/install-config.yaml /tmp
+cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
 
-# Generate manifests for cluster modifications
-echo "Generating manifests..."
-${OCPINSTALL} create manifests --dir /tmp
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
+  save_credentials
+
+  # These vars are used for local look-ups only
+  BOOT_ARTIFACTS_LOCAL_DIR="${INSTALL_DIR}/boot-artifacts"
+  BOOT_ARTIFACTS_POOL_NAME=${POOL_NAME}
+  INITRD=agent.${ARCH}-initrd.img
+  ROOTFS=agent.${ARCH}-rootfs.img
+
+  # These vars are exported since we will used them in the domain.xml creation
+  export KERNEL_NAME="${LEASED_RESOURCE}-kernel"
+  export INITRD_NAME="${LEASED_RESOURCE}-initrd"
+  export ROOTFS_NAME="${LEASED_RESOURCE}-rootfs"
+  export BOOT_ARTIFACTS_PATH="${LIBVIRT_IMAGE_PATH}"
+
+  # The name of the kernel artifact depends on the arch
+  if [ "$ARCH" == "s390x" ]; then
+    KERNEL="agent.${ARCH}-kernel.img"
+    
+    # Merge the initrds together and rename them so they can be found on the remote host; for some reason, order matters when catting these together
+    cat "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD}" > "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}"
+  elif [ "$ARCH" == "ppc64le" ]; then
+    KERNEL="agent.${ARCH}-vmlinuz"
+
+    # Renamed the initrd so we can find it on the remote host
+    mv "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}"
+  else
+    echo "Unrecognized architecture: $ARCH"
+    exit 1
+  fi
+
+  # Rename kernel and rootfs so we can find them on the remote host
+  mv "${BOOT_ARTIFACTS_LOCAL_DIR}/${KERNEL}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${KERNEL_NAME}"
+  mv "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS_NAME}"
+
+  # Show all created boot artifacts  
+  ls -l ${BOOT_ARTIFACTS_LOCAL_DIR}
+
+  if [[ ! -f "${BOOT_ARTIFACTS_LOCAL_DIR}/${KERNEL_NAME}" ]]; then
+      echo "Agent installer couldn't create kernel image, exiting."
+      exit 1
+  fi
+  if [[ ! -f "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}" ]]; then
+      echo "Agent installer couldn't create combined rootfs and initrd image, exiting."
+      exit 1
+  fi
+
+  # Upload the kernel to remote host
+  ${VIRSH} vol-delete ${KERNEL_NAME} --pool ${BOOT_ARTIFACTS_POOL_NAME} || true
+  ${VIRSH} vol-create-as \
+      --name ${KERNEL_NAME} \
+      --pool ${BOOT_ARTIFACTS_POOL_NAME} \
+      --format raw \
+      --capacity "$(wc -c < ${BOOT_ARTIFACTS_LOCAL_DIR}/${KERNEL_NAME})"
+  ${VIRSH} vol-upload \
+      --vol ${KERNEL_NAME} \
+      --pool ${BOOT_ARTIFACTS_POOL_NAME} \
+      --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${KERNEL_NAME}
+
+  # Upload the initrd to remote host
+  ${VIRSH} vol-delete ${INITRD_NAME} --pool ${BOOT_ARTIFACTS_POOL_NAME} || true
+  ${VIRSH} vol-create-as \
+      --name ${INITRD_NAME} \
+      --pool ${BOOT_ARTIFACTS_POOL_NAME} \
+      --format raw \
+      --capacity "$(wc -c < ${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME})"
+  ${VIRSH} vol-upload \
+      --vol ${INITRD_NAME} \
+      --pool ${BOOT_ARTIFACTS_POOL_NAME} \
+      --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}
+
+
+  # On power, the rootfs needs to be staged for download via apache
+  if [ "$ARCH" == "ppc64le" ]; then
+      cat << EOF > ${INSTALL_DIR}/rootfs.xml
+<volume>
+  <name>${ROOTFS_NAME}</name>
+  <capacity unit="bytes">$(wc -c < ${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS_NAME})</capacity>
+  <target>
+    <path>${ROOTFS_NAME}</path>
+    <permissions>
+      <mode>0644</mode>
+      <owner>0</owner>
+      <group>0</group>
+      <label>system_u:object_r:virt_image_t:s0</label>
+    </permissions>
+  </target>
+</volume>
+EOF
+
+      # The rootfs is created via xml because the CLI options don't allow us to specify the permissions mode
+      cat ${INSTALL_DIR}/rootfs.xml
+      
+      echo "Uploading rootfs..."
+      ${VIRSH} vol-delete ${ROOTFS_NAME} --pool ${HTTPD_POOL_NAME} || true
+      ${VIRSH} vol-create --file ${INSTALL_DIR}/rootfs.xml --pool ${HTTPD_POOL_NAME}
+      ${VIRSH} vol-upload \
+        --vol ${ROOTFS_NAME} \
+        --pool ${HTTPD_POOL_NAME} \
+        --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS_NAME}
+  fi
+
+  # Generate manifests for cluster modifications
+  echo "Generating manifests..."
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" agent create cluster-manifests
+
+else
+  RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
+  QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
+  VOLUME_NAME="rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+
+  # Check if we need to update the source volume
+  CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
+  if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
+    # Delete the old source volume
+    if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
+      echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
+      ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
+    fi
+
+    # Download the new rhcos image
+    echo "Downloading new rhcos image..."
+    curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
+
+    # Resize the rhcos image to match the volume capacity
+    echo "Resizing rhcos image to match volume capacity..."
+    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+
+    # Create the new source volume
+    echo "Creating source volume..."
+    ${VIRSH} vol-create-as \
+      --name ${VOLUME_NAME} \
+      --pool ${POOL_NAME} \
+      --format qcow2 \
+      --capacity ${VOLUME_CAPACITY}
+
+    # Upload the rhcos image to the source volume
+    echo "Uploading rhcos image to source volume..."
+    ${VIRSH} vol-upload \
+      --vol ${VOLUME_NAME} \
+      --pool ${POOL_NAME} \
+      ${INSTALL_DIR}/${VOLUME_NAME}
+  fi
+
+  # Generate manifests for cluster modifications
+  echo "Generating manifests..."
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" create manifests
+fi
 
 # Check for the node tuning yaml config, and save it in the installation directory
 NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
 if [ -f "${NODE_TUNING_YAML}" ]; then
   echo "Saving ${NODE_TUNING_YAML} to the install directory..."
-  cp ${NODE_TUNING_YAML} /tmp/manifests
+  cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then
   echo "Saving ${ETCD_RAMDISK_YAML} to the install directory..."
-  cp ${ETCD_RAMDISK_YAML} /tmp/manifests
+  cp ${ETCD_RAMDISK_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for static pod controller degraded yaml config, and save it in the installation directory
 STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
 if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   echo "Saving ${STATIC_POD_DEGRADED_YAML} to the install directory..."
-  cp ${STATIC_POD_DEGRADED_YAML} /tmp/manifests
+  cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
-# Generating ignition configs
-echo "Generating ignition configs..."
-${OCPINSTALL} create ignition-configs --dir /tmp
+if [ "$INSTALLER_TYPE" == "default" ]; then
+  # Generating ignition configs
+  echo "Generating ignition configs..."
+  ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}
 
+  # Create ignition volumes and upload the ignition configs
+  for IGNITION_TYPE in bootstrap master worker; do
+    NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
+
+    echo "Creating ${IGNITION_TYPE} ignition volume..."
+    ${VIRSH} vol-create-as \
+      --name ${NAME} \
+      --pool ${POOL_NAME} \
+      --format raw \
+      --capacity 1M
+
+    echo "Uploading ${IGNITION_TYPE}.ign to ${NAME} volume..."
+    ${VIRSH} vol-upload \
+      --vol ${NAME} \
+      --pool ${POOL_NAME} \
+      ${INSTALL_DIR}/${IGNITION_TYPE}.ign
+  done
+fi
+
+# Save credentials now that we've finished the install pre-requisites.
 save_credentials
 
-# Create ignition volumes and upload the ignition configs
-for IGNITION_TYPE in bootstrap master worker; do
-  NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
-
-  echo "Creating ${IGNITION_TYPE} ignition volume..."
-  ${VIRSH} vol-create-as \
-    --name ${NAME} \
-    --pool ${POOL_NAME} \
-    --format raw \
-    --capacity 1M
-
-  echo "Uploading ${IGNITION_TYPE}.ign to ${NAME} volume..."
-  ${VIRSH} vol-upload \
-    --vol ${NAME} \
-    --pool ${POOL_NAME} \
-    /tmp/${IGNITION_TYPE}.ign
-done
+restart_nodes () {
+  echo "Starting node monitor to restart nodes post-install."
+  GUESTS_RESTARTED=0
+  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0}))
+  while [ $GUESTS_RESTARTED -lt $TOTAL_GUESTS ]
+  do
+     INSTALLED=$(${VIRSH} list --all | grep "${LEASED_RESOURCE}" | grep "shut off" | awk -F' ' '{print $2}' || true)
+     for i in $INSTALLED; do
+       GUESTS_RESTARTED=$(($GUESTS_RESTARTED + 1))
+       ${VIRSH} start $i
+       echo "Restarted ${GUESTS_RESTARTED}/${TOTAL_GUESTS}"
+     done
+     sleep 30s
+  done
+  echo "Restarted all nodes after initial boot"
+}
 
 clone_volume () {
   if [ -z $1 ]; then
@@ -180,8 +315,8 @@ clone_volume () {
     --newname ${1}
 }
 
-create_vm () {
-  # 1 = vm name, 2 = mac address, 3 = ignition config type
+create_node () {
+  # 1 = node name, 2 = mac address, 3 = ignition config type
   if [[ -z ${1} || -z ${2} || -z ${3} ]]; then
     echo "Domain Name, MAC Address, or Ignition Type not specified..."
     echo "Domain Name: $1"
@@ -194,35 +329,90 @@ create_vm () {
   MAC_ADDRESS=${2}
   IGNITION_VOLUME=${LEASED_RESOURCE}-${3}-ignition-volume
 
-  echo "Creating ${NAME} vm..."
-  virt-install \
-    --connect ${LIBVIRT_CONNECTION} \
-    --name ${NAME} \
-    --memory ${DOMAIN_MEMORY} \
-    --vcpus ${DOMAIN_VCPUS} \
-    --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
-    --disk="vol=${POOL_NAME}/${NAME}-volume" \
-    --osinfo ${VIRT_INSTALL_OSINFO} \
-    --graphics=none \
-    --import \
-    --noautoconsole \
-    --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+  if [ "$INSTALLER_TYPE" == "agent" ]; then
+    # Calculate the last dynamic vars
+    DOMAIN_UUID="$(uuidgen)"
+    EXTRA_ARGS="rw rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal"
+
+    if [[ "$ARCH" == "ppc64le" ]]; then
+      HTTPD_PORT="$(leaseLookup 'httpd-port')"
+      EXTRA_ARGS="${EXTRA_ARGS} coreos.live.rootfs_url=http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME}"
+    fi
+
+    # Boot artifacts names/paths were exported above upon creation
+    # Now create a VM based on the domain template
+    echo "Exporting the variables needed to fill out the lease-based domain template"
+    export DOMAIN_NAME="${NAME}"
+    export DOMAIN_UUID
+    export DOMAIN_VCPUS=${DOMAIN_VCPUS}
+    export DOMAIN_MEMORY=${DOMAIN_MEMORY}
+    export DOMAIN_MAC="${MAC_ADDRESS}"
+    export QCOW_PATH="${LIBVIRT_IMAGE_PATH}"
+    export QCOW_NAME="${DOMAIN_NAME}.qcow2"
+    export NETWORK_NAME="${CLUSTER_NAME}"
+    export EXTRA_ARGS
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-install-template.xml > ${INSTALL_DIR}/"${NAME}-install.xml"
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-template.xml > ${INSTALL_DIR}/"${NAME}.xml"
+
+    echo "Prepared libvirt domain direct kernel boot into RAM for install xml:"
+    cat ${INSTALL_DIR}/"${NAME}-install.xml"
+    echo ""
+
+    echo "Prepared libvirt domain booting to a written disk xml:"
+    cat ${INSTALL_DIR}/"${NAME}.xml"
+    echo ""
+
+    # Create the volume used as the base for the image
+    ${VIRSH} vol-delete ${QCOW_NAME} --pool ${POOL_NAME} || true
+    ${VIRSH} vol-create-as \
+     --name ${QCOW_NAME} \
+     --pool ${POOL_NAME} \
+     --format qcow2 \
+     --capacity ${VOLUME_CAPACITY}
+
+    # Start the domain
+    ${VIRSH} define ${INSTALL_DIR}/"${NAME}-install.xml"
+    ${VIRSH} start "${DOMAIN_NAME}"
+    ${VIRSH} autostart "${DOMAIN_NAME}"
+
+    # Redefine the domain so it reboots to disk instead of memory.
+    # Rebooting to disk is done manually via restart_nodes below.
+    ${VIRSH} define ${INSTALL_DIR}/"${NAME}.xml"
+
+  else
+    # Pre-create the disk volume
+    clone_volume ${NAME}-volume
+
+    echo "Creating ${NAME} vm..."
+    virt-install \
+      --connect ${LIBVIRT_CONNECTION} \
+      --name ${NAME} \
+      --memory ${DOMAIN_MEMORY} \
+      --vcpus ${DOMAIN_VCPUS} \
+      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+      --disk="vol=${POOL_NAME}/${NAME}-volume" \
+      --osinfo ${VIRT_INSTALL_OSINFO} \
+      --graphics=none \
+      --import \
+      --noautoconsole \
+      --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+  fi
 }
 
-# Create the bootstrap node.
-NODE="${LEASED_RESOURCE}-bootstrap"
-echo "Creating ${NODE} node..."
-MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
-clone_volume ${NODE}-volume
-create_vm ${NODE} ${MAC_ADDRESS} bootstrap
+if [ "$INSTALLER_TYPE" == "default" ]; then
+  # Create the bootstrap node.
+  NODE="${LEASED_RESOURCE}-bootstrap"
+  echo "Creating ${NODE} node..."
+  MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
+  create_node ${NODE} ${MAC_ADDRESS} bootstrap
+fi
 
 # Create the control plane nodes.
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-control-${i}"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
-  clone_volume ${NODE}-volume
-  create_vm ${NODE} ${MAC_ADDRESS} master
+  create_node ${NODE} ${MAC_ADDRESS} master
 done
 
 # Create the compute nodes.
@@ -230,44 +420,56 @@ for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-compute-${i}"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
-  clone_volume ${NODE}-volume
-  create_vm ${NODE} ${MAC_ADDRESS} worker
+  create_node ${NODE} ${MAC_ADDRESS} worker
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
-${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  restart_nodes &
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
+else
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
+fi
+
 wait "$!"
 
-# Sleep between destroy and undefine to allow for a slight destroy lag
-echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
-${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
-sleep 1s
-${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
+if [ "$INSTALLER_TYPE" == "default" ]; then
+  # Sleep between destroy and undefine to allow for a slight destroy lag
+  echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
+  ${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
+  sleep 1s
+  ${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
 
-echo "Approving pending CSRs..."
-approve_csrs () {
-  oc version --client
-  while true; do
-    if [[ ! -f /tmp/install-complete ]]; then
-      # even if oc get csr fails continue
-      oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
-      sleep 15 & wait
-      continue
-    else
-      break
-    fi
-  done
-}
-approve_csrs &
+  echo "Approving pending CSRs..."
+  approve_csrs () {
+    oc version --client
+    while true; do
+      if [[ ! -f ${INSTALL_DIR}/install-complete ]]; then
+        # even if oc get csr fails continue
+        oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+        sleep 15 & wait
+        continue
+      else
+        break
+      fi
+    done
+  }
+  approve_csrs &
+fi
 
 # Add a small buffer before waiting for install completion
 sleep 5m
 
 set +x
 echo "Completing UPI setup..."
-${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  ${OCPINSTALL} --dir="${INSTALL_DIR}" agent wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+else
+  ${OCPINSTALL} --dir="${INSTALL_DIR}" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+fi
 wait "$!"
+save_credentials
 
 # Check for image registry availability
 for i in {1..10}; do
@@ -313,4 +515,4 @@ fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-touch /tmp/install-complete
+touch ${INSTALL_DIR}/install-complete

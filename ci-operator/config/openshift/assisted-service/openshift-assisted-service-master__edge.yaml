@@ -1,30 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cluster-api-provider-agent:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   dev-scripts:
@@ -32,9 +32,9 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   postgresql-12-c8s:
     name: postgresql
     namespace: ci
@@ -139,7 +139,7 @@ operator:
     with: postgresql-12-c8s
 promotion:
   to:
-  - name: ocm-2.12
+  - name: ocm-2.13
     namespace: edge-infrastructure
 releases:
   latest:
@@ -346,7 +346,7 @@ tests:
         make ci-deploy-for-subsystem
         oc get pods
         make enable-kube-api-for-subsystem
-        make test-kube-api
+        make subsystem-test-kube-api
       dependencies:
       - env: SERVICE
         name: assisted-service
@@ -382,7 +382,7 @@ tests:
         make ci-deploy-for-subsystem
         oc get pods
         make enable-kube-api-for-subsystem
-        make test-kube-api
+        make subsystem-test-kube-api
       dependencies:
       - env: SERVICE
         name: assisted-service
@@ -1389,6 +1389,50 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-5-control-planes-4-17
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=5
+        NUM_WORKERS=0
+        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-5-control-planes-4-18
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=5
+        NUM_WORKERS=0
+        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-control-planes-4-17
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=4
+        NUM_WORKERS=1
+        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-control-planes-4-18
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=4
+        NUM_WORKERS=1
+        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

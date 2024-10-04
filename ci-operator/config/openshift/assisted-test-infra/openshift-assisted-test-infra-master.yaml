@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -63,7 +63,7 @@ images:
   to: assisted-test-infra-internal
 promotion:
   to:
-  - name: ocm-2.12
+  - name: ocm-2.13
     namespace: edge-infrastructure
 releases:
   latest:
@@ -111,11 +111,14 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-periodic
   cron: 30 01 * * 0-5
   steps:
     cluster_profile: packet-assisted
+    env:
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-tpmv2
@@ -203,6 +206,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-15-periodic
   cron: 30 05 * * 0-5
@@ -213,6 +217,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-15
@@ -234,6 +239,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
@@ -282,6 +288,7 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-lvm
@@ -309,6 +316,7 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-odf-4-16
@@ -369,6 +377,7 @@ tests:
         OPENSHIFT_VERSION=4.16
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce-periodic
   cron: 30 09 * * 0-5
@@ -409,6 +418,7 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
+      TEST_TYPE: minimal
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-periodic
   cron: 30 11 * * 0-5
@@ -417,6 +427,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
+      TEST_TYPE: minimal
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -483,6 +494,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-none
   optional: true
@@ -500,6 +512,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-external
@@ -529,6 +542,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-single-node
@@ -546,6 +560,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -576,6 +591,7 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api
@@ -645,6 +661,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-periodic
   cron: 30 19 * * 0-5
@@ -653,6 +670,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-4-14-periodic
   cron: 30 20 * * 0
@@ -666,6 +684,7 @@ tests:
         TEST_FUNC=test_networking
         OPENSHIFT_VERSION=4.14
       PACKET_PLAN: m3.large.x86
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-4-14-periodic
   cron: 30 21 * * 0
@@ -679,6 +698,7 @@ tests:
         TEST_FUNC=test_networking
         OPENSHIFT_VERSION=4.14
       PACKET_PLAN: m3.large.x86
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-static-ip-suite-4-14
@@ -854,6 +874,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IPXE_BOOT=true
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-vsphere-assisted-umn
@@ -885,6 +906,7 @@ tests:
       ASSISTED_CONFIG: |
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
+      TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-nutanix-assisted
