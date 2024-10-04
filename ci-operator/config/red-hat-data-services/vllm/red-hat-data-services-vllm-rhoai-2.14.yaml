@@ -17,7 +17,7 @@ images:
     value: "3.12"
   context_dir: .
   dockerfile_path: Dockerfile.ubi
-  to: vllm-build-release-cuda
+  to: vllm-build-release-cuda-rhoai-2.14
 - build_args:
   - name: max_jobs
     value: "6"
@@ -27,7 +27,7 @@ images:
     value: "3.12"
   context_dir: .
   dockerfile_path: Dockerfile.rocm.ubi
-  to: vllm-build-release-rocm
+  to: vllm-build-release-rocm-rhoai-2.14
 promotion:
   to:
   - namespace: red-hat-data-services
@@ -43,23 +43,14 @@ resources:
     requests:
       cpu: 200m
       memory: 200Mi
-  smoke-test:
-    limits:
-      cpu: "4"
-      memory: 24Gi
-      nvidia.com/gpu: "1"
-    requests:
-      cpu: "4"
-      memory: 8Gi
-      nvidia.com/gpu: "1"
-  vllm-build-main-cuda:
+  vllm-build-release-cuda-rhoai-2.14:
     limits:
       cpu: "16"
       memory: 50Gi
     requests:
       cpu: "16"
       memory: 24Gi
-  vllm-build-main-rocm:
+  vllm-build-release-rocm-rhoai-2.14:
     limits:
       cpu: "16"
       memory: 35Gi
@@ -67,46 +58,24 @@ resources:
       cpu: "16"
       memory: 35Gi
 tests:
-- always_run: true
-  as: smoke-test
-  cluster: build05
-  commands: |
-    export VIRTUAL_ENV=/opt/vllm
-    export PATH=$VIRTUAL_ENV/bin/:$PATH
-
-    cd extras
-
-    bash smoke-test.sh
-  container:
-    clone: true
-    from: vllm-build-release-cuda
-- as: image-mirror-cuda
+- as: stable-cuda-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-cuda
-    env:
-      IMAGE_REPO: vllm
-      RELEASE_VERSION: rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror
-- as: image-mirror-cuda-1
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-cuda
+      SOURCE_IMAGE_REF: vllm-build-release-cuda-rhoai-2.14
     env:
       IMAGE_REPO: vllm
       RELEASE_VERSION: rhoai-2.14-cuda
-    workflow: opendatahub-io-ci-image-mirror
-- as: image-mirror-rocm
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-rocm-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-build-release-rocm
+      SOURCE_IMAGE_REF: vllm-build-release-rocm-rhoai-2.14
     env:
       IMAGE_REPO: vllm
       RELEASE_VERSION: rhoai-2.14-rocm
-    workflow: opendatahub-io-ci-image-mirror
+    workflow: red-hat-data-services-ci-image-mirror
 zz_generated_metadata:
   branch: rhoai-2.14
   org: red-hat-data-services
