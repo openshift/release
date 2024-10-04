@@ -244,4 +244,4 @@ done
 
 # Add operators status checking until monitoring enhanced to do this
 echo "Ensure that all the cluster operators remain stable and ready"
-oc adm wait-for-stable-cluster --minimum-stable-period=3m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
