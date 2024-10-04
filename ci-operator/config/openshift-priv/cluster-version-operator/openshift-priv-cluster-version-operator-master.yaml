@@ -119,6 +119,38 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-agnostic-operator-techpreview
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-into-change-techpreview
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-upgrade-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: master
   org: openshift-priv
