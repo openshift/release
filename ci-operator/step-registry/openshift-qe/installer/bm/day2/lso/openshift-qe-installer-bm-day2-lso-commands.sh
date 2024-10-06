@@ -73,7 +73,7 @@ sleep 60
 
 # Node labeling
 for i in $(oc get node -l node-role.kubernetes.io/worker -oname | grep -oP "^node/\K.*"); do
-  oc label node $i openshift-storage='' --overwrite
+  oc label node $i cluster.ocs.openshift.io/openshift-storage='' --overwrite
 done
 
 # Auto Discovering Devices and creating Persistent Volumes
