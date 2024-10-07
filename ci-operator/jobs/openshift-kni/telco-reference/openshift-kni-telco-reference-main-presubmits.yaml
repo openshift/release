@@ -1,27 +1,27 @@
 presubmits:
-  red-hat-data-services/vllm:
+  openshift-kni/telco-reference:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^rhoai-2\.14$
-    - ^rhoai-2\.14-
-    cluster: build03
-    context: ci/prow/images
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/lintcheck
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-data-services-vllm-rhoai-2.14-images
-    rerun_command: /test images
+    name: pull-ci-openshift-kni-telco-reference-main-lintcheck
+    rerun_command: /test lintcheck
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=lintcheck
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,4 +54,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )lintcheck,?($|\s.*)
