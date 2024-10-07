@@ -1,18 +1,19 @@
 postsubmits:
-  red-hat-data-services/vllm:
+  openshift/hive:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^rhoai-2\.14$
-    cluster: build03
+    - ^mce-2\.7$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
     max_concurrency: 1
-    name: branch-ci-red-hat-data-services-vllm-rhoai-2.14-images
+    name: branch-ci-openshift-hive-mce-2.7-images
     spec:
       containers:
       - args:
@@ -63,23 +64,24 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^rhoai-2\.14$
-    cluster: build03
+    - ^mce-2\.7$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
     max_concurrency: 1
-    name: branch-ci-red-hat-data-services-vllm-rhoai-2.14-stable-cuda-image-mirror
+    name: branch-ci-openshift-hive-mce-2.7-publish-coverage
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=stable-cuda-image-mirror
+        - --secret-dir=/secrets/hive-codecov-token
+        - --target=publish-coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -89,11 +91,11 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-codecov-token
+          name: hive-codecov-token
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -106,67 +108,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
+      - name: hive-codecov-token
         secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^rhoai-2\.14$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-red-hat-data-services-vllm-rhoai-2.14-stable-rocm-image-mirror
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=stable-rocm-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
+          secretName: hive-codecov-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
