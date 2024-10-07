@@ -1056,6 +1056,24 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-cnv-4-16
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=18700
+        MASTER_CPU=9
+        WORKER_MEMORY=9216
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=5
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-4-17
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -1086,6 +1104,19 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-odf-4-16
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-4-17
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
