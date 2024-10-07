@@ -3,10 +3,6 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
-  ci_nginx-unprivileged_stable:
-    name: nginx-unprivileged
-    namespace: ci
-    tag: stable
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -63,12 +59,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
-- context_dir: images/gh-pull-through-cache/
+- context_dir: images/check-cluster-profiles-config/
+  from: os
   inputs:
-    ci_nginx-unprivileged_stable:
-      as:
-      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
-  to: gh-pull-through-cache
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-cluster-profiles-config
+  to: check-cluster-profiles-config
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
   from: os
   inputs:
@@ -89,14 +87,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/cvp-trigger
   to: cvp-trigger
-- context_dir: images/template-deprecator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
-  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -142,6 +132,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-operator-checkconfig
+  multi_arch: true
   to: ci-operator-checkconfig
 - context_dir: images/bugzilla-backporter/
   from: os
@@ -158,6 +149,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-operator-prowgen
+  multi_arch: true
   to: ci-operator-prowgen
 - context_dir: images/sanitize-prow-jobs/
   from: os
@@ -166,6 +158,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/sanitize-prow-jobs
+  multi_arch: true
   to: sanitize-prow-jobs
 - context_dir: images/pj-rehearse/
   from: os
@@ -192,6 +185,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/config-brancher
+  multi_arch: true
   to: config-brancher
 - context_dir: images/dptp-controller-manager
   from: os
@@ -223,6 +217,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/promoted-image-governor
+  multi_arch: true
   to: promoted-image-governor
 - dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -271,8 +266,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
       - destination_dir: .
-        source_path: /go/bin/template-deprecator
-      - destination_dir: .
         source_path: /go/bin/determinize-prow-config
       - destination_dir: .
         source_path: /go/bin/registry-replacer
@@ -292,6 +285,7 @@ images:
         source_path: /go/bin/prow-job-dispatcher
       - destination_dir: .
         source_path: /go/bin/sanitize-prow-jobs
+  multi_arch: true
   to: prow-job-dispatcher
 - context_dir: images/autotestgridgenerator/
   from: os
@@ -318,6 +312,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/determinize-ci-operator
+  multi_arch: true
   to: determinize-ci-operator
 - context_dir: images/determinize-peribolos/
   from: os
@@ -336,6 +331,7 @@ images:
         source_path: /go/bin/applyconfig
       - destination_dir: usr/bin
         source_path: /usr/local/bin/oc
+  multi_arch: true
   to: applyconfig
 - context_dir: images/autoowners
   from: os
@@ -368,6 +364,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/entrypoint-wrapper
+  multi_arch: true
   to: entrypoint-wrapper
 - context_dir: images/ci-operator-configresolver
   from: centos9
@@ -384,6 +381,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
+  multi_arch: true
   to: determinize-prow-config
 - context_dir: images/tide-config-manager
   from: os
@@ -392,6 +390,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/tide-config-manager
+  multi_arch: true
   to: tide-config-manager
 - context_dir: images/repo-init
   from: os
@@ -406,6 +405,7 @@ images:
         source_path: /go/bin/ci-operator-prowgen
       - destination_dir: .
         source_path: /go/bin/ci-operator-checkconfig
+  multi_arch: true
   to: repo-init
 - context_dir: images/private-org-sync/
   from: os
@@ -490,6 +490,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/generate-registry-metadata
+  multi_arch: true
   to: generate-registry-metadata
 - context_dir: images/publicize/
   from: os
@@ -567,6 +568,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/cluster-init
+  multi_arch: true
   to: cluster-init
 - dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -759,30 +761,30 @@ promotion:
 resources:
   '*':
     requests:
-      cpu: 500m
-      memory: 600Mi
+      cpu: "1"
+      memory: 1Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
+  cluster: build11
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
   node_architecture: arm64
 - as: codegen
-  cluster: build10
+  cluster: build11
   commands: make verify-gen
   container:
     from: src
   node_architecture: arm64
 - as: format
-  cluster: build10
+  cluster: build11
   commands: make format
   container:
     from: src
   node_architecture: arm64
 - as: integration
-  cluster: build10
+  cluster: build11
   commands: make integration
   container:
     from: test-bin
@@ -859,7 +861,7 @@ tests:
     test:
     - as: e2e-oo-post
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -876,32 +878,48 @@ tests:
       - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        namespace: test-credentials
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
+  cluster: build11
   node_architecture: arm64
   optional: true
+  steps:
+    test:
+    - as: breaking-changes
+      commands: |
+        export KUBECONFIG_DIR=/etc/kubeconfigs
+        export KUBECONFIG_SUFFIX=config
+        make check-breaking-changes
+      credentials:
+      - mount_path: /etc/kubeconfigs
+        name: cluster-init
+        namespace: ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
-  cluster: build10
+  cluster: build11
   commands: make validate-checkconfig
   container:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
+  cluster: build11
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
+  cluster: build11
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin

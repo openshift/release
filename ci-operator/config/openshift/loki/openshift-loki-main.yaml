@@ -1,20 +1,20 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
   loki-tag:
-    name: v3.1.0
+    name: v3.2.0
     namespace: logging
     tag: loki
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
     tag: lokistack-gateway
-  ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
   opa-openshift:
     name: mirror-5.y
     namespace: logging
@@ -23,27 +23,15 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  multi_arch: true
-  to: loki
-- dockerfile_path: Dockerfile.promtail.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: promtail
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
-  multi_arch: true
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+      as:
+      - golang:1.22.6
   to: loki-operator
 operator:
   bundles:
@@ -53,7 +41,7 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v3.1.0
+  - pullspec: quay.io/openshift-logging/loki:v3.2.0
     with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
@@ -69,7 +57,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -132,11 +120,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-east-1
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle

@@ -61,6 +61,10 @@ oc label ns cilium-test \
     pod-security.kubernetes.io/warn=privileged \
     --overwrite
 
+# Run the test
 oc apply -n cilium-test -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/connectivity-check/connectivity-check.yaml"
 oc wait --for=condition=Ready pod -n cilium-test --all --timeout=5m
 sleep "$CILIUM_CONNECTIVITY_TEST_DURATION"
+
+# Error out in case of failing pods
+oc wait --for jsonpath="{status.phase}"=Running pods -n cilium-test --all --timeout=5s

@@ -5,6 +5,35 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/check-cluster-profiles-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-cluster-profiles-config
+    optional: true
+    rerun_command: /test check-cluster-profiles-config
+    run_if_changed: ^ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml$
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --config-path=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        command:
+        - check-cluster-profiles-config
+        image: registry.ci.openshift.org/ci/check-cluster-profiles-config:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: check-cluster-profiles
+    trigger: (?m)^/test( | .* )check-cluster-profiles-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/prow/check-gh-automation
     decorate: true
@@ -132,6 +161,43 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/image-mirroring-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ci-image-mirroring-config-validation
+    rerun_command: /test image-mirroring-config-validation
+    run_if_changed: ^core-services/image-mirroring/_config.yaml
+    spec:
+      containers:
+      - args:
+        - --release-repo-git-sync-path=.
+        - --registry-config=/etc/pull/.dockerconfigjson
+        - --config=./core-services/image-mirroring/_config.yaml
+        - --validate-config-only=true
+        command:
+        - /bin/ci-images-mirror
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        volumeMounts:
+        - mountPath: /etc/pull
+          name: pull-credentials
+          readOnly: true
+      volumes:
+      - name: pull-credentials
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )image-mirroring-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/prow/ci-secret-bootstrap-config-validation
     decorate: true
@@ -249,7 +315,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20240806-cf1982e
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20240926-c51c4d9
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -280,31 +346,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/build-clusters
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-clusters
-    rerun_command: /test build-clusters
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-ci-build-clusters.sh
-        image: registry.ci.openshift.org/ci/cluster-init:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: ((?m)^/test build-clusters,?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -683,6 +724,60 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build11-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build11
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build11-dry
+    rerun_command: /test build11-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build11
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build11_id
+          valueFrom:
+            secretKeyRef:
+              key: build11-id
+              name: build11-dex-oidc
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build11.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build11-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build03
     context: ci/prow/ci-operator-config
     decorate: true
@@ -842,7 +937,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20240805-37a08f946
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20241002-8442fff47
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -912,31 +1007,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )core-valid,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/deprecate-templates
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-deprecate-templates
-    rerun_command: /test deprecate-templates
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-template-deprecation.sh
-        image: registry.ci.openshift.org/ci/template-deprecator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )deprecate-templates,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

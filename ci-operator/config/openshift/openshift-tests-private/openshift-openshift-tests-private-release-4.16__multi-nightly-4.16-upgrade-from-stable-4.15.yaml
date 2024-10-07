@@ -3,6 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.15"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.15"
     namespace: ocp
@@ -78,16 +82,18 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-byo-iam-role-fips-amd-f28
+- as: aws-ipi-byo-iam-role-efs-fips-amd-f28
   cron: 44 8 15 * *
   steps:
     cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
 - as: aws-ipi-byo-kms-etcd-encryption-fips-amd-f28
   cron: 35 22 12 * *
   steps:
@@ -98,7 +104,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
-- as: aws-ipi-byo-route53-compact-arm-f28
+- as: aws-ipi-byo-route53-compact-cloudfront-arm-f28
   cron: 1 0 7 * *
   steps:
     cluster_profile: aws-qe
@@ -110,7 +116,7 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
 - as: aws-ipi-imdsv2-fips-amd-f28
   cron: 1 13 13 * *
   steps:
@@ -344,7 +350,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      ENABLE_OTA_TEST: OCP-21588
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
@@ -368,6 +373,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test

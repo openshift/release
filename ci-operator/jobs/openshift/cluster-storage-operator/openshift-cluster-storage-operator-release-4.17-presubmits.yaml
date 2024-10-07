@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-csi
     decorate: true
     labels:
@@ -83,7 +83,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -162,7 +162,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -240,7 +240,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-shared-resources
     decorate: true
     labels:
@@ -319,7 +319,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-csi
     decorate: true
     labels:
@@ -397,7 +397,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-file-csi
     decorate: true
     labels:
@@ -475,7 +475,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     labels:
@@ -554,7 +554,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -881,7 +881,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-csi
     decorate: true
     labels:
@@ -960,7 +960,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-openstack
     decorate: true
     labels:
@@ -1039,7 +1039,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     labels:
@@ -1275,7 +1275,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/hypershift-aws-e2e-external
     decorate: true
     labels:
@@ -1353,7 +1353,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -1403,11 +1403,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1417,6 +1417,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-storage-operator-release-4.17-okd-scos-images
+    optional: true
     rerun_command: /test okd-scos-images
     spec:
       containers:
@@ -1465,7 +1466,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/security
     decorate: true
     labels:
@@ -1526,7 +1527,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1579,7 +1580,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     labels:
@@ -1632,7 +1633,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -1692,7 +1693,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify-kustomize-assets
     decorate: true
     labels:
@@ -1706,6 +1707,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-kustomize-assets
         command:
         - ci-operator
@@ -1716,6 +1718,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1730,6 +1735,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

@@ -215,6 +215,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -395,7 +401,7 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -807,6 +813,22 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
+- as: e2e-powervs-ovn
+  cluster: build01
+  optional: true
+  run_if_changed: powervs
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.17"
+      CLUSTER_NAME_MODIFIER: capi-417
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+  timeout: 6h0m0s
 - as: integration-tests
   run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
   steps:
@@ -936,7 +958,7 @@ tests:
     env:
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
-      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+      OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
     post:
     - chain: gather-network
     - chain: gather-core-dump
@@ -974,7 +996,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -998,7 +1019,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build

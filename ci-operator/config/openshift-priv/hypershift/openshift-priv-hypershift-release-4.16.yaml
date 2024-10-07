@@ -7,6 +7,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
@@ -15,20 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
-binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.16_base-rhel9:
@@ -37,15 +35,10 @@ images:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
-    name: 4.16-priv
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -71,7 +64,7 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
-test_binary_build_commands: make build e2e
+test_binary_build_commands: make e2e
 tests:
 - as: verify
   commands: make verify
@@ -90,7 +83,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -139,8 +132,7 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
-- always_run: false
-  as: e2e-kubevirt-metal-ovn-conformance
+- as: e2e-kubevirt-metal-ovn-conformance
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -148,11 +140,18 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- as: e2e-azure-ovn-conformance
+- as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-azure-conformance
+    workflow: hypershift-azure-aks-conformance
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

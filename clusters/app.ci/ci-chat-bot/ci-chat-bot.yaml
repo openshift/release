@@ -1,3 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ci-chat-bot
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ci-chat-bot
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-chat-bot
+subjects:
+- kind: ServiceAccount
+  name: ci-chat-bot
+  namespace: ci
+---
 apiVersion: authorization.openshift.io/v1
 kind: Role
 metadata:
@@ -202,8 +229,17 @@ spec:
       - name: release
         emptyDir: {}
       - name: build-cluster-kubeconfigs
-        secret:
-          secretName: ci-chat-bot-kubeconfigs
+        projected:
+          sources:
+          - secret:
+              name: ci-chat-bot-kubeconfigs
+          - secret:
+              name: ci-chat-bot-slack-app
+              items:
+                - key: sa.ci-chat-bot-mce.dpcr.config
+                  path: sa.ci-chat-bot-mce.dpcr.config
+                - key: sa.ci-chat-bot-mce.dpcr.token.txt
+                  path: sa.ci-chat-bot-mce.dpcr.token.txt
       - name: workflows-config
         configMap:
           name: ci-chat-bot-workflows-config
@@ -251,13 +287,11 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
+        - --ref=master
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
+        - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release
@@ -268,13 +302,11 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
-        - --wait=30
+        - --ref=master
+        - --period=30s
         - --root=/tmp/git-sync
-        - --max-sync-failures=3
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
+        - --max-failures=3
+        - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release

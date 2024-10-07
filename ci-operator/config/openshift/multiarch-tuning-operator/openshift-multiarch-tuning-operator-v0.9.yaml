@@ -1,0 +1,245 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.16
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
+      as:
+      - golang:1.21
+  to: multiarch-tuning-operator
+- dockerfile_path: bundle.Dockerfile
+  to: multiarch-tuning-op-bundle
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+    FROM src
+    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+  from: src
+  to: operator-sdk-src
+operator:
+  bundles:
+  - as: multiarch-tuning-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:v0.9
+    with: pipeline:multiarch-tuning-operator
+promotion:
+  to:
+  - excluded_images:
+    - operator-sdk-src
+    namespace: origin
+    tag: v0.9
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  sast:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 300m
+      memory: 400Mi
+tests:
+- as: fmt
+  cluster: build11
+  commands: NO_DOCKER=1 make fmt && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: vet
+  cluster: build11
+  commands: NO_DOCKER=1 make vet && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: vendor
+  cluster: build11
+  commands: NO_DOCKER=1 make vendor && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: goimports
+  cluster: build11
+  commands: NO_DOCKER=1 make goimports && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: lint
+  cluster: build11
+  commands: NO_DOCKER=1 make lint && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: sast
+  cluster: build11
+  commands: NO_DOCKER=1 make gosec && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: manifests
+  cluster: build11
+  commands: NO_DOCKER=1 make manifests && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: generate
+  cluster: build11
+  commands: NO_DOCKER=1 make generate && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: unit
+  cluster: build11
+  commands: NO_DOCKER=1 make unit
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: e2e-gcp-multi-operator-olm
+  cluster: build11
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: USE_OLM=true ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-tuning-operator
+      - env: OO_BUNDLE
+        name: pipeline:multiarch-tuning-operator-bundle
+      from: operator-sdk-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-multi-operator
+  cluster: build11
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-tuning-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-aws-post-multi-operator-olm
+  cluster: build11
+  postsubmit: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: USE_OLM=true ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-tuning-operator
+      - env: OO_BUNDLE
+        name: pipeline:multiarch-tuning-operator-bundle
+      from: operator-sdk-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: security
+  cluster: build11
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    env:
+      PROJECT_NAME: multiarch-tuning-operator
+    workflow: openshift-ci-security
+- as: bundle
+  cluster: build11
+  commands: unset VERSION; NO_DOCKER=1 make bundle-verify
+  container:
+    from: operator-sdk-src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+zz_generated_metadata:
+  branch: v0.9
+  org: openshift
+  repo: multiarch-tuning-operator

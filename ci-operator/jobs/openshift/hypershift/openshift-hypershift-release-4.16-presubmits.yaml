@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -84,7 +84,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/e2e-aws-metrics
     decorate: true
     labels:
@@ -163,17 +163,17 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
-    context: ci/prow/e2e-azure-ovn-conformance
+    cluster: build09
+    context: ci/prow/e2e-azure-aks-ovn-conformance
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: hypershift
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-release-4.16-e2e-azure-ovn-conformance
+    name: pull-ci-openshift-hypershift-release-4.16-e2e-azure-aks-ovn-conformance
     optional: true
-    rerun_command: /test e2e-azure-ovn-conformance
+    rerun_command: /test e2e-azure-aks-ovn-conformance
     spec:
       containers:
       - args:
@@ -182,8 +182,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-azure-ovn-conformance-cluster-profile
-        - --target=e2e-azure-ovn-conformance
+        - --secret-dir=/usr/local/e2e-azure-aks-ovn-conformance-cluster-profile
+        - --target=e2e-azure-aks-ovn-conformance
         command:
         - ci-operator
         image: ci-operator:latest
@@ -199,7 +199,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-azure-ovn-conformance-cluster-profile
+        - mountPath: /usr/local/e2e-azure-aks-ovn-conformance-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -236,13 +236,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-ovn-conformance,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-aks-ovn-conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/e2e-conformance
     decorate: true
     labels:
@@ -332,7 +332,6 @@ presubmits:
     name: pull-ci-openshift-hypershift-release-4.16-e2e-kubevirt-aws-ovn
     optional: true
     rerun_command: /test e2e-kubevirt-aws-ovn
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -480,7 +479,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/e2e-kubevirt-azure-ovn
     decorate: true
     labels:
@@ -638,7 +637,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -654,7 +653,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
-        - --target=test-bin
         command:
         - ci-operator
         image: ci-operator:latest
@@ -693,7 +691,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/mce-images
     decorate: true
     decoration_config:
@@ -750,7 +748,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -809,7 +807,68 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
+    context: ci/prow/security
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-release-4.16-security
+    rerun_command: /test security
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     labels:
@@ -863,7 +922,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build09
     context: ci/prow/verify
     decorate: true
     labels:

@@ -5,18 +5,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp4.14-acceptance-distributed-tracing-tests-acceptance
+    cluster: build09
+    context: ci/prow/ocp-4.14-acceptance-distributed-tracing-tests-acceptance
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.14-acceptance
+      ci-operator.openshift.io/variant: ocp-4.14-acceptance
       ci.openshift.io/generator: prowgen
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-qe-main-ocp4.14-acceptance-distributed-tracing-tests-acceptance
-    rerun_command: /test ocp4.14-acceptance-distributed-tracing-tests-acceptance
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.14-acceptance-distributed-tracing-tests-acceptance
+    rerun_command: /test ocp-4.14-acceptance-distributed-tracing-tests-acceptance
     spec:
       containers:
       - args:
@@ -26,7 +26,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=distributed-tracing-tests-acceptance
-        - --variant=ocp4.14-acceptance
+        - --variant=ocp-4.14-acceptance
         command:
         - ci-operator
         image: ci-operator:latest
@@ -71,24 +71,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.14-acceptance-distributed-tracing-tests-acceptance,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.14-acceptance-distributed-tracing-tests-acceptance,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp4.14-acceptance-images
+    cluster: build09
+    context: ci/prow/ocp-4.14-acceptance-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.14-acceptance
+      ci-operator.openshift.io/variant: ocp-4.14-acceptance
       ci.openshift.io/generator: prowgen
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-qe-main-ocp4.14-acceptance-images
-    rerun_command: /test ocp4.14-acceptance-images
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.14-acceptance-images
+    rerun_command: /test ocp-4.14-acceptance-images
     spec:
       containers:
       - args:
@@ -96,7 +96,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ocp4.14-acceptance
+        - --variant=ocp-4.14-acceptance
         command:
         - ci-operator
         image: ci-operator:latest
@@ -129,24 +129,96 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.14-acceptance-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.14-acceptance-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/ocp-4.14-dast-distributed-tracing-tests-dast
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp-4.14-dast
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.14-dast-distributed-tracing-tests-dast
+    rerun_command: /test ocp-4.14-dast-distributed-tracing-tests-dast
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=distributed-tracing-tests-dast
+        - --variant=ocp-4.14-dast
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ocp-4.14-dast-distributed-tracing-tests-dast|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp4.14-dast-images
+    cluster: build09
+    context: ci/prow/ocp-4.14-dast-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.14-dast
+      ci-operator.openshift.io/variant: ocp-4.14-dast
       ci.openshift.io/generator: prowgen
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-qe-main-ocp4.14-dast-images
-    rerun_command: /test ocp4.14-dast-images
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.14-dast-images
+    rerun_command: /test ocp-4.14-dast-images
     spec:
       containers:
       - args:
@@ -154,7 +226,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ocp4.14-dast
+        - --variant=ocp-4.14-dast
         command:
         - ci-operator
         image: ci-operator:latest
@@ -187,24 +259,107 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.14-dast-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.14-dast-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp4.15-disconnected-images
+    cluster: build02
+    context: ci/prow/ocp-4.15-disconnected-distributed-tracing-tests-disconnected
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.15-disconnected
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+      ci-operator.openshift.io/variant: ocp-4.15-disconnected
       ci.openshift.io/generator: prowgen
       job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-qe-main-ocp4.15-disconnected-images
-    rerun_command: /test ocp4.15-disconnected-images
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.15-disconnected-distributed-tracing-tests-disconnected
+    rerun_command: /test ocp-4.15-disconnected-distributed-tracing-tests-disconnected
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/distributed-tracing-tests-disconnected-cluster-profile
+        - --target=distributed-tracing-tests-disconnected
+        - --variant=ocp-4.15-disconnected
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/distributed-tracing-tests-disconnected-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ocp-4.15-disconnected-distributed-tracing-tests-disconnected|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/ocp-4.15-disconnected-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp-4.15-disconnected
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.15-disconnected-images
+    rerun_command: /test ocp-4.15-disconnected-images
     spec:
       containers:
       - args:
@@ -212,7 +367,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ocp4.15-disconnected
+        - --variant=ocp-4.15-disconnected
         command:
         - ci-operator
         image: ci-operator:latest
@@ -245,4 +400,87 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.15-disconnected-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.15-disconnected-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ocp-4.16-fips-scan-distributed-tracing-operators
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: ocp-4.16-fips-scan
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-distributed-tracing-qe-main-ocp-4.16-fips-scan-distributed-tracing-operators
+    rerun_command: /test ocp-4.16-fips-scan-distributed-tracing-operators
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/distributed-tracing-operators-cluster-profile
+        - --target=distributed-tracing-operators
+        - --variant=ocp-4.16-fips-scan
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/distributed-tracing-operators-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ocp-4.16-fips-scan-distributed-tracing-operators|remaining-required),?($|\s.*)

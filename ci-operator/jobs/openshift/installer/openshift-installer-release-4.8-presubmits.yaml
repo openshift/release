@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -86,7 +86,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -167,7 +167,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -249,7 +249,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -330,133 +330,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
-    context: ci/prow/e2e-aws-rhel8
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-installer-release-4.8-e2e-aws-rhel8
-    optional: true
-    rerun_command: /test e2e-aws-rhel8
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
-        - --target=e2e-aws-rhel8
-        - --template=/usr/local/e2e-aws-rhel8
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          value: |
-            base_images:
-              base:
-                name: '4.4'
-                namespace: ocp
-                tag: base
-              machine-os-content:
-                name: machine-os-content
-                namespace: rhcos
-                tag: latest
-            build_root:
-              image_stream_tag:
-                name: release
-                namespace: openshift
-                tag: golang-1.13
-            canonical_go_repository: github.com/openshift/installer
-            images:
-            - dockerfile_path: images/installer/Dockerfile.ci
-              from: base
-              inputs:
-                root:
-                  as:
-                  - builder
-              to: installer
-            raw_steps:
-            - output_image_tag_step:
-                from: machine-os-content
-                to:
-                  name: stable
-                  tag: machine-os-content
-            resources:
-              '*':
-                limits:
-                  memory: 4Gi
-                requests:
-                  cpu: 100m
-                  memory: 200Mi
-            tag_specification:
-              name: '4.4'
-              namespace: ocp
-            tests:
-            - as: e2e-aws
-              commands: TEST_SUITE=openshift/conformance/parallel run-tests
-              openshift_installer:
-                cluster_profile: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-rhel8
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-rhel8-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-rhel8
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-    trigger: (?m)^/test( | .* )e2e-aws-rhel8,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -537,7 +411,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -617,7 +491,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -698,7 +572,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-upi
     decorate: true
     decoration_config:
@@ -784,7 +658,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -866,7 +740,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -947,7 +821,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-azure-resourcegroup
     decorate: true
     decoration_config:
@@ -1027,7 +901,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -1108,7 +982,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -1790,7 +1664,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -2195,7 +2069,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -2276,7 +2150,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -2358,7 +2232,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -2440,7 +2314,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
@@ -2521,7 +2395,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -2769,7 +2643,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -2825,7 +2699,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -2881,7 +2755,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -2937,7 +2811,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -2994,7 +2868,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build05
+    cluster: build09
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:
@@ -3075,7 +2949,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -3104,7 +2978,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -3134,7 +3008,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -3163,7 +3037,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3219,7 +3093,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -3274,7 +3148,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -3330,7 +3204,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     labels:

@@ -20,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -62,26 +66,14 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
-  multi-latest:
-    prerelease:
-      architecture: multi
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
+      channel: candidate
+      version: "4.17"
   target:
-    candidate:
+    release:
       architecture: multi
-      product: ocp
-      stream: nightly
+      channel: candidate
       version: "4.17"
 resources:
   '*':
@@ -91,8 +83,8 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-c2s-ipi-disc-priv-fips-f14
-  cron: 28 6 5,21 * *
+- as: aws-c2s-ipi-disc-priv-fips-f28
+  cron: 3 19 25 * *
   steps:
     cluster_profile: aws-c2s-qe
     env:
@@ -102,8 +94,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disc-priv-localzone-fips-f14
-  cron: 26 6 6,22 * *
+- as: aws-ipi-disc-priv-localzone-fips-f28
+  cron: 49 19 24 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -113,8 +105,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-sts-ep-fips-f14
-  cron: 5 10 7,21 * *
+- as: aws-ipi-disc-priv-sts-ep-fips-f28
+  cron: 29 15 17 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -133,21 +125,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-60396
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-proxy-sts-f14
-  cron: 26 19 10,26 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-shared-vpc-phz-sts-fips-f14
   cron: 14 7 6,20 * *
   steps:
@@ -159,16 +139,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
-- as: aws-ipi-usertags-custom-sg-fips-f14
-  cron: 55 4 4,20 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-ocm-osd-ccs-f7
   cron: 9 12 4,13,20,27 * *
   steps:
@@ -308,6 +278,7 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: candidate
+      NAME_PREFIX: rosa-hcp-auth
       OPENSHIFT_VERSION: "4.17"
       TEST_PROFILE: rosa-hcp-external-auth
     test:
@@ -397,15 +368,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: azure-ipi-fullyprivate-proxy-f14
-  cron: 23 7 16,30 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-to-multiarch-f28
   cron: 10 16 5 * *
   steps:
@@ -416,20 +378,9 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-53921
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-usertags-f14
-  cron: 36 20 6,20 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-usertags
 - as: azure-mag-ipi-fips-f14
   cron: 43 9 3,19 * *
   steps:
@@ -489,6 +440,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
@@ -499,17 +451,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
-- as: gcp-ipi-compact-filestore-csi-f14
-  cron: 36 15 15,29 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
-    env:
-      SIZE_VARIANT: compact
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
 - as: gcp-ipi-disc-priv-oidc-fips-f28
   cron: 31 1 7 * *
   steps:
@@ -520,13 +461,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-f14
-  cron: 24 3 6,20 * *
-  steps:
-    cluster_profile: gcp-qe
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-to-multiarch-f28
   cron: 24 11 16 * *
   steps:
@@ -536,26 +470,17 @@ tests:
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-60396
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-xpn-fips-f14
-  cron: 44 11 4,20 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn
 - as: gcp-ocm-osd-ccs-marketplace-f7
   cron: 46 19 3,12,19,26 * *
   steps:
     cluster_profile: gcp-qe
     env:
       CHANNEL_GROUP: candidate
+      COMPUTE_NODES: "3"
+      MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.17"
       SUBSCRIPTION_TYPE: marketplace-gcp
     test:
@@ -582,15 +507,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-gcp-xpn-private
-- as: ibmcloud-ipi-disc-priv-f14
-  cron: 21 11 1,17 * *
+- as: ibmcloud-ipi-disc-priv-f28
+  cron: 57 17 1 * *
   steps:
     cluster_profile: ibmcloud-qe-2
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: ibmcloud-ipi-proxy-private-rt-f14
-  cron: 43 13 2,18 * *
+- as: ibmcloud-ipi-proxy-private-rt-f28
+  cron: 31 0 25 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -598,31 +523,9 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: nutanix-ipi-compact-f14
+- as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
-  cron: 5 1 7,23 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      SIZE_VARIANT: compact
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-disc-rt-f14
-  cluster: build01
-  cron: 52 1 2,16 * *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      RT_ENABLED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-proxy-fips-mini-perm-f14
-  cluster: build01
-  cron: 23 17 12,26 * *
+  cron: 44 9 2 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -631,8 +534,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
-- as: vsphere-ipi-disc-f14
-  cron: 10 0 14,30 * *
+- as: vsphere-ipi-disc-f28
+  cron: 33 13 24 * *
   steps:
     cluster_profile: vsphere-dis-2
     leases:
@@ -641,15 +544,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
-- as: vsphere-ipi-ovn-dualstack-f14
-  cron: 12 5 7,21 * *
+- as: vsphere-ipi-ovn-dualstack-f28
+  cron: 1 21 2 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
-- as: vsphere-ipi-proxy-fips-f14
-  cron: 59 11 16,30 * *
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 43 18 25 * *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -660,13 +563,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-zones-f14
-  cron: 2 22 11,27 * *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

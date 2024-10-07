@@ -44,7 +44,7 @@ releases:
   arm64-latest:
     release:
       architecture: arm64
-      channel: candidate
+      channel: fast
       version: "4.16"
   arm64-target:
     release:
@@ -54,7 +54,7 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: candidate
+      channel: fast
       version: "4.16"
   target:
     release:
@@ -84,38 +84,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-proxy-sts-f28
-  cron: 5 11 23 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      ENABLE_OTA_TEST: OCP-24358
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-usertags-custom-sg-f28
-  cron: 54 2 26 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: azure-ipi-disc-fullyprivate-f28
   cron: 31 19 27 * *
   steps:
@@ -131,21 +99,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-fullyprivate-proxy-f28
-  cron: 13 12 3 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      ENABLE_OTA_TEST: OCP-24358
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: gcp-ipi-disc-priv-oidc-f28
   cron: 17 0 26 * *
   steps:

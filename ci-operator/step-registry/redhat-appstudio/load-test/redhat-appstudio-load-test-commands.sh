@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL PUSHGATEWAY_URL
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST PUSHGATEWAY_URL QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN
 
 DEFAULT_QUAY_ORG=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org)
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org-token)
@@ -18,13 +18,14 @@ GITHUB_TOKENS_LIST="$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/githu
 QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-token)
 QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-token)
-OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/oauth-redirect-proxy-url)
 PYXIS_STAGE_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-key)
 PYXIS_STAGE_CERT=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-cert)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
 PUSHGATEWAY_URL="$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/pushgateway-url)"
+QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-host)
+QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-token)
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/github_accounts)"
