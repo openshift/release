@@ -2,7 +2,7 @@
 
 set -eux
 
-EXTRA_ARGS=""
+EXTRA_ARGS="--experimental=true"
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $HO_MULTI == "true" ]]; then
