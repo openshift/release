@@ -8,7 +8,7 @@ set -o pipefail
 SSH_KEY_PATH=/var/run/ssh-key/ssh-key
 SSH_KEY=~/key
 JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
-JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
+JENKINS_USER_TOKEN="$(cat "/var/run/jenkins-credentials/${JENKINS_INSTANCE}-jenkins-token")"
 
 cp $SSH_KEY_PATH $SSH_KEY
 chmod 600 $SSH_KEY
@@ -38,4 +38,4 @@ PARAMS=$(echo "$PARAMS" | tr -d '\n')
 ansible-playbook playbooks/launch-jenkins-job.yaml -i inventory \
  -e username=$JENKINS_USER_NAME \
  -e token=$JENKINS_USER_TOKEN \
- -e job_params="$PARAMS" -e job_url="https://auto-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-olm-setup/" -vvv
+ -e job_params="$PARAMS" -e job_url="https://${JENKINS_INSTANCE}-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-olm-setup/" -vvv
