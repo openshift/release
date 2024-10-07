@@ -60,6 +60,7 @@ sudo podman run -d --rm \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \$EXTRAVOLUMES \
      --name external-squid \
      --dns 127.0.0.1 \
+     --mount type=bind,source=/etc/hosts,target=/etc/hosts,readonly \
      quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
