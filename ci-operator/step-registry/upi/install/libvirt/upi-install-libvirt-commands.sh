@@ -9,6 +9,7 @@ INSTALL_DIR=/tmp
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+echo "Test "
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
