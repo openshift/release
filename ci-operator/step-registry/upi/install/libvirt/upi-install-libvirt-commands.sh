@@ -197,7 +197,7 @@ EOF
 else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-  VOLUME_NAME="rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+  VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
 
   # Check if we need to update the source volume
   CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
