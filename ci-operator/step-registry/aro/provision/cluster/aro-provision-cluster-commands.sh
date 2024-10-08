@@ -123,9 +123,9 @@ fi
 
 echo $KUBECRED > ${SHARED_DIR}/clustercreds
 
-oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS"
+oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS" --insecure-skip-tls-verify=true
 
 echo "Generating kubeconfig in ${SHARED_DIR}/kubeconfig"
 
-oc config view --raw > ${SHARED_DIR}/kubeconfig
+oc config view --raw > ${SHARED_DIR}/kubeconfig --insecure-skip-tls-verify=true
 

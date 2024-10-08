@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   tools:
     name: "4.18"
     namespace: ocp
@@ -33,6 +37,9 @@ images:
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   inputs:
@@ -182,7 +189,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure
 - as: e2e-gcp-ovn-builds
-  run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+  run_if_changed: ^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-builds
@@ -301,6 +308,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
+  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-ipsec-serial
   optional: true
@@ -676,7 +684,6 @@ tests:
     workflow: upi-vsphere-platform-external-ccm
   timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift
-  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -686,7 +693,6 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
   timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift-serial
-  optional: true
   steps:
     cluster_profile: aws
     env:

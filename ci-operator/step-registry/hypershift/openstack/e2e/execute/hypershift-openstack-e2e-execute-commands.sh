@@ -39,4 +39,4 @@ hack/ci-test-e2e.sh \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
         --e2e.openstack-external-network-id="${OPENSTACK_EXTERNAL_NETWORK_ID}" \
         --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}" \
-	--e2e.openstack-node-image-name="rhcos-4.17-hcp-nodepool"
+	--e2e.openstack-node-image-name="${RHCOS_IMAGE_NAME}"
