@@ -1,0 +1,75 @@
+base_images:
+  amq-broker-test-image:
+    name: claire
+    namespace: ci
+    tag: amq-broker-lpt
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: amq-broker-interop-aws
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "amq-broker-install-and-tests", "failure_type": "pod_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "amq-broker-install-and-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTMQBR", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","amq-broker-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: tbueno@redhat.com
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario amq-broker
+    test:
+    - ref: amq-broker-install-and-tests
+    workflow: firewatch-ipi-aws
+- as: amq-broker-interop-aws-fips
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "amq-broker-install-and-tests", "failure_type": "pod_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "amq-broker-install-and-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTMQBR", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","fips","amq-broker-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: tbueno@redhat.com
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario amq-broker
+    test:
+    - ref: amq-broker-install-and-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: lpt
+  org: rh-messaging-qe
+  repo: claire
+  variant: amq-broker-ocp4.18-lp-interop
