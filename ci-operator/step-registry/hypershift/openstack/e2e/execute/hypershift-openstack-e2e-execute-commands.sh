@@ -33,7 +33,7 @@ hack/ci-test-e2e.sh \
 	--e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
 	--e2e.base-domain=origin-ci-int-aws.dev.rhcloud.com \
         --test.run='^TestCreateCluster$' \
-	--test.parallel=1 \
+	--test.parallel=2 \
         --e2e.platform="OpenStack" \
 	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
