@@ -87,15 +87,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/cvp-trigger
   to: cvp-trigger
-- context_dir: images/template-deprecator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
-  multi_arch: true
-  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -274,8 +265,6 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
       - destination_dir: .
@@ -777,25 +766,25 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
+  cluster: build11
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
   node_architecture: arm64
 - as: codegen
-  cluster: build10
+  cluster: build11
   commands: make verify-gen
   container:
     from: src
   node_architecture: arm64
 - as: format
-  cluster: build10
+  cluster: build11
   commands: make format
   container:
     from: src
   node_architecture: arm64
 - as: integration
-  cluster: build10
+  cluster: build11
   commands: make integration
   container:
     from: test-bin
@@ -898,7 +887,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
+  cluster: build11
   node_architecture: arm64
   optional: true
   steps:
@@ -918,19 +907,19 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: checkconfig
-  cluster: build10
+  cluster: build11
   commands: make validate-checkconfig
   container:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
+  cluster: build11
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
+  cluster: build11
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin

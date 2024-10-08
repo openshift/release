@@ -113,7 +113,7 @@ case "${BOOT_MODE}" in
 "iso")
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.${arch}.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
@@ -121,10 +121,10 @@ case "${BOOT_MODE}" in
    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
    if [ "${transfer_protocol_type}" == "cifs" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-     iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.${arch}.iso"
+     iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.iso"
    else
      # Assuming HTTP or HTTPS
-     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.${arch}.iso"
+     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.iso"
    fi
    mount_virtual_media "${host}" "${iso_path}"
   done
@@ -189,4 +189,4 @@ fi
 
 # Add operators status checking until monitoring enhanced to do this
 echo "Check all cluster operators get stable and ready"
-oc adm wait-for-stable-cluster --minimum-stable-period=3m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
