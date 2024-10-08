@@ -1,26 +1,20 @@
 periodics:
 - agent: kubernetes
-  cluster: vsphere02
-  cron: 0 9 * * 1
+  cluster: build03
+  cron: 0 8 * * 1
   decorate: true
+  decoration_config:
+    timeout: 5h0m0s
   extra_refs:
-  - base_ref: master
+  - base_ref: release-4.18
     org: openshift
     repo: windows-machine-config-operator
   labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure4
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-windows-machine-config-operator-master-vsphere-e2e-ccm-install
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-winc'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
-        <{{.Status.URL}}|View logs>. Please investigate.
+  name: periodic-ci-openshift-windows-machine-config-operator-release-4.18-azure-e2e-upgrade-from-previous-eus
   spec:
     containers:
     - args:
@@ -29,8 +23,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/vsphere-e2e-ccm-install-cluster-profile
-      - --target=vsphere-e2e-ccm-install
+      - --secret-dir=/usr/local/azure-e2e-upgrade-from-previous-eus-cluster-profile
+      - --target=azure-e2e-upgrade-from-previous-eus
       command:
       - ci-operator
       image: ci-operator:latest
@@ -46,7 +40,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/vsphere-e2e-ccm-install-cluster-profile
+      - mountPath: /usr/local/azure-e2e-upgrade-from-previous-eus-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -73,7 +67,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-vsphere
+        secretName: cluster-secrets-azure4
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
