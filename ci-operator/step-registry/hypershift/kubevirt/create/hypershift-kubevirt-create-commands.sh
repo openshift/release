@@ -64,6 +64,11 @@ if [[ -n ${MCE} ]] ; then
   EXTRA_ARGS="${EXTRA_ARGS} --toleration=key=taint-test,operator=Exists,effect=NoSchedule"
 fi
 
+while read -r name _ _ _; do
+  oc adm taint node "$name" taint-test=Exists:NoSchedule
+done < <(oc get node --no-headers)
+EXTRA_ARGS="${EXTRA_ARGS} --toleration=key=taint-test,operator=Exists,effect=NoSchedule"
+
 if [ -n "${KUBEVIRT_CSI_INFRA}" ]
 then
   EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=${KUBEVIRT_CSI_INFRA}/${KUBEVIRT_CSI_INFRA}"
