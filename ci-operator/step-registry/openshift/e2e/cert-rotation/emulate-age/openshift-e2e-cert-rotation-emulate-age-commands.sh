@@ -78,7 +78,7 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cluster-age-test.sh "root@${IP}:/usr/local/b
 
 timeout \
 	--kill-after 10m \
-	180m \
+	8h \
 	ssh \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
