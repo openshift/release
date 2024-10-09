@@ -89,6 +89,59 @@ tests:
           memory: 100Mi
       timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-hypershift
+- as: push-image
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: push-image
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "docker login -u='maistra-dev+prow' \
+          -p=${QUAY_PASS} quay.io; \
+          cd /work/; make docker \
+          HUB=quay.io/maistra-dev TAG=PR-${PULL_NUMBER}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: master
   org: openshift-service-mesh
