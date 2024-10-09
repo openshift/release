@@ -8,6 +8,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Setting the Machine Network CIDR for $CONFIG_TYPE CONFIG_TYPE"
+if [[ "$CONFIG_TYPE" != *"dualstack"* ]]; then
+    echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
+else
+    echo ${MACHINES_SUBNET_v4_RANGE:?}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
+fi
+
 if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
     echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
@@ -45,7 +52,6 @@ MACHINES_SUBNET_ID="$(openstack subnet create "${CLUSTER_NAME}-${CONFIG_TYPE}-ma
   --format value --column id)"
 echo "Created subnet for OpenShift machines: ${MACHINES_SUBNET_ID}"
 echo ${MACHINES_SUBNET_ID}>${SHARED_DIR}/MACHINES_SUBNET_ID
-echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
 
 # This block only works if the subnet range is a /24
 if [[ ${SUBNET_RANGE} != *"/24" ]]; then
