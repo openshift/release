@@ -78,9 +78,20 @@ echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
-CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/preview/application-pipeline"
+CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
 CYPRESS_SSO_URL="$(oc get feenv env-$HAC_NAMESPACE --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.sso}")"
+
+# Patch clowder env for dev-sso
+oc --kubeconfig=$HAC_KUBECONFIG get clowdenvironment env-$HAC_NAMESPACE -o json | jq '.spec.disabled=true' | oc --kubeconfig=$HAC_KUBECONFIG apply -f -
+oc --kubeconfig=$HAC_KUBECONFIG get deployment env-$HAC_NAMESPACE-mbop -o json | \
+  jq --arg url 'https://'"$(oc get route keycloak -n dev-sso -o json | jq -r .spec.host)" --arg user $KEYCLOAK_USERNAME --arg pass $KEYCLOAK_PASSWORD \
+    '(.spec.template.spec.containers[].env=[
+     {"name": "KEYCLOAK_SERVER", "value": $url},
+     {"name": "KEYCLOAK_USERNAME", "value": $user},
+     {"name": "KEYCLOAK_PASSWORD", "value": $pass},
+     {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc --kubeconfig=$HAC_KUBECONFIG replace -f -
+oc --kubeconfig="$HAC_KUBECONFIG" rollout status deployment env-$HAC_NAMESPACE-mbop
 
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
@@ -129,8 +140,9 @@ BONFIRE_NAMESPACE=$(oc get --kubeconfig=$HAC_KUBECONFIG NamespaceReservations -o
 oc patch --kubeconfig=$HAC_KUBECONFIG NamespaceReservations/"$BONFIRE_NAMESPACE" --type=merge --patch-file=/dev/stdin <<-EOF
 {
     "spec": {
-        "duration": "0s"
+        "duration": "4h"
     }
 }
 EOF
+sleep 4h
 exit $TEST_RUN
