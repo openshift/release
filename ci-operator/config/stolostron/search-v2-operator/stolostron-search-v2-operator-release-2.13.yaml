@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.20-linux
+    tag: go1.21-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -22,7 +22,8 @@ images:
   to: search-v2-operator
 promotion:
   to:
-  - name: "2.13"
+  - disabled: true
+    name: "2.13"
     namespace: stolostron
 resources:
   '*':
@@ -38,12 +39,6 @@ tests:
       IMAGE_REPO: search-v2-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: git-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
 - as: lint
   commands: |
     GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
@@ -64,6 +59,42 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-v2-operator
+    env:
+      IMAGE_REPO: search-v2-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_VERSION="2.13"
+        export OSCI_COMPONENT_NAME="search-v2-operator"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-v2-operator
+    env:
+      IMAGE_REPO: search-v2-operator
+      IMAGE_TAG: "2.13"
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -75,6 +106,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
   repo: search-v2-operator
