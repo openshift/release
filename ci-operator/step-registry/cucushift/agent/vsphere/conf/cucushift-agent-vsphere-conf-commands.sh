@@ -96,6 +96,11 @@ echo "Installing from initial release $RELEASE_IMAGE_LATEST"
 oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
 
+bn_vsphere_datacenter=$(basename "${vsphere_datacenter}")
+bn_vsphere_cluster=$(basename "${vsphere_cluster}")
+bn_vsphere_datastore=$(basename "${vsphere_datastore}")
+bn_vsphere_network=$(basename "${vsphere_portgroup}")
+
 version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
 # Add vSphere credentials if the version is 4.15 or more
 if [[ "${version}" -ge "415" ]]; then
@@ -107,17 +112,17 @@ platform:
       region: changeme-region
       server: ${vsphere_url}
       topology:
-        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
-        datacenter: ${vsphere_datacenter}
-        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+        computeCluster: /${bn_vsphere_datacenter}/host/${bn_vsphere_cluster}
+        datacenter: ${bn_vsphere_datacenter}
+        datastore: /${bn_vsphere_datacenter}/datastore/${bn_vsphere_datastore}
         networks:
-        - ${vsphere_portgroup}
-        resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources
-        folder: /${vsphere_datacenter}/vm/${cluster_name}
+        - ${bn_vsphere_network}
+        resourcePool: /${bn_vsphere_datacenter}/host/${bn_vsphere_cluster}/Resources
+        folder: /${bn_vsphere_datacenter}/vm/${cluster_name}
       zone: changeme-zone
     vcenters:
     - datacenters:
-      - ${vsphere_datacenter}
+      - ${bn_vsphere_datacenter}
       server: ${vsphere_url}
       password: ${GOVC_PASSWORD}
       user: ${GOVC_USERNAME}
