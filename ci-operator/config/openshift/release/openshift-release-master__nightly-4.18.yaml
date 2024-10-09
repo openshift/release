@@ -542,7 +542,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FORCE_SOS_REPORT: "true"
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -554,7 +553,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FORCE_SOS_REPORT: "true"
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -582,8 +580,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      FORCE_SOS_REPORT: "true"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
   interval: 168h
@@ -604,7 +600,6 @@ tests:
     env:
       FEATURE_GATES: '["VSphereMultiVCenters=true"]'
       FEATURE_SET: CustomNoUpgrade
-      FORCE_SOS_REPORT: "true"
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
@@ -740,6 +735,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-csi
   interval: 168h
   steps:
@@ -873,7 +869,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-hcp-cnf
-- as: metal-ovn-network-flow-matrix-bm
+- as: telco5g-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 3
   restrict_network_access: false
@@ -884,8 +880,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: network-flow-matrix-bm
-- as: metal-ovn-network-flow-matrix-single-node-bm
+    workflow: telco5g-network-flow-matrix-bm
+- as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
   cron: 0 23 * * 3
   restrict_network_access: false
@@ -896,7 +892,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: network-flow-matrix-single-node-bm
+    workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
   cron: 0 23 * * 3
   steps:
@@ -911,6 +907,18 @@ tests:
     test:
     - ref: network-flow-matrix-tests
     workflow: openshift-e2e-aws-single-node
+- as: metal-ovn-network-flow-matrix-bm
+  cluster: build05
+  cron: 0 23 * * 3
+  steps:
+    cluster_profile: equinix-ocp-metal
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: network-flow-matrix-tests
+    - ref: baremetalds-e2e-test
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-alibaba-ovn
   cron: '@weekly'
   steps:
