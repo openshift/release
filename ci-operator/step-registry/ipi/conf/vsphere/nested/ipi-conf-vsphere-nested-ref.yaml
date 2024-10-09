@@ -1,0 +1,37 @@
+ref:
+  as: ipi-conf-vsphere-nested
+  from: nested-environment-builder
+  commands: ipi-conf-vsphere-nested-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: HOSTS
+    default: "1"
+    documentation: |-
+      The number of hosts to provision. If more than one, resources will be divided among the hosts.
+  - name: VCENTER_VERSION
+    default: "8"
+    documentation: |-
+      The version of vCenter to provision. Valid options are 7 or 8.
+  - name: NESTED_DATACENTERS
+    default: "1"
+    documentation: |-
+      Number of datacenters to provision. Presently, 1 is the only supported value. Datacenters will be named as:
+      nested-ci-datacenter-[0..NESTED_DATACENTERS] where NESTED_DATACENTERS is exclusive. For example, 1 will result 
+      in creating nested-ci-datacenter-0.
+  - name: NESTED_CLUSTERS
+    default: "1"
+    documentation: |-
+      Number of clusters per datacenter to create. Presently, 1 is the only supported value. Cluster will be named as:
+      nested-ci-datacenter-[dc number]-cluster-[0..NESTED_CLUSTERS] where NESTED_CLUSTERS is exclusive. For example, 1 will result 
+      in creating nested-ci-datacenter-[dc number]-cluster-0.
+
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-ci
+    mount_path: /var/run/vault/vsphere-ibmcloud-ci
+  documentation: >-
+    Provisions a nested environment in the vCenter associated with the ${SHARED_DIR}/LEASE_single.json. The install-config.yaml
+    will be updated to reflect the nested vCenter. This step is to be called after some other step that sets up 
