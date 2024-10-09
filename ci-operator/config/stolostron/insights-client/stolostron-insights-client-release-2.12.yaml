@@ -19,10 +19,10 @@ images:
     stolostron_builder_go1.20-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.20-linux
-  to: search-collector
+  to: insights-client
 promotion:
   to:
-  - name: "2.13"
+  - name: "2.12"
     namespace: stolostron
 resources:
   '*':
@@ -33,12 +33,12 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-collector
+      SOURCE_IMAGE_REF: insights-client
     env:
-      IMAGE_REPO: search-collector
+      IMAGE_REPO: insights-client
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-on-kind-cluster
+- as: e2e
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
@@ -58,24 +58,37 @@ tests:
         set +o pipefail
       dependencies:
       - env: COMPONENT_IMAGE_REF
-        name: search-collector
+        name: insights-client
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: git-fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-client
     env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
+      IMAGE_REPO: insights-client
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -85,7 +98,6 @@ tests:
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    export DEPLOYED_IN_HUB=true
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -95,7 +107,6 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    export DEPLOYED_IN_HUB=true
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -104,6 +115,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.12
   org: stolostron
-  repo: search-collector
+  repo: insights-client
