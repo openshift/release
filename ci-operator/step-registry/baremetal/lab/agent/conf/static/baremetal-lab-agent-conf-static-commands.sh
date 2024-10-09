@@ -33,6 +33,7 @@ hosts: []
 EOF
 
 cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+cpuArchitecture: ${day2_arch}
 hosts: []
 EOF
 
@@ -46,10 +47,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
-  "
-  else
-    ADAPTED_YAML="
-  CPUArchitecture: ${day2_arch}
   "
   fi
   ADAPTED_YAML+="
