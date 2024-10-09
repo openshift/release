@@ -1,0 +1,30 @@
+ref:
+  as: openshift-qe-cluster-health
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-cluster-health-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: perfscale-metal-bastion
+    mount_path: /bm
+  env:
+  - name: KUBE_BURNER_VERSION
+    default: "v1.3.3"
+    documentation: |-
+      Override the kube burner version
+  - name: BAREMETAL
+    default: "false"
+    documentation: |-
+      Set to true if the job is for baremetal
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs a cluster health-check in the deployed cluster with the help of kube-burner-ocp

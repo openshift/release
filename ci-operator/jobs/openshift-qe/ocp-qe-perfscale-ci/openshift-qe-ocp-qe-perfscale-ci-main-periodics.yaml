@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 15 2 * *
   decorate: true
   decoration_config:
@@ -92,7 +92,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 16 5 * *
   decorate: true
   decoration_config:
@@ -3976,7 +3976,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 2 8,22 * *
   decorate: true
   decoration_config:
@@ -4069,7 +4069,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 2 8,22 * *
   decorate: true
   decoration_config:
@@ -5380,6 +5380,100 @@ periodics:
       - --secret-dir=/usr/local/weekly-6nodes-cluster-profile
       - --target=weekly-6nodes
       - --variant=metal-4.16-latest-x86
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/weekly-6nodes-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-metal-perscale-cpt
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 0 * * 3
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-qe
+    repo: ocp-qe-perfscale-ci
+  labels:
+    ci-operator.openshift.io/cloud: metal-perscale-cpt
+    ci-operator.openshift.io/cloud-cluster-profile: metal-perscale-cpt
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: metal-4.17-latest-x86
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-qe-ocp-qe-perfscale-ci-main-metal-4.17-latest-x86-weekly-6nodes
+  reporter_config:
+    slack:
+      channel: '#ocp-qe-scale-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/weekly-6nodes-cluster-profile
+      - --target=weekly-6nodes
+      - --variant=metal-4.17-latest-x86
       command:
       - ci-operator
       image: ci-operator:latest
@@ -6788,6 +6882,98 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/node-density-heavy-24nodes-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-perfscale-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 3 3,17 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-qe
+    repo: ocp-qe-perfscale-ci
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci-operator.openshift.io/variant: rosa-4.17-candidate-x86-loaded-upgrade-from-4.16
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-qe-ocp-qe-perfscale-ci-main-rosa-4.17-candidate-x86-loaded-upgrade-from-4.16-loaded-upgrade417-24nodes
+  reporter_config:
+    slack:
+      channel: '#ocp-qe-scale-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/loaded-upgrade417-24nodes-cluster-profile
+      - --target=loaded-upgrade417-24nodes
+      - --variant=rosa-4.17-candidate-x86-loaded-upgrade-from-4.16
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/loaded-upgrade417-24nodes-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -8637,6 +8823,98 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 0 6 3,17 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-qe
+    repo: ocp-qe-perfscale-ci
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci-operator.openshift.io/variant: rosa_hcp-4.17-candidate-x86-loaded-upgrade-from-4.16
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-qe-ocp-qe-perfscale-ci-main-rosa_hcp-4.17-candidate-x86-loaded-upgrade-from-4.16-loaded-upgrade417-24nodes
+  reporter_config:
+    slack:
+      channel: '#ocp-qe-scale-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/loaded-upgrade417-24nodes-cluster-profile
+      - --target=loaded-upgrade417-24nodes
+      - --variant=rosa_hcp-4.17-candidate-x86-loaded-upgrade-from-4.16
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/loaded-upgrade417-24nodes-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-perfscale-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 0 9 2,9,16,23 * *
   decorate: true
   decoration_config:
@@ -9311,7 +9589,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 0 */21 * *
   decorate: true
   decoration_config:
