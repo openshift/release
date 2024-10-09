@@ -57,6 +57,13 @@ trap finished EXIT TERM
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
 
+sed -i '/NO_PROXY=$NO_PROXY,$LOCAL_REGISTRY_DNS_NAME/c\
+    # If INSTALLER_PROXY has been set, all traffic must go via the proxy (the bm network has no access)\
+    if [[ ${INSTALLER_PROXY:-false} == "false" ]]; then\
+      NO_PROXY=$NO_PROXY,$LOCAL_REGISTRY_DNS_NAME\
+    fi' network.sh
+grep -A7 "When a local registry is enabled" network.sh
+
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
