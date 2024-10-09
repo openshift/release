@@ -193,6 +193,7 @@ function approve_csrs() {
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
   knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  echo "the knownCaps is" $knownCaps
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
@@ -329,7 +330,7 @@ fi
 
 destroy_bootstrap &
 approve_csrs &
-update_image_registry &
+update_image_registry
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
