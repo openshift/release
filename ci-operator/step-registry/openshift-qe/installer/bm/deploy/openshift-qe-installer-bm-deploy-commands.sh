@@ -15,9 +15,9 @@ cat <<EOF >>/tmp/all.yml
 lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
+cluster_name: $PUBLIC_VLAN_NAME
 worker_node_count: $NUM_WORKER_NODES
 sno_node_count: $NUM_SNO_NODES
-public_vlan: false
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
@@ -29,16 +29,15 @@ pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 smcipmitool_url:
 bastion_lab_interface: eno12399
-bastion_controlplane_interface: ens6f0
-controlplane_network: 192.168.216.1/21
-controlplane_network_prefix: 21
-bastion_vlaned_interface: ens1f1
+bastion_controlplane_interface: ens6f1
+controlplane_network: 10.6.66.0/25
+controlplane_network_prefix: 25
+gateway: 10.6.66.126
+bastion_vlaned_interface:
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-controlplane_lab_interface: eno1np0
-controlplane_pub_network_cidr:
-controlplane_pub_network_gateway:
+controlplane_lab_interface: eno12399
 jumbo_mtu: false
 rwn_lab_interface: eno1np0
 rwn_network_interface: ens1f0
