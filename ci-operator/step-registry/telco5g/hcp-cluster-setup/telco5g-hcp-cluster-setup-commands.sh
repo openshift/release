@@ -293,6 +293,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_release=nightly \
+    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
 

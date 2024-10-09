@@ -117,7 +117,7 @@ ret=0
 if version_check "4.17"; then
 
   echo "$(date -u --rfc-3339=seconds) - Checking userTags of machines..."
-  readarray -t items < <(gcloud compute instances list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+  readarray -t items < <(gcloud compute instances list --filter="name~${INFRA_ID}" --format="table(name,zone)" | grep -v NAME)
   for line in "${items[@]}"; do
     name="${line%% *}"
     zone="${line##* }"
@@ -133,7 +133,7 @@ if version_check "4.17"; then
   done
 
   echo "$(date -u --rfc-3339=seconds) - Checking userTags of disks..."
-  readarray -t items < <(gcloud compute disks list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+  readarray -t items < <(gcloud compute disks list --filter="name~${INFRA_ID}" --format="table(name,zone)" | grep -v NAME)
   for line in "${items[@]}"; do
     name="${line%% *}"
     zone="${line##* }"
