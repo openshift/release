@@ -215,6 +215,8 @@ EOF
 
 cat ${HAPROXY_PATH}
 
+sleep 3600
+
 curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
 
 LB_VMNAME="${cluster_name}-lb"

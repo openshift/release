@@ -342,25 +342,6 @@ for LEASE in $LEASES; do
   extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
   NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
-  # if [[ -n "${VSPHERE_MULTI_NETWORKS}" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
-  #   # seems only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, other pending create lease
-  #   # if [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
-  #     echo "multi-networks is enabled GGGGGGGGGGGGG"
-  #     for network_resource in $NETWORK_RESOURCE; do
-  #       NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${network_resource}.json"
-  #       echo "AAAAAAAA:$network_resource"
-  #       if [ ! -f "$NETWORK_CACHE_PATH" ]; then
-  #         log caching network resource "${network_resource}"
-  #         oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${network_resource}" -o json > "${NETWORK_CACHE_PATH}"
-  #       fi
-  #       networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${network_resource}"
-
-  #       vcenter_portgroups[$VCENTER]=${portgroup_name}
-  #       log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
-  #       cp /tmp/lease.json "${SHARED_DIR}/LEASE_${LEASE}_${network_resource}.json"
-  #     done
-  #   # fi
-  # else
   if [ ! -f "$NETWORK_CACHE_PATH" ]; then
     log caching network resource "${NETWORK_RESOURCE}"
     oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${NETWORK_RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
@@ -393,7 +374,6 @@ EOF
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-  # fi
 done
 
 # debug, confirm correct subnets.json
