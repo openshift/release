@@ -1,8 +1,4 @@
 base_images:
-  odh-tests:
-    name: odh-manifests-tests
-    namespace: ocp
-    tag: latest
   os:
     name: centos
     namespace: origin
@@ -11,27 +7,30 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.21
 images:
-- context_dir: .
-  dockerfile_path: Dockerfile
+- build_args:
+  - name: MANIFEST_RELEASE
+    value: master
+  context_dir: .
+  dockerfile_path: Dockerfiles/Dockerfile
   from: os
   to: opendatahub-operator
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/opendatahub/opendatahub-operator:v1.6.0
+  - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -48,28 +47,21 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-image-mirror
   postsubmit: true
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator
     env:
       IMAGE_REPO: opendatahub-operator
-      RELEASE_VERSION: master
-    workflow: opendatahub-io-ci-image-mirror
-- as: opendatahub-operator-image-mirror-latest
-  cron: 0 2 * * *
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
-    env:
-      IMAGE_REPO: opendatahub-operator
-      IMAGE_TAG: latest
+      RELEASE_VERSION: incubation
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$
   steps:
     cluster_profile: gcp-opendatahub
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
-      OO_CHANNEL: rolling
+      OO_CHANNEL: fast
       OO_INSTALL_NAMESPACE: openshift-operators
       OO_PACKAGE: opendatahub-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -85,26 +77,7 @@ tests:
           cpu: 2000m
           memory: 3Gi
     workflow: optional-operators-ci-gcp
-- as: opendatahub-manifests-e2e
-  optional: true
-  steps:
-    cluster_profile: gcp-opendatahub
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-      OO_CHANNEL: rolling
-      OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: opendatahub-operator
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: manifests-e2e
-      commands: SKIP_OPERATOR_INSTALL=true $HOME/peak/installandtest.sh
-      from: odh-tests
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
-  branch: master
+  branch: feature-operator-refactor
   org: opendatahub-io
   repo: opendatahub-operator
