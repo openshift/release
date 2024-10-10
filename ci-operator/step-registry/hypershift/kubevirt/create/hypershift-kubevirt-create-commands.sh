@@ -161,21 +161,43 @@ fi
 
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
-# shellcheck disable=SC2086
-"${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
-  --name "${CLUSTER_NAME}" \
-  --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
-  --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
-  --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
-  --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
-  --root-volume-size 64 \
-  --release-image "${RELEASE_IMAGE}" \
-  --pull-secret "${PULL_SECRET_PATH}" \
-  --generate-ssh \
-  --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
-  --infra-availability-policy "${INFRA_AVAILABILITY}" \
-  --service-cidr 172.32.0.0/16 \
-  --cluster-cidr 10.136.0.0/14
+# Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
+if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+  # shellcheck disable=SC2086
+  "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+    --name "${CLUSTER_NAME}" \
+    --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
+    --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+    --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
+    --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
+    --root-volume-size 64 \
+    --release-image "${RELEASE_IMAGE}" \
+    --pull-secret "${PULL_SECRET_PATH}" \
+    --generate-ssh \
+    --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
+    --infra-availability-policy "${INFRA_AVAILABILITY}" \
+    --service-cidr 172.32.0.0/16 \
+    --cluster-cidr 10.136.0.0/14 --render --render-sensitive > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+
+  oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+else
+  # shellcheck disable=SC2086
+  "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+    --name "${CLUSTER_NAME}" \
+    --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
+    --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+    --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
+    --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
+    --root-volume-size 64 \
+    --release-image "${RELEASE_IMAGE}" \
+    --pull-secret "${PULL_SECRET_PATH}" \
+    --generate-ssh \
+    --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
+    --infra-availability-policy "${INFRA_AVAILABILITY}" \
+    --service-cidr 172.32.0.0/16 \
+    --cluster-cidr 10.136.0.0/14
+fi
+
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
