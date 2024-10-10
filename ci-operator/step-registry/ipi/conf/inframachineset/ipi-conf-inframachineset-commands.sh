@@ -167,6 +167,16 @@ data:
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoExecute
     kubeStateMetrics:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
