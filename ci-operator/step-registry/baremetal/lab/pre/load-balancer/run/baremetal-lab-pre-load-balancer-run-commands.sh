@@ -67,11 +67,14 @@ echo "Setting the network interfaces in the HAProxy container"
 
 # For the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interfaces.
 # eth2 will only get local routes configuration
-if [ x"${DISCONNECTED}" != x"true" ]; then
-  devices=( eth1.br-ext eth2.br-int )
-else
-  devices=( eth1.br-int )
+
+devices=( eth1.br-ext eth2.br-int )
+api_ip_interface=eth1
+
+if [ x"${DISCONNECTED}" == x"true" ]; then
+  api_ip_interface=eth2
 fi
+
 echo "${devices[@]}"
 for dev in "${devices[@]}"; do
   interface=${dev%%.*}
@@ -98,14 +101,14 @@ podman kill --signal HUP "haproxy-$CLUSTER_NAME"
 echo "Gather the IP Address for the new interface"
 
 api_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
-  /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
+  /sbin/ip -o -4 a list ${api_ip_interface} | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
 if [ "${#api_ip}" -eq 0 ]; then
   echo "No IPv4 Address has been set for the external API VIP, failing"
   exit 1
 fi
 
 api_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
-  /sbin/ip -o -6 a list eth1 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
+  /sbin/ip -o -6 a list ${api_ip_interface} | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
 if [ "${#api_ip_v6}" -eq 0 ]; then
   echo "No global IPv6 Address has been set for the external API VIP, failing"
   exit 1
