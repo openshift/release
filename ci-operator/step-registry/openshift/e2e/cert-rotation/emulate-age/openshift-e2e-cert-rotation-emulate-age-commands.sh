@@ -49,10 +49,10 @@ function emulate-cluster-age {
   # Restart kubelet
   run-on-all-nodes "systemctl restart kubelet"
 
+  pod-restart-workarounds
+
   # Wait for nodes to become unready and approve CSRs until nodes are ready again
   wait-for-nodes-to-be-ready
-
-  pod-restart-workarounds
 
   wait-for-operators-to-stabilize
 
@@ -78,7 +78,7 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cluster-age-test.sh "root@${IP}:/usr/local/b
 
 timeout \
 	--kill-after 10m \
-	180m \
+	8h \
 	ssh \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
