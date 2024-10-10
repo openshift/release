@@ -19,9 +19,9 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- always_run: false
-  as: qa-e2e-tests
+- as: qa-e2e-tests
   optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -32,6 +32,7 @@ tests:
 - always_run: false
   as: scanner-v4-tests
   optional: true
+  run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -68,9 +69,9 @@ tests:
       TEST_SUITE: ocp-sensor-integration-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
-  as: ui-e2e-tests
+- as: ui-e2e-tests
   optional: true
+  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -89,9 +90,9 @@ tests:
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
-  as: compliance-e2e-tests
+- as: compliance-e2e-tests
   optional: true
+  run_if_changed: ^(compliance|central\/compliance.*)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -99,7 +100,7 @@ tests:
       TEST_SUITE: ocp-compliance-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
+- always_run: true
   as: nongroovy-e2e-tests
   optional: true
   steps:
@@ -107,6 +108,59 @@ tests:
       COLLECTION_METHOD: core_bpf
       OCP_VERSION: ocp/candidate
       TEST_SUITE: ocp-nongroovy-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-qa-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-operator-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-operator-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-scanner-v4-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-scanner-v4-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-ui-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-ui-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-nongroovy-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-compliance-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate
+      TEST_SUITE: ocp-compliance-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
