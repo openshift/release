@@ -1,0 +1,93 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  mtc-python-client:
+    name: mtc-python-client
+    namespace: mtc-qe
+    tag: master
+  oadp-apps-deployer:
+    name: oadp-apps-deployer
+    namespace: oadp-qe
+    tag: master
+  oadp-e2e-qe:
+    name: oadp-e2e-qe
+    namespace: oadp-qe
+    tag: master
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/testing/interop/Dockerfile
+  inputs:
+    mtc-python-client:
+      paths:
+      - destination_dir: mtc-python-client.tar.gz
+        source_path: /mtc-python-client.tar.gz
+    oadp-apps-deployer:
+      paths:
+      - destination_dir: oadp-apps-deployer.tar.gz
+        source_path: /oadp-apps-deployer.tar.gz
+    oadp-e2e-qe:
+      paths:
+      - destination_dir: oadp-e2e-qe.tar.gz
+        source_path: /oadp-e2e-qe.tar.gz
+  to: oadp-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: oadp-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "oadp-s3-*", "failure_type": "all", "classification":  "Infrastructure Provisioning - S3 Buckets", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OADP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","rosa-classic-lp","oadp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.17"
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.4", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"}
+        ]
+    test:
+    - chain: install-operators
+    - ref: oadp-execute-tests
+    workflow: oadp-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation
+  variant: oadp1.4-ocp4.17-lp-rosa-classic
