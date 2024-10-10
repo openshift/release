@@ -90,6 +90,9 @@ EOF
             metadata:
                 name: "${operator_group}"
                 namespace: "${operator_install_namespace}"
+            installModes:
+                - supported: true
+                  type: AllNamespaces    
 EOF
         else
             echo "Deploying OperatorGroup ${operator_group} in to ${operator_install_namespace} with target namespaces: ${operator_target_namespaces}"
