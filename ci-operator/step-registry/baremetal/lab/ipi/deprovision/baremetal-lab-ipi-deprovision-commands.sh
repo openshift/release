@@ -3,7 +3,6 @@
 set -o nounset
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -11,6 +10,14 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+    { echo "The cluster is expected to persist. Skipping deprovisioning..."; exit 0; }
+echo "No request to let the cluster persist detected. Deprovisioning..."
+
+[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 echo "[INFO] Look for a bootstrap VM in the provisioning host and destroy it..."
 LIBVIRT_DEFAULT_URI="qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1"

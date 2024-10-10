@@ -7,17 +7,22 @@ if [ -z "${AUX_HOST}" ]; then
     exit 1
 fi
 
-if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
-  echo "Skipping the wipe step, as it's not implemented for non self-managed networks"
-  exit 0
-fi
-
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
+if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
+  echo "Skipping the wipe step, as it's not implemented for non self-managed networks"
+  exit 0
+fi
 
 function wait_for_power_down() {
   local bmc_host="${1}"
