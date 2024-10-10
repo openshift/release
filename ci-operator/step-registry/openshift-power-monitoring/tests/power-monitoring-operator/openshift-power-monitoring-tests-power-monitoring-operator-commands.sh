@@ -71,7 +71,7 @@ create_ds() {
 	# TODO: Remove this once older CI jobs are deprecated/removed
 	local cmd=""
 	if [[ $img =~ model_server:v0.7.11.* ]]; then
-		cmd="[\"model-server\", \"-l\", \"warn\"]"
+		cmd="[\"model-server\", \"-l\", \"info\"]"
 	else
 		cmd="[\"python3.8\", \"-u\", \"src/server/model_server.py\"]"
 	fi
