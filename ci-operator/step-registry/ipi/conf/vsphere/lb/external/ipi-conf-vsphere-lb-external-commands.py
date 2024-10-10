@@ -140,7 +140,10 @@ with open(subnets_config) as sf:
 
     if cluster_profile_name == "vsphere-elastic":
         for key, value in subnet_obj[prh].items():
-            ipaddresses.append(ipaddress.IPv4Network(value["machineNetworkCidr"])[10:])
+            machineNetworkCidr = value["machineNetworkCidr"]
+            print(f"machine network cidr {machineNetworkCidr}")
+
+            ipaddresses.append(ipaddress.IPv4Network(machineNetworkCidr)[10:])
     else:
         ipaddresses.append(ipaddress.IPv4Network(subnet_obj[prh][vlanid]["machineNetworkCidr"])[10:])
 
