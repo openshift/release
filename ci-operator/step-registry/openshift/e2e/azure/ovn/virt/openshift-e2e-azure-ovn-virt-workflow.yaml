@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-azure-ovn-virt
+  steps:
+    pre:
+      - chain: ipi-conf-azure
+      - ref: ovn-conf
+      - chain: ipi-install
+      - ref: install-operators
+    test:
+      - ref: openshift-e2e-test
+    post:
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+    env:
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK: "true"
+      OPERATORS: |
+        [
+            {"name": "kubevirt-hyperconverged", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cnv","target_namespace": "openshift-cnv", "operator_group": "kubevirt-hyperconverged-group"}
+        ]
+  documentation: |-
+    The Openshift E2E OVN virt workflow executes the VIRT end-to-end test suite in Azure with the OVNKubernetes network plugin with dualstack configured.
