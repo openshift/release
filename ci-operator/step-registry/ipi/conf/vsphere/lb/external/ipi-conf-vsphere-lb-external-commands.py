@@ -151,7 +151,7 @@ vips_file_name = f"{shared_dir}/vips.txt"
 
 gateway = subnet_obj[prh][vlanid]["gateway"]
 mask = subnet_obj[prh][vlanid]["mask"]
-dns_server = subnet_obj[prh][vlanid]["dns_server"]
+dns_server = subnet_obj[prh][vlanid]["dnsServer"]
 external_lb_ip_address = subnet_obj[prh][vlanid]["ipAddresses"][2]
 
 with open(vips_file_name, "w") as vip_file:
