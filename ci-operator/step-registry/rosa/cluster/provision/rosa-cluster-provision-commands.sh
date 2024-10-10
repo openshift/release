@@ -164,12 +164,56 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   version_cmd="$version_cmd --hosted-cp"
 fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+  # shellcheck disable=SC2089
   version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
   version_cmd="$version_cmd | jq -r '.[].raw_id'"
 fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
+
+# If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
+# supplied by CI for the payload to use. This only really works for nightlies. ROSA
+# SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
+# and it can take for up to 60 minutes in practice for the nightly to be available and listed
+# from the ROSA CLI, so we keep retrying with a back off.
+if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
+    PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)
+
+    DELAY=60
+    MAX_DELAY=360
+    TIME_LIMIT=3600
+    start_time=$(date +%s)
+
+    while true; do
+        # Check if image has been synced yet
+        if eval "$version_cmd" | grep -q "$PAYLOAD_TAG"; then
+            echo "$PAYLOAD_TAG is available from ROSA, continuing..."
+            OPENSHIFT_VERSION=$PAYLOAD_TAG
+            break
+        fi
+
+        current_time=$(date +%s)
+        elapsed_time=$((current_time - start_time))
+
+        # Don't wait longer than $TIME_LIMIT for the payload to be synced
+        if [[ $elapsed_time -ge $TIME_LIMIT ]]; then
+            minutes=$((TIME_LIMIT / 60))
+            echo "Error: timed out after $minutes minutes waiting for $PAYLOAD_TAG to become available"
+            exit 1
+        fi
+
+        # Wait for the current delay before retrying
+        echo "Payload tag not found. Waiting for $DELAY seconds before retrying..."
+        sleep $DELAY
+
+        # Double the delay for exponential back-off, but cap it at the max delay
+        DELAY=$((DELAY * 2))
+        if [[ $DELAY -gt $MAX_DELAY ]]; then
+            DELAY=$MAX_DELAY
+        fi
+    done
+fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
