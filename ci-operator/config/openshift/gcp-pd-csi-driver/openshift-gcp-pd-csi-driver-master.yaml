@@ -65,6 +65,27 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
+- as: e2e-gcp-csi-c3
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_TYPE: c3-standard-4
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-gcp-pd.yaml
+      TEST_SUITE: openshift/csi
+    post:
+    - ref: storage-obj-check
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-compute-node-type
+    - ref: storage-conf-storageclass-install-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: storage-conf-csi-gcp-pd
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
 - as: e2e-gcp-ovn-upgrade
   steps:
     cluster_profile: gcp
