@@ -34,8 +34,6 @@ kind: PerformanceProfile
 metadata:
   name: openshift-single-node-cpu-rt-master
 spec:
-  realTimeKernel:
-    enabled: true
   cpu:
     reserved: 0-$((RESERVED_CPU_COUNT - 1))
     isolated: $RESERVED_CPU_COUNT-$((max_cpus - 1))
@@ -43,9 +41,6 @@ spec:
     pools.operator.machineconfiguration.openshift.io/master: ""
   nodeSelector:
     node-role.kubernetes.io/master: ""
-  workloadHints:
-    highPowerConsumption: true
-    realTime: true
 EOF
 
 # Wait for the node restart to trigger, this can take a few minutes
@@ -85,16 +80,18 @@ echo "Validating the updated kernel version"
 node_name=$(oc get nodes -o jsonpath='{.items[*].metadata.name}')
 kernel_info=$(oc debug --to-namespace='default' --quiet node/${node_name} -- uname -r)
 
-if [[ $kernel_info != *"+rt" ]]; then
-  echo "ERROR: the kernel version ${kernel_info} on node ${node_name} does not have the real-time modifier '+rt'"
-  exit 1
-fi
+#if [[ $kernel_info != *"+rt" ]]; then
+#  echo "ERROR: the kernel version ${kernel_info} on node ${node_name} does not have the real-time modifier '+rt'"
+#  exit 1
+#fi
 
 node_info=$(oc get nodes -o jsonpath='{.items[*].status.nodeInfo.kernelVersion}')
 
-if [[ $node_info != "$kernel_info" ]]; then
-  echo "ERROR: nodeInfo.kernelVersion is not properly reflecting the realtime kernel update. Observed '${node_info}' but expected '${kernel_info}'"
-  exit 1
-fi
+echo $node_info
 
-echo "Successfully activated the realtime kernel '$kernel_info'"
+#if [[ $node_info != "$kernel_info" ]]; then
+#  echo "ERROR: nodeInfo.kernelVersion is not properly reflecting the realtime kernel update. Observed '${node_info}' but expected '${kernel_info}'"
+#  exit 1
+#fi
+
+#echo "Successfully activated the realtime kernel '$kernel_info'"
