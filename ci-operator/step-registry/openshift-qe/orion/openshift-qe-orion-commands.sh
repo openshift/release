@@ -1,7 +1,4 @@
 #!/bin/bash
-set -o errexit
-set -o nounset
-set -o pipefail
 set -x
 
 if [ ${RUN_ORION} == false ]; then
@@ -52,10 +49,15 @@ if [[ -n "$ORION_CONFIG" ]]; then
   export CONFIG="${ORION_CONFIG}"
 fi
 
+set +e
 es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+orion_exit_status=$?
+set -e
 
 if [ ${JUNIT} == true ]; then
   cp *.xml ${ARTIFACT_DIR}/
 else
   cat *.csv
 fi
+
+exit $orion_exit_status
