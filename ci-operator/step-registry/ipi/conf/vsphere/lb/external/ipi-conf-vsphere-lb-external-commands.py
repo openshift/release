@@ -143,9 +143,9 @@ with open(subnets_config) as sf:
             machineNetworkCidr = value["machineNetworkCidr"]
             print(f"machine network cidr {machineNetworkCidr}")
 
-            ipaddresses.append(ipaddress.IPv4Network(machineNetworkCidr)[10:])
+            ipaddresses.append(list(ipaddress.IPv4Network(machineNetworkCidr).hosts())[10:127])
     else:
-        ipaddresses.append(ipaddress.IPv4Network(subnet_obj[prh][vlanid]["machineNetworkCidr"])[10:])
+        ipaddresses.append(list(ipaddress.IPv4Network(subnet_obj[prh][vlanid]["machineNetworkCidr"]).hosts())[10:127])
 
 vips_file_name = f"{shared_dir}/vips.txt"
 
