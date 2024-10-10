@@ -20,5 +20,8 @@ function secrets {
   mv secrets/* "${SHARED_DIR}/"
 }
 
+# for saving files...
+cd /tmp
+
 login
 secrets
