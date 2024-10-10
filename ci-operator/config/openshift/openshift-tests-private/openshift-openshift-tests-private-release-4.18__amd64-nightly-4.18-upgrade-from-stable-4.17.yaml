@@ -12,9 +12,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -116,8 +120,10 @@ tests:
       ENABLE_OTA_TEST: OCP-66839
       EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: CloudCredential CloudCredential+Ingress
         MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudCredential MachineAPI MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential CloudCredential+Ingress
+        MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudControllerManager CloudCredential CloudCredential+CloudControllerManager
+        CloudCredential+Ingress Ingress MachineAPI MachineAPI+CloudCredential
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       PERSISTENT_MONITORING: "false"
@@ -319,6 +325,34 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: azure-aks-hypershift-byo-vnet-inplace-guest-f28
+  cron: 28 15 19 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      EXTRA_ARGS: --fips --node-upgrade-type=InPlace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-aks-hypershift-byo-vnet-replace-guest-f28
+  cron: 38 17 28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-aks-hypershift-etcd-disk-encryption-replace-guest-f28
+  cron: 37 14 26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
 - as: azure-aks-hypershift-registry-overrides-replace-guest-f28
   cron: 23 23 4 * *
   steps:
@@ -334,6 +368,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_TRUSTEDLAUNCH_COMPUTE: "true"
+      ENABLE_TRUSTEDLAUNCH_CONTROL_PLANE: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
@@ -580,16 +616,18 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-marketplace-f28
-  cron: 31 16 2 * *
+- as: gcp-ipi-mini-perm-marketplace-f28
+  cron: 27 15 10 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace
 - as: gcp-ipi-mini-perm-custom-type-f28
   cron: 37 18 24 * *
   steps:

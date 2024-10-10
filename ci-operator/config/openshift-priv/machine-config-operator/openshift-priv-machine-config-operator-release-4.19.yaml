@@ -28,13 +28,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -431,6 +431,26 @@ tests:
   steps:
     cluster_profile: openstack-hwoffload
     workflow: openshift-e2e-openstack-dualstack
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
+- always_run: false
+  as: e2e-openstack-hypershift
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vexxhost-quota-slice
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-external
 - as: security
   optional: true
   steps:

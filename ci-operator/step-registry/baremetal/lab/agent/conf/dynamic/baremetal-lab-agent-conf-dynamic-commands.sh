@@ -8,6 +8,9 @@ if [ "${ipv6_enabled:-}" == "true" ]; then
  QUERY=".[0].ipv6"
 fi
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 "${QUERY}" "${SHARED_DIR}/hosts.yaml")"
+
+day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+
 # Create an agent-config file containing only the minimum required configuration
 
 ntp_host=$(< "${CLUSTER_PROFILE_DIR}/aux-host-internal-name")
@@ -28,21 +31,25 @@ additionalNTPSources:
 hosts: []
 EOF
 
+cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+cpuArchitecture: ${day2_arch}
+hosts: []
+EOF
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    # Do not create host config for additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
-    # on a single-arch payload migrated to a multi-arch cluster)
-    continue
-  fi
-  ADAPTED_YAML="
-  hostname: ${name}
+  if [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
+    ADAPTED_YAML="
   role: ${name%%-[0-9]*}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+  "
+  fi
+  ADAPTED_YAML+="
+  hostname: ${name}
   interfaces:
   - macAddress: ${mac}
     name: ${baremetal_iface}
@@ -80,7 +87,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 #        dhcp: false
 #    "
 #  done
-  # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
+  # Patch agent-config.yaml or nodes-config.yaml if host used for day2 by adding the given host to the hosts list
+  CONFIG_FILE=agent-config.yaml
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    CONFIG_FILE="nodes-config.yaml"
+  fi
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-    "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
+      "$SHARED_DIR/$CONFIG_FILE" - <<< "$ADAPTED_YAML"
 done

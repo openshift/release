@@ -44,6 +44,12 @@ chain:
       default: "false"
       documentation: |-
         If true, enable OS disk encryption by specifying --disk-encryption-set-id="$(cat "${SHARED_DIR}/azure_des_id")".
+    - name: HYPERSHIFT_ENCRYPTION_AT_HOST
+      default: ""
+      documentation: |-
+        Set to true or false to enable or disable encryption at the host on Azure VMs. 
+        If left empty, the flag will be omitted, and the default behavior will apply.
+        Currently, the default is Enabled, see https://github.com/openshift/hypershift/blob/9f15114301ae6c1cd2a6ecf700cb8d7e626c14b4/vendor/github.com/openshift/hypershift/api/hypershift/v1beta1/nodepool_types.go#L1015
     - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
       default: "false"
       documentation: |-
@@ -72,6 +78,9 @@ chain:
     - name: HYPERSHIFT_NODE_DRAIN_TIMEOUT
       default: ""
       documentation: "The NodeDrainTimeout on the NodePool created with the hosted cluster."
+    - name: HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT
+      default: ""
+      documentation: "The NodeVolumeDetachTimeout on any created NodePools."
     - name: HYPERSHIFT_NP_AUTOREPAIR
       default: "false"
       documentation: "Enables machine autorepair with machine health checks."
@@ -177,6 +186,16 @@ chain:
       
       if [[ -n $HYPERSHIFT_NODE_DRAIN_TIMEOUT ]]; then
         EXTRA_ARGS+=" --node-drain-timeout=${HYPERSHIFT_NODE_DRAIN_TIMEOUT}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT ]]; then
+        EXTRA_ARGS+=" --node-volume-detach-timeout=${HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT}"
+      fi
+      
+      if [[ $HYPERSHIFT_ENCRYPTION_AT_HOST == "true" ]]; then
+        EXTRA_ARGS+=" --encryption-at-host=Enabled"
+      elif [[ $HYPERSHIFT_ENCRYPTION_AT_HOST == "false" ]]; then
+        EXTRA_ARGS+=" --encryption-at-host=Disabled"
       fi
       
       /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \

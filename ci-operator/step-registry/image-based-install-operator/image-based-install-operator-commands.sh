@@ -8,6 +8,8 @@ echo "************ image based install operator command ************"
 
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "export BMH_EXTERNALLY_PROVISIONED=${BMH_EXTERNALLY_PROVISIONED}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
 # prepending each printed line with a timestamp
@@ -15,12 +17,26 @@ exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 
 set -xeo pipefail
 
+source /root/env.sh
+
 cd /root/dev-scripts
 source common.sh
 source utils.sh
 source network.sh
 
-yq -iy 'select(.kind == "BareMetalHost").spec.automatedCleaningMode="disabled"' ocp/ostest/extra_host_manifests.yaml
+echo "### Download latest version of yq"
+export YQ_PATH=$(which yq)
+if [ -z "${YQ_PATH}" ];
+then
+  export YQ_PATH=/usr/local/bin/yq
+else
+  rm -f ${YQ_PATH}
+fi
+wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ${YQ_PATH}
+chmod +x ${YQ_PATH}
+
+yq -i 'select(.kind == "BareMetalHost").spec.automatedCleaningMode = "disabled"' ocp/ostest/extra_host_manifests.yaml
+yq -i 'select(.kind == "BareMetalHost").spec.externallyProvisioned = env(BMH_EXTERNALLY_PROVISIONED)' ocp/ostest/extra_host_manifests.yaml
 oc create -f ocp/ostest/extra_host_manifests.yaml
 oc create namespace ibi-cluster
 oc create secret generic pull-secret -n ibi-cluster --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=${PULL_SECRET_FILE}
@@ -37,6 +53,8 @@ nslookup api.ibi-cluster.mydomain.com
 nslookup a.apps.ibi-cluster.mydomain.com
 
 echo "Configured dns successfully"
+
+export SSH_PUB_KEY=$(cat /home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key.pub)
 
 tee <<EOCR | oc create -f -
 apiVersion: hive.openshift.io/v1
@@ -61,6 +79,7 @@ spec:
   imageSetRef:
     name: ibi-cluster-image-set
   machineNetwork: ${EXTERNAL_SUBNET_V4}
+  sshKey: ${SSH_PUB_KEY}
 ---
 apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
@@ -88,8 +107,8 @@ sleep 60
 oc wait -n ibi-cluster --for=jsonpath='{.status.conditions[?(@.type=="Completed")].reason}'=ClusterInstallationSucceeded imageclusterinstalls.extensions.hive.openshift.io/ibi-cluster --timeout=60m
 
 echo "### Check connectivity to ibi cluster"
-mkdir /tmp/ibi-cluster
-oc extract secret/ibi-cluster-admin-kubeconfig -n ibi-cluster --to /tmp/ibi-cluster/
-oc --kubeconfig /tmp/ibi-cluster/kubeconfig get clusterversion,clusteroperators
+mkdir /root/ibi-cluster
+oc extract secret/ibi-cluster-admin-kubeconfig -n ibi-cluster --to /root/ibi-cluster/
+oc --kubeconfig /root/ibi-cluster/kubeconfig get clusterversion,clusteroperators
 
 EOF

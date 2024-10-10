@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 23 1 * * 1,5
   decorate: true
   decoration_config:
@@ -91,7 +91,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 43 1 * * 1,5
   decorate: true
   decoration_config:
@@ -182,7 +182,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 4 1 * * 1,5
   decorate: true
   decoration_config:
@@ -274,7 +274,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 16 5 * * 1,5
   decorate: true
   decoration_config:
@@ -365,8 +365,99 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 41 0 * * 1,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+    ci-operator.openshift.io/variant: "413"
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-413-test-soak-aws-413-c
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-soak-aws-413-c-cluster-profile
+      - --target=test-soak-aws-413-c
+      - --variant=413
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/test-soak-aws-413-c-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-serverless
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 35 4 * * 1,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -456,8 +547,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 35 4 * * 1,5
+  cluster: build05
+  cron: 42 1 * * 1,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -547,8 +638,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 42 1 * * 1,5
+  cluster: build05
+  cron: 6 5 * * 1,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -638,7 +729,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 25 0 * * 6
   decorate: true
   decoration_config:
@@ -651,10 +742,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: 415-aws-ovn
+    ci-operator.openshift.io/variant: 416-aws-ovn
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-aws-ovn-e2e-aws-ovn-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-aws-ovn-e2e-aws-ovn-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -676,7 +767,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-ovn-continuous-cluster-profile
       - --target=e2e-aws-ovn-continuous
-      - --variant=415-aws-ovn
+      - --variant=416-aws-ovn
       command:
       - ci-operator
       image: ci-operator:latest
@@ -730,7 +821,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 6 7 * * 6
   decorate: true
   decoration_config:
@@ -743,10 +834,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: 415-azure
+    ci-operator.openshift.io/variant: 416-azure
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-azure-e2e-azure-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-azure-e2e-azure-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -768,7 +859,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-continuous-cluster-profile
       - --target=e2e-azure-continuous
-      - --variant=415-azure
+      - --variant=416-azure
       command:
       - ci-operator
       image: ci-operator:latest
@@ -835,10 +926,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
-    ci-operator.openshift.io/variant: 415-gcp
+    ci-operator.openshift.io/variant: 416-gcp
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-gcp-e2e-gcp-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-gcp-e2e-gcp-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -860,7 +951,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-continuous-cluster-profile
       - --target=e2e-gcp-continuous
-      - --variant=415-gcp
+      - --variant=416-gcp
       command:
       - ci-operator
       image: ci-operator:latest
@@ -918,7 +1009,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 43 20 * * 6
   decorate: true
   decoration_config:
@@ -931,10 +1022,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: 415-hypershift
+    ci-operator.openshift.io/variant: 416-hypershift
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-hypershift-e2e-hypershift-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-hypershift-e2e-hypershift-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -956,7 +1047,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-hypershift-continuous-cluster-profile
       - --target=e2e-hypershift-continuous
-      - --variant=415-hypershift
+      - --variant=416-hypershift
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1010,87 +1101,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 6 5 * * 1,5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/variant: "415"
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-kitchensink-e2e-aws-415-c
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=kitchensink-e2e-aws-415-c
-      - --variant=415
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 1 3 * * 1,5
   decorate: true
   decoration_config:
@@ -1100,10 +1111,10 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/variant: "415"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-kitchensink-upgrade-aws-415-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-kitchensink-e2e-aws-416-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1123,8 +1134,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=kitchensink-upgrade-aws-415-c
-      - --variant=415
+      - --target=kitchensink-e2e-aws-416-c
+      - --variant=416
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1170,8 +1181,88 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 18 3 * * 1,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/variant: "416"
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-kitchensink-upgrade-aws-416-c
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=kitchensink-upgrade-aws-416-c
+      - --variant=416
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 44 2 * * 1,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1181,10 +1272,10 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/variant: "415"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-mesh-e2e-aws-415-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-mesh-e2e-aws-416-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1204,8 +1295,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=mesh-e2e-aws-415-c
-      - --variant=415
+      - --target=mesh-e2e-aws-416-c
+      - --variant=416
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1251,8 +1342,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 44 2 * * 1,5
+  cluster: build05
+  cron: 57 0 * * 1,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1261,10 +1352,10 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/variant: "415"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-operator-e2e-aws-415-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-operator-e2e-aws-416-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1284,8 +1375,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-e2e-aws-415-c
-      - --variant=415
+      - --target=operator-e2e-aws-416-c
+      - --variant=416
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1331,7 +1422,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 31 3 * * 0
   decorate: true
   decoration_config:
@@ -1344,10 +1435,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: osd-ephemeral
     ci-operator.openshift.io/cloud-cluster-profile: osd-ephemeral
-    ci-operator.openshift.io/variant: 415-osd
+    ci-operator.openshift.io/variant: 416-osd
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-osd-e2e-osd-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-osd-e2e-osd-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1369,7 +1460,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-osd-continuous-cluster-profile
       - --target=e2e-osd-continuous
-      - --variant=415-osd
+      - --variant=416-osd
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1436,10 +1527,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
-    ci-operator.openshift.io/variant: 415-single-node
+    ci-operator.openshift.io/variant: 416-single-node
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-single-node-e2e-sno-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-single-node-e2e-sno-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1461,7 +1552,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-sno-continuous-cluster-profile
       - --target=e2e-sno-continuous
-      - --variant=415-single-node
+      - --variant=416-single-node
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1519,87 +1610,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 57 0 * * 1,5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/variant: "415"
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-test-upgrade-aws-415-c
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-upgrade-aws-415-c
-      - --variant=415
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 45 5 * * 1,5
   decorate: true
   decoration_config:
@@ -1609,10 +1620,10 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/variant: "415"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-ui-e2e-aws-415-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-test-soak-aws-416-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1632,8 +1643,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ui-e2e-aws-415-c
-      - --variant=415
+      - --target=test-soak-aws-416-c
+      - --variant=416
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1679,7 +1690,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 32 2 * * 1,5
   decorate: true
   decoration_config:
@@ -1689,10 +1700,10 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/variant: "415"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-upstream-e2e-kafka-aws-415-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-test-upgrade-aws-416-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1712,8 +1723,168 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=upstream-e2e-kafka-aws-415-c
-      - --variant=415
+      - --target=test-upgrade-aws-416-c
+      - --variant=416
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 36 4 * * 1,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/variant: "416"
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-ui-e2e-aws-416-c
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ui-e2e-aws-416-c
+      - --variant=416
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 58 2 * * 1,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/variant: "416"
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-upstream-e2e-kafka-aws-416-c
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=upstream-e2e-kafka-aws-416-c
+      - --variant=416
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1771,10 +1942,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: 415-vsphere
+    ci-operator.openshift.io/variant: 416-vsphere
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-415-vsphere-e2e-vsphere-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-vsphere-e2e-vsphere-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1796,7 +1967,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-continuous-cluster-profile
       - --target=e2e-vsphere-continuous
-      - --variant=415-vsphere
+      - --variant=416-vsphere
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1850,7 +2021,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 25 12 *
   decorate: true
   decoration_config:
@@ -1943,7 +2114,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 25 10 *
   decorate: true
   decoration_config:
@@ -2036,7 +2207,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 25 10 *
   decorate: true
   decoration_config:
@@ -2129,7 +2300,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 25 10 *
   decorate: true
   decoration_config:
@@ -2222,7 +2393,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 11 2 *
   decorate: true
   decoration_config:
@@ -2315,7 +2486,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 11 2 *
   decorate: true
   decoration_config:
@@ -2408,7 +2579,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 11 2 *
   decorate: true
   decoration_config:
@@ -2501,7 +2672,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 0 6 11 2 *
   decorate: true
   decoration_config:

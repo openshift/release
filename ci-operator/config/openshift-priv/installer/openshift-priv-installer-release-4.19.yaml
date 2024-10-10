@@ -252,13 +252,13 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.19"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -480,6 +480,11 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - always_run: false
@@ -489,6 +494,10 @@ tests:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - as: e2e-azure-ovn-shared-vpc
@@ -641,6 +650,13 @@ tests:
         function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -875,6 +891,17 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
   timeout: 6h0m0s
+- as: integration-tests-nodejoiner
+  run_if_changed: ^(cmd|pkg|data).*/(agent|node-joiner)/
+  steps:
+    test:
+    - as: integration-tests-nodejoiner
+      commands: |
+        hack/go-integration-test-nodejoiner.sh
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: integration-tests
   run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
   steps:
@@ -941,6 +968,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         NUM_EXTRA_WORKERS=2
         EXTRA_WORKER_DISK=100
+        OPENSHIFT_CLIENT_FROM_RELEASE=true
       DEVSCRIPTS_TARGET: agent_plus_add_node
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
@@ -1004,7 +1032,7 @@ tests:
     env:
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
-      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+      OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
     post:
     - chain: gather-network
     - chain: gather-core-dump

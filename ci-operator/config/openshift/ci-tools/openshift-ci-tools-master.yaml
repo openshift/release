@@ -3,10 +3,6 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
-  ci_nginx-unprivileged_stable:
-    name: nginx-unprivileged
-    namespace: ci
-    tag: stable
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -71,12 +67,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-cluster-profiles-config
   to: check-cluster-profiles-config
-- context_dir: images/gh-pull-through-cache/
-  inputs:
-    ci_nginx-unprivileged_stable:
-      as:
-      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
-  to: gh-pull-through-cache
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
   from: os
   inputs:
@@ -97,15 +87,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/cvp-trigger
   to: cvp-trigger
-- context_dir: images/template-deprecator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
-  multi_arch: true
-  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -179,6 +160,14 @@ images:
         source_path: /go/bin/sanitize-prow-jobs
   multi_arch: true
   to: sanitize-prow-jobs
+- context_dir: images/multi-pr-prow-plugin/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/multi-pr-prow-plugin
+  to: multi-pr-prow-plugin
 - context_dir: images/pj-rehearse/
   from: os
   inputs:
@@ -284,8 +273,6 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
       - destination_dir: .
@@ -782,8 +769,8 @@ promotion:
 resources:
   '*':
     requests:
-      cpu: 500m
-      memory: 600Mi
+      cpu: "1"
+      memory: 1Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
@@ -909,11 +896,24 @@ tests:
           memory: 200Mi
 - as: breaking-changes
   cluster: build10
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
   node_architecture: arm64
   optional: true
+  steps:
+    test:
+    - as: breaking-changes
+      commands: |
+        export KUBECONFIG_DIR=/etc/kubeconfigs
+        export KUBECONFIG_SUFFIX=config
+        make check-breaking-changes
+      credentials:
+      - mount_path: /etc/kubeconfigs
+        name: cluster-init
+        namespace: ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
   cluster: build10
   commands: make validate-checkconfig

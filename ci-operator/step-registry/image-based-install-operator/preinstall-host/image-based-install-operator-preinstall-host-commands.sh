@@ -10,6 +10,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 echo "export INSTALLER_PULL_REF=${INSTALLER_PULL_REF}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 echo "export SEED_IMAGE=${SEED_IMAGE}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export SEED_IMAGE_TAG=${SEED_IMAGE_TAG}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
@@ -49,6 +50,7 @@ set +x
 export PULL_SECRET=$(cat ${PULL_SECRET_FILE} | jq -c .)
 set -x
 
+export SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 podman pull ${SEED_IMAGE}
 export SEED_VERSION=$(podman inspect ${SEED_IMAGE} | jq '.[0].Labels."com.openshift.lifecycle-agent.seed_cluster_info"' | jq -R -s 'split(",")' | grep seed_cluster_ocp_version | jq -R -s 'split(":")'[1] | jq -R -s 'split(",")'[0] | sed -E 's/(\\|,|\")//g')
 echo ${SEED_VERSION} > seed-version
@@ -113,8 +115,12 @@ sleep 60
 export IBI_MACS=$(virsh --connect=${LIBVIRT_DEFAULT_URI} domiflist ${IBI_VM_NAME} | sed 1,2d | awk '{print $5}')
 export IBI_VM_IP=$(for MAC in ${IBI_MACS}; do arp -n | grep -i ${MAC} | awk '{print $1}'; done | cut --delimiter " " --fields 1)
 echo ${IBI_VM_IP} > ibi-vm-ip
-export SSH_FLAGS="-o IdentityFile=/home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-until nc -zv ${IBI_VM_IP} 22; do sleep 5; done
+export SSH_FLAGS="-n -o IdentityFile=/home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+timeout 10m bash -c 'until nc -zv ${IBI_VM_IP} 22; do sleep 5; done'
 ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sudo journalctl -flu install-rhcos-and-restore-seed.service | stdbuf -o0 -e0 awk '{print \$0 } /Finished SNO Image-based Installation./ { exit }'"
+
+ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sleep 60 && sudo shutdown now" &
+sleep 70
+timeout 10m bash -c 'until [[ $(virsh --connect=${LIBVIRT_DEFAULT_URI} domstate ${IBI_VM_NAME}) = "shut off" ]]; do sleep 5; done'
 
 EOF

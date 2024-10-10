@@ -19,7 +19,6 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.18
-binary_build_commands: make build
 build_root:
   from_repository: true
   use_build_cache: true
@@ -39,15 +38,22 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
+- dockerfile_path: Dockerfile.e2e
+  inputs:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+  to: hypershift-tests
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
+  - excluded_images:
+    - hypershift-operator
+    - hypershift-tests
     name: 4.18-priv
     namespace: ocp-private
   - additional_images:
       hypershift-operator: hypershift-operator
-      hypershift-tests: test-bin
+      hypershift-tests: hypershift-tests
     disabled: true
     excluded_images:
     - '*'
@@ -88,7 +94,6 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
-test_binary_build_commands: make build e2e
 tests:
 - as: verify
   commands: make verify
@@ -114,7 +119,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-4-17
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
@@ -125,20 +130,18 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: aws
+    cluster_profile: hypershift
     env:
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
       SKIP_E2E_LOCAL: "true"
-    workflow: hypershift-kubevirt-e2e-aws
+    workflow: hypershift-kubevirt-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
@@ -187,6 +190,13 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 - as: e2e-openstack
   optional: true
   steps:
@@ -194,12 +204,28 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-openstack-nfv
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+      NFV_NODEPOOLS: "true"
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-nfv-quota-slice
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: main
   org: openshift-priv

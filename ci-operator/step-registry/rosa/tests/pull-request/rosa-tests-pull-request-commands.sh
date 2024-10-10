@@ -65,8 +65,12 @@ run_testing_steps () {
   log "[CI] the generated JUNIT_XML is $JUNIT_XML"
   log "[CI] the generated JUNIT_TEMP_DIR is $JUNIT_TEMP_DIR" 
   
-  # Generate running cmd for day1-post
-  cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "$FOCUS" "$TEST_TIMEOUT" "$JUNIT_XML")
+  # Generate running cmd for $RUN_TIME
+  if [[ "${RUN_TIME}" == "destroy" ]]; then
+    cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "" "$TEST_TIMEOUT" "$JUNIT_XML")
+  else
+    cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "$FOCUS" "$TEST_TIMEOUT" "$JUNIT_XML")
+  fi
   log "[CI] Start e2e testing with command $cmd\n"
 
   # Execute the day1-post running cmd combined with focus
