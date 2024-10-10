@@ -30,6 +30,7 @@ COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 
+
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
@@ -64,6 +65,13 @@ echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status 
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
+
+cat << EOF > $ARTIFACT_DIR/test-summary.html
+<h3>test summary</h3>
+<p> these tests finsihed here <b>some test <i>result</i></b></p>
+<br><br>
+<p>Link to reports in artifact: <a href="/blabla/test.html">test report, working??</a></p>
+EOF
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
