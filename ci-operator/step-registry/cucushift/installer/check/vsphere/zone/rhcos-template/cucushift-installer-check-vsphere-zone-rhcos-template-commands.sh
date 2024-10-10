@@ -20,16 +20,21 @@ readarray -t zones_name_from_config < <(yq-go r ${INSTALL_CONFIG} "platform.vsph
 infra_id=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 
 function check_rhcos() {
-    local check_result=0 fd_folder fd_datacenter fd_region fd_zone
+    local check_result=0 fd_folder fd_datacenter fd_region fd_zone fd_template
     # shellcheck disable=SC2207
     for name in "${zones_name_from_config[@]}"; do
         fd_folder=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.failureDomains.(name==${name}).topology.folder")
 	fd_datacenter=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.failureDomains.(name==${name}).topology.datacenter")
+	fd_template=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.failureDomains.(name==${name}).topology.template")
         [[ -z "${fd_datacenter}" ]] && fd_datacenter=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.datacenter")
 	fd_region=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.failureDomains.(name==${name}).region")
 	fd_zone=$(yq-go r ${INSTALL_CONFIG} "platform.vsphere.failureDomains.(name==${name}).zone")
 	[[ -z "${fd_folder}" ]] && fd_folder="/${fd_datacenter}/vm/${infra_id}"
-        if [[ -n "$(govc ls ${fd_folder})" ]]; then
+        if [[ -n "${fd_template}" ]]; then
+	    echo "temmplate ${fd_template} specify in failureDomain ${name}, installer will use pre-existing template instead of importing new template, skip the check"
+	    continue
+	fi
+	if [[ -n "$(govc ls ${fd_folder})" ]]; then
 	    echo "INFO: folder ${fd_folder} created successful"
 	    if [[ -n "$(govc ls ${fd_folder}/${infra_id}-rhcos-${fd_region}-${fd_zone})" ]]; then
 	        echo "INFO: rhcos image ${infra_id}-rhcos-${fd_region}-${fd_zone} uploaded to specified failureDomain"
