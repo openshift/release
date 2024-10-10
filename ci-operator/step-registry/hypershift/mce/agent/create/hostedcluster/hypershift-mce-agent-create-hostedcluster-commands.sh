@@ -92,7 +92,11 @@ fi
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
   --ssh-key="${SHARED_DIR}/id_rsa.pub" \
-  --release-image ${RELEASE_IMAGE}
+  --release-image ${RELEASE_IMAGE} \
+  --render-sensitive --render > /tmp/cluster-agent.yaml
+
+cat /tmp/cluster-agent.yaml
+sleep 1800
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
