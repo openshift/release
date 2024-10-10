@@ -41,7 +41,7 @@ metadata:
 spec:
   components:
   - kind: clair
-    managed: false
+    managed: true
 EOF
 
 for _ in {1..60}; do
