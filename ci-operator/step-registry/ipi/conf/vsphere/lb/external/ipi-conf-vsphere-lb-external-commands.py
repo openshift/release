@@ -20,9 +20,11 @@ try:
 except ImportError:
     print("linter not available, run outside of CI")
 
+# This step uses:
+# https://github.com/openshift-splat-team/vsphere-ci-images
+# https://github.com/openshift/release/pull/57722
+# https://quay.io/repository/ocp-splat/vsphere-ci-python
 
-# NOTES:
-# This step uses a python image from: https://github.com/openshift-splat-team/vsphere-ci-images
 
 # vSphere steps create shell scripts with exports
 # to copy variables from one step to another
@@ -142,8 +144,6 @@ with open(subnets_config) as sf:
     else:
         ipaddresses.append(ipaddress.IPv4Network(subnet_obj[prh][vlanid]["machineNetworkCidr"])[10:])
 
-# echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
-
 vips_file_name = f"{shared_dir}/vips.txt"
 
 gateway = subnet_obj[prh][vlanid]["gateway"]
@@ -257,16 +257,13 @@ passwd:
         - {ssh_pub_key}
 '''
 
-
 print(butane_config)
 
 butane_config_path = "/tmp/butane.cfg"
 with open(butane_config_path, "w") as bf:
     bf.write(butane_config)
 
-
 vm_template = download_import_rhcos_ova()
-
 
 butane = subprocess.run(["butane", "-r", "-d", "/tmp", butane_config_path],
                stdout=subprocess.PIPE,
@@ -276,9 +273,7 @@ butane = subprocess.run(["butane", "-r", "-d", "/tmp", butane_config_path],
 
 encoded_ign = base64.b64encode(gzip.compress(butane.stdout.encode()))
 
-
 ip_config = f"ip={external_lb_ip_address}::{gateway}:{mask}:lb::none nameserver={dns_server}"
-
 
 govc_ls_networks = subprocess.run(["govc", "ls", f"/{vsphere_datacenter}/network"],
                                   stdout=subprocess.PIPE,
