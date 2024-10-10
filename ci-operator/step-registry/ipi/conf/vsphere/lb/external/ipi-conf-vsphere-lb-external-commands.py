@@ -36,7 +36,7 @@ def convert_shell_file_to_envvar(filename):
         for line in ef:
             # There are tabs in the govc.sh file
             keyvalue = line.replace('\t', '').replace('export ', '').split("=")
-            os.environ[keyvalue[0]] = keyvalue[1]
+            os.environ[keyvalue[0]] = keyvalue[1].replace('\n', '').replace(' ','').replace('"','')
 
 
 def download_import_rhcos_ova():
