@@ -159,6 +159,10 @@ EOF
   fi
 fi
 
+if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
+fi
+
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # shellcheck disable=SC2086
