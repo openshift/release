@@ -69,11 +69,11 @@ create_ds() {
 
 	# Switch to python 3.10 for model server image v0.7.11 or higher
 	# TODO: Remove this once older CI jobs are deprecated/removed
-	local python_version=""
-	if [[ $img =~ model_server:v0.7.11 ]]; then
-		python_version="python3.10"
+	local cmd=""
+	if [[ $img =~ model_server:v0.7.11.* ]]; then
+		cmd="[\"model-server\", \"-l\", \"warn\"]"
 	else
-		python_version="python3.8"
+		cmd="[\"python3.8\", \"-u\", \"src/server/model_server.py\"]"
 	fi
 
 	echo "creating dummy model-server daemonset inside default namespace using image: $img"
@@ -101,7 +101,7 @@ create_ds() {
         - name: model-server
           image: $img
           imagePullPolicy: Always
-          command: ["$python_version","-u","src/server/model_server.py"]
+          command: $cmd
 EOF
 
 	validate_ds default dummy-model-server 10 30 || {
