@@ -9,6 +9,7 @@ export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 # for interop
 if test -f ${SHARED_DIR}/kubeadmin-password
 then
