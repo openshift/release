@@ -14,6 +14,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: ocp4.17-lp-rosa-hypershift
     ci.openshift.io/generator: prowgen
+    job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-cluster-nfd-operator-release-4.17-ocp4.17-lp-rosa-hypershift-nfd-e2e-master-aws-rosa-hypershift
   spec:
@@ -23,6 +24,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/nfd-e2e-master-aws-rosa-hypershift-cluster-profile
       - --target=nfd-e2e-master-aws-rosa-hypershift
       - --variant=ocp4.17-lp-rosa-hypershift
@@ -37,6 +39,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/nfd-e2e-master-aws-rosa-hypershift-cluster-profile
         name: cluster-profile
@@ -60,6 +65,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws-cspi-qe
