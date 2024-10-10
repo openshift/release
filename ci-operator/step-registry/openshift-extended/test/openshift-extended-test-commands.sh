@@ -141,6 +141,7 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+sleep 14400
 if test -f "${SHARED_DIR}/cluster-id"
 then
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
