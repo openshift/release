@@ -9,6 +9,7 @@ ${SHARED_DIR}/login_script.sh
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     sudo chown -R ${USER} /tmp/*
     sudo chmod -R 777 /tmp/artifacts/*
+    sudo chmod -R 777 /tmp/_artifacts/*
 EOF
 
 
@@ -21,6 +22,7 @@ function getlogs() {
       fi
     done
     scp -rv "${SSHOPTS[@]}" "${USER}@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+    scp -rv "${SSHOPTS[@]}" "${USER}@${IP}:/tmp/_artifacts/*" "${ARTIFACT_DIR}/"
     ssh "${SSHOPTS[@]}" -o StrictHostKeyChecking=no "${USER}@${IP}" "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/journal.log"
 }
 
