@@ -147,7 +147,9 @@ metadata:
   namespace: openshift-cnv
 spec:
   featureGates:
+    deployKubevirtIpamController: true
     enableCommonBootImageImport: false
+    primaryUserDefinedNetworkBinding: true
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8
