@@ -12,6 +12,10 @@ export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
+# Sleep 6h for debugging
+echo "Pause deleting. Sleep 8h for personal usage"
+sleep 28800
+
 # add for hosted kubeconfig in the hosted cluster env
 if test -f "${SHARED_DIR}/nested_kubeconfig"
 then
