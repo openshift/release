@@ -64,6 +64,7 @@ then
   echo "using additional run-monitor args ${MONITOR_ARGS}"
 fi
 
+sleep 28800
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
 DISABLED_MONITOR_TESTS="apiserver-new-disruption-invariant,disruption-summary-serializer,incluster-disruption-serializer,pod-network-avalibility"
 openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
