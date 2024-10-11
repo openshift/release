@@ -206,7 +206,7 @@ function destroy_upi_cluster() {
 
 trap 'error_handler $? $LINENO' ERR
 
-echo "Invoking upi deprovision heterogeneous powervs for ${WORKSPACE_NAME}"
+echo "Invoking upi deprovision heterogeneous powervs"
 
 setup_home
 setup_ibmcloud_cli

@@ -256,13 +256,13 @@ function configure_terraform() {
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/pull-secret.txt
 
-    # TODO: calculate the POWERVS_SERVICE_INSTANCE_ID
     WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
     VPC_NAME="${WORKSPACE_NAME}"
     echo "IC: ${WORKSPACE_NAME}"
     echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
-    POWERVS_SERVICE_INSTANCE_ID="626e36c2-6a2e-4ce2-91e1-543185709880"
+    # Select the workspace ID 
+    POWERVS_SERVICE_INSTANCE_ID=$(ibmcloud pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
     export POWERVS_SERVICE_INSTANCE_ID
 
 cat << EOF >${IBMCLOUD_HOME_FOLDER}/ocp-install-dir/var-multi-arch-upi.tfvars
