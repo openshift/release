@@ -56,7 +56,7 @@ function emulate-cluster-age {
 
   wait-for-operators-to-stabilize
 
-  oc get nodes
+  oc --request-timeout=5s get nodes
 }
 
 full_steps=$((${CLUSTER_AGE_DAYS}/${CLUSTER_AGE_STEP}))

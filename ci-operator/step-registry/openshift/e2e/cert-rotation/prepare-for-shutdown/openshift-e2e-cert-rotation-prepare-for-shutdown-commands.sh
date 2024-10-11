@@ -63,7 +63,7 @@ run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
-  mapfile -t nodes < <( oc get nodes -o name )
+  mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
   echo "Approving CSRs at $(date)"
   fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
@@ -71,9 +71,9 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
     until (( approved_csrs >= required_csrs )); do
-      mapfile -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
       if [[ ${#csrs[@]} -gt 0 ]]; then
-        oc adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
+        oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
       sleep 10
     done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
@@ -84,8 +84,8 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     STATUS="False"
     TIME_DIFF="301"
     until [[ ${TIME_DIFF} -le 300 ]] && [[ ${STATUS} == True ]]; do
-      STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-      NODE_HEARTBEAT_TIME=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
+      STATUS=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      NODE_HEARTBEAT_TIME=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
       if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then
         continue
       fi
@@ -108,7 +108,7 @@ function wait-for-nodes-to-be-ready {
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
-  until oc get nodes; do sleep 10; done
+  until oc --request-timeout=5s get nodes; do sleep 10; done
 EOZ
 chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
@@ -121,7 +121,7 @@ function wait-for-valid-lb-ext-kubeconfig {
 cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
-  oc wait --for=condition=Progressing clusteroperator/kube-apiserver --timeout=300s 
+  oc --request-timeout=5s wait --for=condition=Progressing clusteroperator/kube-apiserver --timeout=300s 
 EOZ
 chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
@@ -134,7 +134,7 @@ function wait-for-kubeapiserver-to-start-progressing {
 cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
-  ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
@@ -166,12 +166,12 @@ function prepull-tools-image-for-gather-step {
 
 function wait-for-operators-to-stabilize {
   export KUBECONFIG=/tmp/lb-ext.kubeconfig
-  oc get nodes
+  oc --request-timeout=5s get nodes
   # Wait for operators to stabilize
   if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
-      oc get nodes
-      oc get co | grep -v "True\s\+False\s\+False"
+    ! oc --request-timeout=5s adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
+      oc --request-timeout=5s get nodes
+      oc --request-timeout=5s get co | grep -v "True\s\+False\s\+False"
       exit 1
   fi
 }
