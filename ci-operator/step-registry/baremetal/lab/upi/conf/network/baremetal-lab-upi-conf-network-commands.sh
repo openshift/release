@@ -19,6 +19,7 @@ if [[ "${ipv4_enabled:-false}" == "true" ]]; then
     hostPrefix: 23"
   PRIMARY_NET_SERVICE="172.30.0.0/16"
   PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
+  PRIMARY_NET_MACHINE_TEST="cidr: 193.168.80.0/22"
 fi
 
 if [[ "${ipv6_enabled:-false}" == "true" ]]; then
@@ -40,6 +41,7 @@ ipv4)
     hostPrefix: 23"
   PRIMARY_NET_SERVICE="172.30.0.0/16"
   PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
+  PRIMARY_NET_MACHINE_TEST="cidr: 193.168.80.0/22"
   SECONDARY_NET_CLUSTER="cidr: fd02::/48
     hostPrefix: 64"
   SECONDARY_NET_SERVICE="fd03::/112"
@@ -57,5 +59,6 @@ networking:
   ${SECONDARY_NET_SERVICE:+- ${SECONDARY_NET_SERVICE}}
   machineNetwork:
   ${PRIMARY_NET_MACHINE:+- ${PRIMARY_NET_MACHINE}}
+  ${PRIMARY_NET_MACHINE_TEST:+- ${PRIMARY_NET_MACHINE_TEST}}
   ${SECONDARY_NET_MACHINE:+- ${SECONDARY_NET_MACHINE}}
 EOF
