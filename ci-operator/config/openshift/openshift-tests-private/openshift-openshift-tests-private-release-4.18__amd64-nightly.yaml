@@ -333,7 +333,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "120"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -348,7 +348,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical|Medium|Low
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "120"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -363,7 +363,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -1383,6 +1383,16 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
+- as: azure-aks-hypershift-full-cert-guest-f14
+  cron: 26 15 12,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-full-cert-guest
 - as: azure-aks-hypershift-registry-overrides-guest-f7
   cron: 26 11 6,14,21,28 * *
   steps:
@@ -1664,6 +1674,46 @@ tests:
       masters: "3"
       workers: "2"
     workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-sno-agent-ipv4-static-fips-day2-f14
+  cluster: build05
+  cron: 51 21 6,20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-day2
+- as: baremetal-ha-agent-ipv4-static-disc-day2-f14
+  cluster: build05
+  cron: 3 14 13,27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
+      RESERVE_BOOTSTRAP: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-disconnected-day2
 - as: baremetal-ipi-ovn-lvms-f14
   cluster: build05
   cron: 1 13 1,17 * *
@@ -2035,7 +2085,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -2049,7 +2099,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -2063,7 +2113,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical|Medium|Low
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -2078,7 +2128,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical|Medium|Low
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -2093,7 +2143,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: High
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -2105,7 +2155,7 @@ tests:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
     env:
       TEST_SCENARIOS: Cluster_Operator|OTA|GCP-Filestore-CSI
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
@@ -2118,7 +2168,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
       TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "100"
+      TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longduration
     workflow: cucushift-agent-vsphere-dualstack-install-sno
@@ -2837,6 +2887,34 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
+  cron: 13 9 9,25 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: High
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longduration
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-longduration-mco-fips-proxy-g2-f14
+  cron: 13 9 9,25 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longduration
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-longduration-reliability-test-f14
   cron: 13 9 9,25 * *
   steps:
@@ -3046,6 +3124,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
+- as: vsphere-ipi-proxy-fips-regen-cert-f14
+  cron: 18 15 7,23 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-regenerate-cluster-cert
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-f14-disasterrecovery
   cron: 11 1 8,22 * *
   steps:

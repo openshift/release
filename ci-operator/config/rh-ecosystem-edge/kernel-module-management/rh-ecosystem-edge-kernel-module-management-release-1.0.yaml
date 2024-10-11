@@ -115,41 +115,6 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: e2e-in-cluster-build
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: rh-ecosystem-edge
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
-  steps:
-    test:
-    - as: install
-      cli: latest
-      commands: |
-        oc create namespace openshift-kmm
-        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-kmm deployment kmm-operator-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: operator-bundle
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    - as: run-test
-      cli: latest
-      commands: |
-        oc project default
-        SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
-      from: src
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    workflow: generic-claim
 zz_generated_metadata:
   branch: release-1.0
   org: rh-ecosystem-edge

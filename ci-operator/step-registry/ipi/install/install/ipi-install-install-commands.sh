@@ -678,6 +678,22 @@ aws|aws-arm64|aws-usgov)
       inject_spot_instance_config "${dir}" "masters"
     fi
     ;;
+vsphere*)
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+apiVersion: samples.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  architectures:
+  - x86_64
+  skippedImagestreams:
+  - openliberty
+EOF
+    fi
+    ;;
 esac
 
 set-cluster-version-spec-update-service

@@ -115,6 +115,8 @@ function create_upi_tf_varfile(){
   export IBMCLOUD_API_KEY
   # OCP_TMP_VERSION=$(openshift-install version | grep openshift-install | awk '{print $2}')
   # echo "OCP_TMP_VERSION: ${OCP_TMP_VERSION}"
+  POWERVS_SERVICE_INSTANCE_ID="626e36c2-6a2e-4ce2-91e1-543185709880"
+  export POWERVS_SERVICE_INSTANCE_ID
 
   cat <<EOF >${IBMCLOUD_HOME_FOLDER}/ocp-install-dir/var-multi-arch-upi.tfvars
 ibmcloud_region     = "${POWERVS_REGION}"
@@ -129,16 +131,17 @@ system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "multi-arch-p2"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
-bootstrap = { memory = "16", processors = "0.5", "count" = 1 }
-master    = { memory = "16", processors = "0.5", "count" = 3 }
-worker    = { memory = "16", processors = "0.5", "count" = 2 }
+bootstrap = { memory = "16", processors = "1", "count" = 1 }
+master    = { memory = "16", processors = "1", "count" = 3 }
+worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
 # release_image_override    = "quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-multi"
 release_image_override    = "$(openshift-install version | grep 'release image' | awk '{print $3}')"
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
-ibm_cloud_vpc_name         = "${workspace_name}-vpc"
+ibm_cloud_vpc_name        = "${workspace_name}"
+private_network_mtu       = 9000
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
@@ -180,7 +183,7 @@ function create_upi_powervs_cluster() {
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/pull-secret.txt "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/pull-secret.txt
   echo "Applying terraform"
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs && "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init && "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -auto-approve \
-    -var-file "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars | \
+    -var-file "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate | \
     sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
@@ -219,6 +222,7 @@ function create_upi_powervs_cluster() {
   echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
   echo "Done copying the kubeconfig"
+  sleep 7200
 }
 
 function ic() {
@@ -248,25 +252,6 @@ function setup_ibmcloud_cli() {
 function cleanup_ibmcloud_powervs() {
   local version="${1}"
   local workspace_name="${2}"
-  local vpc_name="${3}"
-
-  echo "Cleaning up the Transit Gateways"
-  for GW in $(ic tg gateways --output json | jq -r '.[].id')
-  do
-    echo "Checking the resource_group and location for the transit gateways ${GW}"
-    VALID_GW=$(ic tg gw "${GW}" --output json | jq -r '. | select(.name | contains("'${WORKSPACE_NAME}'"))')
-    if [ -n "${VALID_GW}" ]
-    then
-      for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
-      do 
-        retry "ic tg connection-delete ${GW} ${CS} --force"
-        sleep 30
-      done
-      retry "ic tg gwd ${GW} --force"
-      echo "waiting up a minute while the Transit Gateways are removed"
-      sleep 60
-    fi
-  done
 
   echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
 
@@ -291,270 +276,9 @@ function cleanup_ibmcloud_powervs() {
       retry "ic pi image delete ${IMAGE_ID}"
       sleep 60
     done
-
-    echo "Deleting the Network"
-    for NETWORK_ID in $(ic pi subnet ls --json | jq -r '.networks[].networkID')
-    do
-      echo "Deleting network ${NETWORK_ID}"
-      retry "ic pi subnet delete ${NETWORK_ID}"
-      sleep 60
-    done
-
-    retry "ic resource service-instance-update ${CRN} --allow-cleanup true"
-    sleep 30
-    retry "ic resource service-instance-delete ${CRN} --force --recursive"
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ic pi workspace ls 2> /dev/null | grep "${CRN}" || true)
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
     echo "Done Deleting the ${CRN}"
   done
-
-  echo "Cleaning up the Subnets"
-  for SUB in $(ic is subnets --output json | jq -r '.[].id')
-  do
-    VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-    if [ -n "${VALID_SUB}" ]
-    then
-      retry "ic is subnetd ${SUB} --force"
-      echo "waiting up a minute while the Subnets are removed"
-      sleep 60
-    fi
-  done
-
-  echo "Cleaning up the Public Gateways"
-  for PGW in $(ic is pubgws --output json | jq -r '.[].id')
-  do
-    VALID_PGW=$(ic is pubgw "${PGW}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-    if [ -n "${VALID_PGW}" ]
-    then
-      retry "ic is pubgwd ${PGW} --force"
-      echo "waiting up a minute while the Public Gateways are removed"
-      sleep 60
-    fi
-  done
-
-  echo "Delete the VPC Instance"
-  VALID_VPC=$(ic is vpcs 2> /dev/null | grep "${vpc_name}" || true)
-  if [ -n "${VALID_VPC}" ]
-  then
-    retry "ic is vpc-delete ${vpc_name} --force"
-    echo "waiting up a minute while the vpc is deleted"
-    sleep 60
-  fi
-
   echo "Done cleaning up prior runs"
-}
-
-function create_powervs_workspace() {
-  local workspace_name="${1}"
-
-  ##List the resource group id
-  RESOURCE_GROUP_ID=$(ic resource group "${RESOURCE_GROUP}" --id)
-  export RESOURCE_GROUP_ID
-  echo "${RESOURCE_GROUP_ID}" > "${SHARED_DIR}"/RESOURCE_GROUP_ID
-  SERVICE_NAME=power-iaas
-  SERVICE_PLAN_NAME=power-virtual-server-group
-
-  ##Create a Workspace on a Power Edge Router enabled PowerVS zone
-  # Dev Note: uses a custom loop since we want to redirect errors
-  for i in {1..5}
-  do
-    echo "Attempt: $i/5"
-    echo "Creating powervs workspace"
-    ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_ZONE}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
-    cat /tmp/instance.id
-    if [ $? = 0 ]; then
-      break
-    elif [ "$i" == "5" ]; then
-      echo "All retry attempts failed! Please try running the script again after some time"
-    else
-      sleep 30
-    fi
-    [ -f /tmp/instance.id ] && cat /tmp/instance.id && break
-  done
-
-  ##Get the CRN
-  CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
-  export CRN
-  echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
-
-  ##Get the ID
-  POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
-  export POWERVS_SERVICE_INSTANCE_ID
-  echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
-
-  ##Target the workspace
-  echo "Retry workspace target crn: ${CRN}"
-  retry "ic pi workspace target ${CRN}"
-
-  ##Check the status it should be active
-  WS_COUNTER=0
-  WS_STATE=""
-  while [ -z "${WS_STATE}" ]
-  do
-    WS_COUNTER=$((WS_COUNTER+1))
-    TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
-    echo "pvs workspace state: ${TEMP_STATE}"
-    echo ""
-    if [ "${TEMP_STATE}" == "active" ]
-    then
-      WS_STATE="active"
-    elif [[ $WS_COUNTER -ge 20 ]]
-    then
-      WS_STATE="pending"
-      echo "Workspace has not come up in active state... login and verify"
-      exit 2
-    else
-      echo "Waiting for Workspace to become active... [30 seconds]"
-      sleep 30
-    fi
-  done
-}
-
-function create_transit_gateway() {
-  local workspace_name="${1}"
-
-  TGW_NAME="${workspace_name}"-tg
-
-  ##Create the Transit Gateway
-  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing local --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
-  TGW_ID=$(cat /tmp/tgw.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
-  export TGW_ID
-  echo "${TGW_ID}" > "${SHARED_DIR}"/TGW_ID
-
-  ##Check the status it should be available
-  TGW_COUNTER=0
-  TGW_STATE=""
-  while [ -z "${TGW_STATE}" ]
-  do
-    TGW_COUNTER=$((TGW_COUNTER+1)) 
-    TEMP_STATE="$(ic tg gw "${TGW_ID}" --output json 2> /dev/null | jq -r '.status')"
-    echo "tg state: ${TEMP_STATE}"
-    echo ""
-    if [ "${TEMP_STATE}" == "available" ]
-    then
-      TGW_STATE="available"
-    elif [[ $TGW_COUNTER -ge 20 ]]
-    then
-      TGW_STATE="pending"
-      echo "Transit Gateway has not come up in available state... login and verify"
-      exit 2
-    else
-      echo "Waiting for Transit Gateway to become available... [30 seconds]"
-      sleep 30
-    fi
-  done
-}
-
-function create_vpc() {
-  local workspace_name="${1}"
-  local vpc_name="${2}"
-
-  ##Create a VPC with at least one subnet with a Public Gateway
-  retry "ic is vpc-create ${vpc_name} --resource-group-id ${RESOURCE_GROUP_ID} --output JSON"
-
-  ##Check the status it should be available
-  VPC_COUNTER=0
-  VPC_STATE=""
-  while [ -z "${VPC_STATE}" ]
-  do
-    VPC_COUNTER=$((VPC_COUNTER+1)) 
-    TEMP_STATE="$(ic is vpc "${vpc_name}" --output json 2> /dev/null | jq -r '.status')"
-    echo "vpc state: ${TEMP_STATE}"
-    echo ""
-    if [ "${TEMP_STATE}" == "available" ]
-    then
-      VPC_STATE="available"
-    elif [[ $VPC_COUNTER -ge 20 ]]
-    then
-      VPC_STATE="pending"
-      echo "VPC has not come up in available state... login and verify"
-      exit 2
-    else
-      echo "Waiting for VPC to become available... [30 seconds]"
-      sleep 30
-    fi
-  done
-
-  ##Fetch VPC CRN
-  VPC_CRN="$(ic is vpc "${vpc_name}" --output json 2> /dev/null | jq -r '.crn')"
-  export VPC_CRN
-  echo "${VPC_CRN}" > "${SHARED_DIR}"/VPC_CRN
-
-  ##Add a subnet
-  retry "ic is subnet-create sn01 ${vpc_name} --resource-group-id ${RESOURCE_GROUP_ID} --ipv4-address-count 256 --zone ${VPC_ZONE}"
-
-  ##Attach a public gateway to the subnet
-  retry "ic is public-gateway-create gw01 ${vpc_name} ${VPC_ZONE} --resource-group-id ${RESOURCE_GROUP_ID} --output JSON"
-
-  ##Attach the Public Gateway to the Subnet
-  retry "ic is subnet-update sn01 --vpc ${vpc_name} --pgw gw01"
-
-  ##Attach the PER network to the TG
-  ic tg connection-create "${TGW_ID}" --name powervs-conn --network-id "${CRN}" --network-type power_virtual_server --output json | tee /tmp/tgwper.id
-  TGW_PER_ID=$(cat /tmp/tgwper.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
-  export TGW_PER_ID
-  echo "${TGW_PER_ID}" > "${SHARED_DIR}"/TGW_PER_ID
-
-  ##Check the status it should be attached
-  TGW_PER_COUNTER=0
-  TGW_PER_STATE=""
-  while [ -z "${TGW_PER_STATE}" ]
-  do
-    TGW_PER_COUNTER=$((TGW_PER_COUNTER+1)) 
-    TEMP_STATE="$(ic tg connection "${TGW_ID}" "${TGW_PER_ID}" --output json 2> /dev/null | jq -r '.status')"
-    echo "tg connection state: ${TEMP_STATE}"
-    echo ""
-    if [ "${TEMP_STATE}" == "attached" ]
-    then
-      TGW_PER_STATE="attached"
-    elif [[ $TGW_PER_COUNTER -ge 20 ]]
-    then
-      TGW_PER_STATE="pending"
-      echo "PER has not attached to Transit Gateway... login and verify"
-      exit 2
-    else
-      echo "Waiting for PER to attached to Transit Gateway... [30 seconds]"
-      sleep 30
-    fi
-  done
-
-  ##Attach the VPC to the TG
-  ic tg connection-create "${TGW_ID}" --name vpc-conn --network-id "${VPC_CRN}" --network-type vpc --output json | tee /tmp/tgwvpc.id
-  TGW_VPC_ID=$(cat /tmp/tgwvpc.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
-  export TGW_VPC_ID
-  echo "${TGW_VPC_ID}" > "${SHARED_DIR}"/TGW_VPC_ID
-
-  ##Check the status it should be attached
-  TGW_VPC_COUNTER=0
-  TGW_VPC_STATE=""
-  while [ -z "${TGW_VPC_STATE}" ]
-  do
-    TGW_VPC_COUNTER=$((TGW_VPC_COUNTER+1)) 
-    TEMP_STATE="$(ic tg connection "${TGW_ID}" "${TGW_VPC_ID}" --output json 2> /dev/null | jq -r '.status')"
-    echo "tg connection state: ${TEMP_STATE}"
-    echo ""
-    if [ "${TEMP_STATE}" == "attached" ]
-    then
-      TGW_VPC_STATE="attached"
-    elif [[ $TGW_VPC_COUNTER -ge 20 ]]
-    then
-      TGW_VPC_STATE="pending"
-      echo "VPC has not attached to Transit Gateway... login and verify"
-      exit 2
-    else
-      echo "Waiting for VPC to attached to Transit Gateway... [30 seconds]"
-      sleep 30
-    fi
-  done
 }
 
 echo "Cluster type is ${CLUSTER_TYPE}"
@@ -576,8 +300,8 @@ case "$CLUSTER_TYPE" in
   # Generates a workspace name like rdr-multi-arch-upi-4-14-au-syd-n1
   # this keeps the workspace unique
   CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/' | tr '.' '-')
-  WORKSPACE_NAME=rdr-multi-arch-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
-  VPC_NAME="${WORKSPACE_NAME}"-vpc
+  WORKSPACE_NAME=rdr-multi-arch-p2-1
+  VPC_NAME="${WORKSPACE_NAME}"
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
   echo "IC: Installing cluster to upi for ${WORKSPACE_NAME}"
@@ -592,10 +316,6 @@ case "$CLUSTER_TYPE" in
   echo "IC: Resource Group is ${RESOURCE_GROUP}"
   echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
-  create_powervs_workspace "${WORKSPACE_NAME}"
-  ic pi subnet create ocp-net --cidr-block 192.168.200.0/24 --net-type private --dns-servers 9.9.9.9 --gateway 192.168.200.1 --ip-range 192.168.200.10-192.168.200.250 --mtu 9000
-  create_transit_gateway "${WORKSPACE_NAME}"
-  create_vpc "${WORKSPACE_NAME}" "${VPC_NAME}"
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
