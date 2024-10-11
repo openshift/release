@@ -1,5 +1,5 @@
 #!/bin/bash
-
+sleep 28800
 set -e
 set -u
 set -o pipefail
@@ -116,4 +116,3 @@ export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
 check_marketplace
 create_catalog_sources
-sleep 28800
