@@ -378,6 +378,7 @@ function run {
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     remove_kubeadmin_user
     create_must-gather_dir_for_case
+    sleep 14400
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
