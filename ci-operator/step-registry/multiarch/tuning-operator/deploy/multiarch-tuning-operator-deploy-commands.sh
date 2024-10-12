@@ -76,10 +76,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - github.com/openshift/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}
+patches:
 EOF
     if [[ -n "$CATALOG_IMAGE_OVERRIDE" ]]; then
         cat <<EOF >> /tmp/kustomization/kustomization.yaml
-patches:
   - target:
       group: operators.coreos.com
       version: v1alpha1
@@ -93,7 +93,6 @@ EOF
     fi
     if [[ -n "$SUBSCRIPTION_CHANNEL_OVERRIDE" ]]; then
         cat <<EOF >> /tmp/kustomization/kustomization.yaml
-patches:
   - target:
       group: operators.coreos.com
       version: v1alpha1
