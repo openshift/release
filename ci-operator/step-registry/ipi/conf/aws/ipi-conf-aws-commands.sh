@@ -344,8 +344,12 @@ compute:
         authentication: ${AWS_METADATA_SERVICE_AUTH}
 EOF
 
+  echo "install-config.yaml before merge:"
+  cat "${CONFIG}"
   yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
   cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
+  echo "install-config.yaml after merge:"
+  cat "${CONFIG}"
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
