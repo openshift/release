@@ -1,0 +1,62 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+images:
+- context_dir: .
+  dockerfile_path: tests/dast/Dockerfile
+  to: distributed-tracing-tests-runner-telco
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telco-dast-ci
+  cluster: build05
+  cron: 00 13 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "0"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      OPERATORS: |
+        [
+          {"name": "lifecycle-agent", "source": "redhat-operators-disconnected", "channel": "stable", "install_namespace": "openshift-lifecycle-agent","target_namespace": "!install", "operator_group": "lifecycle-agent"},
+          {"name": "ptp-operator", "source": "redhat-operators-disconnected", "channel": "stable", "install_namespace": "openshift-ptp","target_namespace": "!install", "operator_group": "ptp-operators"},
+          {"name": "openshift-numaresources", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-marketplace","target_namespace": "openshift-numaresources", "operator_group": "numaresources-operator"},
+          {"name": "topology-aware-lifecycle-manager", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-marketplace","target_namespace": "openshift-operator-lifecycle-manager", "operator_group": "redhat-operators"},
+        ]
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: install-operators
+    - ref: telcov10n-functional-dast-tests
+    workflow: telcov10n-functional-dast-setup
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: telco-operators-dast-4.16
