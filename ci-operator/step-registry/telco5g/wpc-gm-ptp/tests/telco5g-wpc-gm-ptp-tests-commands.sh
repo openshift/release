@@ -341,96 +341,117 @@ sleep 60
 
 # get RTC logs
 print_time
-jobdefinition='---
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: vse-sync-test-volume
-  labels:
-    type: local
-spec:
-  storageClassName: manual
-  capacity:
-    storage: 3Gi
-  accessModes:
-    - ReadWriteMany
-  hostPath:
-    path: VSE_SYNC_TEST_OUTPUT_DIR
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: vse-sync-test-pv-claim
-  namespace: openshift-ptp
-spec:
-  storageClassName: manual
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 3Gi
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: vse-sync-pod
-  namespace: openshift-ptp
-spec:
-  restartPolicy: Never
-  containers:
-    - name: vse-sync-container
-      image: quay.io/podman/stable
-      command:
-        - /bin/bash
-        - -c
-        - |
-          set -xe
-          podman run \
-            -v /var/.kubeconfig:/usr/vse/kubeconfig:Z \
-            -v /var/test-data:/usr/vse/data:Z \
-            quay.io/redhat-partner-solutions/vse-sync-test:latest
-          set -x
-      volumeMounts:
-        - mountPath: /var/test-data
-          name: output-dir-vol
-        - mountPath: /var/.kubeconfig
-          name: kubeconfig-vol
-  volumes:
-    - name: output-dir-vol
-      persistentVolumeClaim:
-        claimName: vse-sync-test-pv-claim
-    - name: kubeconfig-vol
-      hostPath:
-        path: KUBECONFIG
-      '
-jobdefinition=$(sed "s#VSE_SYNC_TEST_OUTPUT_DIR#${VSE_SYNC_TEST_OUTPUT_DIR}#" <<< "$jobdefinition")
-jobdefinition=$(sed "s#KUBECONFIG#${KUBECONFIG}#" <<< "$jobdefinition")
-echo "$jobdefinition" | oc apply -f -
+#jobdefinition='---
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: vse-sync-test-volume
+#  labels:
+#    type: local
+#spec:
+#  storageClassName: manual
+#  capacity:
+#    storage: 3Gi
+#  accessModes:
+#    - ReadWriteMany
+#  hostPath:
+#    path: VSE_SYNC_TEST_OUTPUT_DIR
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: vse-sync-test-pv-claim
+#  namespace: openshift-ptp
+#spec:
+#  storageClassName: manual
+#  accessModes:
+#    - ReadWriteMany
+#  resources:
+#    requests:
+#      storage: 3Gi
+#---
+#apiVersion: v1
+#kind: Pod
+#metadata:
+#  name: vse-sync-pod
+#  namespace: openshift-ptp
+#spec:
+#  restartPolicy: Never
+#  containers:
+#    - name: vse-sync-container
+#      image: quay.io/podman/stable
+#      command:
+#        - /bin/bash
+#        - -c
+#        - |
+#          set -xe
+#          podman run \
+#            -v /var/.kubeconfig:/usr/vse/kubeconfig:Z \
+#            -v /var/test-data:/usr/vse/data:Z \
+#            quay.io/redhat-partner-solutions/vse-sync-test:latest
+#          set -x
+#      volumeMounts:
+#        - mountPath: /var/test-data
+#          name: output-dir-vol
+#        - mountPath: /var/.kubeconfig
+#          name: kubeconfig-vol
+#  volumes:
+#    - name: output-dir-vol
+#      persistentVolumeClaim:
+#        claimName: vse-sync-test-pv-claim
+#    - name: kubeconfig-vol
+#      hostPath:
+#        path: KUBECONFIG
+#      '
+#jobdefinition=$(sed "s#VSE_SYNC_TEST_OUTPUT_DIR#${VSE_SYNC_TEST_OUTPUT_DIR}#" <<< "$jobdefinition")
+#jobdefinition=$(sed "s#KUBECONFIG#${KUBECONFIG}#" <<< "$jobdefinition")
+#echo "$jobdefinition" | oc apply -f -
+#
+#success=0
+#iterations=0
+#sleep_time=10
+#max_iterations=72 # results in 12 minutes timeout
+#until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
+#do
+#  run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
+#   if [ "$run_status" == "Succeeded" ]; then
+#          success=1
+#          break
+#   fi
+#   iterations=$((iterations+1))
+#   sleep $sleep_time
+#done
+#
+#if [[ $success -eq 1 ]]; then
+#  echo "[INFO] index build succeeded"
+#else
+#  echo "[ERROR] index build failed"
+#  exit 1
+#fi
+#
+#oc -n openshift-ptp logs vse-sync-pod
+## get RTC logs
+## Install vse-sync-test dependencies:
+dnf install -y python3-yaml tar ruby
+pip3 install pandas junitparser matplotlib allantools
+gem install asciidoctor-pdf:2.3.9 asciidoctor-diagram:2.2.14 rouge:3.30.0
 
-success=0
-iterations=0
-sleep_time=10
-max_iterations=72 # results in 12 minutes timeout
-until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
-do
-  run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
-   if [ "$run_status" == "Succeeded" ]; then
-          success=1
-          break
-   fi
-   iterations=$((iterations+1))
-   sleep $sleep_time
-done
 
-if [[ $success -eq 1 ]]; then
-  echo "[INFO] index build succeeded"
-else
-  echo "[ERROR] index build failed"
-  exit 1
-fi
+# Run vse-sync-tests and generate report
+export VSE_TEST_BRANCH="mno_support"
+cd -
+echo "running vse-sync-tests from branch ${VSE_TEST_BRANCH}"
 
-oc -n openshift-ptp logs vse-sync-pod
-# get RTC logs
+git clone https://github.com/nishant-parekh/vse-sync-test.git -b "${VSE_TEST_BRANCH}" vse-tests
+git clone https://github.com/nishant-parekh/vse-sync-collection-tools.git -b "${VSE_TEST_BRANCH}" vse-tests
+git clone https://github.com/nishant-parekh/vse-sync-test-report.git -b "${VSE_TEST_BRANCH}" vse-tests
+
+cd vse-tests
+mkdir data
+./vse-sync-test/cmd/e2e.sh -d 2000s -n cnfdf32.telco5gran.eng.rdu2.redhat.com  $KUBECONFIG
+ls -ltr data/*
+cp "data/*.pdf" "${ARTIFACT_DIR}/"
+
 print_time
 
 # saving overall status (all success=0, any failure=1)
