@@ -70,6 +70,13 @@ case "${IP_STACK}" in
     ;;
 esac
 
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )); then
+  while read -r name _ _ _; do
+    oc adm taint node "$name" taint-test=Exists:NoSchedule
+  done < <(oc get node --no-headers)
+  EXTRA_ARGS="${EXTRA_ARGS} --toleration=key=taint-test,operator=Exists,effect=NoSchedule"
+fi
+
 if [[ "$DISCONNECTED" == "true" ]]; then
   source "${SHARED_DIR}/packet-conf.sh"
   # disconnected requires the additional trust bundle containing the local registry certificate
