@@ -1,0 +1,72 @@
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 2.5Gi
+tests:
+- as: cvp-common-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
+    env:
+      CUSTOM_SCORECARD_TESTCASE: ""
+      ENABLE_HYBRID_OVERLAY: "false"
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      TEST_MODE: cvp
+    workflow: optional-operators-cvp-common-claim
+- as: cvp-fips-common-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      variant: fips
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
+    env:
+      CUSTOM_SCORECARD_TESTCASE: ""
+      ENABLE_HYBRID_OVERLAY: "false"
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      TEST_MODE: cvp
+    workflow: optional-operators-cvp-common-claim
+- as: cvp-common-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-cpaas
+    workflow: optional-operators-cvp-common-aws
+zz_generated_metadata:
+  branch: ocp-4.18
+  org: redhat-openshift-ecosystem
+  repo: cvp

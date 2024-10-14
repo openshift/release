@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 # Get the day of the month
-month_day=$(date +%d)
+month_day=$(date +%-d)
 
 # additional checks for self-managed fips and non-fips testing
 self_managed_string='self-managed-lp-interop-jobs'

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/artifacts
     decorate: true
     labels:
@@ -133,7 +133,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
     labels:
@@ -1329,7 +1329,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-azure
     decorate: true
     labels:
@@ -1409,7 +1409,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     labels:
@@ -1898,7 +1898,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-openstack-csi-cinder
     decorate: true
     labels:
@@ -1978,7 +1978,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-openstack-csi-manila
     decorate: true
     labels:
@@ -2138,7 +2138,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -2194,7 +2194,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/integration
     decorate: true
     labels:
@@ -2737,7 +2737,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -2792,11 +2792,92 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build09
+    context: ci/prow/perfscale-control-plane-6nodes
+    decorate: true
+    decoration_config:
+      timeout: 3h30m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kubernetes-master-perfscale-control-plane-6nodes
+    path_alias: k8s.io/kubernetes
+    rerun_command: /test perfscale-control-plane-6nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/perfscale-control-plane-6nodes-cluster-profile
+        - --target=perfscale-control-plane-6nodes
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/perfscale-control-plane-6nodes-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-perfscale-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(perfscale-control-plane-6nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     labels:
@@ -2850,7 +2931,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/verify
     decorate: true
     labels:
@@ -2904,7 +2985,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build09
     context: ci/prow/verify-commits
     decorate: true
     labels:

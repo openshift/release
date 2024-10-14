@@ -5,17 +5,17 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build05
-    context: ci/prow/412-images
+    cluster: build09
+    context: ci/prow/413-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "412"
+      ci-operator.openshift.io/variant: "413"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-net-istio-release-v1.14-412-images
-    rerun_command: /test 412-images
+    name: pull-ci-openshift-knative-net-istio-release-v1.14-413-images
+    rerun_command: /test 413-images
     spec:
       containers:
       - args:
@@ -24,7 +24,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=412
+        - --variant=413
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,71 +57,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )412-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )413-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build05
-    context: ci/prow/415-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "415"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-net-istio-release-v1.14-415-images
-    rerun_command: /test 415-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=src
-        - --variant=415
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.14$
-    - ^release-v1\.14-
-    cluster: build05
+    cluster: build09
     context: ci/prow/416-images
     decorate: true
     decoration_config:
@@ -129,7 +71,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-net-istio-release-v1.14-416-images
     rerun_command: /test 416-images
@@ -140,6 +81,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
         - --variant=416
         command:
         - ci-operator
@@ -174,3 +116,61 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )416-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build09
+    context: ci/prow/417-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "417"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-net-istio-release-v1.14-417-images
+    rerun_command: /test 417-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=417
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )417-images,?($|\s.*)

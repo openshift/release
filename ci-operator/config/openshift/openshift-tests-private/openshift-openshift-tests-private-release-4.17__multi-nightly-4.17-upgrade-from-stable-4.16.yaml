@@ -3,6 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.16"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.16"
     namespace: ocp
@@ -44,7 +48,7 @@ releases:
   latest:
     release:
       architecture: multi
-      channel: candidate
+      channel: fast
       version: "4.16"
   target:
     candidate:
@@ -78,16 +82,19 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-byo-iam-role-fips-amd-f28
+- as: aws-ipi-byo-iam-role-efs-fips-amd-f28-custom-cert
   cron: 21 3 11 * *
   steps:
     cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
+    - chain: cert-manager-custom-api-ingress-cert
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
 - as: aws-ipi-byo-kms-etcd-encryption-fips-amd-f28
   cron: 6 7 16 * *
   steps:
@@ -98,7 +105,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
-- as: aws-ipi-byo-route53-compact-arm-f28
+- as: aws-ipi-byo-route53-compact-cloudfront-arm-f28
   cron: 59 0 22 * *
   steps:
     cluster_profile: aws-qe
@@ -110,7 +117,7 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
 - as: aws-ipi-imdsv2-arm-f28
   cron: 21 16 6 * *
   steps:
@@ -159,19 +166,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
-- as: aws-ipi-ovn-efs-fips-amd-f28-cert-manager-custom-cert
-  cron: 36 19 11 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - chain: cert-manager-custom-api-ingress-cert
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
 - as: aws-ipi-ovn-ipsec-arm-mixarch-f28
   cron: 43 13 2 * *
   steps:
@@ -428,23 +422,26 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      ENABLE_OTA_TEST: OCP-21588
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-canary-f28
   cron: 14 0 21 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "mcpfoo", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker="}]'
+      MCO_CONF_DAY2_CUSTOM_MCP_TO_BE_DELETED: mcpfoo
       OCP_ARCH: arm64
+      PAUSED_MCP_NAME: mcpfoo
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 - as: azure-ipi-private-spec-net-type-spec-perm-arm-f28
   cron: 51 21 7 * *
@@ -478,6 +475,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
@@ -639,17 +637,21 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: gcp-ipi-basecap-none-additionalcaps-arm-f28
+- as: gcp-ipi-basecap-none-additionalcaps-arm-canary-f28
   cron: 41 21 15 * *
   steps:
     cluster_profile: gcp-qe
     env:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: t2a-standard-4
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "mcpfoo", "mcp_node_num": "1", "mcp_node_label":
+        "node-role.kubernetes.io/worker="}]'
+      MCO_CONF_DAY2_CUSTOM_MCP_TO_BE_DELETED: mcpfoo
       OCP_ARCH: arm64
+      PAUSED_MCP_NAME: mcpfoo
       PERSISTENT_MONITORING: "false"
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
 - as: gcp-ipi-compact-filestore-csi-arm-f28
   cron: 29 10 17 * *

@@ -1,9 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 trap_subprocesses_on_term
 
@@ -85,7 +84,10 @@ else
     rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/el9/os"
     ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/el9/os"
 
-    if sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}"; then
+    # `dnf repoquery` returns 1 when the repository is not available,
+    # but returns 0 when the repo is up and package is not present.
+    released=$(sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}" || true)
+    if [[ -n "${released}" ]]; then
         sudo subscription-manager repos --enable "${rhocp}"
     elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-rc,${rc}"; then
         enable_mirror_repo "${rc}"
@@ -105,7 +107,7 @@ chmod +x /tmp/install.sh
 
 scp \
     "${MICROSHIFT_CLUSTERBOT_SETTINGS}" \
-    /tmp/ci-functions.sh \
+    "${SHARED_DIR}/ci-functions.sh" \
     /tmp/install.sh \
     /tmp/config.yaml \
     /var/run/rhsm/subscription-manager-org \

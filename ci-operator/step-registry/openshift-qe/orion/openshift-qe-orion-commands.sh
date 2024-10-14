@@ -52,7 +52,7 @@ if [[ -n "$ORION_CONFIG" ]]; then
   export CONFIG="${ORION_CONFIG}"
 fi
 
-orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
 
 if [ ${JUNIT} == true ]; then
   cp *.xml ${ARTIFACT_DIR}/

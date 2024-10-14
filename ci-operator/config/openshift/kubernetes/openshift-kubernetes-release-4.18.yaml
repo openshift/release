@@ -35,18 +35,18 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: oc-rpms
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_4.17_tools:
+  ocp_4.18_tools:
     name: "4.18"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
   rhel-coreos-base:
     name: "4.18"
     namespace: ocp
@@ -62,21 +62,21 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   inputs:
-    ocp_4.17_tools:
+    ocp_4.18_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.17:tools
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:tools
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: kubernetes-tests
 - dockerfile_literal: |
     # We want to test the PR using the code from it. Now, this repo ships RPMs
@@ -107,21 +107,21 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer-kube-apiserver-artifacts
 promotion:
   to:
@@ -456,6 +456,24 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun-wasm
+- always_run: false
+  as: perfscale-control-plane-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

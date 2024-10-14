@@ -61,13 +61,11 @@ items:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
+          - --ref=master
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
+          - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
           volumeMounts:
           - name: release
@@ -78,13 +76,11 @@ items:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
-          - --wait=30
+          - --ref=master
+          - --period=30s
           - --root=/tmp/git-sync
-          - --max-sync-failures=3
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
+          - --max-failures=3
+          - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
           volumeMounts:
           - name: release
@@ -108,14 +104,18 @@ items:
           - --cluster-config-path=/var/repo/release/core-services/sanitize-prow-jobs/_clusters.yaml
           - --jobs-storage-path=/cache/job-cache.gob
           - --prow-jobs-dir=/var/repo/release/ci-operator/jobs
+          - --slack-token-path=/etc/slack/oauth_token
           - --self-approve=true
-          - --daemonize
+          - --assign=openshift/test-platform
           - --prometheus-bearer-token-path=/etc/prometheus/token
           - --create-pr=true
           ports:
           - name: main
             containerPort: 8888
           volumeMounts:
+          - mountPath: /etc/slack
+            name: slack
+            readOnly: true
           - name: cache
             mountPath: /cache
           - mountPath: /etc/prometheus
@@ -131,6 +131,9 @@ items:
               memory: "2Gi"
               cpu: "0.7"
         volumes:
+        - name: slack
+          secret:
+            secretName: slack-credentials-dptp-bot
         - name: cache
           persistentVolumeClaim:
             claimName: prowjob-dispatcher

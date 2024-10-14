@@ -1,22 +1,30 @@
 base_images:
-  ocp_4.17_base-rhel9:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cluster-storage-operator
 promotion:
   to:
@@ -48,9 +56,15 @@ tests:
   container:
     from: src
 - as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - always_run: false
   as: e2e-aws-ovn
   optional: true
@@ -122,15 +136,6 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-csi
-- as: e2e-aws-shared-resources
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - ref: csi-driver-shared-resource-e2e
-    workflow: csi-driver-shared-resource-e2e-test
 - as: e2e-openstack
   optional: true
   steps:

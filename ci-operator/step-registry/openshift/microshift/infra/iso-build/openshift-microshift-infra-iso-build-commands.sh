@@ -1,9 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 trap_subprocesses_on_term
 
@@ -22,7 +21,7 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
-if [[ "${JOB_NAME}" =~ .*metal-cache.* ]] ; then
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
 else
     ./test/bin/ci_phase_iso_build.sh
@@ -30,10 +29,11 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
-    /tmp/ci-functions.sh \
+    "${SHARED_DIR}/ci-functions.sh" \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \

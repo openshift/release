@@ -350,7 +350,6 @@ EOF
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-
 done
 
 # debug, confirm correct subnets.json
@@ -367,6 +366,13 @@ log "building local variables and failure domains"
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
+
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
+    log "storing primary lease as LEASE_single"
+    cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
+  fi
+
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
   oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
@@ -411,7 +417,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
     platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
-  fi  
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
@@ -437,14 +443,19 @@ fi
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-cp /tmp/lease.json "${SHARED_DIR}"/LEASE_single.json
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
 source /tmp/envvars
+
+
+if [[ -z "${GOVC_URL}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF

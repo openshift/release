@@ -70,6 +70,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-reboot-nodes-arm-f28
+  cron: 4 0 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_REBOOT_CHECK: "true"
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-phz-f14
   cron: 23 16 5,19 * *
   steps:
@@ -88,6 +103,16 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-upi-reboot-nodes-f28
+  cron: 35 23 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-custom-nsg-f28
   cron: 41 19 22 * *
   steps:
@@ -98,13 +123,14 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
-- as: azure-ipi-disc-fullyprivate-firewall-idms-f28
+- as: azure-ipi-disc-fullyprivate-firewall-idms-oc-mirror-f28
   cron: 58 22 12 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall
@@ -219,8 +245,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -287,6 +313,11 @@ tests:
   cron: 55 11 25 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_TYPE: n4-standard-2
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: n4-standard-4
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
