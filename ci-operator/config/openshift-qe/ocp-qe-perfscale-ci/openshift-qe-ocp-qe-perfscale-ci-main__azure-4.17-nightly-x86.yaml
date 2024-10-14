@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-azure-417
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -26,9 +19,10 @@ tests:
   as: control-plane-ipsec-120nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: azure-qe
+    cluster_profile: azure-perfscale
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.hyp.azure.rhperfscale.org
+      BASE_DOMAIN_RESOURCE_GROUP: perfscale-prow
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
       CUSTOM_AZURE_REGION: centralus
@@ -36,10 +30,11 @@ tests:
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "120"
     test:
+    - ref: openshift-qe-installer-azure-update-allocated-outbound-ports
     - chain: workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
-  timeout: 5h0m0s
+  timeout: 8h0m0s
 - always_run: false
   as: control-plane-ipsec-3nodes
   steps:

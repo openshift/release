@@ -1,0 +1,27 @@
+workflow:
+  as: hypershift-kubevirt-e2e-nested
+  documentation: |-
+    Sets up all the mgmt/infra cluster prerequisites necessary for hypershift kubevirt guest clusters on nested management infra.
+    Then runs basic hypershift e2e tests.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK: "true"
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      HYPERSHIFT_INSTANCE_TYPE: c5n.metal
+      HYPERSHIFT_ZONES: "us-east-1a"
+    pre:
+      - ref: ipi-install-rbac
+      - chain: hypershift-setup-nested-management-cluster
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-install
+    test:
+      - chain: hypershift-kubevirt-run-e2e-local
+      - chain: hypershift-kubevirt-run-e2e-external
+    post:
+      - chain: hypershift-dump
+      - chain: gather-core-dump
+      - chain: hypershift-destroy-nested-management-cluster

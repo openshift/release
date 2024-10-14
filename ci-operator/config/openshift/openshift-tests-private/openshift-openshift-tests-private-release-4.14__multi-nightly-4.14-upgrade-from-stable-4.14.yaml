@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.14"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.14"
     namespace: ocp
@@ -60,10 +64,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-byo-iam-role-arm-f28
-  cron: 6 4 2 * *
+- as: aws-ipi-byo-iam-role-efs-arm-f60
+  cron: 28 9 27 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -71,9 +77,9 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-route53-compact-arm-f28
-  cron: 3 1 27 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
+- as: aws-ipi-byo-route53-compact-cloudfront-arm-f60
+  cron: 42 19 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -84,9 +90,9 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-imdsv2-arm-f28
-  cron: 24 10 22 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
+- as: aws-ipi-imdsv2-arm-f60
+  cron: 2 5 14 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -97,8 +103,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
-- as: aws-ipi-ingress-lbtype-nlb-arm-f28
-  cron: 2 21 25 * *
+- as: aws-ipi-ingress-lbtype-nlb-arm-f60
+  cron: 3 18 12 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -109,8 +115,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-ovn-ipsec-arm-mixarch-day2-f28
-  cron: 31 18 24 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-day2-f60
+  cron: 23 21 7 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -127,8 +133,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
-  cron: 51 20 27 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f60
+  cron: 13 8 9 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -147,7 +153,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-proxy-sts-arm-f28
-  cron: 25 7 13 * *
+  cron: 45 17 6 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -159,8 +165,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-usertags-custom-sg-arm-f28
-  cron: 4 1 2 * *
+- as: aws-ipi-usertags-custom-sg-arm-f60
+  cron: 26 15 12 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -171,8 +177,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
-- as: azure-ipi-arm-mixarch-day2-f28
-  cron: 28 12 6 * *
+- as: azure-ipi-arm-mixarch-day2-f60
+  cron: 24 10 7 1,3,5,7,9,11 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -188,8 +194,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-arm-mixarch-f28
-  cron: 36 18 12 * *
+- as: azure-ipi-arm-mixarch-f60
+  cron: 2 23 12 1,3,5,7,9,11 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -206,8 +212,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-des-fips-amd-f28
-  cron: 11 20 30 * *
+- as: azure-ipi-des-fips-amd-f60
+  cron: 36 9 15 2,4,6,8,10,12 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -217,8 +223,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: azure-ipi-fullyprivate-proxy-arm-f28
-  cron: 23 6 13 * *
+- as: azure-ipi-fullyprivate-proxy-arm-f60
+  cron: 56 10 20 2,4,6,8,10,12 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -228,8 +234,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-oidc-arm-f28
-  cron: 53 6 22 * *
+- as: azure-ipi-oidc-arm-f60
+  cron: 43 6 6 1,3,5,7,9,11 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -240,8 +246,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
-- as: azure-ipi-ovn-ipsec-arm-f28
-  cron: 11 11 26 * *
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
+  cron: 49 9 27 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -250,9 +256,9 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-upi-arm-f28
-  cron: 51 19 18 * *
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
+- as: azure-upi-arm-f60
+  cron: 32 5 23 2,4,6,8,10,12 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -264,18 +270,23 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi
-- as: gcp-ipi-ovn-ipsec-arm-f28
-  cron: 54 20 7 * *
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f60
+  cron: 54 6 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     test:
+    - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-proxy-private-arm-f28
-  cron: 19 1 15 * *
+- as: gcp-ipi-proxy-private-arm-f60
+  cron: 6 16 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -284,8 +295,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-oidc-rt-fips-amd-f28
-  cron: 38 7 13 * *
+- as: gcp-ipi-oidc-rt-fips-amd-f60
+  cron: 26 3 11 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -296,7 +307,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-upi-arm-f28
-  cron: 26 23 17 * *
+  cron: 37 23 6 * *
   steps:
     cluster_profile: gcp-qe
     env:

@@ -57,9 +57,59 @@ function property_check() {
     [[ "${expected_value}" == "Disabled" ]] && [[ "${actual_value}" == "false" ]] && return 0
     [[ "${expected_value}" == "Enabled" ]] && [[ "${actual_value}" == "true" ]] && return 0
     [[ "${expected_value}" == "${actual_value}" ]] && [[ "${actual_value}" != "null" ]] && return 0
+    [[ "${expected_value}" == "false" ]] && ([[ "${actual_value}" == "null" ]] || [[ "${actual_value}" == "false" ]]) && return 0
 
-    echo "ERROR: property ${property} on node ${node_name} compared failed, expected value: ${expected_value}, acutal value: ${actual_value}"
+    echo "ERROR: property ${property} on node ${node_name} compared failed, expected value: ${expected_value}, actual value: ${actual_value}"
     return 1
+}
+
+function vm_trustedlaunch_check() {
+
+    local node=$1 encryptionathost=$2 security_type=$3 secure_boot=$4 vtpm=$5
+    local check_result=0
+
+    echo "--- check node ${node} ---"
+    security_profile_output=$(mktemp)
+    az vm show -n "${node}" -g "${RESOURCE_GROUP}" -ojson | jq -r '.securityProfile' 1>"${security_profile_output}"
+
+    echo "node ${node} security profile"
+    cat "${security_profile_output}"
+    if [[ $(< "${security_profile_output}") == "null" ]]; then
+        echo "node ${node} security profile is null, check failed!"
+        check_result=1
+        return ${check_result}
+    fi
+
+    if property_check "${node}" "encryptionAtHost" "${encryptionathost}" "${security_profile_output}" ; then
+        echo "property encryptionAtHost check passed."
+    else
+        echo "property encryptionAtHost check failed."
+        check_result=1
+    fi
+
+    if property_check "${node}" "securityType" "${security_type}" "${security_profile_output}" ; then
+        echo "property securityType check passed."
+    else
+        echo "property securityType check failed."
+        check_result=1
+    fi
+
+    if property_check "${node}" "uefiSettings.secureBootEnabled" "${secure_boot}" "${security_profile_output}"; then
+        echo "property secureBootEnabled check passed."
+    else
+        echo "property secureBootEnabled check failed."
+        check_result=1
+    fi
+
+    if property_check "${node}" "uefiSettings.vTpmEnabled" "${vtpm}" "${security_profile_output}"; then
+        echo "property vTpmEnabled check passed."
+    else
+        echo "property vTpmEnabled check failed."
+        check_result=1
+    fi
+    rm -f "${security_profile_output}"
+
+    return ${check_result}
 }
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -73,53 +123,59 @@ critical_check_result=0
 
 # machine check
 # expected values are from step `ipi-conf-azure-confidential-trustedlaunch`
-encryptionathost="true"
-security_type="TrustedLaunch"
-secure_boot="Enabled"
-vtpm="Enabled"
+if [[ "${ENABLE_TRUSTEDLAUNCH_DEFAULT_MACHINE}" == "true" ]]; then
+    master_encryptionathost=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.encryptionAtHost')
+    master_security_type=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.settings.securityType')
+    master_secure_boot=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.settings.trustedLaunch.uefiSettings.secureBoot')
+    master_vtpm=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.settings.trustedLaunch.uefiSettings.virtualizedTrustedPlatformModule')
+    worker_encryptionathost="${master_encryptionathost}"
+    worker_security_type="${master_security_type}"
+    worker_secure_boot="${master_secure_boot}"
+    worker_vtpm="${master_vtpm}"
+fi
 
-nodes_list=$(oc get nodes --no-headers | awk '{print $1}')
-for node in ${nodes_list}; do
-    echo "--- check node ${node} ---"
+if [[ "${ENABLE_TRUSTEDLAUNCH_CONTROL_PLANE}" == "true" ]]; then
+    master_encryptionathost=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.encryptionAtHost')
+    master_security_type=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.settings.securityType')
+    master_secure_boot=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.settings.trustedLaunch.uefiSettings.secureBoot')
+    master_vtpm=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.settings.trustedLaunch.uefiSettings.virtualizedTrustedPlatformModule')
+fi
 
-    security_profile_output=$(mktemp)
-    az vm show -n "${node}" -g "${RESOURCE_GROUP}" -ojson | jq -r '.securityProfile' 1>"${security_profile_output}"
+if [[ "${ENABLE_TRUSTEDLAUNCH_COMPUTE}" == "true" ]]; then
+    worker_encryptionathost=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.encryptionAtHost')
+    worker_security_type=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.settings.securityType')
+    worker_secure_boot=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.settings.trustedLaunch.uefiSettings.secureBoot')
+    worker_vtpm=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.settings.trustedLaunch.uefiSettings.virtualizedTrustedPlatformModule')
+fi
 
-    echo "node ${node} security profile"
-    cat "${security_profile_output}"
-    if [[ $(< "${security_profile_output}") == "null" ]]; then
-        echo "node ${node} security profile is null, check failed!"
-        critical_check_result=1
-        continue
-    fi
-
-    if property_check "${node}" "encryptionAtHost" "${encryptionathost}" "${security_profile_output}" ; then
-        echo "property encryptionAtHost check passed."
+master_nodes_list=$(oc get nodes --selector='node-role.kubernetes.io/master' --no-headers | awk '{print $1}')
+for node in ${master_nodes_list}; do
+    if vm_trustedlaunch_check "${node}" "${master_encryptionathost}" "${master_security_type}" "${master_secure_boot}" "${master_vtpm}"; then
+        echo -e "INFO: trustedLaunch check on node ${node} passed!\n"
     else
-        echo "property encryptionAtHost check failed."
+        echo -e "ERROR: trustedLaunch check on node ${node} failed!\n"
         critical_check_result=1
-    fi
-
-    if property_check "${node}" "securityType" "${security_type}" "${security_profile_output}" ; then
-        echo "property securityType check passed."
-    else
-        echo "property securityType check failed."
-        critical_check_result=1
-    fi
-
-    if property_check "${node}" "uefiSettings.secureBootEnabled" "${secure_boot}" "${security_profile_output}"; then
-        echo "property secureBootEnabled check passed."
-    else
-        echo "property secureBootEnabled check failed."
-        critical_check_result=1
-    fi
-
-    if property_check "${node}" "uefiSettings.vTpmEnabled" "${vtpm}" "${security_profile_output}"; then
-        echo "property vTpmEnabled check passed."
-    else
-        echo "property vTpmEnabled check failed."
-        critical_check_result=1
-    fi
-    rm -f "${security_profile_output}"
+    fi   
 done
+
+worker_nodes_list=$(oc get nodes --selector='node-role.kubernetes.io/worker' --no-headers | awk '{print $1}')
+for node in ${worker_nodes_list}; do
+    if vm_trustedlaunch_check "${node}" "${worker_encryptionathost}" "${worker_security_type}" "${worker_secure_boot}" "${worker_vtpm}"; then
+        echo -e "INFO: trustedLaunch check on node ${node} passed!\n"
+    else
+        echo -e "ERROR: trustedLaunch check on node ${node} failed!\n"
+        critical_check_result=1
+    fi
+done
+
+# gen2 image definition check
+echo -e "\nGen2 image definition check..."
+image_def_security_type=$(az sig image-definition show --gallery-image-definition ${INFRA_ID}-gen2 --gallery-name gallery_${INFRA_ID//-/_} -g ${RESOURCE_GROUP} --query "features[?name=='SecurityType'].value" -otsv)
+if [[ "${image_def_security_type}" == "${master_security_type}" ]]; then
+    echo "INFO: Gen2 image defintion has expected feature setting!"
+else
+    echo "ERROR: Gen2 image definition has unexpected feature setting, expected feature: ${master_security_type}, actual vaule: ${image_def_security_type}."
+    critical_check_result=1
+fi
+
 exit ${critical_check_result}

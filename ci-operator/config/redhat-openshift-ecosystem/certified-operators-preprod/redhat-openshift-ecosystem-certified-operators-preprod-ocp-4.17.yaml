@@ -1,0 +1,44 @@
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: preflight-preprod-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-openshift-ecosystem
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: '@yearly'
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ASSET_TYPE: operator
+      PFLT_ARTIFACTS: artifacts
+      PFLT_INDEXIMAGE: quay.io/opdev/simple-demo-operator-catalog:latest
+      TEST_ASSET: quay.io/opdev/simple-demo-operator-bundle:latest
+    post:
+    - chain: gather
+    pre:
+    - ref: operator-pipelines-preflight-preprod-health
+    - ref: ipi-install-rbac
+    - ref: operator-pipelines-preflight-preprod-approve-csrs
+    - ref: operator-pipelines-preflight-preprod-operator-registry-cache-fix
+    test:
+    - ref: operator-pipelines-preflight-preprod-decrypt
+    - ref: operator-pipelines-preflight-preprod-check
+    - ref: operator-pipelines-preflight-preprod-encrypt
+zz_generated_metadata:
+  branch: ocp-4.17
+  org: redhat-openshift-ecosystem
+  repo: certified-operators-preprod

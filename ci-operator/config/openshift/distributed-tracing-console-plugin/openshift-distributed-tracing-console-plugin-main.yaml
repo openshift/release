@@ -1,3 +1,8 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
@@ -5,14 +10,19 @@ build_root:
     tag: golang-1.13
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
   to: distributed-tracing-console-plugin
 - dockerfile_path: Dockerfile.test
   to: distributed-tracing-console-plugin-test
 promotion:
   to:
   - excluded_images:
+    - distributed-tracing-console-plugin
     - distributed-tracing-console-plugin-test
-    name: "0.1"
+    name: latest
     namespace: observability-ui
 resources:
   '*':
@@ -26,6 +36,12 @@ tests:
   commands: make lint-frontend
   container:
     from: distributed-tracing-console-plugin-test
+- as: fips-image-scan
+  steps:
+    dependencies:
+      SCAN_IMAGE: distributed-tracing-console-plugin
+    test:
+    - ref: fips-check-image-scan
 zz_generated_metadata:
   branch: main
   org: openshift

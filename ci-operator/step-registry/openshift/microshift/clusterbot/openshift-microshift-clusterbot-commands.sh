@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+
+# Note: Cannot source '${SHARED_DIR}/ci-functions.sh' from this script
+# because it is run before the AWS EC2 steps.
 
 # TODO:
 # - Handle MICROSHIFT_GIT=PR_URL
@@ -37,7 +39,7 @@ fi
 
 : Getting OCP version from release image
 oc registry login -a /tmp/registry.json
-OCP_VERSION=$(oc adm release info -o=jsonpath='{.metadata.version}' -a /tmp/registry.json $RELEASE_IMAGE_LATEST | cut -d. -f1-2)
+OCP_VERSION=$(oc adm release info -o=jsonpath='{.metadata.version}' -a /tmp/registry.json "${RELEASE_IMAGE_LATEST}" | cut -d. -f1-2)
 rm -f /tmp/registry.json
 
 if [[ -z "${EC2_INSTANCE_TYPE+x}" ]] || [[ "${EC2_INSTANCE_TYPE}" == "" ]]; then

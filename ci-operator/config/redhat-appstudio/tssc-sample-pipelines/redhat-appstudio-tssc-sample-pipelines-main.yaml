@@ -1,8 +1,8 @@
 base_images:
-  rhtap-installer:
+  rhtap-cli:
     name: redhat-appstudio
     namespace: ci
-    tag: rhtap-installer
+    tag: rhdh-prerelease-install
 build_root:
   image_stream_tag:
     name: redhat-appstudio
@@ -38,42 +38,8 @@ tests:
     set -o nounset
     set -o pipefail
 
-    CONFIG_FILE=yamllint.yaml
-    cat <<EOF > "$CONFIG_FILE"
-    ---
-    yaml-files:
-      - '*.yaml'
-      - '*.yml'
-    rules:
-      braces: enable
-      brackets: enable
-      colons: enable
-      commas: enable
-      comments:
-        require-starting-space: true
-        ignore-shebangs: true
-        min-spaces-from-content: 1
-      comments-indentation: enable
-      document-end: disable
-      document-start: disable
-      empty-lines: enable
-      empty-values: disable
-      float-values: disable
-      hyphens: enable
-      indentation: enable
-      key-duplicates: enable
-      key-ordering: disable
-      line-length: disable
-      new-line-at-end-of-file: enable
-      new-lines: enable
-      octal-values: disable
-      quoted-strings: disable
-      trailing-spaces: enable
-      truthy:
-        check-keys: false
-    EOF
-
-    yamllint -c "$CONFIG_FILE" .
+    pwd && ls -la
+    yamllint -c yamllint.yaml .
   container:
     from: src
   optional: true
@@ -83,19 +49,18 @@ tests:
     cloud: aws
     labels:
       region: us-east-2
-    owner: rhtap
+    owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     env:
       EVENT_TYPE: pull_request
-      RHTAP_ENABLE_TPA: "false"
     post:
     - ref: redhat-appstudio-rhtap-gather
     pre:
-    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-cli
     test:
     - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
     workflow: generic-claim
@@ -105,18 +70,16 @@ tests:
     cloud: aws
     labels:
       region: us-east-2
-    owner: rhtap
+    owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    env:
-      RHTAP_ENABLE_TPA: "false"
     post:
     - ref: redhat-appstudio-rhtap-gather
     pre:
-    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-cli
     test:
     - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
     workflow: generic-claim

@@ -31,14 +31,8 @@ build_root:
 releases:
   latest:
     release:
-      architecture: amd64
-      channel: candidate
-      version: "4.16"
-  multi-latest:
-    candidate:
       architecture: multi
-      product: ocp
-      stream: nightly
+      channel: candidate
       version: "4.16"
 resources:
   '*':
@@ -48,12 +42,10 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-disc-priv-arm-mixarch-f14
-  cron: 5 8 11,27 * *
+- as: aws-ipi-disc-priv-arm-mixarch-f28
+  cron: 14 16 28 * *
   steps:
     cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
@@ -68,12 +60,10 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 5 11 16,30 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 3 12 13 * *
   steps:
     cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
@@ -87,12 +77,33 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-disc-fullypriv-arm-mixarch-f14
-  cron: 51 14 8,24 * *
+- as: aws-ipi-proxy-sts-arm-f28
+  cron: 5 1 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-usertags-custom-sg-fips-f28
+  cron: 44 18 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
+- as: azure-ipi-disc-fullypriv-arm-mixarch-f28
+  cron: 33 8 6 * *
   steps:
     cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
@@ -105,30 +116,60 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: gcp-ipi-disc-priv-oidc-arm-mixarch-f14
-  cron: 22 4 1,17 * *
+- as: azure-ipi-fullyprivate-proxy-arm-f28
+  cron: 56 6 23 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-usertags-sa-encryption-arm-f28
+  cron: 38 5 24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
+- as: gcp-ipi-compact-filestore-csi-arm-f28
+  cron: 9 20 17 * *
   steps:
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
+- as: gcp-ipi-disc-priv-arm-mixarch-f28
+  cron: 46 1 23 * *
+  steps:
+    cluster_profile: gcp-qe
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
-      EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
     - ref: ipi-install-heterogeneous
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 5 5 3,19 * *
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 34 10 6 * *
   steps:
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
@@ -140,6 +181,28 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: gcp-ipi-proxy-oidc-amd-mixarch-f28
+  cron: 45 9 5 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+- as: gcp-ipi-xpn-mini-perm-fips-amd-f28
+  cron: 52 15 22 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

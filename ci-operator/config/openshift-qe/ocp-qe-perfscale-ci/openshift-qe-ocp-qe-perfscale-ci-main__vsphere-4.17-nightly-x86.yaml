@@ -8,13 +8,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-vsphere-417
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   initial:
     candidate:
@@ -102,6 +95,18 @@ tests:
     test:
     - chain: workers-scale
     - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: cluster-density-v2-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
 zz_generated_metadata:

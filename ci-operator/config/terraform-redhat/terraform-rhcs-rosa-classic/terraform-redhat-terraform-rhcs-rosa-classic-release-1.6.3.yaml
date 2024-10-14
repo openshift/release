@@ -1,0 +1,99 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: Dockerfile
+  to: terraform-rhcs-rosa-clients
+releases:
+  latest:
+    integration:
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: verify-format
+  commands: make verify
+  container:
+    from: terraform-rhcs-rosa-clients
+- always_run: true
+  as: verify-gen
+  commands: make verify-gen
+  container:
+    from: terraform-rhcs-rosa-clients
+- always_run: true
+  as: rosa-classic-public
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-unmanaged-oidc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-unmanaged-oidc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-shared-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-shared-vpc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-idp-machine-pools
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-idp-machine-pools
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-byo-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-byo-vpc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-byo-vpc-byo-iam-byo-oidc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-byo-vpc-byo-iam-byo-oidc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-multiple-machinepools-and-idps
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-multiple-machinepools-and-idps
+    test:
+    - ref: rhcs-module-run-example
+- always_run: true
+  as: rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
+    test:
+    - ref: rhcs-module-run-example
+zz_generated_metadata:
+  branch: release-1.6.3
+  org: terraform-redhat
+  repo: terraform-rhcs-rosa-classic

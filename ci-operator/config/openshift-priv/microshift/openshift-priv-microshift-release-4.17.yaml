@@ -19,12 +19,16 @@ images:
   to: microshift-test-rpm
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - microshift-test-rpm
     name: 4.17-priv
     namespace: ocp-private
 releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
   nightly-amd64:
     candidate:
       product: ocp
@@ -43,9 +47,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.17-priv
-  namespace: ocp-private
 tests:
 - as: verify
   steps:
@@ -171,12 +172,20 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-full-conformance-rhel-eus
-  run_if_changed: ^(origin/.*)$
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
   steps:
     cluster_profile: aws
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-origin-conformance
+- as: footprint-and-performance
+  run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-footprint-and-performance
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

@@ -5,7 +5,87 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted
+    optional: true
+    rerun_command: /test e2e-metal-assisted
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
+        - --target=e2e-metal-assisted
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-12
     decorate: true
     labels:
@@ -78,13 +158,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-12,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-metal-assisted-4-12|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-13
     decorate: true
     labels:
@@ -164,7 +244,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-14
     decorate: true
     labels:
@@ -244,7 +324,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-15
     decorate: true
     labels:
@@ -324,7 +404,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-16
     decorate: true
     labels:
@@ -404,8 +484,8 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-cnv-4-16
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-cnv-4-17
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
@@ -413,8 +493,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-cnv-4-16
-    rerun_command: /test e2e-metal-assisted-cnv-4-16
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-cnv-4-17
+    rerun_command: /test e2e-metal-assisted-cnv-4-17
     run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
@@ -424,8 +504,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
-        - --target=e2e-metal-assisted-cnv-4-16
+        - --secret-dir=/usr/local/e2e-metal-assisted-cnv-4-17-cluster-profile
+        - --target=e2e-metal-assisted-cnv-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -441,7 +521,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
+        - mountPath: /usr/local/e2e-metal-assisted-cnv-4-17-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -478,13 +558,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-cnv-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-cnv-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-day2
     decorate: true
     labels:
@@ -563,7 +643,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-ipv4v6
     decorate: true
     labels:
@@ -642,7 +722,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-lvm
     decorate: true
     labels:
@@ -722,8 +802,8 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-odf-4-16
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-odf-4-17
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
@@ -731,8 +811,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-odf-4-16
-    rerun_command: /test e2e-metal-assisted-odf-4-16
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-odf-4-17
+    rerun_command: /test e2e-metal-assisted-odf-4-17
     run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
@@ -742,8 +822,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
-        - --target=e2e-metal-assisted-odf-4-16
+        - --secret-dir=/usr/local/e2e-metal-assisted-odf-4-17-cluster-profile
+        - --target=e2e-metal-assisted-odf-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -759,7 +839,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
+        - mountPath: /usr/local/e2e-metal-assisted-odf-4-17-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -796,92 +876,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-odf-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-odf-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-onprem
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-onprem
-    rerun_command: /test e2e-metal-assisted-onprem
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
-        - --target=e2e-metal-assisted-onprem
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-onprem-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-onprem,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^cloud_hotfix_releases$
-    - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-single-node
     decorate: true
     labels:
@@ -960,7 +961,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-static-ip-suite
     decorate: true
     labels:
@@ -1039,7 +1040,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -1093,7 +1094,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/lint
     decorate: true
     labels:
@@ -1147,7 +1148,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/subsystem-aws
     decorate: true
     labels:
@@ -1216,7 +1217,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/unit-test
     decorate: true
     labels:
@@ -1278,7 +1279,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/verify-generated-code
     decorate: true
     labels:

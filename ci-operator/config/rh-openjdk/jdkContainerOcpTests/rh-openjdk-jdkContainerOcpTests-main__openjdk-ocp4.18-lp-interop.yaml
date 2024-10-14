@@ -1,0 +1,84 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  rh-openjdk-runner:
+    name: rh_jdk_ocp_testsuite
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openjdk-interop-aws
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "rh-openjdk-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rh-openjdk-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OPENJDK", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["container_qe"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","openjdk-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sfroberg@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPENJDK_VERSION: 8 11 17 21
+      USER_TAGS: |
+        scenario openjdk
+    test:
+    - ref: rh-openjdk-test
+    workflow: firewatch-ipi-aws
+- as: openjdk-interop-aws-fips
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "rh-openjdk-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rh-openjdk-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OPENJDK", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["container_qe"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","fips","openjdk-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sfroberg@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPENJDK_VERSION: 8 11 17 21
+      USER_TAGS: |
+        scenario openjdk
+    test:
+    - ref: rh-openjdk-test
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-openjdk
+  repo: jdkContainerOcpTests
+  variant: openjdk-ocp4.18-lp-interop

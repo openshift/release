@@ -16,6 +16,7 @@
     - build05
     - build09
     - build10
+    - build11
     - vsphere02
     service_account:
     - deck
@@ -28,6 +29,7 @@
     - promoted-image-governor
     - github-ldap-user-group-creator
     - cluster-display
+    - cluster-init
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -76,12 +78,10 @@
     - release-controller-ocp-multi-priv
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
-      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller")'|
-      jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq
-      '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output |
-      tr -d '\n'
-    name: token_image-puller_$(cluster)_reg_auth_value.txt
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64
+      -w 0
+    name: token_$(service_account)_$(cluster)_reg_auth_value.txt
   item_name: build_farm
   params:
     cluster:
@@ -93,27 +93,11 @@
     - build05
     - build09
     - build10
+    - build11
     - vsphere02
-- fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
-      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher")'
-      | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode |
-      jq '.["image-registry.openshift-image-registry.svc.cluster.local:5000"].auth'
-      --raw-output | tr -d '\n'
-    name: token_image-pusher_$(cluster)_reg_auth_value.txt
-  item_name: build_farm
-  params:
-    cluster:
-    - app.ci
-    - build01
-    - build02
-    - build03
-    - build04
-    - build05
-    - build09
-    - build10
-    - vsphere02
+    service_account:
+    - image-puller
+    - image-pusher
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -132,6 +116,7 @@
     - build05
     - build09
     - build10
+    - build11
     - vsphere02
     service_account:
     - ci-chat-bot
@@ -154,6 +139,7 @@
     - build05
     - build09
     - build10
+    - build11
     service_account:
     - pod-scaler
 - fields:
@@ -217,13 +203,12 @@
     - app.ci
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
-      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="multi-arch-builder-controller")'|
-      jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq
-      '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output |
-      tr -d '\n'
+      create token -n ci multi-arch-builder-controller --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64
+      -w 0
     name: token_multi-arch-builder-controller_$(cluster)_reg_auth_value.txt
   item_name: build_farm
   params:
     cluster:
     - build10
+    - build11

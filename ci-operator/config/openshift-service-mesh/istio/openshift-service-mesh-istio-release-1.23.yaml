@@ -1,0 +1,222 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: upstream-1.23
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: sync-upstream-istio-release-1-23
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=istio \
+    --branch=release-1.23 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge,auto-merge" \
+    --modifier=merge_upstream_istio_release_1_23 \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=release-1.23 \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+  timeout: 20m0s
+- as: istio-integration-pilot
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.23
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-pilot-test-run
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          pilot 'TestGatewayConformance|TestCustomGateway|TestCNIRaceRepair|TestGateway/managed-owner|TestProxyHeaders|TestCustomGateway/helm|TestCustomGateway/helm-simple|TestTcpProbe/rewrite-success|TestGRPCProbe|TestTunnelingOutboundTraffic|TestCNIVersionSkew|TestGateway|TestIngress|TestLabelChanges|TestLocality|TestMirroring/mirror-percent-absent|TestMirroring/mirror-50|TestMirroring/mirror-10|TestMirroringExternalService'"
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-telemetry
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.23
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-telemetry-test-run
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          telemetry 'TestProxyTracingOpenCensusMeshConfig|TestProxyTracingOpenTelemetryProvider|TestClientTracing|TestServerTracing|TestAccessLogs/enabled-with-targetref|TestAccessLogsMode|TestCustomizeMetrics|TestStatsFilter|TestStatsTCPFilter|TestStatsGatewayServerTCPFilter|TestImagePullPolicy|TestGatewaySelection|TestAccessLogs|TestImagePullPolicy|TestGatewaySelection|TestImagePullPolicyWithHTTP|TestBadWasmRemoteLoad|TestBadWasmWithFailOpen|TestOutboundTrafficPolicy_AllowAny|TestOutboundTrafficPolicy_RegistryOnly|TestDashboard|TestRateLimiting|TestLocalRateLimiting|TestLocalRouteSpecificRateLimiting|TestLocalRateLimitingServiceAccount'"
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6312
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-helm
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.23
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-helm-test-run
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
+          export KUBECONFIG=/work/ci-kubeconfig
+          oc version
+          export ARTIFACT_DIR="${ARTIFACT_DIR}"
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
+          export BUILD_WITH_CONTAINER="0"
+          export VARIANT=distroless
+          export GCP_REGISTRIES=" "
+          cd /work
+          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease'
+        EOF
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6571
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+zz_generated_metadata:
+  branch: release-1.23
+  org: openshift-service-mesh
+  repo: istio

@@ -1,79 +1,87 @@
 #!/bin/bash
 
+echoerr() { echo "$@" 1>&2; }
+
+trigger_build() {
+	curl -sik --resolve "$endpoint_resolve" "https://${endpoint}/job/${test_name}/buildWithParameters?token=${dpu_token}&pullnumber=${PULL_NUMBER}" | grep location: | tr -d '\r\n' | cut -d' ' -f2
+}
+
 wait_for_job_to_run() {
-	echo "Waiting for job to start..."
-	max_sleep_duration=432000  # Maximum sleep duration in seconds (5 days)
+	echoerr "Waiting for job to start..."
+	# Maximum sleep duration in seconds (5 days)
+	max_sleep_duration=432000
 	sleep_counter=0
+
 	while :
 	do
 		JSON_FILE=$(mktemp /tmp/pullnumber.XXX)
-    		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
+		curl -k --resolve "$endpoint_resolve" -X GET $1/api/json > $JSON_FILE
+		blocked=$(cat $JSON_FILE | jq .why)
 
-    		pullnumber_job=$(cat $JSON_FILE | jq -r '.actions[] | select(.parameters) | .parameters[] | select(.name == "pullnumber") | .value')
+                if [[ "$blocked" != "null" && "$blocked" =~ ^\"(.*)\"$ ]]; then
+    			blocked="${BASH_REMATCH[1]}"
+                fi
 
-    		if [[ "$pullnumber_job" == "$PULL_NUMBER" ]]; then
-			ID=$(cat $JSON_FILE | jq -r '.id')	
+		if [[ "$blocked" == "Waiting for next available executor on "* ]]; then
+			echo "Job is blocked, waiting for job to start"
+		elif [[ "$blocked" == "null" ]]; then
+			cat $JSON_FILE | jq -r .executable.url
 			break
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting- job has not started for longer than 5 days..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
+		else
+			echo "Error: unknown value of blocked variable: $blocked"
+			exit 1
+		fi
+
+		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
+			echo "Exiting- job has not started for longer than 5 days..."
+			exit 1
+		fi
+		sleep_counter=$((sleep_counter + 60))
+		sleep 60
 	done
 }
 
 wait_for_job_to_finish_running() {
-	job_url_id="https://${endpoint}/job/$test_name/$ID"
-	max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
-	sleep_counter=0
+	echoerr "Waiting for job to finish..."
+	local job_url=$1/api/json
+	local max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
+	local sleep_counter=0
+
 	while :
-	do	
+	do
 		JSON_FILE=$(mktemp /tmp/output.XXX)
-		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
+		curl -k -s --resolve "$endpoint_resolve" "$job_url" > "$JSON_FILE"
 
-    		# Extract the result field
-    		result=$(cat $JSON_FILE | jq -r '.result')
+		# Extract the result field
+		result=$(jq -r '.result' < "$JSON_FILE")
 
-    		if [[ "$result" != "null" ]]; then
-        		# Job has completed
-        		echo "Job Result: $result"
-	
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url_id}/consoleText")
+		if [[ "$result" != "null" ]]; then
+			# Job has completed
+			echo "Job Result: $result"
+			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "$1/consoleText")
 			echo "$curl_info"
-        
 			if [ "$result" == "SUCCESS" ]; then
-            			exit 0
-        		else
-            			exit 1
-        		fi
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting due to long sleep duration..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
+				exit 0
+			else
+				exit 1
+			fi
+		else
+			if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
+				echo "Exiting due to long sleep duration..."
+				exit 1
+			fi
+			sleep_counter=$((sleep_counter + 60))
+			sleep 60
+		fi
 	done
 }
 
-trigger_build() {
-	curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/view/dpu-test/job/${test_name}/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
-}
-
-token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
 endpoint=$(cat "/var/run/token/dpu-token/url")
-test_name="99_Lab217_E2E_IPU_Deploy"
-
-job_url="https://${endpoint}/job/${test_name}/lastBuild"
+dpu_token=$(cat "/var/run/token/dpu-token/dpu-key")
+test_name="99_E2E_IPU_Deploy"
 endpoint_resolve="${endpoint}:443:10.0.180.88"
+job_url="https://${endpoint}/job/${test_name}/lastBuild"
 
-trigger_build
-
-wait_for_job_to_run
-
-wait_for_job_to_finish_running
-
+job_queue_item=$(trigger_build)
+job_url=$(wait_for_job_to_run "$job_queue_item" | tail -n1)
+wait_for_job_to_finish_running "$job_url"

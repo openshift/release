@@ -26,6 +26,12 @@ To provision the necessary infrastructure and using that infrastructure to execu
 
 Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/firewatch-ipi-aws)documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
 
+#### RHSSO on ROSA Classic STS:
+
+We use the `firewatch-rosa-aws-sts` workflow for cluster provisioning and deprovisioning.
+
+**Note that the cluster must have FIPS disabled.**
+
 ### Test Setup, Execution, and Reporting Results - `rhsso-interop-aws`
 
 1. [`install-operators`](../../../step-registry/install-operators/README.md)

@@ -140,7 +140,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-powervs-ovn-multi-p-px
-  cron: 20 10 * * *
+  cron: 40 18 * * *
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
@@ -149,6 +149,7 @@ tests:
       BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       IBMCLOUD_CIS_CRN: 'crn:v1:bluemix:public:internet-svcs:global:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:8a93b3a8-b109-4c74-952c-7578dca2c4ee::'
       JQ_VERSION: "1.6"
+      OCP_VERSION: "4.17"
       RESOURCE_GROUP: multi-arch-cicd-resource-group
       TERRAFORM_VERSION: 1.5.5
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -207,7 +208,6 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -370,7 +370,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
 - as: ocp-e2e-ibmcloud-ovn-multi-x-px
-  cron: 20 13 * * *
+  cron: 20 18 * * *
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     dependencies:
@@ -429,7 +429,7 @@ tests:
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 0 5 * * 1-5
+  cron: 0 21 * * 1,4
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -437,12 +437,28 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi
+- as: ocp-e2e-ovn-agent-remote-libvirt-s390x
+  cluster: build01
+  cron: 0 23 * * 0
+  steps:
+    cluster_profile: libvirt-s390x
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.17"
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      TEST_TYPE: conformance-parallel
+      VOLUME_CAPACITY: 120G
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 5 * * 1-5
+  cron: 0 21 * * 1,4
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -450,8 +466,24 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt-upi
+- as: ocp-e2e-ovn-agent-remote-libvirt-multi-z-z
+  cluster: build01
+  cron: 0 23 * * 0
+  steps:
+    cluster_profile: libvirt-s390x
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.17"
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      TEST_TYPE: conformance-parallel
+      VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
   cluster: build01
@@ -468,7 +500,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi-heterogeneous
 - as: ocp-heavy-build-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 13 * * 1-5
+  cron: 0 21 * * 3
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -476,12 +508,13 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: heavy-build
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 18 * * 0
+  cron: 0 21 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -489,11 +522,12 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 19 * * 0
+  cron: 0 22 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -501,11 +535,12 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 18 * * 6
+  cron: 0 21 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -513,11 +548,12 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 19 * * 6
+  cron: 0 22 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -525,13 +561,14 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-z-z
   cluster: build01
-  cron: 0 20 * * 6
+  cron: 0 23 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -541,12 +578,13 @@ tests:
       BRANCH: "4.17"
       COMPUTE_COUNT: "0"
       DOMAIN_MEMORY: "32768"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
       VOLUME_CAPACITY: 64GB
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 5 * * 1-5
+  cron: 0 21 * * 1,4
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -555,12 +593,13 @@ tests:
       ARCH: ppc64le
       BRANCH: "4.17"
       DOMAIN_MEMORY: "34816"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 5 * * 1-5
+  cron: 0 21 * * 1,4
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -569,12 +608,29 @@ tests:
       ARCH: ppc64le
       BRANCH: "4.17"
       DOMAIN_MEMORY: "34816"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
+- as: ocp-e2e-ovn-agent-remote-libvirt-multi-p-p
+  cluster: build01
+  cron: 0 23 * * 0
+  steps:
+    cluster_profile: libvirt-ppc64le
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.17"
+      DOMAIN_MEMORY: "34816"
+      INSTALLER_TYPE: agent
+      TEST_TYPE: conformance-parallel
+      USE_RAMFS: "true"
+      VOLUME_CAPACITY: 120G
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 13 * * 1-5
+  cron: 0 21 * * 3
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -582,12 +638,13 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: heavy-build
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 13 * * 1-5
+  cron: 0 21 * * 3
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -595,12 +652,13 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: heavy-build
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 18 * * 0
+  cron: 0 21 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -608,11 +666,12 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 19 * * 0
+  cron: 0 22 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -620,11 +679,12 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 18 * * 6
+  cron: 0 21 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -632,11 +692,12 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 19 * * 6
+  cron: 0 22 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -644,12 +705,13 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
+      ETCD_DISK_SPEED: slow
       FIPS_ENABLED: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-p-p
   cluster: build01
-  cron: 0 20 * * 6
+  cron: 0 23 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -659,23 +721,10 @@ tests:
       BRANCH: "4.17"
       COMPUTE_COUNT: "0"
       DOMAIN_MEMORY: "32768"
+      ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
       VOLUME_CAPACITY: 64GB
     workflow: openshift-e2e-libvirt-upi
-- as: ocp-e2e-ovn-powervs-original-multi-p-p
-  cluster: build01
-  cron: 0 17 * * *
-  steps:
-    cluster_profile: powervs-4
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.17"
-      CLUSTER_NAME_MODIFIER: par-orig-416
-      INSTALLER: powervs
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-ovn-powervs-capi-multi-p-p
   cluster: build01
   cron: 0 9,21 * * *
@@ -788,7 +837,6 @@ tests:
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
-      FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: multi
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image

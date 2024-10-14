@@ -16,10 +16,10 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 35,
-        'us-west-2': 40,
+        'us-east-1': 60,
+        'us-east-2': 60,
+        'us-west-1': 55,
+        'us-west-2': 60,
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
@@ -70,7 +70,7 @@ CONFIG = {
     'aws-interop-qe-quota-slice': {
         'us-east-2': 5,
     },
-    'aws-local-zones-quota-slice': {
+    'aws-edge-zones-quota-slice': {
         'us-east-1': 5,
         'us-west-2': 5
     },
@@ -151,7 +151,7 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
-   'azurestack-qe-quota-slice': {
+    'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
     'azuremag-quota-slice': {
@@ -159,8 +159,20 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'southcentralus': 10,
+        'westus2': 10,
         'centralus': 10
+    },
+    'azure-hcp-qe-quota-slice': {
+        'westus': 5,
+        'eastus': 5,
+        'uksouth': 5,
+        'westeurope': 5,
+    },
+    'azure-hcp-ha-qe-quota-slice': {
+        'westus2': 5,
+        'southcentralus': 5,
+        'eastasia': 5,
+        'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
         'eastus2': 4
@@ -224,9 +236,10 @@ CONFIG = {
     'nutanix-qe-quota-slice': {},
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
+    'nutanix-qe-gpu-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 9,
+        'default': 18,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -244,7 +257,7 @@ CONFIG = {
         'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 2,
+        'default': 4,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -358,6 +371,9 @@ CONFIG = {
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'aws-kubevirt-quota-slice': {
+        'us-east-2': 10,
+    },
     'hypershift-powervs-quota-slice': {
         'default': 3,
     },
@@ -418,6 +434,9 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+    },
+    'aro-redhat-tenant-quota-slice': {
+        'default': 1,
     }
 }
 
@@ -442,6 +461,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-zone-quota-slice']['nutanix-qe-zone-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-gpu-quota-slice']['nutanix-qe-gpu-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

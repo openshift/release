@@ -24,6 +24,12 @@ cp ${OPERATOR_E2E_DIR}/manifest.yaml ${TEST_MANIFEST}
 echo "Using ${TEST_MANIFEST}"
 cat ${TEST_MANIFEST}
 
+if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
+    cp test/e2e/samba/ocp-manifest.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
+    cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+fi
+
 echo "Copying samba-server manifest from csi-operator repo"
 cp ${OPERATOR_E2E_DIR}/samba-server.yaml ${SMB_SERVER_MANIFEST}
 echo "Using ${SMB_SERVER_MANIFEST}"

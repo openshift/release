@@ -71,6 +71,99 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
+- as: krkn-hub-cloud-gcp-node-tests
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHURN: "False"
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "4"
+      PROFILE_TYPE: reporting
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-gcp
+- as: krkn-hub-tests-417-azure-node
+  cron: 29 5 * * 2
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "False"
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "4"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-azure-4.16
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-azure
+  timeout: 6h0m0s
+- as: krkn-hub-tests-417-gcp
+  cron: 29 5 9,25 * 2
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TELEMETRY_GROUP: prow-ocp-gcp-4.16
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-gcp
+  timeout: 6h0m0s
+- as: krkn-hub-tests-417-azure
+  cron: 29 5 9,25 * 2
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "False"
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "4"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-azure-4.16
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-azure
+- always_run: false
+  as: krkn-hub-ibm-cloud-api-tests
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - ref: redhat-chaos-node-disruptions-master-outage
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- as: krkn-hub-tests-aro
+  cron: 0 8 * * 1
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      ARO_MASTER_VM_SIZE: Standard_D16s_v3
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "4"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-aro-4.17
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - chain: redhat-chaos-hog-scenarios
+    workflow: openshift-qe-installer-azure-aro-upi
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

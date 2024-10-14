@@ -38,7 +38,7 @@ declare -A compute_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
-	['openstack-hwoffload']='m1.xlarge.nfv'
+	['openstack-hwoffload']='m1.xlarge'
 	['openstack-nerc-dev']='cpu-su.4'
 	)
 

@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: build
+  commands: make build-coredns
+  container:
+    from: src
+- as: verify-operator
+  commands: make -C operator verify
+  container:
+    from: src
+- as: unit-operator
+  commands: make -C operator test
+  container:
+    from: src
+- as: build-operator
+  commands: make -C operator build
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: coredns-ocp-dnsnameresolver

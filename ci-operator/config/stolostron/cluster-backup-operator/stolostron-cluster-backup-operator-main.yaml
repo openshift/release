@@ -17,7 +17,7 @@ images:
   to: cluster-backup-controller
 promotion:
   to:
-  - name: "2.12"
+  - name: "2.13"
     namespace: stolostron
 resources:
   '*':
@@ -25,8 +25,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: crd-and-gen-files-check
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    # Check that crd manifests are up-to-date
+    make -f Makefile.prow manifests
+    diff=$(git diff --color --ignore-space-change config/crd/bases)
+    if [ -n "$diff" ]; then
+      echo "$diff"
+      echo "***** config/crd/bases is out-of-date *****"
+      echo "*****     run 'make manifests'      *****"
+      exit 1
+    fi
+    # Check that generated deepcopy files are up-to-date
+    make -f Makefile.prow generate
+    diff=$(git diff --color --ignore-space-change api/v1beta1/*generated*.go)
+    if [ -n "$diff" ]; then
+      echo "$diff"
+      echo "***** api/v1beta1 generated files are out-of-date *****"
+      echo "*****     run 'make generate'      *****"
+      exit 1
+    fi
+  container:
+    from: src
 - as: unit-tests
-  commands: make -f Makefile.prow unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow unit-tests
   container:
     from: src
 - as: sonar
@@ -74,7 +101,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.12
+      DESTINATION_BRANCH: release-2.13
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

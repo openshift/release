@@ -1,0 +1,392 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: builder/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: e2e-gcp-common-templates-unit-tests
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: unit-tests
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        make unit-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-go-tests
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-gcp-go-tests
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        make go-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-rhel7
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-rhel7
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=rhel7 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-rhel8
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-rhel8
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=rhel8 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-rhel9
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-rhel9
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=rhel9 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows10
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-windows10
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows10 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows11
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-windows11
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows11 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows2016
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-tests-windows2016
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2016 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows2019
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-tests-windows2019
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2019 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows2022
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-tests-windows2022
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2022 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-fedora
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-fedora
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=fedora && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-ubuntu
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-ubuntu
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=ubuntu && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-centos6
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-centos6
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=centos6 && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-centos7
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-centos7
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=centos7 && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-centos-stream8
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-centos8
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=centos-stream8 && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-centos-stream9
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-centos9
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=centos-stream9 && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-opensuse
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-tests-opensuse
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=opensuse && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.31
+  org: kubevirt
+  repo: common-templates

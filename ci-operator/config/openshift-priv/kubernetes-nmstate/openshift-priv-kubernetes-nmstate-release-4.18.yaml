@@ -7,35 +7,35 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-nmstate
 images:
 - dockerfile_path: build/Dockerfile.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: kubernetes-nmstate-operator
 - dockerfile_literal: |
     FROM src
@@ -50,7 +50,8 @@ images:
   to: src-with-oc-and-kubectl
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - kubernetes-nmstate-handler
     - kubernetes-nmstate-operator
     - src-with-oc-and-kubectl
@@ -70,7 +71,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.18"
   stable:
     release:
       channel: fast
@@ -107,8 +108,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
   cluster: build05
@@ -119,18 +118,13 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator
 - always_run: false
-  as: e2e-operator-azure
+  as: e2e-handler-azure
   cluster: build05
   optional: true
   steps:
     cluster_profile: azure4
-    env:
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-azure
 zz_generated_metadata:
   branch: release-4.18

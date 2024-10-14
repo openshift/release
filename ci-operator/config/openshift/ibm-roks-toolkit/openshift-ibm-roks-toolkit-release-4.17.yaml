@@ -1,0 +1,97 @@
+base_images:
+  base:
+    name: roks-toolkit-base
+    namespace: hypershift-toolkit
+    tag: latest
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+images:
+- from: base
+  inputs:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+  to: ibm-roks-toolkit
+- dockerfile_path: Dockerfile.cpoperator
+  from: base
+  inputs:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+  to: control-plane-operator
+- dockerfile_path: Dockerfile.metrics
+  from: base
+  inputs:
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.17
+  to: metrics
+- dockerfile_path: hack/releaser/Dockerfile
+  from: src
+  to: release-base
+promotion:
+  to:
+  - excluded_images:
+    - release-base
+    name: ibm-roks-4.17
+    namespace: hypershift-toolkit
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify-code
+  commands: make verify-bindata && make verify-gofmt
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: gosec
+  commands: make verify-gosec
+  container:
+    from: src
+- as: makerelease
+  postsubmit: true
+  steps:
+    test:
+    - as: test
+      cli: initial
+      commands: KUBECONFIG=/var/run/appci/kubeconfig GITHUB_TOKEN="$(cat /var/run/github/token)"
+        make create-release
+      credentials:
+      - mount_path: /var/run/github
+        name: ibm-roks-toolkit-gh-token
+        namespace: test-credentials
+      - mount_path: /var/run/appci
+        name: ibm-roks-appci-kubeconfig
+        namespace: test-credentials
+      from: release-base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: ibm-roks-toolkit

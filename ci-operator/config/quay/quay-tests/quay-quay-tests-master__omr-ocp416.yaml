@@ -5,18 +5,19 @@ base_images:
     tag: upi-installer
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - dockerfile_literal: |
     FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_16.x | bash - && \
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman" && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman jq" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
         yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-        yum -y install terraform \
+        yum -y install terraform && \
+        jq --version && \
         yum clean all && rm -rf /var/cache/yum/*
     RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
         unzip -q awscliv2.zip && \

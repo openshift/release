@@ -20,14 +20,14 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
-  initial:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.16"
   latest:
     candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  multi-latest:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.16"
@@ -41,15 +41,17 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
@@ -80,11 +82,6 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
-- as: installer-rehearse-ibmcloud-disconnected
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe-2
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:

@@ -77,7 +77,7 @@ done
 for ((i = 0; i < total_workers; i++)); do
   ipaddress=$(jq -r --argjson N $((i + 10)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
   ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
-
+  ipv4_addresses+="${ipaddress},"
   ipv4="
         ipv4:
           enabled: true
@@ -149,12 +149,11 @@ cp -t "${dir}" "${SHARED_DIR}"/nodes-config.yaml
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-curl https://raw.githubusercontent.com/openshift/installer/master/docs/user/agent/add-node/node-joiner.sh --output "${dir}/node-joiner.sh"
+oc adm node-image create --dir="${dir}" --insecure=true
 
-chmod +x "${dir}/node-joiner.sh"
-sh "${dir}/node-joiner.sh"
+echo "node_${folder_name}.iso" >"${SHARED_DIR}"/node-iso.txt
+node_iso=$(<"${SHARED_DIR}"/node-iso.txt)
 
-node_iso="node.x86_64_${folder_name}.iso"
 echo "uploading ${node_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
@@ -168,7 +167,7 @@ for ((i = 0; i < 3; i++)); do
     sleep 2
   fi
 done
-if [ $status -ne 0 ]; then
+if [ "$status" -ne 0 ]; then
   echo "Agent node ISO upload failed after 3 attempts!!!"
   exit 1
 fi
@@ -211,10 +210,9 @@ for ((i = 0; i < total_workers; i++)); do
     -on=true "/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 done
 
-sleep 600
 # To check if there are pending CSRs
 function wait_for_pending_csrs_and_approve() {
-  for ((i = 0; i < 18; i++)); do
+  for ((i = 0; i < 3; i++)); do
     pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
     if [ -n "$pending_csrs" ]; then
       for csr in $pending_csrs; do
@@ -229,27 +227,21 @@ function wait_for_pending_csrs_and_approve() {
   done
 }
 
-node_count=$(($(oc get nodes --no-headers | wc -l | tr -d '[:space:]') + total_workers))
-wait_for_pending_csrs_and_approve
+echo "Monitoring additional worker nodes IPs ${ipv4_addresses} to join the cluster"
+sleep 60
+oc adm node-image monitor --ip-addresses "${ipv4_addresses%,}" 2>&1 | tee output.txt &
 
-for ((i = 0; i < 5; i++)); do
-  updated_node_count=$(oc get nodes --no-headers | wc -l | tr -d '[:space:]')
-  echo "Waiting for nodes to reach count $node_count. Current count: ${updated_node_count}"
-  if [ "${updated_node_count}" -eq "${node_count}" ]; then
+for ((i = 0; i < 20; i++)); do
+  if grep -q "Kubelet" output.txt; then
+    # TODO: Handle CSR approvals based on pending CSRs that require DNS entries for nodes.
+    wait_for_pending_csrs_and_approve
+    sleep 20
+    wait_for_pending_csrs_and_approve
     break
   fi
   sleep 30
 done
 
-if [ "${updated_node_count}" -ne "${node_count}" ]; then
-  echo "Expected count ${node_count} does not match the actual count ${updated_node_count}. Exiting."
-  exit 1
-fi
-
-if oc wait --for=condition=Ready node --all --timeout=3m; then
-  echo "Successfully added all the worker nodes."
-else
-  echo "Timed out waiting for nodes to be Ready. Exiting."
-  oc get nodes
-  exit 1
-fi
+# Add operators status checking until monitoring enhanced to do this
+echo "Ensure that all the cluster operators remain stable and ready"
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

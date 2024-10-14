@@ -1,0 +1,120 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: cluster-etcd-operator
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: e2e-metal-assisted-four-node-serial
+  interval: 24h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/conformance/serial
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-parallel
+  interval: 24h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/conformance/parallel
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-recovery
+  interval: 24h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/etcd/recovery
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-scaling
+  interval: 24h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/etcd/scaling
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: cluster-etcd-operator
+  variant: periodics

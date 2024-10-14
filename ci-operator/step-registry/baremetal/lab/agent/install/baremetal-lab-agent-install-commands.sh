@@ -46,11 +46,11 @@ function get_ready_nodes_count() {
 
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -70,11 +70,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -98,55 +97,17 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
    name: master
    replicas: ${masters}
-"
-
-if [ "${masters}" -eq 1 ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-platform:
-  none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-"
-fi
-
-if [ "${masters}" -gt 1 ]; then
-  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
-platform:
-  none: {}
 "
-  else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
-"
-  fi
-fi
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
 
@@ -156,7 +117,7 @@ do
   if test -f "${f}"
   then
       echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
   fi
 done
 
@@ -273,7 +234,6 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
-  # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
 fi
@@ -284,6 +244,8 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
-  # TODO: gather logs??
   exit 1
 fi
+
+echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

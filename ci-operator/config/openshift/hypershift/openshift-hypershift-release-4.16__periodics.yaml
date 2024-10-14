@@ -4,17 +4,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-tests
-  test-bin:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   upi-installer:
     name: "4.16"
     namespace: ocp
@@ -49,6 +45,9 @@ tests:
   cron: 31 8 6,28 * *
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
   cron: 55 1 11,20 * *
@@ -89,11 +88,18 @@ tests:
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
-- as: e2e-azure-ovn-conformance
+- as: e2e-azure-aks-ovn-conformance
   cron: 14 4 12,20 * *
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-azure-conformance
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-kubevirt-azure
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: azure4
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    workflow: hypershift-kubevirt-azure-conformance
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

@@ -22,7 +22,6 @@ fi
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
-POOL_NAME="multiarch-ci-pool"
 
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
@@ -39,11 +38,20 @@ do
 done
 
 # Remove stale volumes
-echo "Removing stale volumes..."
+echo "Removing stale ci pool volumes..."
 if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
     ${VIRSH} vol-delete --pool ${POOL_NAME} ${VOLUME}
+  done
+fi
+
+# Remove stale httpd volumes
+echo "Removing stale httpd volumes..."
+if [[ ! -z "$(${VIRSH} pool-list | grep ${HTTPD_POOL_NAME})" ]]; then
+  for VOLUME in $(${VIRSH} vol-list --pool ${HTTPD_POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
+  do
+    ${VIRSH} vol-delete --pool ${HTTPD_POOL_NAME} ${VOLUME}
   done
 fi
 

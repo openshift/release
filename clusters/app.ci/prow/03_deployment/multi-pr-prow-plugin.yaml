@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multi-pr-prow-plugin
+  namespace: ci
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: multi-pr-prow-plugin
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: multi-pr-prow-plugin
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: multi-pr-prow-plugin
+  namespace: ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - update
+  - create
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: multi-pr-prow-plugin
+  namespace: ci
+subjects:
+- kind: ServiceAccount
+  name: multi-pr-prow-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: multi-pr-prow-plugin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: prow
+    component: multi-pr-prow-plugin
+  name: multi-pr-prow-plugin
+  namespace: ci
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-pr-prow-plugin
+  labels:
+    app: prow
+    component: multi-pr-prow-plugin
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"multi-pr-prow-plugin:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"multi-pr-prow-plugin\")].image"}]'
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prow
+      component: multi-pr-prow-plugin
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: multi-pr-prow-plugin
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --link=release
+        - --depth=1
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --link=release
+        - --max-failures=3
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: multi-pr-prow-plugin
+        image: multi-pr-prow-plugin:latest
+        imagePullPolicy: Always
+        args:
+        - --endpoint=/
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --ci-op-config-dir=/var/repo/release/ci-operator/config
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --job-config=/etc/jobs/jobs.json
+        - --log-level=debug
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+        - name: http
+          containerPort: 8888
+        volumeMounts:
+        - name: hmac
+          mountPath: /etc/webhook
+          readOnly: true
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: jobs
+          mountPath: /etc/jobs
+        - name: release
+          mountPath: /var/repo
+        resources:
+          requests:
+            memory: "300Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      serviceAccountName: multi-pr-prow-plugin
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: config
+        configMap:
+          name: config
+      - name: jobs
+        persistentVolumeClaim:
+          claimName: multi-pr-prow-plugin
+      - name: release
+        emptyDir: {}

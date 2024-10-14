@@ -60,6 +60,9 @@ echo "Deleting AWS route53 hosted zone"
 HOSTED_ZONE="$(aws --region "${REGION}" route53 delete-hosted-zone --id  "$(cat "${HOSTED_ZONE_ID}")")"
 CHANGE_ID="$(echo "${HOSTED_ZONE}" | jq -r '.ChangeInfo.Id' | awk -F / '{printf $3}')"
 
+# add a sleep time to reduce Rate exceeded errors
+sleep 120
+
 aws --region "${REGION}" route53 wait resource-record-sets-changed --id "${CHANGE_ID}" &
 wait "$!"
 echo "AWS route53 hosted zone $(cat "${HOSTED_ZONE_ID}") successfully deleted."

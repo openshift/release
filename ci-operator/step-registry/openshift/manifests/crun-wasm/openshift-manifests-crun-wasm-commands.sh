@@ -12,13 +12,13 @@ runtime_path = "/usr/bin/crun"
 platform_runtime_paths = {"wasi/wasm32" = "/usr/bin/crun-wasm"}
 EOF
 
-cat > "${SHARED_DIR}/manifest_mc-worker-crun-wasm.yml" << EOF
+cat > "${SHARED_DIR}/manifest_mc-master-crun-wasm.yml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
   labels:
-    machineconfiguration.openshift.io/role: worker
-  name: 99-worker-crun-wasm
+    machineconfiguration.openshift.io/role: master
+  name: 99-master-crun-wasm
 spec:
   config:
     ignition:
@@ -33,3 +33,5 @@ spec:
   extensions:
     - wasm
 EOF
+
+sed 's/master/worker/g' "${SHARED_DIR}/manifest_mc-master-crun-wasm.yml" > "${SHARED_DIR}/manifest_mc-worker-crun-wasm.yml"

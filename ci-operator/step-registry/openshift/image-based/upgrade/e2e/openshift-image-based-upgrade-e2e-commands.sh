@@ -45,12 +45,20 @@ rm -rf tmp
 
 mkdir ${remote_artifacts_dir}
 
-# Run the conformance suite
-openshift-tests run ${CONFORMANCE_SUITE} \
-  --max-parallel-tests 15 \
-  -o "${remote_artifacts_dir}/e2e.log" \
-  --junit-dir "${remote_artifacts_dir}/junit" &
-wait "\$!"
+if [[ -n "${TEST_SKIPS}" ]]; then
+    TESTS="\$(openshift-tests run --dry-run "${CONFORMANCE_SUITE}")" &&
+    echo "\${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+    echo "Skipping tests:" &&
+    echo "\${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return \$exit_code; } &&
+    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+fi &&
+
+set -x &&
+openshift-tests run "${CONFORMANCE_SUITE}" \${TEST_ARGS:-} \
+    -o "${remote_artifacts_dir}/e2e.log" \
+    --junit-dir "${remote_artifacts_dir}/junit" &
+wait "\$!" &&
+set +x
 EOF
 
 chmod +x ${SHARED_DIR}/e2e_test.sh

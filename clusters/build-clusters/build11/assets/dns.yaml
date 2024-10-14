@@ -1,0 +1,30 @@
+apiVersion: operator.openshift.io/v1
+kind: DNS
+metadata:
+  finalizers:
+    - dns.operator.openshift.io/dns-controller
+  name: default
+spec:
+  logLevel: Normal
+  operatorLogLevel: Normal
+  upstreamResolvers:
+    policy: Sequential
+    upstreams:
+      - port: 53
+        type: SystemResolvConf
+  servers:
+    - name: rdu2-qe-dns
+      zones:
+        - arm.eng.rdu2.redhat.com
+      forwardPlugin:
+        policy: Sequential
+        upstreams:
+          - 10.10.137.10
+    - name: opensearch-instance-orion-dns
+      zones:
+        - opensearch.app.intlab.redhat.com
+      forwardPlugin:
+        policy: Sequential
+        upstreams:
+          - 10.1.170.91
+          - 10.1.170.93

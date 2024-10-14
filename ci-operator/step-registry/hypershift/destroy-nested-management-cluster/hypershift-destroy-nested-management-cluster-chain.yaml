@@ -13,11 +13,7 @@ chain:
       documentation: "The cloud provider of the cluster."
     commands: |-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
-      if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
-        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
-      else
-        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      fi
+      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       mkdir -p "${ARTIFACT_DIR}/output"
       bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
       tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
@@ -30,9 +26,9 @@ chain:
       name: azure-hypershift-ci
       namespace: test-credentials
     from_image:
-      namespace: ocp
-      name: "4.14"
-      tag: hypershift-operator
+      namespace: hypershift
+      name: hypershift-operator
+      tag: latest
     grace_period: 15m0s
     resources:
       requests:
@@ -54,13 +50,8 @@ chain:
         default: "AWS"
         documentation: "The cloud provider to use for the management cluster"
     commands: |-
-      if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
-        AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
-        DEFAULT_BASE_DOMAIN=hypershift.azure.devcluster.openshift.com
-      else
-        AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-        DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-      fi 
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -71,24 +62,14 @@ chain:
       
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       
-      if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
-        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
-        bin/hypershift destroy cluster azure \
-        --azure-creds=${AZURE_GUEST_INFRA_CREDENTIALS_FILE}  \
-        --name="${CLUSTER_NAME}" \
-        --namespace="${HYPERSHIFT_NAMESPACE}" \
-        --infra-id=${CLUSTER_NAME} \
-        --cluster-grace-period 40m
-      else
-        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-        bin/hypershift destroy cluster aws \
-        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
-        --name="${CLUSTER_NAME}" \
-        --namespace="${HYPERSHIFT_NAMESPACE}" \
-        --infra-id=${CLUSTER_NAME} \
-        --base-domain=${DOMAIN} \
-        --cluster-grace-period 40m
-      fi
+      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+      bin/hypershift destroy cluster aws \
+      --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+      --name="${CLUSTER_NAME}" \
+      --namespace="${HYPERSHIFT_NAMESPACE}" \
+      --infra-id=${CLUSTER_NAME} \
+      --base-domain=${DOMAIN} \
+      --cluster-grace-period 40m
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
@@ -96,16 +77,10 @@ chain:
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2
       namespace: test-credentials
-    - mount_path: /etc/hypershift-ci-jobs-azurecreds
-      name: hypershift-ci-jobs-azurecreds
-      namespace: test-credentials
-    - mount_path: /etc/hypershift-kubeconfig-azure
-      name: azure-hypershift-ci
-      namespace: test-credentials
     from_image:
-      namespace: ocp
-      name: "4.14"
-      tag: hypershift-operator
+      namespace: hypershift
+      name: hypershift-operator
+      tag: latest
     grace_period: 15m0s
     resources:
       requests:

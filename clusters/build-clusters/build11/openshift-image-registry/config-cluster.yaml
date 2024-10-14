@@ -1,0 +1,30 @@
+#We put only the customized fields in git
+apiVersion: imageregistry.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: docker-registry
+              operator: In
+              values:
+              - default
+          topologyKey: "kubernetes.io/hostname"
+  managementState: Managed
+  nodeSelector:
+    node-role.kubernetes.io/infra: ""
+  replicas: 5
+  tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/infra
+    operator: Exists
+  routes:
+  - hostname: registry.build11.ci.openshift.org
+    name: public-routes
+    secretName: public-route-tls

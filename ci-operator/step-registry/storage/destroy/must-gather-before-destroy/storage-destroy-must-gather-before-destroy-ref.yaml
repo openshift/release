@@ -1,0 +1,18 @@
+ref:
+  as: storage-destroy-must-gather-before-destroy
+  best_effort: true
+  optional_on_success: true
+  from: cli
+  commands: storage-destroy-must-gather-before-destroy-commands.sh
+  env:
+  - name: MUST_GATHER_TIMEOUT
+    default: 35m
+    documentation: A timeout for oc adm must-gather command.
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  timeout: 2h
+  documentation: |-
+    The must-gather step runs the must-gather tool to gather artifacts.
+    This is a copy of gather-must-gather step, because we want to run must-gather *before* un-installation of an optional CSI driver (to save the driver logs) and then also *after* driver uninstallation to check that the driver was removed completely (and have logs for it). CI does not allow running the same step twice, we need a copy.

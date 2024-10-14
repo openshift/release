@@ -25,7 +25,7 @@ parameters:
   value: registry.ci.openshift.org/ci/origin-release
   required: false
 - name: BASE_REPOSITORY
-  value: quay.io/centos/centos:7
+  value: quay.io/centos/centos:stream9
 - description: Namespace
   name: NAMESPACE
   required: false
@@ -184,6 +184,35 @@ objects:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
       contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.21/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.22"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.22"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.22/"
       type: Git
     strategy:
       dockerStrategy:

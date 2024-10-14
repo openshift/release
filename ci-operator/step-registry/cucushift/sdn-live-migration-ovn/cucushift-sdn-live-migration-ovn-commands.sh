@@ -11,7 +11,7 @@ currentVersion=$(oc version -o yaml | grep openshiftVersion | grep -o '[0-9]*[.]
 currentPlugin=$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')
 
 # Check if the current version and plugin match the expected values
-if [[ ${currentVersion} != "4.16" || ${currentPlugin} != "OpenShiftSDN" ]]; then
+if [[ ${currentVersion} != "4.16" && ${currentVersion} != "4.15" || ${currentPlugin} != "OpenShiftSDN" ]]; then
   echo "Exiting script because the version or plugin is incorrect."
   exit
 fi

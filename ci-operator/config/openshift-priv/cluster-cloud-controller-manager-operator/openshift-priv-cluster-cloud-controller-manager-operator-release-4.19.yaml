@@ -1,0 +1,179 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-cloud-controller-manager-operator
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-cloud-controller-manager-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: fmt
+  commands: make verify-fmt
+  container:
+    from: src
+- as: vet
+  commands: make verify-vet
+  container:
+    from: src
+- as: lint
+  commands: make verify-lint
+  container:
+    from: src
+- as: vendor
+  commands: make verify-vendor
+  container:
+    from: src
+- as: unit
+  steps:
+    test:
+    - as: unit
+      commands: |
+        make verify-generate
+        make verify-manifests
+        make unit
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-azure-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-ovn-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: level0-clusterinfra-azure-ipi-proxy-tests
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_FILTERS: LEVEL0
+      TEST_SCENARIOS: Cluster_Infrastructure
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: e2e-gcp-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-ovn-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upgrade
+- as: e2e-ibmcloud-ovn
+  optional: true
+  run_if_changed: ibm
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud
+  timeout: 6h0m0s
+- as: e2e-openstack-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-vsphere-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: regression-vsphere-ipi-ccmo
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: CCM
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+- as: e2e-nutanix-ovn
+  cluster: build01
+  optional: true
+  run_if_changed: .*nutanix.*
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: cluster-cloud-controller-manager-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cluster-cloud-controller-manager-operator

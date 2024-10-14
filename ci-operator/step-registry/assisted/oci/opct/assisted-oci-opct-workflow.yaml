@@ -4,20 +4,18 @@ workflow:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     pre:
+      - chain: opct-pre-init
       - ref: assisted-oci-setup
       - chain: assisted-common-pre
       - ref: assisted-common-setup-image-registry
-      - ref: provider-certification-tool-conf-dedicated
-      - ref: provider-certification-tool-conf-setup
-      - ref: provider-certification-tool-wait-ready
+      - chain: opct-pre
     test:
-      - ref: provider-certification-tool-run
-      - ref: provider-certification-tool-results
+      - chain: opct-conformance-test
     post:
       - ref: assisted-common-gather
-      - ref: provider-certification-tool-destroy
+      - chain: opct-post
       - ref: assisted-oci-teardown
     env:
-      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:v0.4.1
+      OPCT_CLI_IMAGE: "quay.io/opct/opct:v0.5.0"
   documentation: |-
     This workflow installs an OCP cluster by running assisted-installer on Oracle cloud and runs the OPCT on it.

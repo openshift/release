@@ -264,10 +264,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
-\$portgroup = "${vsphere_portgroup}"
-\$datastore = "${vsphere_datastore}"
-\$datacenter = "${vsphere_datacenter}"
-\$cluster = "${vsphere_cluster}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
@@ -655,6 +655,31 @@ spec:
               - key: node-role.kubernetes.io/master
                 operator: Exists
 EOF
+
+cat > "/tmp/vsphere-conf.ini" <<EOF
+[Global]
+cluster-id = "${cluster_name}"
+insecure-flag = true
+[VirtualCenter "${vsphere_url}"]
+user = "${GOVC_USERNAME}"
+password = "${GOVC_PASSWORD}"
+port = "443"
+datacenters = "$(basename "${vsphere_datacenter}")"
+EOF
+
+cat >"manifests/99_vsphere_csi_driver_config.yaml"<<-EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vsphere-config-secret
+  namespace: vmware-system-csi
+data:
+  csi-vsphere.conf: "$(base64 -w0 < /tmp/vsphere-conf.ini)"
+EOF
+
+curl -o "manifests/99_vsphere_csi_driver_namespace.yaml" https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/namespace.yaml
+curl -o "manifests/99_vsphere_csi_driver_manifests.yaml" "https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/vsphere-csi-driver.yaml"
+
 fi
 
 ### Make control-plane nodes unschedulable

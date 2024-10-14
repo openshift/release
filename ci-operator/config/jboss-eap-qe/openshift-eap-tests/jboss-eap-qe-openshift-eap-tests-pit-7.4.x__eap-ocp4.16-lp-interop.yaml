@@ -14,22 +14,24 @@ images:
   to: eap-runner
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 200Mi
 tests:
-- as: eap-74-interop-aws
+- as: eap-74-interop-ibmcloud
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
         "failure_rules":
@@ -38,7 +40,7 @@ tests:
           {"step": "eap-pit-74-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default", "interop-tests"]}
         ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","eap-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dcihak@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -47,18 +49,16 @@ tests:
         [
             {"name": "eap", "source": "redhat-operators", "channel": "stable", "version": "2.4.0", "install_namespace": "openshift-operators"}
         ]
-      USER_TAGS: |
-        scenario eap
     test:
     - ref: install-operators
     - ref: eap-pit-74-execute-tests
-    workflow: firewatch-ipi-aws
-- as: eap-74-xp-interop-aws
+    workflow: firewatch-ipi-ibmcloud
+- as: eap-74-xp-interop-ibmcloud
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
         "failure_rules":
@@ -69,7 +69,7 @@ tests:
           {"step": "eap-xp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default", "interop-tests"]}
         ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","eap-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dcihak@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -78,13 +78,11 @@ tests:
         [
             {"name": "eap", "source": "redhat-operators", "channel": "stable", "version": "2.4.0", "install_namespace": "openshift-operators"}
         ]
-      USER_TAGS: |
-        scenario eap
     test:
     - ref: install-operators
     - ref: eap-pit-74-execute-tests
     - ref: eap-xp-execute-tests
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: pit-7.4.x
   org: jboss-eap-qe

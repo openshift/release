@@ -8,9 +8,9 @@ base_images:
     namespace: ci
     tag: v1.59.0
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -34,8 +34,7 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -225,6 +224,16 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cidr-expansion
+- as: e2e-aws-ovn-subnet-configs
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: ovn-subnet-configs
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:

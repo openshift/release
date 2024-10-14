@@ -82,7 +82,7 @@ else
     long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
     CLUSTER_NAME="$CLUSTER_PREFIX-$long_name_prefix"
   fi
-  
+
   #set the domain prefix of length (<=15)
   MAX_DOMAIN_PREFIX_LENGTH=15
   if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
@@ -263,8 +263,12 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-  record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
+  if [[ "$HOSTED_CP" == "true" ]] && [[ "$OCM_LOGIN_ENV" == "production" ]]; then
+     echo "The feature WORKER_DISK_SIZE is not ready for HCP on Prod"
+  else
+      COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+      record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
+  fi
 fi
 
 AUDIT_LOG_SWITCH=""
@@ -298,10 +302,12 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
     MIN_REPLICAS=3
   fi
   COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  record_cluster "nodes" "install_nodes" ${MIN_REPLICAS}
   record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
   record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
+  record_cluster "nodes" "install_nodes" ${REPLICAS}
   record_cluster "nodes" "replicas" ${REPLICAS}
 fi
 
@@ -544,6 +550,9 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
+
+#Record installation start time
+record_cluster "timers" "global_start" "$(date +'%s')"
 
 # Provision cluster
 cmd="rosa create cluster -y \

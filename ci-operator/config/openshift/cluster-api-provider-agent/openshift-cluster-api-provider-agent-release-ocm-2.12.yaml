@@ -1,0 +1,119 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: ocm-2.12
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- dockerfile_path: Dockerfile
+  to: cluster-api-provider-agent
+promotion:
+  to:
+  - name: ocm-2.12
+    namespace: edge-infrastructure
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-api-provider-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-api-provider-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: build
+  commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    HOME=/tmp make build
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: unit-test
+  commands: HOME=/tmp make test
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: e2e-ai-operator-ztp-capi
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 00 21 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+zz_generated_metadata:
+  branch: release-ocm-2.12
+  org: openshift
+  repo: cluster-api-provider-agent

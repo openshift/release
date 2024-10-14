@@ -1,0 +1,176 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  must-gather:
+    name: "4.17"
+    namespace: ocp
+    tag: must-gather
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build build-vgmanager
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+images:
+- dockerfile_literal: |-
+    FROM ubi_minimal
+    RUN microdnf install -y make git python3 python3-pip patch
+    RUN pip3 install pre-commit
+
+    COPY --from=root:current /usr/lib/golang /usr/local/go
+    ENV PATH=$PATH:/usr/local/go/bin
+
+    ENV GOPATH=/tmp/go
+    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+    RUN mkdir /.local && chmod 777 /.local
+
+    ENV PRE_COMMIT_HOME=/.cache/precommit
+    ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+
+    # Snyk
+    ENV SNYK_DIR=/tmp/snyk
+    RUN mkdir -p ${SNYK_DIR}
+    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
+    RUN chmod +x ${SNYK_DIR}/snyk
+    ENV PATH=$PATH:${SNYK_DIR}
+  from: ubi_minimal
+  inputs:
+    root:
+      as:
+      - root:current
+  to: lvms-pre-commit
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - fedora:latest
+  to: lvm-operator
+- context_dir: must-gather/
+  dockerfile_path: Dockerfile
+  from: must-gather
+  to: lvms-must-gather
+operator:
+  bundles:
+  - as: lvm-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/lvms_dev/lvms-operator:latest
+    with: pipeline:lvm-operator
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+  mkdir /.local && chmod 777 /.local
+tests:
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    clone: true
+    from: lvms-pre-commit
+- as: unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+- as: post-unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+- as: snyk-code
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
+  container:
+    clone: true
+    from: lvms-pre-commit
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
+- as: snyk-deps
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
+  container:
+    clone: true
+    from: lvms-pre-commit
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
+- as: e2e-aws-single-node
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: lvm-operator

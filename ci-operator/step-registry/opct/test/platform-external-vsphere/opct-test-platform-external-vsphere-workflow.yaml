@@ -2,19 +2,21 @@ workflow:
   as: opct-test-platform-external-vsphere
   steps:
     pre:
+      - chain: opct-pre-init
       - chain: upi-vsphere-platform-external-ovn-pre
-      - ref: provider-certification-tool-conf-dedicated
-      - ref: provider-certification-tool-conf-setup
-      - ref: provider-certification-tool-wait-ready
+      - chain: opct-pre
     test:
-      - ref: provider-certification-tool-run
-      - ref: provider-certification-tool-results
+      - chain: opct-conformance-test
     post:
       - chain: gather
-      - ref: provider-certification-tool-destroy
+      - chain: opct-post
       - ref: upi-deprovision-vsphere
       - ref: upi-deprovision-vsphere-dns
       - ref: ipi-deprovision-vsphere-lease
+    env:
+      OPCT_CLI_IMAGE: "quay.io/opct/opct:v0.5.0"
   documentation: |-
-    The Openshift E2E vSphere (with no integration, platform: External) chain executes the provider certification tool,
-    gather's the results archive, and performs certification namespace teardown.
+    The OPCT workflow installs OpenShift on vSphere using platform type None, then
+    the run test steps using conformance workflow using OPCT, gather's the results archive, and
+    performs environment cleanup.
+    The OPCT_CLI_IMAGE and OPCT_DEV_EXTRA_CMD must be removed when OPCT v0.5 will be released.

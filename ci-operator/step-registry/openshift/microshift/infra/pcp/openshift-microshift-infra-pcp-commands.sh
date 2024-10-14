@@ -1,24 +1,11 @@
 #!/bin/bash
+set -xeuo pipefail
 
-set -eux
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
+trap_subprocesses_on_term
+trap_install_status_exit_code $EXIT_CODE_PCP_FAILURE
 
 ssh "${IP_ADDRESS}" "\
     sudo dnf install -y pcp-zeroconf pcp-pmda-libvirt && \

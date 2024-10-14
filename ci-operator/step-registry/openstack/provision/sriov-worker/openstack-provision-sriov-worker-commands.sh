@@ -57,7 +57,7 @@ NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
 SUBNET_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f json -c subnets | jq '.subnets[0]' | sed 's/"//g')
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
-if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* ]]; then
+if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* && "$CONFIG_DRIVE" != "true" ]]; then
     CONFIG_DRIVE=false
 else
     CONFIG_DRIVE=true

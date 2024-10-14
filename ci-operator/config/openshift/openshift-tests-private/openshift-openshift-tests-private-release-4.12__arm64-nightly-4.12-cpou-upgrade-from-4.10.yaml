@@ -1,0 +1,115 @@
+base_images:
+  ansible:
+    name: "4.10"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.10"
+  tools:
+    name: "4.10"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  intermediate:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  intermediate-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.10"
+  latest-arm64:
+    release:
+      architecture: arm64
+      channel: candidate
+      version: "4.10"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  target-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-ovn-f60
+  cron: 1 22 6 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.10 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.10 and @aws-ipi and
+        not @fips'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:intermediate-arm64
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-4.12-cpou-upgrade-from-4.10

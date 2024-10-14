@@ -40,6 +40,7 @@ while true; do
   sleep 15
 done
 
+cp -vf ${INSTALL_DIR}/auth/kubeconfig $SHARED_DIR/kubeconfig 
 
 log "Install Completed!"
 

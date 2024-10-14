@@ -1,0 +1,70 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: go build .
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: powervs-cloud-controller-manager
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: vet
+  commands: go vet $(go list ./... | grep -v "/vendor/")
+  container:
+    from: src
+- as: test
+  commands: go test -v -race -covermode=atomic -coverprofile=cover.out $(go list ./...)
+  container:
+    from: src
+- as: fmt
+  commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cloud-provider-powervs

@@ -1,0 +1,46 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/must-gather-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-harness-build
+  container:
+    from: src
+  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: must-gather-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: must-gather-operator

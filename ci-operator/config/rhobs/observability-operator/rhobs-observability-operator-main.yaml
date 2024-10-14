@@ -60,9 +60,21 @@ tests:
     - as: install
       cli: latest
       commands: |
-        oc create namespace obo
-        operator-sdk run bundle -n obo "$OO_BUNDLE"
-        oc wait --for condition=Available -n obo deployment observability-operator
+        oc create namespace coo
+        operator-sdk run bundle -n coo "$OO_BUNDLE"
+        if [ -e "${SHARED_DIR}/coo-csv.yml" ]; then
+          rm -f "${SHARED_DIR}/coo-csv.yml"
+        fi
+        tries=30
+        while [[ $tries -gt 0 ]] && ! oc -n coo rollout status deploy/obo-prometheus-operator; do
+          sleep 10
+          ((tries--))
+        done
+        oc wait -n coo --for=condition=Available deploy/obo-prometheus-operator --timeout=300s
+        oc wait -n coo --for=condition=Available deploy/obo-prometheus-operator-admission-webhook --timeout=300s
+        oc wait -n coo --for=condition=Available deploy/observability-operator --timeout=300s
+        CSV_NAME=$(oc -n coo get csv | grep 'observability-operator' | awk '{print $1}')
+        oc -n coo get csv "$CSV_NAME" -oyaml > "${SHARED_DIR}/coo-csv.yml"
       dependencies:
       - env: OO_BUNDLE
         name: observability-bundle
@@ -71,6 +83,7 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
+    - ref: rhobs-enable-ocp
     - ref: rhobs-obo-test-harness
     workflow: generic-claim
 zz_generated_metadata:

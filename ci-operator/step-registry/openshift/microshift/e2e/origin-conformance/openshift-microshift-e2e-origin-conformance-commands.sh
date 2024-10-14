@@ -1,8 +1,9 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+trap_subprocesses_on_term
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 MICROSHIFT_URL="https://${IP_ADDRESS}:6443"
@@ -30,7 +31,7 @@ fi
 # The test list belongs to MicroShift repo to control this by release.
 while read -r test; do
     grep -F "$test" "${CONFORMANCE_SKIP}" > /dev/null || echo "$test" >> "${CONFORMANCE_TEST_LIST}"
-done < <(openshift-tests run openshift/conformance --dry-run --provider none 2>/dev/null | egrep '^"\[')
+done < <(openshift-tests run "${TEST_SUITE}" --dry-run --provider none 2>/dev/null | egrep '^"\[')
 cp "${CONFORMANCE_TEST_LIST}" "${ARTIFACT_DIR}/tests.txt"
 
 cat > "${STATIC_CONFIG_MANIFEST_DIR}/infrastructure.yaml" <<EOF
@@ -60,4 +61,4 @@ status:
   networkType: OVNKubernetes
 EOF
 
-openshift-tests run openshift/conformance -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+openshift-tests run "${TEST_SUITE}" -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"

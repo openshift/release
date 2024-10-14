@@ -76,7 +76,7 @@ oc patch ingresscontroller default -n openshift-ingress-operator --type=merge --
 oc create secret tls api-certs --cert=${CERT_DIR}/fullchain.pem --key=${CERT_DIR}/key.pem -n openshift-config
 oc patch apiserver cluster --type merge --patch="{\"spec\": {\"servingCerts\": {\"namedCertificates\": [ { \"names\": [  \"$LE_API\"  ], \"servingCertificate\": {\"name\": \"api-certs\" }}]}}}"
 
-timeout_seconds=600
+timeout_seconds=1200
 end_time=$((SECONDS + timeout_seconds))
 
 while [ $SECONDS -lt $end_time ]; do
@@ -91,8 +91,10 @@ while [ $SECONDS -lt $end_time ]; do
         echo "The certificate for $OPENSHIFT_CONSOLE_URL is not trusted."
     fi
 
-    if [ $SECONDS -ge $end_time ]; then
-        echo "Timeout reached. Certificate is still not trusted after $timeout_seconds seconds."
-        break
-    fi
+    sleep 30
+
 done
+
+if [ $SECONDS -ge $end_time ]; then
+    echo "Timeout reached. Certificate is still not trusted after $timeout_seconds seconds."
+fi

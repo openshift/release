@@ -51,6 +51,9 @@ HOSTED_ZONE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.HostedZone.Id' | awk 
 echo "${HOSTED_ZONE_ID}" > "${SHARED_DIR}/hosted_zone_id"
 CHANGE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.ChangeInfo.Id' | awk -F / '{printf $3}')"
 
+# add a sleep time to reduce Rate exceeded errors
+sleep 120
+
 aws --region "${REGION}" route53 wait resource-record-sets-changed --id "${CHANGE_ID}" &
 wait "$!"
 echo "Hosted zone ${HOSTED_ZONE_ID} successfully created."

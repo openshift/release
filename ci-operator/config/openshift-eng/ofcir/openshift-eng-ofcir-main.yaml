@@ -1,3 +1,8 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 build_root:
   image_stream_tag:
     name: release
@@ -7,10 +12,34 @@ canonical_go_repository: github.com/openshift/ofcir
 images:
 - dockerfile_path: Dockerfile
   to: ofcir
+- dockerfile_literal: |
+    FROM base-build
+    COPY . .
+  inputs:
+    dev-scripts:
+      as:
+      - base-build
+    src:
+      paths:
+      - destination_dir: ./ofcir
+        source_path: /go/src/github.com/openshift/ofcir/.
+  to: ofcir-tests-base
 promotion:
   to:
-  - name: test
+  - excluded_images:
+    - ofcir-tests-base
+    name: test
     namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -19,6 +48,51 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- always_run: false
+  as: e2e-tests
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: lab-small
+    post:
+    - ref: ofcir-release
+    pre:
+    - ref: ofcir-acquire
+    test:
+    - as: test
+      commands: |
+        SERVER_IP="$(cat ${SHARED_DIR}/server-ip)"
+        SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "$SSH_KEY")
+        echo "Setup test environment"
+        # Copy current ofcir sources to the remote server
+        tar -czf ofcir.tar.gz ofcir
+        scp "${SSHOPTS[@]}" ofcir.tar.gz "cloud-user@${SERVER_IP}:/tmp/ofcir.tar.gz"
+        timeout -s 9 60m ssh "${SSHOPTS[@]}" "cloud-user@${SERVER_IP}" bash - << EOF
+          set -euo pipefail
+          sudo su
+          ### Unpack ofcir sources
+          tar -xzvf /tmp/ofcir.tar.gz
+          ### Install golang
+          curl -OL https://go.dev/dl/go1.21.10.linux-amd64.tar.gz
+          tar -C /usr/local -xzf go1.21.10.linux-amd64.tar.gz
+          export GOPATH=/usr/local/go
+          export PATH=\$PATH:\$GOPATH/bin
+          ### Install dependencies
+          dnf install -y make podman
+          curl -LO "https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+          export PATH=\$PATH:/usr/local/bin
+          echo "Running e2e tests..."
+          cd ofcir
+          make e2e-tests
+        EOF
+      from: ofcir-tests-base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: |
     XDG_CACHE_HOME="/tmp/cache" \

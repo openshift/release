@@ -1,0 +1,40 @@
+ref:
+  as: openstack-provision-mirror
+  from: openstack-installer
+  commands: openstack-provision-mirror-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: OS_CLOUD
+      default: 'openstack'
+      documentation: Name of cloud to use from ${SHARED_DIR}/clouds.yaml file
+    - name: BASE_DOMAIN
+    - name: BASTION_IMAGE
+      default: 'centos9-stream'
+      documentation: The image of the bastion machine
+    - name: BASTION_FLAVOR
+      default: ''
+      documentation: |-
+        The flavor of the bastion machine. Defaults to the value in
+        "${SHARED_DIR}/BASTION_FLAVOR"
+    - name: BASTION_USER
+      default: 'cloud-user'
+      documentation: The user of the bastion machine
+    - name: CONTROL_PLANE_NETWORK
+      default: ''
+      documentation: |-
+        Name of the OpenStack dualstack network. Defaults to the value in
+        "${SHARED_DIR}/CONTROL_PLANE_NETWORK"
+    - name: CONFIG_TYPE
+      documentation: |
+        The type of config for the environment to deploy.
+
+        * 'singlestackv6' - Configure the bastion to mirror images for a disconnected install.
+  documentation: |-
+    This step creates the mirror on a bastion when $CONFIG_TYPE is "singlestackv6".
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
