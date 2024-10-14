@@ -36,7 +36,7 @@ fi
 if [ -f "${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
     report_command+=" --additional-labels-file=${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
 fi
-
+sleep 10
 echo $report_command
 
 eval "$report_command"
