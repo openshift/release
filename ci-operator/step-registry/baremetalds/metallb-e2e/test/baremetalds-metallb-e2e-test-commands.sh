@@ -69,3 +69,5 @@ if [[ -z $DONT_DEPLOY_OPERATOR ]]; then
 fi
 echo "### running metallb E2E tests"
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./run_e2e.sh"
+
+scp "${SSHOPTS[@]}" -r "root@${IP}:/logs/artifacts" "${ARTIFACT_DIR}"
