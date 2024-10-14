@@ -20,17 +20,8 @@ if [[ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" != "" ]]; then
   EXTERNAL_DNS_ARGS="--e2e.external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
 fi
 
-if [[ "${AKS}" == "true" ]]; then
-  AKS_ANNOTATIONS=""
-  HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
-
-  if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
-    while IFS= read -r line; do
-      if [[ -n "$line" ]]; then
-        AKS_ANNOTATIONS+=" --e2e.annotations=${line}"
-      fi
-    done < "$HC_ANNOTATIONS_FILE"
-  fi
+if [[ "${POD_SECURITY_ADMISSION_ANNOTATION}" == "true" ]]; then
+  AKS_ANNOTATIONS="hypershift.openshift.io/pod-security-admission-label-override=baseline"
 fi
 
 if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
