@@ -23,7 +23,8 @@ images:
   to: submariner-addon
 promotion:
   to:
-  - name: "2.13"
+  - disabled: true
+    name: "2.13"
     namespace: stolostron
 releases:
   initial:
@@ -38,7 +39,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 12Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 300Mi
@@ -54,13 +55,13 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-- as: integration
-  commands: make test-integration
-  container:
-    from: test-bin
 - as: unit
   commands: |
     make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
   container:
     from: test-bin
 - as: sonarcloud
@@ -78,30 +79,32 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: pr-merge-image-mirror
+- as: publish
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: submariner-addon
     env:
       IMAGE_REPO: submariner-addon
-      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="submariner-addon"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
-- as: golangci-lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    make golangci-lint SHELL=/bin/bash
-  container:
-    from: bin
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
   repo: submariner-addon
