@@ -7,6 +7,19 @@ set -o xtrace
 set -x
 ls
 
+ES_PASSWORD=$(cat "/secret/es/password" || "")
+ES_USERNAME=$(cat "/secret/es/username" || "")
+
+export ES_PASSWORD
+export ES_USERNAME
+
+if [[ -n $ES_PASSWORD ]]; then
+    export ELASTIC_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+fi
+
+telemetry_password=$(cat "/secret/telemetry/telemetry_password"  || "")
+export TELEMETRY_PASSWORD=$telemetry_password
+
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 30
