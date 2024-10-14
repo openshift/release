@@ -45,6 +45,10 @@ rm -rf tmp
 
 mkdir ${remote_artifacts_dir}
 
+if [[ "${TEST_VM_NAME}" = "target-sno-node" ]]; then
+    sudo virsh shutdown seed-sno-node
+fi
+
 if [[ -n "${TEST_SKIPS}" ]]; then
     TESTS="\$(openshift-tests run --dry-run "${CONFORMANCE_SUITE}")" &&
     echo "\${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
@@ -59,6 +63,18 @@ openshift-tests run "${CONFORMANCE_SUITE}" \${TEST_ARGS:-} \
     --junit-dir "${remote_artifacts_dir}/junit" &
 wait "\$!" &&
 set +x
+exit_code=\$?
+
+if [[ "${TEST_VM_NAME}" = "target-sno-node" ]]; then
+    sudo virsh start seed-sno-node
+    oc --kubeconfig=\${remote_work_dir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-seed/auth/kubeconfig \
+      adm wait-for-stable-cluster \
+      --minimum-stable-period=2m \
+      --timeout=5m
+fi
+
+return \${exit_code}
+
 EOF
 
 chmod +x ${SHARED_DIR}/e2e_test.sh
