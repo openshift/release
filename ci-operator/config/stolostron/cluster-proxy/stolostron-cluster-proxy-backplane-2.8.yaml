@@ -22,8 +22,7 @@ images:
   to: cluster-proxy
 promotion:
   to:
-  - disabled: true
-    name: "2.8"
+  - name: "2.8"
     namespace: stolostron
 resources:
   '*':
@@ -45,29 +44,6 @@ tests:
   commands: export XDG_CACHE_HOME="/tmp" && make test-integration
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
@@ -75,26 +51,38 @@ tests:
       SOURCE_IMAGE_REF: cluster-proxy
     env:
       IMAGE_REPO: cluster-proxy
-      IMAGE_TAG: latest
+      IMAGE_TAG: backplane-2.8
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: pr-merge-image-mirror-main
+- as: publish
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: cluster-proxy
     env:
       IMAGE_REPO: cluster-proxy
-      IMAGE_TAG: main
       REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_COMPONENT_NAME="cluster-proxy"
+        export OSCI_COMPONENT_VERSION="2.8"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.8
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.8
   org: stolostron
   repo: cluster-proxy
