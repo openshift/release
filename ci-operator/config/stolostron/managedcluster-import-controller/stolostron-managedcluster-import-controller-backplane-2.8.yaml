@@ -23,8 +23,7 @@ images:
   to: managedcluster-import-controller
 promotion:
   to:
-  - disabled: true
-    name: "2.8"
+  - name: "2.8"
     namespace: stolostron
 releases:
   initial:
@@ -44,26 +43,12 @@ resources:
       cpu: 80m
       memory: 200Mi
 tests:
-- as: sonar-pre-submit
+- as: sonarcloud
   commands: |
-    export XDG_CACHE_HOME="/tmp"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: sonar-post-submit
-  commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
@@ -97,7 +82,7 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
-        OCM_VERSION=main
+        OCM_VERSION=backplane-2.8
         export KUBECTL OCM_VERSION
         set -o pipefail
         make e2e-test-prow 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
@@ -128,13 +113,35 @@ tests:
       IMAGE_REPO: managedcluster-import-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: managedcluster-import-controller
     env:
-      DESTINATION_BRANCH: backplane-2.8
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: managedcluster-import-controller
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=managedcluster-import-controller
+        export OSCI_COMPONENT_VERSION=2.8.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.8
   org: stolostron
   repo: managedcluster-import-controller

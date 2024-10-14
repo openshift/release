@@ -7,7 +7,7 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.19-linux
-binary_build_commands: make build
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
@@ -23,19 +23,8 @@ images:
   to: cluster-lifecycle-e2e
 promotion:
   to:
-  - disabled: true
-    name: "2.13"
+  - name: "2.13"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.10"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.10"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -63,13 +52,33 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-lifecycle-e2e
     env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: cluster-lifecycle-e2e
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=cluster-lifecycle-e2e
+        export OSCI_COMPONENT_VERSION=2.13
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
   repo: cluster-lifecycle-e2e
