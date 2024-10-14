@@ -38,12 +38,11 @@ chmod +x ${script}
 set -o pipefail
 ./${script} $PARAMETERS |& tee output.out
 
-
 result=$?
 set -e
 # copy the reliability test result
 
-cp output.out ${SHARED_DIR}/svt_result/output.out
+cp output.out ${ARTIFACT_DIR}/
 if [[ $result -ne 0 ]]; then
     exit 1
 fi 
