@@ -1,21 +1,22 @@
 periodics:
 - agent: kubernetes
   cluster: build10
+  cron: 30 10 10 * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: main
     org: openshift
     repo: multiarch-tuning-operator
-  interval: 72h
   labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/cluster: build10
+    ci-operator.openshift.io/variant: ocp418
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-tuning-operator-main-e2e-gcp-ovn-mto-heterogeneous-origin
+  name: periodic-ci-openshift-multiarch-tuning-operator-main-ocp418-e2e-aws-ovn-proxy-mto-origin
   spec:
     containers:
     - args:
@@ -24,8 +25,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-ovn-mto-heterogeneous-origin-cluster-profile
-      - --target=e2e-gcp-ovn-mto-heterogeneous-origin
+      - --secret-dir=/usr/local/e2e-aws-ovn-proxy-mto-origin-cluster-profile
+      - --target=e2e-aws-ovn-proxy-mto-origin
+      - --variant=ocp418
       command:
       - ci-operator
       image: ci-operator:latest
@@ -41,7 +43,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ovn-mto-heterogeneous-origin-cluster-profile
+      - mountPath: /usr/local/e2e-aws-ovn-proxy-mto-origin-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -67,12 +69,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
+      secret:
+        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

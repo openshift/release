@@ -20,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -66,16 +70,10 @@ releases:
       architecture: amd64
       channel: candidate
       version: "4.14"
-  multi-latest:
+  target:
     release:
       architecture: multi
       channel: candidate
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
       version: "4.14"
 resources:
   '*':
@@ -126,10 +124,8 @@ tests:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-shared-vpc-phz-sts-fips-f28
   cron: 42 19 6 * *
@@ -168,6 +164,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       CHANNEL_GROUP: candidate
+      COMPUTE_NODES: "3"
+      MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
       SUBSCRIPTION_TYPE: marketplace-gcp
     test:
@@ -387,10 +385,8 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-53921
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-mag-ipi-fips-f28
   cron: 11 14 27 * *
@@ -451,6 +447,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
@@ -479,10 +476,8 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: ibmcloud-ipi-proxy-private-rt-f28
   cron: 36 23 7 * *
@@ -493,27 +488,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: nutanix-ipi-compact-f28
-  cluster: build01
-  cron: 23 12 2 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      SIZE_VARIANT: compact
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-disc-f28
-  cluster: build01
-  cron: 0 3 24 * *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
   cron: 44 13 4 * *

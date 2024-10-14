@@ -16,8 +16,6 @@ hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
-httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
-export httpd_vsi_ip
 
 # Installing CLI tools
 set -e
@@ -114,7 +112,10 @@ fi
 bsg_name=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
 echo "Adding an inbound rule in the $infra_name-bastion instance security group for ssh and scp."
 ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 22 --port-max 22
-ibmcloud is sg-rulec $bsg_name inbound all
+echo "Adding an inbound rule in $infra_name-bastion instance security group for configuring and accessing proxy server"
+ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 3128 --port-max 3128
+bvsi_rip=$(ibmcloud is instance $infra_name-bastion --output json | jq -r '.primary_network_interface.primary_ip.address')
+
 
 if [ $? -eq 0 ]; then
     echo "Successfully added the inbound rule."
@@ -255,17 +256,30 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
+echo "Configuring HTTPD server on bastion"
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install -y httpd ; systemctl start httpd ; systemctl enable httpd"
+ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl is-active --quiet httpd"
+if [ $? -ne 0 ]; then
+  echo 'HTTPD server configuration failed, httpd serivce not running'
+  exit 1
+else
+  echo 'HTTPD server configuration succeeded'
+fi
+
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs-$PROW_JOB_ID.img 
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs-$PROW_JOB_ID.img"
+scp "${ssh_options[@]}" $HOME/rootfs.img root@$bvsi_fip:/var/www/html/rootfs.img 
+ssh "${ssh_options[@]}" root@$bvsi_fip "chmod 644 /var/www/html/rootfs.img"
+
 echo "Downloading the setup script for pxeboot of agents"
-curl -k -L --output $HOME/trigger_pxeboot.sh "http://$httpd_vsi_ip:80/trigger_pxeboot.sh"
+git clone -c "core.sshCommand=ssh ${ssh_options[*]}" git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+cp hosted-control-plane/.archive/trigger_pxeboot.sh $HOME/trigger_pxeboot.sh
+
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
 export mkernel_url
-rootfs_url_httpd="http://$httpd_vsi_ip:80/rootfs-$PROW_JOB_ID.img"
+rootfs_url_httpd="http://$bvsi_rip:80/rootfs.img"
 export rootfs_url_httpd
 sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/trigger_pxeboot.sh 
 sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/trigger_pxeboot.sh 
@@ -325,8 +339,8 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condi
 echo "Getting management cluster basedomain to allow traffic to proxy server"
 mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
-echo "Downloading the proxy setup script"
-curl -k -L --output $HOME/setup_proxy.sh "http://$httpd_vsi_ip:80/setup_proxy.sh"
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
 
 sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
 sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 

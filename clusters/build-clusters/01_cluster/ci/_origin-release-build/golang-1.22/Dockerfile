@@ -14,10 +14,9 @@ ENV VERSION=1.22.5 \
 
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
-RUN yum install -y epel-release && \
+RUN yum install -y epel-release epel-next-release && \
     rpm -V epel-release && \
-    INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler protobuf-devel rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
+    INSTALL_PKGS="bc bind-utils bsdtar device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glib2-devel gpgme hostname jq krb5-devel libassuan libseccomp-devel lsof make mercurial nmap-ncat openssl rsync socat systemd-devel tar tito tree util-linux wget which xfsprogs zip" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
@@ -27,7 +26,7 @@ RUN yum install -y epel-release && \
 
 RUN \
     set -x &&  \
-    curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/').tar.gz | tar -C /usr/local -xzf - && \
     go install golang.org/x/tools/cmd/cover@latest && \
     go install golang.org/x/tools/cmd/goimports@latest && \
     go install golang.org/x/lint/golint@latest && \

@@ -79,6 +79,7 @@ EOF
 cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
 oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
+canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 api.openshift.com
 console.redhat.com
 mirror.openshift.com

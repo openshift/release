@@ -13,10 +13,12 @@ base_images:
     tag: release-0.40.x
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     requests:
@@ -26,9 +28,9 @@ tests:
 - as: amq-streams-2-7
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -37,16 +39,14 @@ tests:
               {"step": "strimzi-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTMQST", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","amq-streams-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       GROUPS: sanity
-      OLM_OPERATOR_VERSION: 2.7.0-3
-      USER_TAGS: |
-        scenario amq-streams
+      OLM_OPERATOR_VERSION: 2.7.0-5
     test:
     - ref: strimzi-run-tests
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: amq-streams-qe

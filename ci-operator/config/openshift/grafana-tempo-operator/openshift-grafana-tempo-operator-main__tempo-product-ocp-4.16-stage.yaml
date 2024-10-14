@@ -3,10 +3,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  upi-installer:
-    name: "4.16"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -29,8 +25,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tempo-stage-tests
-  cron: 0 6 1 10 *
+- always_run: false
+  as: tempo-stage-tests
   steps:
     cluster_profile: aws-qe
     env:
@@ -40,15 +36,16 @@ tests:
             {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
-            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespace": "", "operator_group": "openshift-serverless"}
         ]
     test:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: tempo-stage-tests-fips
-  cron: 0 6 1 10 *
+- always_run: false
+  as: tempo-stage-tests-fips
   steps:
     cluster_profile: aws-qe
     env:
@@ -59,7 +56,8 @@ tests:
             {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
-            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespace": "", "operator_group": "openshift-serverless"}
         ]
     test:
     - ref: enable-stage-catalogsource

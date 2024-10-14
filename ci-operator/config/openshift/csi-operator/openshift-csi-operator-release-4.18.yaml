@@ -7,6 +7,14 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: csi-driver-smb-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   livenessprobe-operand:
     name: "4.18"
     namespace: ocp
@@ -15,10 +23,18 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -42,7 +58,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.17"
+    tag: "4.18"
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -52,18 +68,30 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-ebs-csi-driver-operator
 - dockerfile_path: Dockerfile.aws-efs
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
@@ -79,40 +107,82 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: azure-disk-csi-driver-operator
+- dockerfile_path: Dockerfile.azure-file
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: azure-file-csi-driver-operator
+- dockerfile_path: Dockerfile.openstack-cinder
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: openstack-cinder-csi-driver-operator
+- dockerfile_path: Dockerfile.openstack-manila
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-driver-manila-operator
+- dockerfile_path: Dockerfile.samba
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: smb-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
   to: aws-ebs-csi-driver-operator-test
 - dockerfile_path: Dockerfile.test
   from: src
   to: azure-disk-csi-driver-operator-test
-- dockerfile_path: Dockerfile.azure-file
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: azure-file-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
   to: azure-file-csi-driver-operator-test
-- dockerfile_path: Dockerfile.samba
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: smb-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: openstack-cinder-csi-driver-operator-test
 - dockerfile_path: Dockerfile.test
   from: src
   to: smb-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: manila-csi-driver-operator-test
 operator:
   bundles:
   - as: smb-csi-driver-operator-bundle
@@ -208,7 +278,7 @@ tests:
     env:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
-    workflow: openshift-e2e-aws-csi-efs-extended
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
 - as: e2e-azure
   steps:
     cluster_profile: azure4
@@ -221,6 +291,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
 - as: e2e-azure-csi-extended
   optional: true
   steps:
@@ -256,6 +327,29 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]|\[Azure-File-CSI-Driver-Operator\]
     workflow: openshift-e2e-azure-csi-extended
+- as: e2e-openstack
+  optional: true
+  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*|Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-cinder-csi
+  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-manila-csi
+  run_if_changed: ^(Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
 - as: smb-operator-e2e
   optional: true
   steps:

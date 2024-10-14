@@ -31,7 +31,48 @@ function copyArtifacts {
     done
     cp -r ./cypress/videos/* $ARTIFACT_DIR
     cp -r ./cypress/logs/* $ARTIFACT_DIR
-    #cp -r ./quay_new_ui_testing_report.xml $ARTIFACT_DIR
+
+    if [[ -e "./quay_new_ui_testing_report.xml" ]]; then
+        cp -r "./quay_new_ui_testing_report.xml" $ARTIFACT_DIR
+    fi
+
+    if [[ -e "./quay_new_ui_testing_report_before_format.xml" ]]; then
+        cp -r "./quay_new_ui_testing_report_before_format.xml" $ARTIFACT_DIR
+    fi
+}
+
+function reformat_report { 
+
+      ReportFileNameOrg=$1
+      ReportFileName=${ReportFileNameOrg%\.*}
+      ReportType=$2
+
+      echo "ReportFileName = $ReportFileName" 
+      echo "ReportType = $ReportType"  
+
+      sed '/testsuite name=\"Root Suite\"/d'  ${ReportFileName}.xml  > ${ReportFileName}_v1.xml
+  
+      TotalTCNum=$(awk -F'"' '/<testsuites/ {print $6}' ${ReportFileName}_v1.xml)
+      FailedTCNum=$(awk -F'"' '/<testsuites/ {print $2}' ${ReportFileName}_v1.xml)
+      SikppedTCNum=$(grep "<testsuite .*/>" ${ReportFileName}_v1.xml|wc -l|sed 's/ //g')
+      RunTCNum=$(expr $TotalTCNum - $SikppedTCNum)
+
+      echo "TotalTCNum   = $TotalTCNum"
+      echo "FailedTCNum  = $FailedTCNum"
+      echo "SikppedTCNum = $SikppedTCNum"
+      echo "RunTCNum     = $RunTCNum"
+
+      sed -i '4,$ {/<testsuite /d}' ${ReportFileName}_v1.xml
+      sed -i '4,$ {/<\/testsuite>/d}' ${ReportFileName}_v1.xml
+      sed -i '$i  </testsuite>' ${ReportFileName}_v1.xml
+      sed -i "3s/OCP-[0-9]*/${ReportType}/g" ${ReportFileName}_v1.xml
+      sed -i '3s/time="[0-9.]*"//g' ${ReportFileName}_v1.xml
+
+      sed -i "2s/$TotalTCNum/$RunTCNum/g"  ${ReportFileName}_v1.xml
+      sed -i -r "3s/(tests=\")[0-9]*(\"[ ]*failures=\")[0-9]*(\")/\1${RunTCNum}\2${FailedTCNum}\3/g"  ${ReportFileName}_v1.xml
+
+      mv ${ReportFileName}.xml ${ReportFileName}_before_format.xml
+      mv ${ReportFileName}_v1.xml  ${ReportFileName}.xml
 }
 
 # Install Dependcies defined in packages.json
@@ -78,5 +119,9 @@ export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
 
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
-yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --nopipeline' || true
+yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
+
+yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
+
+reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
 

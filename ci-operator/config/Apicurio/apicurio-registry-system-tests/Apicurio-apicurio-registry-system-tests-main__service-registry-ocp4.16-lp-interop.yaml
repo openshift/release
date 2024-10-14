@@ -13,17 +13,19 @@ base_images:
     tag: interop
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: service-registry-2-5
+- as: service-registry-2-6
   cron: 0 6 11 2 *
   steps:
     cluster_profile: aws-cspi-qe
@@ -45,6 +47,29 @@ tests:
     test:
     - ref: service-registry-run-tests
     workflow: firewatch-ipi-aws
+  timeout: 4h0m0s
+- as: service-registry-2-6-ibmcloud
+  cron: 0 6 10 9 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: bx2-8x32
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "service-registry-run-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "service-registry-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "APICURQE", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","service-registry-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      SIZE_VARIANT: large
+    test:
+    - ref: service-registry-run-tests
+    workflow: firewatch-ipi-ibmcloud
   timeout: 4h0m0s
 zz_generated_metadata:
   branch: main

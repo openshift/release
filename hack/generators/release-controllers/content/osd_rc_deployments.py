@@ -311,13 +311,8 @@ def _add_osd_rc_deployment(gendoc):
                                 "--ref=master",
                                 "--root=/tmp/git-sync",
                                 "--one-time=true",
-                                "--depth=1"
-                            ],
-                            "env": [
-                                {
-                                    "name": "GIT_SYNC_DEST",
-                                    "value": "release"
-                                }
+                                "--depth=1",
+                                "--link=release"
                             ],
                             "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
                             "volumeMounts": [
@@ -336,13 +331,8 @@ def _add_osd_rc_deployment(gendoc):
                                 "--ref=master",
                                 "--period=30s",
                                 "--root=/tmp/git-sync",
-                                "--max-failures=3"
-                            ],
-                            "env": [
-                                {
-                                    "name": "GIT_SYNC_DEST",
-                                    "value": "release"
-                                }
+                                "--max-failures=3",
+                                "--link=release"
                             ],
                             "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
                             "volumeMounts": [

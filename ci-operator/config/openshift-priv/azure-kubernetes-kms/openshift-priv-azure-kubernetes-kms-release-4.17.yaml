@@ -1,4 +1,12 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
@@ -21,6 +29,12 @@ promotion:
   - name: 4.17-priv
     namespace: ocp-private
 releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.17"
   latest:
     integration:
       include_built_images: true
@@ -38,6 +52,10 @@ tests:
   commands: make unit-test
   container:
     from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

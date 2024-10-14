@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal-dev
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -25,10 +18,12 @@ tests:
 - as: weekly-6nodes
   cluster: build05
   cron: 0 0 * * 4
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
@@ -47,6 +42,7 @@ tests:
 - always_run: false
   as: deploy-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -61,6 +57,7 @@ tests:
 - always_run: false
   as: deploy-sno
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -75,6 +72,7 @@ tests:
 - always_run: false
   as: node-density-heavy-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -93,10 +91,12 @@ tests:
 - always_run: false
   as: data-path-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
@@ -111,8 +111,33 @@ tests:
     - chain: openshift-qe-data-path-tests
   timeout: 8h0m0s
 - always_run: false
+  as: data-path-cnv-6nodes
+  cluster: build05
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CNV_VERSION: "4.18"
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+      RUN_CERBERUS: "false"
+      TELCO: "false"
+      VM: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-network-vm-perf
+    - chain: openshift-qe-data-path-tests
+  timeout: 8h0m0s
+- always_run: false
   as: web-burner-node-density-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -131,6 +156,7 @@ tests:
 - always_run: false
   as: web-burner-cluster-density-6nodes
   cluster: build05
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:

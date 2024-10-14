@@ -16,9 +16,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -58,26 +62,19 @@ build_root:
     tag: golang-1.18
 releases:
   arm64-latest:
-    prerelease:
+    release:
       architecture: arm64
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
+      channel: candidate
+      version: "4.17"
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        stream: 4-dev-preview
-        upper: 4.18.0-0
+      channel: candidate
+      version: "4.17"
   target:
-    candidate:
+    release:
       architecture: multi
-      product: ocp
-      stream: nightly
+      channel: candidate
       version: "4.17"
 resources:
   '*':
@@ -87,8 +84,8 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-disc-priv-sts-ep-f14
-  cron: 29 6 5,21 * *
+- as: aws-ipi-disc-priv-sts-ep-f28
+  cron: 36 15 10 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -118,25 +115,9 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       ENABLE_OTA_TEST: OCP-60397
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-usertags-custom-sg-f14
-  cron: 15 20 3,19 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: azure-ipi-to-multiarch-f28
   cron: 26 2 15 * *
   steps:
@@ -152,10 +133,8 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_OTA_TEST: OCP-60397
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
   cluster: build05
@@ -201,6 +180,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
@@ -232,16 +212,14 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
       ENABLE_OTA_TEST: OCP-60397
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration
+    - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: release-4.17

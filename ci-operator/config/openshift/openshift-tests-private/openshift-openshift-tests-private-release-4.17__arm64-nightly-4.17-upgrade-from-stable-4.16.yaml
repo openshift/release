@@ -3,6 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.16"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.16"
     namespace: ocp
@@ -44,7 +48,7 @@ releases:
   arm64-latest:
     release:
       architecture: arm64
-      channel: candidate
+      channel: fast
       version: "4.16"
   arm64-target:
     candidate:
@@ -55,7 +59,7 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: candidate
+      channel: fast
       version: "4.16"
   target:
     candidate:
@@ -97,7 +101,8 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+        Ingress
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -105,8 +110,10 @@ tests:
       ENABLE_OTA_TEST: OCP-66839
       EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: CloudCredential CloudCredential+Ingress
         MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudCredential MachineAPI MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential CloudCredential+Ingress
+        MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudControllerManager CloudCredential CloudCredential+CloudControllerManager
+        CloudCredential+Ingress Ingress MachineAPI MachineAPI+CloudCredential
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"

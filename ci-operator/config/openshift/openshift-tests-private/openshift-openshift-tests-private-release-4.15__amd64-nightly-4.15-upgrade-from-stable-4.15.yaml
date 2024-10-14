@@ -7,6 +7,10 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
+  aws-efs-csi-operator-create-efs:
+    name: "4.15"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.15"
     namespace: ocp
@@ -16,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.15"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.15"
     namespace: ocp
@@ -68,8 +76,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-shared-vpc-phz-sts-fips-f14
-  cron: 14 0 6,20 * *
+- as: aws-ipi-shared-vpc-phz-sts-fips-f60
+  cron: 21 14 29 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -79,8 +87,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
-- as: aws-ipi-outpost-day2-f14
-  cron: 33 2 8,24 * *
+- as: aws-ipi-outpost-day2-f60
+  cron: 43 17 13 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-outpost-qe
     env:
@@ -88,8 +96,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-outpost-day2
-- as: aws-ipi-ovn-hypershift-mce-inplace-f28
-  cron: 5 17 28 * *
+- as: aws-ipi-ovn-hypershift-mce-inplace-f60
+  cron: 41 0 7 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -100,8 +108,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
-- as: aws-ipi-ovn-hypershift-mce-replace-f28
-  cron: 5 17 2 * *
+- as: aws-ipi-ovn-hypershift-mce-replace-f60
+  cron: 59 11 3 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -111,8 +119,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
-- as: aws-ipi-wavelength-fips-f14
-  cron: 37 17 9,25 * *
+- as: aws-ipi-wavelength-fips-f60
+  cron: 4 18 25 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -122,8 +130,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone
-- as: azure-mag-ipi-fullyprivate-f14
-  cron: 40 17 13,27 * *
+- as: azure-mag-ipi-fullyprivate-f28
+  cron: 5 20 21 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -131,9 +139,9 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
-- as: baremetalds-agent-hypershift-mce-inplace-f7
+- as: baremetalds-agent-hypershift-mce-inplace-f60
   cluster: build05
-  cron: 26 0 1,8,15,22 * *
+  cron: 17 13 9 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -144,8 +152,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
-- as: baremetalds-kubevirt-hypershift-mce-replace-f14
-  cron: 7 5 16,30 * *
+- as: baremetalds-kubevirt-hypershift-mce-replace-f60
+  cron: 5 23 12 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -157,7 +165,7 @@ tests:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-ipv6-fips-f360
-  cron: 17 4 14 1 *
+  cron: 42 15 16 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -171,7 +179,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f360
-  cron: 35 7 1 1 *
+  cron: 10 23 16 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -183,8 +191,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 5 12 5 * *
+- as: gcp-ipi-disc-priv-oidc-fips-f60
+  cron: 13 2 17 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -196,8 +204,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: ibmcloud-ipi-disc-priv-f28
-  cron: 31 15 27 * *
+- as: ibmcloud-ipi-disc-priv-f60
+  cron: 33 5 14 1,3,5,7,9,11 *
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
@@ -208,7 +216,7 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
-  cron: 38 22 7 * *
+  cron: 11 11 12 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:

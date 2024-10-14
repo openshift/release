@@ -1,0 +1,150 @@
+kind: List
+apiVersion: v1
+items:
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: prow
+      component: prowjob-dispatcher
+    name: prowjob-dispatcher
+    namespace: ci
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: prowjob-dispatcher
+    name: prowjob-dispatcher
+    namespace: ci
+  spec:
+    ports:
+    - name: main
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: prow
+      component: prowjob-dispatcher
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: prowjob-dispatcher
+    labels:
+      app: prow
+      component: prowjob-dispatcher
+    namespace: ci
+  spec:
+    replicas: 1
+    strategy:
+      type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: prowjob-dispatcher
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: prowjob-dispatcher
+      spec:
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=master
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: prowjob-dispatcher
+          image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
+          args:
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --github-login=openshift-bot
+          - --git-name=openshift-bot
+          - --git-email=openshift-bot@redhat.com
+          - --target-dir=/tmp
+          - --config-path=/var/repo/release/core-services/sanitize-prow-jobs/_config.yaml
+          - --cluster-config-path=/var/repo/release/core-services/sanitize-prow-jobs/_clusters.yaml
+          - --jobs-storage-path=/cache/job-cache.gob
+          - --prow-jobs-dir=/var/repo/release/ci-operator/jobs
+          - --slack-token-path=/etc/slack/oauth_token
+          - --self-approve=true
+          - --assign=openshift/test-platform
+          - --prometheus-bearer-token-path=/etc/prometheus/token
+          - --create-pr=true
+          ports:
+          - name: main
+            containerPort: 8888
+          volumeMounts:
+          - mountPath: /etc/slack
+            name: slack
+            readOnly: true
+          - name: cache
+            mountPath: /cache
+          - mountPath: /etc/prometheus
+            name: prometheus
+            readOnly: true
+          - mountPath: /etc/github
+            name: token
+            readOnly: true
+          - name: release
+            mountPath: /var/repo
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "0.7"
+        volumes:
+        - name: slack
+          secret:
+            secretName: slack-credentials-dptp-bot
+        - name: cache
+          persistentVolumeClaim:
+            claimName: prowjob-dispatcher
+        - name: prometheus
+          secret:
+            items:
+            - key: sa.ci-monitoring.app.ci.token.txt
+              path: token
+            secretName: app-ci-openshift-user-workload-monitoring-credentials
+        - name: release
+          emptyDir: {}
+        - name: token
+          secret:
+            secretName: github-credentials-openshift-bot

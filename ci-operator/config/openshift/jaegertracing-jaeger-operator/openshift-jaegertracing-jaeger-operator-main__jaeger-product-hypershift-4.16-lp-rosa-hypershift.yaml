@@ -1,0 +1,79 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/jaegertracing/jaeger-operator
+images:
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: jaeger-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: jaeger-product-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "distributed-tracing-install-*", "failure_type": "pod_failure", "classification": "Distributed tracing operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-install-*", "failure_type": "test_failure", "classification": "Distributed tracing operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operatorhub-subscribe-*", "failure_type": "pod_failure", "classification": "Distributed tracing dependency operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operatorhub-subscribe-*", "failure_type": "test_failure", "classification": "Distributed tracing dependency operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-tests-*", "failure_type": "pod_failure", "classification": "Jaeger e2e tests", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-tests-*", "failure_type": "test_failure", "classification": "Jaeger e2e tests", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","rosa-hypershift-lp","jaeger-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_PRIVATE_DECK: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.16"
+      OPERATORS: |
+        [
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
+      REGION: us-west-2
+    test:
+    - ref: ipi-install-rbac
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: install-operators
+    - ref: distributed-tracing-tests-jaeger
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: jaegertracing-jaeger-operator
+  variant: jaeger-product-hypershift-4.16-lp-rosa-hypershift

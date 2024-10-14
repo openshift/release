@@ -1,8 +1,8 @@
 base_images:
-  coreos_coreos-assembler_latest:
+  coreos_coreos-assembler_4.17:
     name: coreos-assembler
     namespace: coreos
-    tag: latest
+    tag: "4.17"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -12,7 +12,7 @@ canonical_go_repository: github.com/openshift/os
 images:
 - dockerfile_literal: |
     # COSA + source code
-    FROM registry.ci.openshift.org/coreos/coreos-assembler:latest
+    FROM registry.ci.openshift.org/coreos/coreos-assembler:4.17
     WORKDIR /src
     # Tell the build scripts that we have setup a directory for unprivileged build
     ENV COSA_DIR=/tmp/cosa
@@ -31,9 +31,9 @@ images:
     USER builder
     WORKDIR /tmp/cosa
   inputs:
-    coreos_coreos-assembler_latest:
+    coreos_coreos-assembler_4.17:
       as:
-      - registry.ci.openshift.org/coreos/coreos-assembler:latest
+      - registry.ci.openshift.org/coreos/coreos-assembler:4.17
   to: build-image
 promotion:
   to:
@@ -70,20 +70,6 @@ resources:
       cpu: 2000m
       devices.kubevirt.io/kvm: "1"
       memory: 3Gi
-  scos-9-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  scos-9-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
 tests:
 - as: validate
   commands: ci/prow-entrypoint.sh validate
@@ -100,20 +86,6 @@ tests:
 - as: rhcos-9-build-test-metal
   cluster: build02
   commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 3h0m0s
-- as: scos-9-build-test-qemu
-  cluster: build02
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 4h0m0s
-- as: scos-9-build-test-metal
-  cluster: build02
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-metal
   container:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
