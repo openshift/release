@@ -126,8 +126,8 @@ export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 echo "Run extended-platform-tests" 
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
-# extended-platform-tests run all --dry-run | grep -E "Quay-High|Quay-Medium"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
-extended-platform-tests run all --dry-run | grep -E "Quay-Allns-Medium|Quay-Allns-High"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
+extended-platform-tests run all --dry-run | grep -E "Quay-High|Quay-Medium"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
+#extended-platform-tests run all --dry-run | grep -E "Quay-Allns-Medium|Quay-Allns-High"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 function handle_result {
 
