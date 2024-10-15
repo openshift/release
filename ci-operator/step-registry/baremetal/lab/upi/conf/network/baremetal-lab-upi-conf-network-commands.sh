@@ -19,7 +19,7 @@ if [[ "${ipv4_enabled:-false}" == "true" ]]; then
     hostPrefix: 23"
   PRIMARY_NET_SERVICE="172.30.0.0/16"
   PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
-  PRIMARY_NET_MACHINE_TEST="cidr: 192.168.0.0/16"
+  PRIMARY_NET_MACHINE_TEST="cidr: 192.168.70.0/22"
 fi
 
 if [[ "${ipv6_enabled:-false}" == "true" ]]; then
