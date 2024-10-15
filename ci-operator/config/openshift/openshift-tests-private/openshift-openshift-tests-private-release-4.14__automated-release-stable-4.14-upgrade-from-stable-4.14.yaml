@@ -1,0 +1,108 @@
+base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      relative: 1
+      version_bounds:
+        lower: 4.14.0-0
+        upper: 4.15.0-0
+  target:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.14.0-0
+        upper: 4.15.0-0
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-f360
+  cron: 6 15 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-f360
+  cron: 51 17 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-upi-f360
+  cron: 19 16 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: gcp-ipi-f360
+  cron: 28 1 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-autorelease-qe
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: openshift-tests-private
+  variant: automated-release-stable-4.14-upgrade-from-stable-4.14
