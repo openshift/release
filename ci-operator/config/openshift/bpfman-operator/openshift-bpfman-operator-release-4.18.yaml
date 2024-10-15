@@ -1,0 +1,71 @@
+base_images:
+  bpfman:
+    name: "4.18"
+    namespace: ocp
+    tag: bpfman
+  kube-rbac-proxy:
+    name: "4.18"
+    namespace: ocp
+    tag: kube-rbac-proxy
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Containerfile.bpfman-operator
+  to: bpfman-operator
+- dockerfile_path: Containerfile.bpfman-agent
+  to: bpfman-agent
+- dockerfile_path: Containerfile.bundle.openshift
+  to: bpfman-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-bpfman:4.18
+    with: pipeline:bpfman
+  - pullspec: quay.io/openshift/origin-bpfman-operator:4.18
+    with: pipeline:bpfman-operator
+  - pullspec: quay.io/openshift/origin-bpfman-agent:4.18
+    with: pipeline:bpfman-agent
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.18
+    with: pipeline:kube-rbac-proxy
+promotion:
+  to:
+  - disabled: true
+    name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-fmt
+  commands: |
+    make fmt
+  container:
+    from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: bpfman-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: bpfman-operator
