@@ -22,6 +22,16 @@ function setup_aux_host_ssh_access {
 
 }
 
+function append_pr_tag_cluster_profile_artifacts {
+
+  # Just in case of running this script being part of a Pull Request
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo "************ telcov10n Append the 'pr-${PULL_NUMBER}' tag to '${SHARED_HUB_CLUSTER_PROFILE}' folder ************"
+    # shellcheck disable=SC2153
+    SHARED_HUB_CLUSTER_PROFILE="${SHARED_HUB_CLUSTER_PROFILE}-pr-${PULL_NUMBER}"
+  fi
+}
+
 function get_hub_cluster_profile_artifacts {
 
   echo "************ telcov10n Get Hub cluster profile stored from AUX_HOST location ************"
@@ -48,6 +58,7 @@ function share_hub_cluster_profile {
 
 function main {
   setup_aux_host_ssh_access
+  append_pr_tag_cluster_profile_artifacts
   get_hub_cluster_profile_artifacts
   share_hub_cluster_profile
 }
