@@ -516,4 +516,11 @@ fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
+# check if all the COs are updated properly
+ALL_CO_AVAILABLE=$(oc get co)
+echo "Displaying all the CO state"
+echo ${ALL_CO_AVAILABLE}
+echo "Saving credentials after the installation is done"
+save_credentials
+
 touch ${INSTALL_DIR}/install-complete
