@@ -206,7 +206,10 @@ else
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14
+    --cluster-cidr 10.136.0.0/14  > /tmp/hc-manifests/cluster-agent.yaml
+
+    cat /tmp/hc-manifests/cluster-agent.yaml
+    sleep 3600
 fi
 
 
