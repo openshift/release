@@ -151,7 +151,7 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
-   'azurestack-qe-quota-slice': {
+    'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
     'azuremag-quota-slice': {
@@ -161,6 +161,18 @@ CONFIG = {
         'northcentralus': 10,
         'westus2': 10,
         'centralus': 10
+    },
+    'azure-hcp-qe-quota-slice': {
+        'westus': 5,
+        'eastus': 5,
+        'uksouth': 5,
+        'westeurope': 5,
+    },
+    'azure-hcp-ha-qe-quota-slice': {
+        'westus2': 5,
+        'southcentralus': 5,
+        'eastasia': 5,
+        'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
         'eastus2': 4
