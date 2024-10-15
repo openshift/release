@@ -32,7 +32,7 @@ function check_pod_status() {
 
         if [[ $((CNT)) -eq 0 ]]; then
             echo "Pod $1 did not successfully deploy"
-            oc -n "${MAISTRA_NAMESPACE}" get pods "$1"
+            oc -n "${MAISTRA_NAMESPACE}" describe pods "$1"
             return 1
         fi
     done
