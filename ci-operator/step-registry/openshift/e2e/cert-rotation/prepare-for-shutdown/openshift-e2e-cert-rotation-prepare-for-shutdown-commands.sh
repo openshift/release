@@ -193,6 +193,8 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
+
 # Use emptyDir for image-registry
 oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
 
