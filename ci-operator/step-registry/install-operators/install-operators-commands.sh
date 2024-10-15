@@ -44,6 +44,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     else
         # If source is any, use any available catalog
         if [[ "${operator_source}" == "!any" ]]; then
+<<<<<<< HEAD
             # Prioritize the use of the default catalog
             operator_source=$(oc get packagemanifest ${operator_name} | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
             if [[ -n "${operator_source}" ]]; then
@@ -54,11 +55,18 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
                     echo "ERROR: '${operator_name}' packagemanifest not found in any available catalog"
                     exit 1
                 fi
+=======
+            operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}' || echo)
+            if [[ -z "${operator_source}" ]]; then
+                echo "ERROR: '${operator_name}' packagemanifest not found in any available catalog"
+                exit 1
+>>>>>>> 33219a7b20c (update install operators)
             fi
             echo "Selecting '${operator_source}' catalog to install '${operator_name}'"
         fi
     fi
 
+    echo "Getting '${operator_name}' packagemanifest from '${operator_channel}' channel using '${operator_source}' catalog"
     # If install_namespace not defined, use DEFAULT_OPERATOR_INSTALL_NAMESPACE.
     if [[ -z "${operator_install_namespace}" ]]; then
         operator_install_namespace="${DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
@@ -89,6 +97,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         fi
     fi
 
+    echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # If "!install" in target_namespaces, use the install namespace
     if [[ "${operator_target_namespaces}" == "!install" ]]; then
         operator_target_namespaces="${operator_install_namespace}"
@@ -131,7 +140,10 @@ EOF
 EOF
         fi
     fi
+<<<<<<< HEAD
 
+=======
+>>>>>>> 33219a7b20c (update install operators)
     echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
     cat <<EOF | oc apply -f -
