@@ -165,6 +165,7 @@ fi
 
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
+<<<<<<< HEAD
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
 if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
 
