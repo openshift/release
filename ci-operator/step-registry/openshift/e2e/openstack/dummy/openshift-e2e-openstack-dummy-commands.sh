@@ -16,4 +16,4 @@ then
 fi
 
 # Cur to titan20
-curl http://titan20.lab.eng.tlv2.redhat.com:3128
+curl http://10.46.4.36:3128
