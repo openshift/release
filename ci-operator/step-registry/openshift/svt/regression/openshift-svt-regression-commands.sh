@@ -10,11 +10,9 @@ oc projects
 python --version
 
 
-if [[ $SCRIPT_1 != "" ]]
-then
-    export SCRIPT=$SCRIPT_1
-    export PARAMETERS=$PARAMETERS_1
-fi
+# If running from the one folder, will reset SCRIPT and PARAMETERS variables
+export SCRIPT=${SCRIPT_1:-$SCRIPT}
+export PARAMETERS=${PARAMETERS_1:-$PARAMETERS}
 
 pushd /tmp
 
