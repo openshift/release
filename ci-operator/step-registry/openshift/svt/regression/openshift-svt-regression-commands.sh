@@ -9,6 +9,13 @@ oc config view
 oc projects
 python --version
 
+
+if [[ $SCRIPT_1 != "" ]]
+then
+    export SCRIPT=$SCRIPT_1
+    export PARAMETERS=$PARAMETERS_1
+fi
+
 pushd /tmp
 
 git clone https://github.com/openshift/svt --depth=1
