@@ -23,12 +23,9 @@ export KUBE_BURNER_VERSION='1.7.6'
 # If SCRIPT is not specified, find the script by the TEST_CASE.
 if [[ $SCRIPT == "" ]]
 then
-    SCRIPT=$(find perfscale_regression_ci -name $TEST_CASE.sh)
-    if [[ $SCRIPT == "" ]]
-    then
-        echo "$TEST_CASE.sh is not found under svt repo perfscale_regression_ci/scripts folder. Please check."
-        exit 1
-    fi
+    echo "$SCRIPT is not found under svt repo perfscale_regression_ci/scripts folder. Please check."
+    exit 1
+
 fi
 export folder=${SCRIPT%/*}
 export script=${SCRIPT##*/} 
