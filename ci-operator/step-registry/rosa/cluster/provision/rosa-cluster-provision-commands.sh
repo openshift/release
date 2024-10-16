@@ -263,12 +263,8 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  if [[ "$HOSTED_CP" == "true" ]] && [[ "$OCM_LOGIN_ENV" == "production" ]]; then
-     echo "The feature WORKER_DISK_SIZE is not ready for HCP on Prod"
-  else
-      COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-      record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
-  fi
+    COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+    record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
 fi
 
 AUDIT_LOG_SWITCH=""
