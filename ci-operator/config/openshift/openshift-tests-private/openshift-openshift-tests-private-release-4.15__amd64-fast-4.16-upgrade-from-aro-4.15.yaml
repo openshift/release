@@ -1,0 +1,69 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+releases:
+  latest:
+    release:
+      architecture: amd64
+      product: ocp
+      channel: fast
+      version: "4.16"
+  target:
+    candidate:
+      product: ocp
+      architecture: amd64
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aro-f7
+  cron: 25 13 1,10,17,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: 4.15.27
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-e2e
+    workflow: cucushift-installer-rehearse-azure-aro
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-fast-4.16-upgrade-from-aro-4.15
