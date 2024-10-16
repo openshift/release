@@ -1033,88 +1033,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-image-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build01
-    context: ci/prow/e2e-aws-ovn-ipsec-serial
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-release-4.19-e2e-aws-ovn-ipsec-serial
-    optional: true
-    rerun_command: /test e2e-aws-ovn-ipsec-serial
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-ipsec-serial-cluster-profile
-        - --target=e2e-aws-ovn-ipsec-serial
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-ipsec-serial-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-2
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-ipsec-serial,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.19$
@@ -1289,15 +1207,16 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.19-e2e-aws-ovn-microshift
-    optional: true
     reporter_config:
       slack:
         channel: '#microshift-alerts'
         job_states_to_report:
         - failure
         - error
-        report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+        report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* {{- if .Spec.Refs.Pulls
+          }} on PR <{{(index .Spec.Refs.Pulls 0).Link}}|{{(index .Spec.Refs.Pulls
+          0).Title}}> {{- end }} ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs>'
     rerun_command: /test e2e-aws-ovn-microshift
     spec:
       containers:
@@ -1378,15 +1297,16 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.19-e2e-aws-ovn-microshift-serial
-    optional: true
     reporter_config:
       slack:
         channel: '#microshift-alerts'
         job_states_to_report:
         - failure
         - error
-        report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+        report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* {{- if .Spec.Refs.Pulls
+          }} on PR <{{(index .Spec.Refs.Pulls 0).Link}}|{{(index .Spec.Refs.Pulls
+          0).Title}}> {{- end }} ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs>'
     rerun_command: /test e2e-aws-ovn-microshift-serial
     spec:
       containers:
@@ -1459,6 +1379,8 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
+    decoration_config:
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -2007,6 +1929,86 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-upgrade-rollback
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.19-e2e-aws-ovn-upgrade-rollback
+    optional: true
+    rerun_command: /test e2e-aws-ovn-upgrade-rollback
+    run_if_changed: ^(test/e2e/upgrade)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-rollback-cluster-profile
+        - --target=e2e-aws-ovn-upgrade-rollback
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-upgrade-rollback-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-2
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade-rollback,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2730,7 +2732,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-csi
     decorate: true
     labels:
@@ -2814,7 +2816,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-disruptive
     decorate: true
     labels:
@@ -2897,7 +2899,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-fips-serial
     decorate: true
     labels:
@@ -2980,7 +2982,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -3063,7 +3065,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-builds
     decorate: true
     labels:
@@ -3073,7 +3075,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.19-e2e-gcp-ovn-builds
     rerun_command: /test e2e-gcp-ovn-builds
-    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    run_if_changed: ^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
     spec:
       containers:
       - args:
@@ -3146,7 +3148,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-etcd-scaling
     decorate: true
     labels:
@@ -3229,7 +3231,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-image-ecosystem
     decorate: true
     labels:
@@ -3312,7 +3314,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-rt-upgrade
     decorate: true
     labels:
@@ -3396,7 +3398,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -3479,7 +3481,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview-serial
     decorate: true
     labels:
@@ -3562,7 +3564,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     labels:

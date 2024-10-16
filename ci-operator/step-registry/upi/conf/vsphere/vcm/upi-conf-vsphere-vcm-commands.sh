@@ -368,9 +368,39 @@ networking:
   - cidr: "${machine_cidr}"
 EOF
 
+PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-disable"
+CACHE_FORCE_DISABLE="false"
+if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
+  CACHE_FORCE_DISABLE=$(cat ${PULL_THROUGH_CACHE_DISABLE})
+fi
 
-
-
+if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
+  if [ ${PULL_THROUGH_CACHE} == "enabled" ]; then
+    echo "$(date -u --rfc-3339=seconds) - pull-through cache enabled for job"
+    PULL_THROUGH_CACHE_CREDS="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-secret"
+    PULL_THROUGH_CACHE_CONFIG="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-config"
+    PULL_SECRET="/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret"
+    TMP_INSTALL_CONFIG="/tmp/tmp-install-config.yaml"
+    if [ -f ${PULL_THROUGH_CACHE_CREDS} ]; then
+      echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials found. updating pullSecret"
+      cat ${install_config} | sed '/pullSecret/d' >${TMP_INSTALL_CONFIG}2
+      cat ${TMP_INSTALL_CONFIG}2 | sed '/\"auths\"/d' >${TMP_INSTALL_CONFIG}
+      jq -cs '.[0] * .[1]' ${PULL_SECRET} ${PULL_THROUGH_CACHE_CREDS} >/tmp/ps-combined.json
+      echo -e "\npullSecret: '""$(cat /tmp/ps-combined.json)""'" >>${TMP_INSTALL_CONFIG}
+      cat ${TMP_INSTALL_CONFIG} >${install_config}
+    else
+      echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials not found. not updating pullSecret"
+    fi
+    if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
+      echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
+      cat ${PULL_THROUGH_CACHE_CONFIG} >>${install_config}
+    else
+      echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
+    fi
+  fi
+else
+  echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
+fi
 
 if [ "${Z_VERSION}" -lt 13 ]; then
   #vsphere_cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)

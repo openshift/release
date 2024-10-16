@@ -22,7 +22,7 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-cni
 
 # A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50" ./run.sh
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=2m" ./run.sh
 
 # The measurable run
 export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"

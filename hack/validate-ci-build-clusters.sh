@@ -30,17 +30,10 @@ releaserepo_workdir="${workdir}/release"
 mkdir -p "$releaserepo_workdir"
 cp -r "${base_dir}/"* "${releaserepo_workdir}"
 
-cat >"${workdir}/cluster-install.yaml" <<EOF
-onboard:
-  releaseRepo: "$releaserepo_workdir"
-  kubeconfigDir: "$kubeconfig_dir"
-  kubeconfigSuffix: "$kubeconfig_suffix"
-EOF
-
-cluster-init onboard config generate \
-    --cluster-install="${workdir}/cluster-install.yaml" \
-    --create-pr=false \
-    --update=true
+cluster-init onboard config update \
+  --release-repo="$releaserepo_workdir" \
+  --kubeconfig-dir="$kubeconfig_dir" \
+  --kubeconfig-suffix="$kubeconfig_suffix"
 
 declare -a files=(
               "/clusters/app.ci"

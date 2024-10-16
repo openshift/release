@@ -71,10 +71,8 @@ resources:
       cpu: 300m
       memory: 400Mi
 tests:
-- always_run: false
-  as: e2e-gcp
+- as: e2e-gcp
   cluster: build10
-  optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
     cluster_profile: gcp
@@ -125,7 +123,53 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-ovn
+    workflow: ipi-aws-ovn
+- as: aws-ovn-mto-heterogeneous-perfscale
+  cluster: build10
+  optional: true
+  run_if_changed: \.perfscale$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "12"
+      COMPUTE_NODE_REPLICAS: "12"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      GC: "false"
+      MTO_OPERATOR_INSTALL_METHOD: catalog
+      OCP_ARCH: arm64
+      PODS_PER_NODE: "245"
+      SUBSCRIPTION_CHANNEL_OVERRIDE: main
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: multiarch-tuning-operator-deploy
+    - ref: multiarch-tuning-operator-deploy-pod-placement
+    - ref: openshift-qe-node-density
+    workflow: ipi-aws-ovn
+- as: aws-ovn-heterogeneous-perfscale
+  cluster: build10
+  optional: true
+  run_if_changed: \.perfscale$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "12"
+      COMPUTE_NODE_REPLICAS: "12"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      GC: "false"
+      OCP_ARCH: arm64
+      PODS_PER_NODE: "245"
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: openshift-qe-node-density
+    workflow: ipi-aws-ovn
 zz_generated_metadata:
   branch: main
   org: openshift

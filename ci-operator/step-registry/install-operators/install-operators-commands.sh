@@ -15,6 +15,7 @@ fi
 
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
+DEFAULT_OPERATOR_SOURCE_DISPLAY="Red Hat Operators"
 DEFAULT_OPERATOR_CHANNEL="!default"
 DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
 
@@ -40,6 +41,22 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     # If source is not defined, use DEFAULT_OPERATOR_SOURCE.
     if [[ -z "${operator_source}" ]]; then
         operator_source="${DEFAULT_OPERATOR_SOURCE}"
+    else
+        # If source is any, use any available catalog
+        if [[ "${operator_source}" == "!any" ]]; then
+            # Prioritize the use of the default catalog
+            operator_source=$(oc get packagemanifest ${operator_name} | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
+            if [[ -n "${operator_source}" ]]; then
+                operator_source="${DEFAULT_OPERATOR_SOURCE}" ;
+            else
+                operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}' || echo)
+                if [[ -z "${operator_source}" ]]; then
+                    echo "ERROR: '${operator_name}' packagemanifest not found in any available catalog"
+                    exit 1
+                fi
+            fi
+            echo "Selecting '${operator_source}' catalog to install '${operator_name}'"
+        fi
     fi
 
     # If install_namespace not defined, use DEFAULT_OPERATOR_INSTALL_NAMESPACE.
@@ -52,12 +69,21 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         operator_channel="${DEFAULT_OPERATOR_CHANNEL}"
     fi
 
+    echo "Getting '${operator_name}' packagemanifest from '${operator_channel}' channel using '${operator_source}' catalog"
     # If the channel is "!default", find the default channel of the operator
     if [[ "${operator_channel}" == "!default" ]]; then
-        operator_channel=$(oc get packagemanifest "${operator_name}" -o jsonpath='{.status.defaultChannel}')
+        operator_channel=$(oc get packagemanifest \
+            -l catalog=${operator_source} \
+            -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.defaultChannel}' 2>/dev/null || echo)
         if [[ -z "${operator_channel}" ]]; then
-            echo "ERROR: Default channel not found."
-            exit 1
+            echo "ERROR: Default channel not found in '${operator_name}' packagemanifest."
+            echo "Checking if the ${operator_name} packagemanifest is available in other catalogs:"
+            set -x
+            oc get packagemanifest "${operator_name}" --ignore-not-found || {
+                echo "There is not any available packagemanifest for '${operator_name}' operator" ;
+                exit 1 ;
+            }
+            operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}')
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi
@@ -106,6 +132,7 @@ EOF
         fi
     fi
 
+    echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
     cat <<EOF | oc apply -f -
     apiVersion: operators.coreos.com/v1alpha1
@@ -147,6 +174,10 @@ EOF
 
     if [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
         echo "Error: Failed to deploy ${operator_name}"
+        echo
+        echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
+        echo
+        oc get packagemanifest ${operator_name} --ignore-not-found
         echo "CSV ${CSV} YAML"
         oc get CSV "${CSV}" -n "${operator_install_namespace}" -o yaml
         echo
