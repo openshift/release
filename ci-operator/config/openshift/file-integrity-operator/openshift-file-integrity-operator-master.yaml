@@ -3,6 +3,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
@@ -30,6 +34,8 @@ operator:
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/file-integrity-operator/file-integrity-operator:1.3.0
+    with: pipeline:file-integrity-operator
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:latest
     with: pipeline:file-integrity-operator
 promotion:
   to:
@@ -108,17 +114,15 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-file-integrity-operator-bundle
+      OO_BUNDLE: file-integrity-operator-bundle
     env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: file-integrity
-      OO_PACKAGE: file-integrity-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-file-integrity
     test:
     - as: test-bundle
       cli: latest
-      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
-        make e2e
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
       dependencies:
       - env: IMAGE_FROM_CI
         name: file-integrity-operator
@@ -126,7 +130,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-bundle-aws-upgrade
   steps:
     cluster_profile: aws
