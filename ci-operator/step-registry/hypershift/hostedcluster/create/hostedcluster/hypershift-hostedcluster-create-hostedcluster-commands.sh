@@ -106,8 +106,8 @@ case "${PLATFORM}" in
     if [[ -z "${POWERVS_VPC}" ]]; then
       POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
-    if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
-      POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
+      POWERVS_TRANSIT_GATEWAY=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
     if [[ -z "${POWERVS_REGION}" ]]; then
       POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -138,7 +138,8 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --cloud-connection ${POWERVS_CLOUD_CONNECTION} \
+      --power-edge-router true \
+      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --debug
