@@ -1,0 +1,65 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.22.5
+images:
+- dockerfile_path: Dockerfile.ubi
+  multi_arch: true
+  to: velero-oadp-e2e
+- dockerfile_path: Dockerfile-velero-restore-helper.ubi
+  multi_arch: true
+  to: velero-restore-helper-oadp-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  optional: true
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      OPERATORS: |
+        [
+            {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.4", "version": "1.4.1", "install_namespace": "openshift-adp"}
+        ]
+    test:
+    - ref: install-operators
+    - as: e2e
+      cli: latest
+      commands: |
+        set -x;
+        cd /tmp/
+        git clone https://github.com/openshift/velero.git;
+        cd velero;
+        git fetch origin pull/353/head:pr-branch-353;
+        git checkout pr-branch-353;
+        make -f Makefile.prow test-e2e;
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: ipi-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: openshift-e2e
+  org: openshift
+  repo: velero
+  variant: "4.16"
