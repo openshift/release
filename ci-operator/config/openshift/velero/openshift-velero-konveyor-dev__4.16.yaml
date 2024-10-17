@@ -1,0 +1,55 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.22.5
+images:
+- dockerfile_path: Dockerfile.ubi
+  multi_arch: true
+  to: velero-oadp-e2e
+- dockerfile_path: Dockerfile-velero-restore-helper.ubi
+  multi_arch: true
+  to: velero-restore-helper-oadp-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  optional: true
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      commands: |
+        set -exuo pipefail
+        dnf install -y podman podman-docker
+        make -f Makefile.prow deploy-olm
+        make -f Makefile.prow test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: ipi-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: konveyor-dev
+  org: openshift
+  repo: velero
+  variant: "4.16"
