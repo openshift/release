@@ -250,9 +250,7 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-#TODOv2 update after v2 backport to 4.16
-#if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-if [[ "$T5CI_VERSION" =~ 4.1[2-6]+ ]]; then
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
     export EVENT_API_VERSION="1.0"
     oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 else
@@ -260,9 +258,7 @@ else
     oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 fi
 
-#TODOv2 update after v2 backport to 4.16
-#if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
-if [[ "$T5CI_VERSION" =~ 4.1[7]+ ]]; then
+if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
     export ENABLE_V1_REGRESSION="true"
 else
     export ENABLE_V1_REGRESSION="false"
