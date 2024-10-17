@@ -1037,6 +1037,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
     upgrade
     check_upgrade_status
+    sleep 6h
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo "Found rhel worker..."
