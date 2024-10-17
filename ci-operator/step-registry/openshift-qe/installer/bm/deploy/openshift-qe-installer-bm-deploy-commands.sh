@@ -40,8 +40,6 @@ controlplane_lab_interface: eno1np0
 controlplane_pub_network_cidr:
 controlplane_pub_network_gateway:
 jumbo_mtu: false
-rwn_lab_interface: eno1np0
-rwn_network_interface: ens1f0
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
