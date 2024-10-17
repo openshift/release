@@ -109,12 +109,9 @@ create_icsp_connected() {
     name: $ICSP_NAME
   spec:
     repositoryDigestMirrors:
-	- source: registry.redhat.io/rhosdt/tempo-rhel8-operator
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-operator
-	- source: registry.redhat.io/rhosdt/tempo-operator-bundle
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-bundle
+    - mirrors:
+      - registry.stage.redhat.io
+      source: registry.redhat.io
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1

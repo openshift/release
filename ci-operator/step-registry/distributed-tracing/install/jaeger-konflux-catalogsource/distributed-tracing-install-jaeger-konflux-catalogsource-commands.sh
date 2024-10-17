@@ -109,30 +109,9 @@ create_icsp_connected() {
     name: $ICSP_NAME
   spec:
     repositoryDigestMirrors:
-	- source: registry.redhat.io/rhosdt/jaeger-all-in-one-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-all-in-one
-	- source: registry.redhat.io/rhosdt/jaeger-collector-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-collector
-	- source: registry.redhat.io/rhosdt/jaeger-es-index-cleaner-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-es-index-cleaner
-	- source: registry.redhat.io/rhosdt/jaeger-es-rollover-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-es-rollover
-	- source: registry.redhat.io/rhosdt/jaeger-ingester-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-ingester
-	- source: registry.redhat.io/rhosdt/jaeger-operator-bundle
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-operator-bundle
-	- source: registry.redhat.io/rhosdt/jaeger-query-rhel8
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-query
-	- source: registry.redhat.io/rhosdt/jaeger-rhel8-operator
-		mirrors:
-		- quay.io/redhat-user-workloads/rhosdt-tenant/jaeger/jaeger-rhel8-operator
+    - mirrors:
+      - registry.stage.redhat.io
+      source: registry.redhat.io
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1
