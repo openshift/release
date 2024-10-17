@@ -4,6 +4,8 @@
 #set -o errexit
 #set -o pipefail
 
+set +e
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
@@ -28,7 +30,7 @@ if [[ "${JOB_NAME_SAFE:-}" == "launch" ]]; then
     ci_type="cluster-bot"
 fi
 
-cluster_info_file="${ARTIFACTS_DIR}/aws-cluster-info-user-tag"
+cluster_info_file="${ARTIFACT_DIR}/aws-cluster-info-user-tag"
 cat <<EOF >>"${cluster_info_file}"
 cluster-type ${CI_CLUSTER_TYPE}
 job-type ${job_type}
