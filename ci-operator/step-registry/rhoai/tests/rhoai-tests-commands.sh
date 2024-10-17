@@ -62,8 +62,8 @@ function createHtpasswdIDP(){
   oc adm policy add-cluster-role-to-user cluster-admin htpasswd-cluster-admin-user
 }
 
-function createIDP{
-  echo "Clone the ods-install repo: "
+function createIDP(){
+  echo "Clone the ods-install repo"
   git clone git@gitlab.cee.redhat.com:ods/ods-install.git
   cd ods-install
   ./odstest --install-identity-providers
