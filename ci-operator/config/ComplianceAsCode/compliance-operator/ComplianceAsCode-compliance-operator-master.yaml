@@ -32,6 +32,14 @@ images:
   to: testcontent
 - dockerfile_path: images/openscap/Dockerfile
   to: testopenscap
+operator:
+  bundles:
+  - as: compliance-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: ghci.io/complianceascode/compliance-operator:latest
+    with: pipeline:compliance-operator
 promotion:
   to:
   - excluded_images:
@@ -138,6 +146,38 @@ tests:
         requests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
+- as: e2e-bundle-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-compliance
+        operator-sdk run bundle --security-context-config restricted -n openshift-compliance "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n openshift-compliance deployment compliance-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: compliance-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode
