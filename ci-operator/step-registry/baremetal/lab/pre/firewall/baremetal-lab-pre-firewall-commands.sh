@@ -13,16 +13,18 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
 if [ "$CLUSTER_WIDE_PROXY" == "true" ] || [ "$DISCONNECTED" == "true" ]; then
  proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
  cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
  export HTTP_PROXY=${proxy}
  export HTTPS_PROXY=${proxy}
- export NO_PROXY="localhost,127.0.0.1"
+ export NO_PROXY=".cluster.local,.svc,127.0.0.1,api-int.${CLUSTER_NAME}.ocpqe.arm.eng.rdu2.redhat.com,fd02::/48,fd03::/112,fd99:2222:3456::/64,localhost"
 
  export http_proxy=${proxy}
  export https_proxy=${proxy}
- export no_proxy="localhost,127.0.0.1"
+ export no_proxy=".cluster.local,.svc,127.0.0.1,api-int.${CLUSTER_NAME}.ocpqe.arm.eng.rdu2.redhat.com,fd02::/48,fd03::/112,fd99:2222:3456::/64,localhost"
 EOF
 fi
 
