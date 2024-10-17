@@ -13,18 +13,18 @@ ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-job_type="${JOB_TYPE}"
+job_type="${JOB_TYPE:-}"
 user=""
 pull_number=""
 if [[ "${job_type}" == "presubmit" ]]; then
-    user=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author')
+    user=$(echo "${JOB_SPEC:-}" | jq -r '.refs.pulls[].author')
     pull_number=${PULL_NUMBER:-unknow}
 fi
 if [[ "${job_type}" == "periodic" ]]; then
     user="cron"
 fi
 ci_type="prow"
-if [[ "${JOB_NAME_SAFE}" == "launch" ]]; then
+if [[ "${JOB_NAME_SAFE:-}" == "launch" ]]; then
     ci_type="cluster-bot"
 fi
 
