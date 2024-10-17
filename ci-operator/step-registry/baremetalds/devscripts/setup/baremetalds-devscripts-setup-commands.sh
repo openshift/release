@@ -308,7 +308,7 @@ test -f /usr/config && rm -f /usr/config || true
 # also the repo doesn't exist on equinix
 dnf config-manager --set-enabled extras-common || true
 
-dnf install -y git sysstat sos make podman python39 jq net-tools gcc
+dnf install -y git sysstat sos make podman python39 jq net-tools gcc --allowerasing
 
 systemctl start sysstat
 
