@@ -9,6 +9,7 @@ INSTALL_DIR=/tmp
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+echo "Test "
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
@@ -514,5 +515,12 @@ if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
 fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
+# check if all the COs are updated properly
+ALL_CO_AVAILABLE=$(oc get co)
+echo "Displaying all the CO state"
+echo ${ALL_CO_AVAILABLE}
+echo "Saving credentials after the installation is done"
+save_credentials
 
 touch ${INSTALL_DIR}/install-complete
