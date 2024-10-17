@@ -80,8 +80,8 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
   if [[ -z "${POWERVS_VPC}" ]]; then
     POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
   fi
-  if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
-    POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
+      POWERVS_TRANSIT_GATEWAY=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
   fi
   if [[ -z "${POWERVS_REGION}" ]]; then
     POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -104,7 +104,7 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
      --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
      --cloud-instance-id ${POWERVS_GUID} \
      --vpc ${POWERVS_VPC} \
-     --cloud-connection ${POWERVS_CLOUD_CONNECTION}
+     --transit-gateway ${POWERVS_TRANSIT_GATEWAY}
    if [ $? == 0 ]; then
       break
    else
