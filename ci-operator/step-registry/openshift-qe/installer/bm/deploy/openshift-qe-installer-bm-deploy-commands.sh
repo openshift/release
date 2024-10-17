@@ -61,6 +61,19 @@ EOF
 
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 
+# Pre-reqs
+ssh ${SSH_ARGS} root@${bastion} '
+  USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_password")
+  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:] .[].pm_addr")
+  for i in $HOSTS; do
+    badfish -v -H $i -u $USER -p $PWD --racreset
+  done
+  sleep 300
+  for i in $HOSTS; do
+    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml --boot-to-type foreman
+  done'
+
 # Setup Bastion
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
