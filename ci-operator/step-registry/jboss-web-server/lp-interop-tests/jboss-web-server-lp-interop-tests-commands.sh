@@ -102,16 +102,17 @@ spec:
 EOF
 
 oc wait --for=condition=ContainersReady=true pod/jws-test-pod --timeout=200s || true
-
-sleep 1200
+oc wait --for=condition=complete pod/jws-test-pod --timeout=120m || true
 
 echo "Retrieve test results..."
 
-oc cp jws-test-image/jws-test-pod:/opt/artifacts/jws-5.x/ "${ARTIFACT_DIR}/jws_artifacts/jws-5/"
+oc cp jws-test-image/jws-test-pod:/opt/artifacts/jws-5.x/ "${ARTIFACT_DIR}/jws_artifacts/jws-5/" --retries=5
 
 for file in "${ARTIFACT_DIR}/jws_artifacts/jws-5/target/surefire-reports/"*.xml; do
-  cp "$file" "${ARTIFACT_DIR}/junit_jws_5_$(basename $file .xml).xml"
-done
+    if [ -f "$file" ]; then
+      cp "$file" "${ARTIFACT_DIR}/junit_jws_5_$(basename "$file" .xml).xml"
+    fi
+  done
 
 result=`cat ${ARTIFACT_DIR}/junit_*.xml | sed 's/"//g'`
 if [[ "$result" =~ "errors=0" ]] && [[ "$result" =~ "failures=0" ]]; then
