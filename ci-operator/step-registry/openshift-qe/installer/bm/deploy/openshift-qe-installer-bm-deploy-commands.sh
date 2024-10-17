@@ -52,10 +52,10 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 # Clean up previous attempts
 
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} '
-  podman pod stop $(podman pod ps -q) || echo No podman pods to stop
-  podman pod rm $(podman pod ps -q) || echo No podman pods to delete
-  podman stop $(podman ps -aq) || echo No podman containers to stop
-  podman rm $(podman ps -aq) || echo No podman containers to delete
+  podman pod stop $(podman pod ps -q) || echo "No podman pods to stop"
+  podman pod rm $(podman pod ps -q)   || echo "No podman pods to delete"
+  podman stop $(podman ps -aq)        || echo "No podman containers to stop"
+  podman rm $(podman ps -aq)          || echo "No podman containers to delete"
   rm -rf /opt/*
 
   USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_user")
