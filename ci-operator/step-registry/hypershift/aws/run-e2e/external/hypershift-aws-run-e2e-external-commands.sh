@@ -38,6 +38,16 @@ if [[ "${AWS_MULTI_ARCH:-}" == "true" ]]; then
   AWS_MULTI_ARCH_PARAMS="--e2e.aws-multi-arch=true"
 fi
 
+N1_MINOR_RELEASE_IMAGE_PARAMS=""
+if [[ "${OCP_IMAGE_N1:-}" != "" ]]; then
+  N1_MINOR_RELEASE_IMAGE_PARAMS="--e2e.n1-minor-release=${OCP_IMAGE_N1}"
+fi
+
+N2_MINOR_RELEASE_IMAGE_PARAMS=""
+if [[ "${OCP_IMAGE_N2:-}" != "" ]]; then
+  N2_MINOR_RELEASE_IMAGE_PARAMS="--e2e.n2-minor-release=${OCP_IMAGE_N2}"
+fi
+
 export EVENTUALLY_VERBOSE="false"
 
 hack/ci-test-e2e.sh -test.v \
@@ -51,6 +61,8 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
   ${PKI_RECONCILIATION_PARAMS:-} \
+  ${N2_MINOR_RELEASE_IMAGE_PARAMS:-} \
+  ${N1_MINOR_RELEASE_IMAGE_PARAMS:-} \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --e2e.aws-endpoint-access=PublicAndPrivate \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
