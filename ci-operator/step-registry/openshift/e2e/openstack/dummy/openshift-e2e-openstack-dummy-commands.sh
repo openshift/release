@@ -15,5 +15,5 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Cur to titan20
-curl http://10.46.4.36:3128
+# Curl to titan20
+curl http://titan20.lab.eng.tlv2.redhat.com:3128
