@@ -65,8 +65,13 @@ update_global_auth() {
 	konflux_auth_password=$(jq -r '.password' $KONFLUX_REGISTRY_PATH)
 	konflux_registry_auth=$(echo -n " " "$konflux_auth_user":"$konflux_auth_password" | base64 -w 0)
 
+	# Add brew registry creds
+	reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+	reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+	brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+
 	# Create a new dockerconfig with the konflux registry credentials without the "email" field
-	jq --argjson a "{\"https://registry.konflux.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
+	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"https://registry.konflux.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
 
 	# update global auth
 	local -i ret=0
@@ -223,9 +228,6 @@ main() {
 		echo "failed to create catalogsource. resolve the above errors"
 		return 1
 	}
-
-	# Print the CSV for the installed operators
-	oc get csv -n openshift-operators
 
 	#support hypershift config guest cluster's icsp
 	oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
