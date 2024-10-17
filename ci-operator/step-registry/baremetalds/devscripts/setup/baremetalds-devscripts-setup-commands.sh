@@ -57,6 +57,19 @@ trap finished EXIT TERM
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
 
+sed -i '/NO_PROXY=$NO_PROXY,$LOCAL_REGISTRY_DNS_NAME/c\
+    # If INSTALLER_PROXY has been set, all traffic must go via the proxy (the bm network has no access)\
+    if [[ ${INSTALLER_PROXY:-false} == "false" ]]; then\
+      NO_PROXY=$NO_PROXY,$LOCAL_REGISTRY_DNS_NAME\
+    fi' network.sh
+sed -i 's/export NO_PROXY=${NO_PROXY}/&\n  # Update libvirt firewalld policy to allow the VM to connect to the proxy\n  sudo firewall-cmd --policy=libvirt-to-host --add-port=$INSTALLER_PROXY_PORT\/tcp\n  # Allow ironic to talk directly to the virt BMCs without proxy\n  sudo firewall-cmd --policy=libvirt-to-host --add-port=8000\/tcp\n  sudo firewall-cmd --policy=libvirt-to-host --add-port=6230-6240\/udp\n  # And NFS if used\n  if [ "${PERSISTENT_IMAGEREG}" == true ] ; then\n    sudo firewall-cmd --policy=libvirt-to-host --add-port=2049\/tcp\n  fi/' 06_create_cluster.sh
+sed -i '114i\    --add-host=virthost.ostest.test.metalkube.org:$PROVISIONING_HOST_EXTERNAL_IP \\' 02_configure_host.sh
+
+grep -A7 "When a local registry is enabled" network.sh
+grep add-host 02_configure_host.sh
+grep -B2 -A2  "Update libvirt firewalld policy to allow the VM to connect to the proxy" 06_create_cluster.sh
+
+
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
