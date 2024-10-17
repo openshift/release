@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: ansible
   aws-efs-csi-operator-create-efs:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
   dev-scripts:
@@ -12,11 +12,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   openstack-installer:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: openstack-installer
   upi-installer:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -24,13 +24,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -45,30 +45,19 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
-      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace-provision
+    - chain: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone-provision
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone
-- as: installer-rehearse-ibmcloud
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: verification-tests
-  variant: installer-rehearse-4.17
+  variant: installer-rehearse-4.18
