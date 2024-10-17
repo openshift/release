@@ -93,7 +93,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     if [[ "${operator_target_namespaces}" == "!install" ]]; then
         operator_target_namespaces="${operator_install_namespace}"
     fi
-    
+
     echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}${operator_target_namespaces:+, targeting $operator_target_namespaces}"
 
     # Create the install namespace
