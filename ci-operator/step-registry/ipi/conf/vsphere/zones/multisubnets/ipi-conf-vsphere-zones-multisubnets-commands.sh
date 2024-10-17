@@ -35,7 +35,7 @@ else
     LB_TYPE_DEF=""
 fi
 
-# CONFIG="${SHARED_DIR}/install-config.yaml"
+CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/multisubnets.yaml.patch"
 
 cat >"${PATCH}" <<EOF
