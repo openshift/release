@@ -2820,6 +2820,88 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
+  cron: 0 1 13,27 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: redhat-chaos
+    repo: prow-scripts
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci-operator.openshift.io/variant: rosa-4.17-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-chaos-prow-scripts-main-rosa-4.17-nightly-krkn-tests-rosa-hcp
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/krkn-tests-rosa-hcp-cluster-profile
+      - --target=krkn-tests-rosa-hcp
+      - --variant=rosa-4.17-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/krkn-tests-rosa-hcp-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-perfscale-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
   cron: 0 4 5,19 * *
   decorate: true
   decoration_config:
