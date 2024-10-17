@@ -113,6 +113,7 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
 fi
 oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc patch cluster -n local-cluster-${CLUSTER_NAME} "$(oc get hostedcluster -n local-cluster ${CLUSTER_NAME} -o=jsonpath="{.spec.infraID}")" --type json -p '[{"op": "add", "path": "/spec/paused", "value": true}]'
 oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
 oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
 cat <<EOF | oc apply -f -
@@ -167,7 +168,6 @@ spec:
 EOF
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 oc annotate hostedcluster -n local-cluster ${CLUSTER_NAME} hypershift.openshift.io/skip-delete-hosted-controlplane-namespace=true
-oc delete machine.c -n "local-cluster-${CLUSTER_NAME}" --all --wait=false
 remove_finalizer machine.c "local-cluster-${CLUSTER_NAME}"
 oc delete machine.c -n "local-cluster-${CLUSTER_NAME}" --all
 oc delete AgentCluster -n "local-cluster-${CLUSTER_NAME}" --all
@@ -202,6 +202,7 @@ oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hosted
 
 oc patch hostedcluster -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "remove", "path": "/spec/pausedUntil"}]'
 oc patch nodepool -n local-cluster ${CLUSTER_NAME} --type json -p '[{"op": "remove", "path": "/spec/pausedUntil"}]'
+oc patch cluster -n local-cluster-${CLUSTER_NAME} "$(oc get hostedcluster -n local-cluster ${CLUSTER_NAME} -o=jsonpath="{.spec.infraID}")" --type json -p '[{"op": "remove", "path": "/spec/paused"}]'
 oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused- --overwrite=true --all
 oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused- --overwrite=true --all
 
