@@ -1,0 +1,68 @@
+base_images:
+  aws-efs-csi-operator-create-efs:
+    name: "4.12"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.12"
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f28
+  cluster: build05
+  cron: 45 18 24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-nightly
