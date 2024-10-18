@@ -79,7 +79,7 @@ if [[ ! -z "$PERMISSIONS_BOUNDARY" ]]; then
 fi
 
 # Whatever the account roles with the prefix exist or not, do creation.
-echo "rosa -v $(rosa -v)"
+echo "rosa -v $(rosa version)"
 echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
 echo "rosa create account-roles -y --mode auto --prefix ${ACCOUNT_ROLES_PREFIX} ${CLUSTER_SWITCH} ${VERSION_SWITCH} ${ARN_PATH_SWITCH}"
 rosa create account-roles -y --mode auto \
