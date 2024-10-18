@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
 set -eou pipefail
+set -x
 
 OPERATOR_VERSION=${OPERATOR_VERSION:-}
 OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-stable}
+
+SMALL_INSTALL=${SMALL_INSTALL:-false}
+
 
 cat <<EOF
 >>> Install ACS into a single cluster [$(date -u)].
@@ -39,22 +43,86 @@ function exit_handler() {
   fi
 }
 trap 'exit_handler' EXIT
-trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+trap 'echo "$(date +%H:%M:%S) + ${BASH_COMMAND}"' DEBUG
 
-
-function get_jq() {
-  local url
-  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-  echo "Downloading jq binary from ${url}"
-  curl -Ls -o ./jq "${url}"
-  chmod u+x ./jq
-  export PATH=${PATH}:${PWD}
+function check_cli_tools {
+  printf "OC $(oc version)"
+  kubectl version --client --output=yaml
+  python --version
+  python3 --version
+  which curl
+  which kubectl
+  which oc
+  which helm
+  which jq
+  which yq
+  which python
+  which python3
+  which base64
 }
-jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
-  || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+function get_roxctl() {
+  version=${1:-latest}
+  os=${2:-linux}
+  arch=${3:+-}${3:-}
+  # https://mirror.openshift.com/pub/rhacs/assets/latest/bin/linux/
+  curl "https://mirror.openshift.com/pub/rhacs/assets/${version}/bin/${os}/roxctl${arch}" --output roxctl
+  chmod +x roxctl
+}
+
+# echo "(Logging oc commands for user to reproduce and confirm state)"
+# function oc() {
+#   echo "$(date +%H:%M:%S) + oc $*" >&2
+#   command oc "$@"
+# }
+#check_cli_tools
+
+
+ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+
+
+central_resources="resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 1"
+
+central_db_resources="db:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 4Gi
+          cpu: 1"
+
+scanner_resources="resources:
+        requests:
+          memory: 500Mi
+          cpu: 500m
+        limits:
+          memory: 2500Mi
+          cpu: 2000m"
+
+scanner_db_resources="db:
+      resources:
+        requests:
+          cpu: 400m
+          memory: 512Mi
+        limits:
+          cpu: 2000m
+          memory: 4Gi"
+
+if [[ "$SMALL_INSTALL" != "true" ]]; then
+  central_resources=""
+  central_db_resources=""
+  scanner_resources=""
+  scanner_db_resources=""
+fi
+
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
@@ -67,26 +135,13 @@ spec:
   central:
     adminPasswordSecret:
       name: admin-pass
-    resources:
-      requests:
-        memory: 1Gi
-        cpu: 500m
-      limits:
-        memory: 4Gi
-        cpu: 1
+    ${central_resources}
     exposure:
       loadBalancer:
         enabled: false
       route:
         enabled: false
-    db:
-      resources:
-        requests:
-          memory: 1Gi
-          cpu: 500m
-        limits:
-          memory: 4Gi
-          cpu: 1
+    ${central_db_resources}
     telemetry:
       enabled: false
   scanner:
@@ -94,21 +149,8 @@ spec:
       scaling:
         autoScaling: Disabled
         replicas: 1
-      resources:
-        requests:
-          memory: 500Mi
-          cpu: 500m
-        limits:
-          memory: 2500Mi
-          cpu: 2000m
-    db:
-      resources:
-        requests:
-          cpu: 400m
-          memory: 512Mi
-        limits:
-          cpu: 2000m
-          memory: 4Gi
+      ${scanner_resources}
+    ${scanner_db_resources}
 ---
 apiVersion: v1
 kind: Secret
@@ -187,11 +229,12 @@ function create_cr() {
   local app
   app=${1:-central}
   echo ">>> Install ${app^}"
-  if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
-    && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
-    echo "INFO: Diff in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
-  fi
-  retry oc apply -f "${app}-cr.yaml" --timeout=30s
+  echo "INFO: Comparing upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
+  curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml"
+  { diff "${app}-cr.yaml" "new.${app}-cr.yaml" || true; } \
+    | grep -v password
+  oc apply -f "${app}-cr.yaml" \
+    || retry oc apply -f "${app}-cr.yaml" --overwrite=true --timeout=30s
 }
 
 function retry() {
@@ -230,7 +273,7 @@ function wait_deploy() {
 
 function wait_pods_running() {
   retry oc get pods "${@}" --field-selector="status.phase==Running" \
-    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
+    -o jsonpath="{.items[0].metadata.name}" 2>&1 \
     || { oc get pods "${@}"; return 1; }
 }
 
