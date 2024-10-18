@@ -87,7 +87,6 @@ quayio-production-s3.s3.amazonaws.com
 rhcos.mirror.openshift.com
 sso.redhat.com
 storage.googleapis.com/openshift-release
-.r2.cloudflarestorage.com
 EOF
 
 # # optional third-party content

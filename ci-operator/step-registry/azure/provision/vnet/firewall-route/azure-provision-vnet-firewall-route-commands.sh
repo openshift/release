@@ -130,7 +130,7 @@ addressPrefix=$(echo $addressPrefix_output)
 azure_fqdns_list="management.azure.com *.blob.core.windows.net login.microsoftonline.com"
 # For nightly build
 redhat_fqdns_list="*.ci.openshift.org"
-redhat_fqdns_list="${redhat_fqdns_list} *.cloudfront.net *.r2.cloudflarestorage.com"
+redhat_fqdns_list="${redhat_fqdns_list} *.cloudfront.net"
 # For registries
 redhat_fqdns_list="${redhat_fqdns_list} registry.redhat.io access.redhat.com quay.io cdn.quay.io cdn01.quay.io cdn02.quay.io cdn03.quay.io sso.redhat.com"
 # For Telemetry
