@@ -23,6 +23,16 @@ function setup_aux_host_ssh_access {
 
 }
 
+function append_pr_tag_cluster_profile_artifacts {
+
+  # Just in case of running this script being part of a Pull Request
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo "************ telcov10n Append the 'pr-${PULL_NUMBER}' tag to '${SHARED_HUB_CLUSTER_PROFILE}' folder ************"
+    # shellcheck disable=SC2153
+    SHARED_HUB_CLUSTER_PROFILE="${SHARED_HUB_CLUSTER_PROFILE}-pr-${PULL_NUMBER}"
+  fi
+}
+
 function save_hub_cluster_profile_artifacts {
 
   echo "************ telcov10n Save those artifacts that will be used during Spoke deployments ************"
@@ -33,7 +43,8 @@ function save_hub_cluster_profile_artifacts {
     "$(readlink -f ${CLUSTER_PROFILE_DIR}/base_domain)"
   )
 
-  local_cluster_profile_shared_folder=$(mktemp -d --dry-run)/${SHARED_HUB_CLUSTER_PROFILE}
+  # shellcheck disable=SC2153
+  local_cluster_profile_shared_folder="$(mktemp -d --dry-run)/${SHARED_HUB_CLUSTER_PROFILE}"
   mkdir -pv ${local_cluster_profile_shared_folder}
   cp -av "${hub_to_spoke_artifacts[@]}" ${local_cluster_profile_shared_folder}/
   cp -v  "$(readlink -f ${KUBECONFIG})" ${local_cluster_profile_shared_folder}/hub-kubeconfig
@@ -90,6 +101,7 @@ EOF
 
 function main {
   setup_aux_host_ssh_access
+  append_pr_tag_cluster_profile_artifacts
   save_hub_cluster_profile_artifacts
   create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder
 }
