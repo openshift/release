@@ -79,6 +79,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
   vsphere-csi-driver-operator-test:
     name: "4.14"
     namespace: ocp
@@ -114,6 +118,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: assisted-baremetal
+- as: e2e-aws-ovn-single-node-workers-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-workers
 - as: e2e-aws-ovn-single-node-workers
   interval: 168h
   steps:
@@ -124,17 +139,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-workers
-  timeout: 3h0m0s
-- as: openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-single-node-workers-upgrade-conformance
 - as: e2e-aws-ovn-single-node
   interval: 168h
   steps:
@@ -414,14 +418,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
-- as: e2e-gcp-libvirt-cert-rotation
-  cron: '@daily'
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-libvirt-cert-rotation
 - as: e2e-azure-sdn-fips
   interval: 168h
   steps:
@@ -808,6 +804,7 @@ tests:
 - as: e2e-telco5g
   cluster: build05
   cron: 10 08 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -822,6 +819,7 @@ tests:
 - as: e2e-telco5g-cnftests
   cluster: build05
   cron: 00 10 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -837,6 +835,7 @@ tests:
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 00 10 */1 * 1-5
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -850,7 +849,8 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 23 * * 2,4,6
+  cron: 0 1 * * 2,4,6
+  restrict_network_access: false
   steps:
     env:
       T5CI_JOB_TYPE: ptp

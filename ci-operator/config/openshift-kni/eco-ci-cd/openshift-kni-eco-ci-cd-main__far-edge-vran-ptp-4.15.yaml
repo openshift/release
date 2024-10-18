@@ -5,9 +5,9 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    name: ci
-    namespace: openshift
-    tag: golang-1.20
+    name: telco-bastion
+    namespace: ci
+    tag: latest
 resources:
   '*':
     limits:
@@ -19,9 +19,9 @@ tests:
 - as: eco-ci-cd
   cluster: build05
   cron: 00 13 * * 1
+  restrict_network_access: false
   steps:
     env:
-      BYPASS_OLM_SYNC: "false"
       CNF_POLARION_BRANCH: enabling_updating_exsisting_test_run
       CNF_POLARION_REPO: https://gitlab.cee.redhat.com/alugasi/cnf-polarion.git
       DEPLOY_DU: "true"
@@ -33,10 +33,6 @@ tests:
       MIRROR_SPOKE_OPERATOR_IMAGES: "true"
       OCP_EDGE_BRANCH: master
       OCP_EDGE_REPO: https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge.git
-      OLM_ANSIBLE_EXTRA_ARGS: ocp_minor_version%3A%20%2715%27%0Agitops_iib_override%3A%20registry.redhat.io%2Fredhat%2Fredhat-operator-index%3Av4.15%0Aacm_mce_downstream_snapshot%3A%20stable
-      OLM_CATALOG_SOURCE: redhat-operators
-      OLM_USE_NEXUS: "true"
-      OPERATORS_LIST: topology-aware-lifecycle-manager
       RAN_HUB: "true"
       RAN_METRICS_FORMAL_TEST: "true"
       RAN_SPOKE: "true"

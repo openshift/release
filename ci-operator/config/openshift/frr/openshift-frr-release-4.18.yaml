@@ -7,10 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   image_stream_tag:
     name: release
@@ -20,9 +20,9 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: ocp_builder_rhel-9-base-openshift-4.17
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: metallb-frr
 promotion:
   to:
@@ -58,17 +58,6 @@ tests:
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
         BGP_TYPE=frr-k8s
-    workflow: baremetalds-metallb-e2e
-- as: metallb-e2e-metal-ipi-ovn
-  cluster: build05
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-      E2E_TESTS_CONFIG: |
-        IP_STACK=v4
     workflow: baremetalds-metallb-e2e
 - as: security
   optional: true

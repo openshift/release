@@ -159,7 +159,6 @@ metadata:
 data:
   password: ${centralAdminPasswordBase64}
 EOF
-cat central-cr.yaml
 
 cat <<EOF > secured-cluster-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
@@ -228,7 +227,6 @@ function install_operator() {
 
 function create_cr() {
   local app
-  set +e
   app=${1:-central}
   echo ">>> Install ${app^}"
   echo "INFO: Comparing upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
@@ -236,8 +234,7 @@ function create_cr() {
   { diff "${app}-cr.yaml" "new.${app}-cr.yaml" || true; } \
     | grep -v password
   oc apply -f "${app}-cr.yaml" \
-    || oc apply -f "${app}-cr.yaml" --overwrite=true
-  set -e
+    || retry oc apply -f "${app}-cr.yaml" --overwrite=true --timeout=30s
 }
 
 function retry() {

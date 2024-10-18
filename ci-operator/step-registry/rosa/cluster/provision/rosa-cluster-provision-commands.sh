@@ -263,8 +263,8 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-  record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
+    COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+    record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
 fi
 
 AUDIT_LOG_SWITCH=""

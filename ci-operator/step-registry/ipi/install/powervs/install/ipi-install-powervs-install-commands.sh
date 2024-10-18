@@ -422,9 +422,14 @@ function destroy_resources() {
   # Create a fake cluster metadata file
   #
   mkdir /tmp/ocp-test
+
   cat > "/tmp/ocp-test/metadata.json" << EOF
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
+
+  if [ -n "${PERSISTENT_TG}" ]; then
+    jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
+  fi
 
   #
   # Call destroy cluster on fake metadata file
@@ -493,9 +498,12 @@ function dump_resources() {
   ibmcloud tg connections ${GATEWAY_ID}
 )
 
-# "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
+  echo "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
 (
+  echo "NOTE: There should be three LBs found"
+  ibmcloud is load-balancers --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id) - \(.provisioning_status)"'
+
   LB_INT_FILE=$(mktemp)
   LB_MCS_POOL_FILE=$(mktemp)
   trap '/bin/rm "${LB_INT_FILE}" "${LB_MCS_POOL_FILE}"' EXIT
@@ -505,6 +513,7 @@ function dump_resources() {
   if [ -z "${LB_INT_ID}" ]
   then
     echo "Error: LB_INT_ID is empty"
+    echo "Error: The internal load balancer was not found!"
     exit
   fi
 
@@ -518,6 +527,7 @@ function dump_resources() {
     if [ -z "${LB_MCS_ID}" ]
     then
       echo "Error: LB_MCS_ID is empty"
+      echo "Error: The machine config server pool under the internal LB was not found!"
       exit
     fi
   fi
@@ -717,6 +727,9 @@ POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+
+echo "PERSISTENT_TG=${PERSISTENT_TG}"
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -726,6 +739,9 @@ export POWERVS_RESOURCE_GROUP
 export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
+
+echo "tgName in ${SHARED_DIR}/install-config.yaml"
+grep tgName "${SHARED_DIR}/install-config.yaml" || true
 
 dir=/tmp/installer
 mkdir "${dir}/"

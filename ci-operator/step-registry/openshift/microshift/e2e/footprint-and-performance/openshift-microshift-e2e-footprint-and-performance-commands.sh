@@ -1,9 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
-curl https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/openshift/microshift/includes/openshift-microshift-includes-commands.sh -o /tmp/ci-functions.sh
 # shellcheck disable=SC1091
-source /tmp/ci-functions.sh
+source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
 cat <<EOF > /tmp/prepare.sh
@@ -18,9 +17,11 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 EOF
 chmod +x /tmp/prepare.sh
 
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+
 scp \
-  /tmp/ci-functions.sh \
+  "${SHARED_DIR}/ci-functions.sh" \
   /tmp/prepare.sh \
   /var/run/rhsm/subscription-manager-org \
   /var/run/rhsm/subscription-manager-act-key \

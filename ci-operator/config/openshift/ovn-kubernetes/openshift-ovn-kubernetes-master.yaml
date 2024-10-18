@@ -4,9 +4,9 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.18"
     namespace: ocp
@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: golang-1.22
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
@@ -347,6 +347,13 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-single-node-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-azure-ovn-techpreview
   optional: true
   steps:
@@ -397,6 +404,18 @@ tests:
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e
 - as: e2e-vsphere-ovn-techpreview
   optional: true
   steps:
@@ -404,6 +423,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-aws-ovn-virt-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-ovn-virt
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,0 +1,130 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  ubi9:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9:latest AS rust-builder
+    ARG TARGETARCH
+
+    RUN echo Target architecture: ${TARGETARCH}
+
+    ENV RUST_TOOLCHAIN=1.81.0
+
+    COPY . /opt/app-root/src/
+    WORKDIR /opt/app-root/src/insights-runtime-extractor
+
+    USER 0
+    ENV HOME="/root"
+    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+
+    RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
+        chmod g+w /opt/app-root/src/insights-runtime-extractor && \
+        dnf install -y gcc make
+
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN}
+    RUN if [ "$TARGETARCH" == "arm64" ]; then rustup target add aarch64-unknown-linux-musl; fi
+    RUN if [ "$TARGETARCH" == "amd64" ]; then rustup target add x86_64-unknown-linux-musl; fi
+
+    RUN mkdir -p $HOME/.cargo/git/ && \
+        find $HOME/. -type d -exec chmod 777 {} \; && \
+        find $HOME/. -type f -exec chmod ugo+rw {} \;
+
+    USER 1001
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/insights-runtime-extractor
+    ubi9:
+      as:
+      - registry.access.redhat.com/ubi9:latest
+  to: src-rust
+- dockerfile_path: ./Containerfile-extractor
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: insights-runtime-extractor
+- dockerfile_path: ./Containerfile-exporter
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: insights-runtime-exporter
+promotion:
+  to:
+  - name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  src-rust:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: rust-unit-tests
+  commands: cd extractor && make unit-tests
+  container:
+    from: src-rust
+- as: unit-tests
+  commands: make unit-tests
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-tests
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-tests
+      cli: latest
+      commands: cd exporter && make e2e-test
+      dependencies:
+      - env: INSIGHTS_RUNTIME_EXPORTER
+        name: insights-runtime-exporter
+      - env: INSIGHTS_RUNTIME_EXTRACTOR
+        name: insights-runtime-extractor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: insights-runtime-extractor

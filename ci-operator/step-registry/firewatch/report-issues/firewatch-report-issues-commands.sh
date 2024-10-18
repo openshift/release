@@ -33,8 +33,10 @@ if [ -n "${FIREWATCH_CONFIG_FILE_PATH}" ]; then
 fi
 
 # If the additional labels file exists, add it to the report command
-if [ -f "${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
-    report_command+=" --additional-labels-file=${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
+if [ -f "${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
+    report_command+=" --additional-labels-file=${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
 fi
+
+echo $report_command
 
 eval "$report_command"

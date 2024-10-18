@@ -3,10 +3,6 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
-  ci_nginx-unprivileged_stable:
-    name: nginx-unprivileged
-    namespace: ci
-    tag: stable
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -63,12 +59,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
-- context_dir: images/gh-pull-through-cache/
+- context_dir: images/check-cluster-profiles-config/
+  from: os
   inputs:
-    ci_nginx-unprivileged_stable:
-      as:
-      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
-  to: gh-pull-through-cache
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-cluster-profiles-config
+  to: check-cluster-profiles-config
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
   from: os
   inputs:
@@ -89,14 +87,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/cvp-trigger
   to: cvp-trigger
-- context_dir: images/template-deprecator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
-  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -113,7 +103,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/result-aggregator
   to: result-aggregator
-- context_dir: images/ci-operator/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator/
   from: os
   inputs:
     bin:
@@ -122,9 +114,10 @@ images:
         source_path: /go/bin/ci-operator
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
-  multi_arch: true
   to: ci-operator
-- context_dir: images/ci-operator-minimal/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-minimal/
   from: os
   inputs:
     bin:
@@ -133,9 +126,10 @@ images:
         source_path: /go/bin/ci-operator
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
-  multi_arch: true
   to: ci-operator-minimal
-- context_dir: images/ci-operator-checkconfig/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-checkconfig/
   from: os
   inputs:
     bin:
@@ -151,7 +145,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/bugzilla-backporter
   to: bugzilla-backporter
-- context_dir: images/ci-operator-prowgen/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-prowgen/
   from: os
   inputs:
     bin:
@@ -159,7 +155,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-operator-prowgen
   to: ci-operator-prowgen
-- context_dir: images/sanitize-prow-jobs/
+- additional_architectures:
+  - arm64
+  context_dir: images/sanitize-prow-jobs/
   from: os
   inputs:
     bin:
@@ -167,6 +165,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/sanitize-prow-jobs
   to: sanitize-prow-jobs
+- context_dir: images/multi-pr-prow-plugin/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/multi-pr-prow-plugin
+  to: multi-pr-prow-plugin
 - context_dir: images/pj-rehearse/
   from: os
   inputs:
@@ -185,7 +191,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/slack-bot
   to: slack-bot
-- context_dir: images/config-brancher/
+- additional_architectures:
+  - arm64
+  context_dir: images/config-brancher/
   from: os
   inputs:
     bin:
@@ -212,7 +220,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/dptp-pools-cm
   to: dptp-pools-cm
-- dockerfile_literal: |-
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD promoted-image-governor /usr/bin/promoted-image-governor
@@ -271,8 +281,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
       - destination_dir: .
-        source_path: /go/bin/template-deprecator
-      - destination_dir: .
         source_path: /go/bin/determinize-prow-config
       - destination_dir: .
         source_path: /go/bin/registry-replacer
@@ -283,7 +291,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/promoted-image-governor
   to: auto-config-brancher
-- context_dir: images/prowjobdispatcher
+- additional_architectures:
+  - arm64
+  context_dir: images/prowjobdispatcher
   from: os
   inputs:
     bin:
@@ -311,7 +321,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/repo-brancher
   to: repo-brancher
-- context_dir: images/determinize-ci-operator/
+- additional_architectures:
+  - arm64
+  context_dir: images/determinize-ci-operator/
   from: os
   inputs:
     bin:
@@ -327,7 +339,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-peribolos
   to: determinize-peribolos
-- context_dir: images/applyconfig
+- additional_architectures:
+  - arm64
+  context_dir: images/applyconfig
   from: os
   inputs:
     bin:
@@ -361,7 +375,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/testgrid-config-generator
   to: testgrid-config-generator
-- context_dir: images/entrypoint-wrapper
+- additional_architectures:
+  - arm64
+  context_dir: images/entrypoint-wrapper
   from: os
   inputs:
     bin:
@@ -377,7 +393,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-operator-configresolver
   to: ci-operator-configresolver
-- context_dir: images/determinize-prow-config
+- additional_architectures:
+  - arm64
+  context_dir: images/determinize-prow-config
   from: os
   inputs:
     bin:
@@ -385,7 +403,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
   to: determinize-prow-config
-- context_dir: images/tide-config-manager
+- additional_architectures:
+  - arm64
+  context_dir: images/tide-config-manager
   from: os
   inputs:
     bin:
@@ -393,7 +413,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/tide-config-manager
   to: tide-config-manager
-- context_dir: images/repo-init
+- additional_architectures:
+  - arm64
+  context_dir: images/repo-init
   from: os
   inputs:
     bin:
@@ -483,7 +505,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/autopublicizeconfig
   to: autopublicizeconfig
-- context_dir: images/generate-registry-metadata/
+- additional_architectures:
+  - arm64
+  context_dir: images/generate-registry-metadata/
   from: os
   inputs:
     bin:
@@ -560,7 +584,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/cluster-display
   to: cluster-display
-- context_dir: images/cluster-init/
+- additional_architectures:
+  - arm64
+  context_dir: images/cluster-init/
   from: os
   inputs:
     bin:
@@ -759,26 +785,34 @@ promotion:
 resources:
   '*':
     requests:
-      cpu: 500m
-      memory: 600Mi
+      cpu: "1"
+      memory: 1Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
+  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
+  node_architecture: arm64
 - as: codegen
+  cluster: build10
   commands: make verify-gen
   container:
     from: src
+  node_architecture: arm64
 - as: format
+  cluster: build10
   commands: make format
   container:
     from: src
+  node_architecture: arm64
 - as: integration
+  cluster: build10
   commands: make integration
   container:
     from: test-bin
+  node_architecture: arm64
 - always_run: false
   as: e2e
   steps:
@@ -877,22 +911,43 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
+  cluster: build10
+  node_architecture: arm64
   optional: true
+  steps:
+    test:
+    - as: breaking-changes
+      commands: |
+        export KUBECONFIG_DIR=/etc/kubeconfigs
+        export KUBECONFIG_SUFFIX=config
+        make check-breaking-changes
+      credentials:
+      - mount_path: /etc/kubeconfigs
+        name: cluster-init
+        namespace: ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
+  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
+  node_architecture: arm64
 - as: validate-vendor
+  cluster: build10
   commands: make validate-vendor
   container:
     from: src
+  node_architecture: arm64
 - as: frontend-checks
+  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
+  node_architecture: arm64
 - as: lint
   commands: make lint
   container:

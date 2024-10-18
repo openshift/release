@@ -21,6 +21,12 @@ function get_tp_operator(){
     "4.16")
     tp_operator=("cluster-api" "olm")
     ;;
+    "4.17")
+    tp_operator=("cluster-api" "olm")
+    ;;
+    "4.18")
+    tp_operator=("cluster-api" "olm")
+    ;;
     *)
     tp_operator=()
     ;;
@@ -364,46 +370,6 @@ function pre-OCP-53907(){
     done
     if [[ "${bad_metadata}" == "true" ]]; then
         echo "All images' metadata is null in available update!"
-        return 1
-    fi
-    return 0
-}
-
-function pre-OCP-69968(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec testurl="http://examplefortest.com"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${testurl}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${testurl}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
-        return 1
-    fi
-    return 0
-}
-
-function pre-OCP-69948(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec teststore="https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${teststore}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${teststore}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
         return 1
     fi
     return 0

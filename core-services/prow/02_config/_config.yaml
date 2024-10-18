@@ -117,8 +117,22 @@ deck:
         slug: redhat-chaos
   - repo: openshift/operator-framework-operator-controller
     rerun_auth_configs:
-      github_users:
-      - m1kola
+      github_team_slugs:
+      - org: openshift
+        slug: openshift-team-operator-framework
+      - org: openshift
+        slug: openshift-team-operator-runtime
+      - org: openshift
+        slug: openshift-team-operator-ecosystem
+  - repo: openshift/operator-framework-olm
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: openshift-team-operator-framework
+      - org: openshift
+        slug: openshift-team-operator-runtime
+      - org: openshift
+        slug: openshift-team-operator-ecosystem
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -199,8 +213,6 @@ deck:
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
-disabled_clusters:
-- build04
 gangway:
   allowed_api_clients:
   - allowed_jobs_filters:
@@ -291,10 +303,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20240805-37a08f946
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20240805-37a08f946
-        initupload: gcr.io/k8s-prow/initupload:v20240805-37a08f946
-        sidecar: gcr.io/k8s-prow/sidecar:v20240805-37a08f946
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20241017-573cf9adb
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20241017-573cf9adb
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20241017-573cf9adb
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20241017-573cf9adb
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -468,7 +480,11 @@ push_gateway:
   serve_metrics: false
 scheduler:
   enabled: true
-  failover: {}
+  external:
+    cache:
+      cleanup_interval: 1h0m0s
+      entry_timeout_interval: 10m0s
+    url: http://prowjob-dispatcher.ci.svc.cluster.local:8080
 sinker:
   max_pod_age: 6h0m0s
   max_prowjob_age: 24h0m0s
@@ -520,6 +536,8 @@ tide:
           podman:
             required-contexts:
             - Total Success
+            skip-unknown-contexts: true
+          podman-machine-os:
             skip-unknown-contexts: true
           podman-py:
             skip-unknown-contexts: true

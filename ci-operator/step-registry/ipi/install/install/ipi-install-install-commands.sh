@@ -101,13 +101,15 @@ function set-cluster-version-spec-update-service() {
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
+
+  current_time=$(date +%s)
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
 
   # terraform may not exist now
   if [ -f "${dir}/terraform.txt" ]; then
@@ -116,7 +118,7 @@ function populate_artifact_dir() {
       s/X-Auth-Token.*/X-Auth-Token REDACTED/;
       s/UserData:.*,/UserData: REDACTED,/;
       ' "${dir}/terraform.txt"
-    tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-${current_time}.tar.gz" --remove-files "${dir}/terraform.txt"
   fi
   case "${CLUSTER_TYPE}" in
     alibabacloud)
@@ -127,8 +129,8 @@ function populate_artifact_dir() {
   # Copy CAPI-generated artifacts if they exist
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
-    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
-    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
   fi
 }
 
@@ -598,6 +600,9 @@ gcp)
     if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+    elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
     elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
@@ -673,6 +678,22 @@ aws|aws-arm64|aws-usgov)
       inject_spot_instance_config "${dir}" "masters"
     fi
     ;;
+vsphere*)
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+apiVersion: samples.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  architectures:
+  - x86_64
+  skippedImagestreams:
+  - openliberty
+EOF
+    fi
+    ;;
 esac
 
 set-cluster-version-spec-update-service
@@ -746,7 +767,7 @@ do
   echo "Install attempt $tries of $max"
   if [ $tries -gt 1 ]; then
     write_install_status
-    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+    populate_artifact_dir
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"

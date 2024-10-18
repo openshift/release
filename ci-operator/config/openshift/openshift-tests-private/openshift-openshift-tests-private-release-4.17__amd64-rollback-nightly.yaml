@@ -12,9 +12,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -41,7 +45,7 @@ releases:
     release:
       architecture: amd64
       channel: candidate
-      version: 4.17.0-rc.0
+      version: 4.17.0-rc.1
   target:
     candidate:
       architecture: amd64
@@ -88,6 +92,15 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift-rollback
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: azure-aks-hypershift-byo-vnet-replace-guest-f7
+  cron: 4 2 4,11,18,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-rollback
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-upi-f7
   cron: 39 21 2,10,17,24 * *
   steps:

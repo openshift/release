@@ -1,4 +1,8 @@
 base_images:
+  assisted-service-scripts:
+    name: ocm-2.11
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -8,9 +12,9 @@ base_images:
     namespace: ci
     tag: v1.46.0
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
@@ -233,16 +237,6 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
-- always_run: false
-  as: e2e-aws-ovn-ipsec-serial
-  optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-    workflow: openshift-e2e-aws-ovn-ipsec-serial
-  timeout: 6h0m0s
 - as: e2e-aws-csi
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -474,6 +468,50 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-agent-connected-ovn-ipv4-metal3
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-metal3-conformance
+- always_run: false
+  as: e2e-agent-connected-ovn-dualstack-metal3
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-metal3-conformance
+- always_run: false
+  as: e2e-agent-disconnected-ovn-dualstack-metal3
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MIRROR_IMAGES=true
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-agent-disconnected-conformance
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

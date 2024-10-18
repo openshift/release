@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -58,17 +58,13 @@ update:
 	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
-	$(MAKE) template-allowlist
 	$(MAKE) release-controllers
-
-template-allowlist:
-	VOLUME_MOUNT_FLAGS="${VOLUME_MOUNT_FLAGS}" ./hack/generate-template-allowlist.sh
 
 release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240805-37a08f946 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20241017-573cf9adb --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -272,9 +268,21 @@ build_farm_credentials_folder:
 	oc --context app.ci -n ci extract secret/config-updater --to=$(build_farm_credentials_folder) --confirm
 .PHONY: build_farm_credentials_folder
 
-update-ci-build-clusters:
+cluster_install_yaml?= /tmp/cluster-install.yaml
+
+cluster-install-yaml: build_farm_credentials_folder
+	printf 'onboard:\n  releaseRepo: %s\n  kubeconfigDir: %s\n  kubeconfigSuffix: config\n' "/release" "$(build_farm_credentials_folder)" >$(cluster_install_yaml)
+.PHONY: cluster-install-yaml
+
+update-ci-build-clusters: cluster-install-yaml
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_cluster-init_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_cluster-init_latest --release-repo=/release --create-pr=false --update=true
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm \
+		-v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(cluster_install_yaml):/etc/cluster-install.yaml$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(build_farm_credentials_folder):$(build_farm_credentials_folder)$(VOLUME_MOUNT_FLAGS)" \
+		quay.io/openshift/ci-public:ci_cluster-init_latest \
+		onboard config generate \
+		--cluster-install=/etc/cluster-install.yaml --create-pr=false --update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:
@@ -456,16 +464,16 @@ generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment: 
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} quay.io/openshift/ci-public:ci_hypershift-cli_${TAG}
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
 	$(CONTAINER_ENGINE) run $(CONTAINER_USER) ${CONTAINER_ENGINE_OPTS} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
-		quay.io/openshift/ci-public:ci_hypershift-cli_${TAG} \
+		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=quay.io/openshift/ci-public:ci_hypershift-cli_${TAG} \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/SS_hypershift-install.yaml
 .PHONY: generate-hypershift-deployment

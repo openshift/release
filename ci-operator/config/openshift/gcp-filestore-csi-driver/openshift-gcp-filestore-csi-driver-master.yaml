@@ -3,26 +3,26 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: make
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: gcp-filestore-csi-driver
 promotion:
   to:
@@ -55,6 +55,11 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: e2e-gcp-csi-c3
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
 - always_run: false
   as: security
   optional: true
