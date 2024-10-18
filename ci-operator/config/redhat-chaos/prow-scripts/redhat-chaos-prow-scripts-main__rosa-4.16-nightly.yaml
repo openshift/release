@@ -19,13 +19,13 @@ build_root:
 images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
-  to: cerberus-prow-rosa-415
+  to: cerberus-main-prow-rosa-416
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -38,18 +38,25 @@ tests:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "False"
       ENABLE_AUTOSCALING: "false"
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "4"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.16"
+      PROFILE_TYPE: reporting
       REPLICAS: "3"
-      TELEMETRY_GROUP: prow-rosa-hcp-4.15
+      TELEMETRY_GROUP: prow-rosa-4.16
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
-    - chain: redhat-chaos-krkn-hub-tests
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-ovn-disruption
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
     workflow: rosa-aws-sts
-- as: krkn-tests-rosa-hog
+- as: krkn-tests-rosa-node
   cron: 0 4 5,19 * *
   steps:
     cluster_profile: aws-qe
@@ -57,15 +64,19 @@ tests:
       CHANNEL_GROUP: nightly
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.16"
       REPLICAS: "3"
-      TELEMETRY_GROUP: prow-rosa-hcp-4.15
+      TELEMETRY_GROUP: prow-rosa-4.16
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
-    - chain: redhat-chaos-hog-scenarios
+    - chain: redhat-chaos-krkn-hub-cluster-disruption
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-service-disruption-etcd
     workflow: rosa-aws-sts
+  timeout: 6h0m0s
 - as: krkn-tests-rosa-hcp
   cron: 0 1 6,20 * *
   steps:
@@ -81,7 +92,7 @@ tests:
       HOSTED_CP: "true"
       ITERATION_MULTIPLIER_ENV: "4"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.16"
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       ZONES_COUNT: "3"
@@ -90,12 +101,12 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
-    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
     - ref: redhat-chaos-pod-scenarios-random-system-pods
-    - ref: redhat-chaos-service-disruption-regex
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
-- as: krkn-rosa-hcp-hog
+- as: krkn-rosa-hcp-node
   cron: 0 4 6,20 * *
   steps:
     allow_skip_on_success: true
@@ -107,7 +118,7 @@ tests:
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.16"
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       ZONES_COUNT: "3"
@@ -115,33 +126,14 @@ tests:
       enable:
       - redhat-chaos-cerberus
     test:
-    - chain: redhat-chaos-hog-scenarios
+    - chain: redhat-chaos-krkn-hub-cluster-disruption
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-service-disruption-etcd
     workflow: rosa-aws-sts-hcp
-  timeout: 5h0m0s
-- always_run: false
-  as: krkn-tests-rosa-infra
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    env:
-      CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m5.xlarge
-      DISABLE_WORKLOAD_MONITORING: "false"
-      ENABLE_AUTOSCALING: "false"
-      MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
-      READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "3"
-      TELEMETRY_GROUP: prow-rosa-4.16
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-    test:
-    - ref: redhat-chaos-node-disruptions-infra-outage
-    workflow: rosa-aws-sts
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: prow-scripts
-  variant: rosa-4.15-nightly
+  variant: rosa-4.16-nightly
