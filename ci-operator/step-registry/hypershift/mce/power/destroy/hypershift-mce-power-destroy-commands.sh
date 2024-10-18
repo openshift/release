@@ -7,7 +7,7 @@ set +e
 HOSTED_CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 
 # PowerVS VSI(Virtual Server Instance) configs
-POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
+POWERVS_VSI_NAME="power-${HOSTED_CLUSTER_NAME}-worker"
 
 # Installing required tools
 mkdir /tmp/bin
@@ -26,6 +26,13 @@ ibmcloud plugin install power-iaas
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
+if [[ -z "${POWERVS_INSTANCE_CRN}" ]]; then
+      if [ ${IS_HETEROGENEOUS} == "yes" ]; then
+        POWERVS_INSTANCE_CRN=$(jq -r '.powervsInstanceCRN' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
+      else
+        POWERVS_INSTANCE_CRN=$(jq -r '.powervsInstanceCRN' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+      fi
+fi
 ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
 ibmcloud cis instance-set ${CIS_INSTANCE}
 
