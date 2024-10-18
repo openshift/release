@@ -147,7 +147,8 @@ then
     export CLUSTER_ID
 fi
 
-# configure environment for different cluster
+sleep 28800
+# configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 gcp)
