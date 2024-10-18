@@ -248,4 +248,11 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.4)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+
+# extract the exact version of the MCE CSV
+MCE_CSV_VERSION=${CSVName##*.v}
+if printf '%s\n' "$MCE_CSV_VERSION" "2.5.7" | sort -V | head -n 1 | grep -qv "$MCE_CSV_VERSION"
+then
+  /tmp/${HYPERSHIFT_NAME} version
+else /tmp/${HYPERSHIFT_NAME} --version
+fi
