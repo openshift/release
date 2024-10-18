@@ -437,6 +437,9 @@ CONFIG = {
     },
     'aro-redhat-tenant-quota-slice': {
         'default': 1,
+    },
+    'aws-ovn-perfscale-quota-slice': {
+        'us-west-2': 4,
     }
 }
 
