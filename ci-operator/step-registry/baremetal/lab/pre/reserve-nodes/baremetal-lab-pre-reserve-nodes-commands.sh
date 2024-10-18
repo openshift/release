@@ -43,7 +43,7 @@ echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
 echo "Copying the env to the bastion host"
 scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
 
-echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers, ${VENDOR} vendor ) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
   "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
