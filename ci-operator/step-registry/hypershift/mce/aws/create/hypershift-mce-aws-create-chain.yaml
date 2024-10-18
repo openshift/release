@@ -86,6 +86,13 @@ chain:
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
           sleep 60
         fi
+        
+        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )); then
+          while read -r name _ _ _; do
+            oc adm taint node "$name" taint-test=Exists:NoSchedule
+          done < <(oc get node --no-headers)
+          EXTRA_ARGS="${EXTRA_ARGS} --toleration=key=taint-test,operator=Exists,effect=NoSchedule"
+        fi
       
         /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
