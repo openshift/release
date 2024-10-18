@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
 build_root:
@@ -11,16 +11,12 @@ build_root:
 images:
 - dockerfile_path: dast/Dockerfile
   to: ocp-qe-ci-dast
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -28,7 +24,7 @@ resources:
       memory: 200Mi
 tests:
 - as: security-first-half
-  cron: 0 16 3 * *
+  cron: 0 16 */21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -60,7 +56,7 @@ tests:
     - ref: openshift-qe-ocpqe-security-tools-dast
   timeout: 1h0m0s
 - as: security-second-half
-  cron: 0 5 4 * *
+  cron: 0 5 */21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -86,4 +82,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocpqe-security-tools
-  variant: dast
+  variant: dast-418
