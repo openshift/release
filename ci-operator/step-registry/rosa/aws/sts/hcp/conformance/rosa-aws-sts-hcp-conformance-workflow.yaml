@@ -1,0 +1,16 @@
+workflow:
+  as: rosa-aws-sts-hcp-conformance
+  steps:
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "release:latest"
+    pre:
+    - chain: rosa-aws-sts-hcp-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: rosa-aws-sts-hcp-deprovision
+  documentation: |-
+    This workflow installs a rosa HCP cluster and performs openshift-tests conformance testing.
