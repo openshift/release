@@ -74,11 +74,10 @@ function updateTestConfig(){
   ocp_console=$(oc whoami --show-console)
   rhods_dashboard="https://$(oc get route rhods-dashboard -n redhat-ods-applications -o jsonpath='{.spec.host}{"\n"}')"
   api_server=$(oc whoami --show-server)
-  prom_server="https://$(oc get route prometheus -n redhat-ods-monitoring -o jsonpath='{.spec.host}{"\n"}')" || true
-  prom_token="$(oc create token prometheus -n redhat-ods-monitoring --duration 6h)" || true
-
-  echo "prom_server: ${prom_server}" || true
-  echo "prom_token: ${prom_token}" || true
+  #prom_server="https://$(oc get route prometheus -n redhat-ods-monitoring -o jsonpath='{.spec.host}{"\n"}')" || true
+  #prom_token="$(oc create token prometheus -n redhat-ods-monitoring --duration 6h)" || true
+  #echo "prom_server: ${prom_server}" || true
+  #echo "prom_token: ${prom_token}" || true
   ldap_pw=rhodsPW#1
 
   export api_server
@@ -116,13 +115,11 @@ function updateTestConfig(){
   #yq -i '.RHODS_PROMETHEUS_TOKEN=env(prom_token)' test-variables.yml
 }
 
-echo "Starting to generate Test Config File..."
-
 echo "Create Htpasswd Admin User in OCP cluster"
-#createHtpasswdIDP
+createHtpasswdIDP
 
 echo "Create IDP"
-#createIDP
+createIDP
 
 echo "Update local test-variables.yml"
 updateTestConfig
