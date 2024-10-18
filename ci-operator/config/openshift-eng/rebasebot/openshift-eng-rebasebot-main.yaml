@@ -464,6 +464,33 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: nmstate-console-plugin
+  cron: 30 5 * * 1-5
+  steps:
+    test:
+    - as: nmstate-console-plugin
+      commands: |
+        rebasebot --source https://github.com/nmstate/nmstate-console-plugin:main \
+                  --dest openshift/nmstate-console-plugin:main \
+                  --rebase nmstate/nmstate-console-plugin:rebase-bot-master \
+                  --github-app-id 855969 \
+                  --github-app-key /secrets/networking-console-plugin/private-key \
+                  --github-cloner-id 855969 \
+                  --github-cloner-key /secrets/networking-console-plugin/private-key \
+                  --git-username cnv-ui-cloner \
+                  --git-email cnv-ui-cloner@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/networking-console-plugin
+        name: cnv-ui-cloner-private-key
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: tempo-operator
   cron: 0 23 * * 1-5
   steps:
