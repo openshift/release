@@ -18,9 +18,9 @@ spec:
   restartPolicy: Never
   containers:
   - name: run-nfd
-    image: quay.io/ocp-edge-qe/eco-gotests:latest
+     image: quay.io/rh_ee_ggordani/eco-go:latest
     command: [ "/bin/bash", "-c", "--" ]
-    args: [ "scripts/test-runner.sh && sleep 500" ]
+    args: [ "scripts/test-runner.sh && sleep 300" ]
     env:
     - name: KUBECONFIG
       value: "/kubeconfig/kubeconfig"
@@ -71,8 +71,9 @@ spec:
 EOF
 
 echo "Check pod status"
-oc wait --for=condition=ContainersReady=true pod/testpod --timeout=300s
+oc wait --for=condition=ContainersReady=true pod/testpod --timeout=500s
 oc get pod testpod
+
 
 while : ; do
   oc exec testpod -- ls /home/testuser/reports > /tmp/Files

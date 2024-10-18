@@ -1,0 +1,77 @@
+base_images:
+  ci-artifacts:
+    name: master
+    namespace: psap
+    tag: ci-artifacts
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: nfd-e2e-master-aws-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "nfd-tests-e2e", "failure_type": "all", "classification": "PQE test failure", "jira_project": "OCPBUGS", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+             ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","rosa-hypershift-lp","nfd-lp"]'
+      FIREWATCH_DEFAULT_JIRA_AFFECTS_VERSION: "4.17"
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ggordani@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.17"
+      OPERATORS: |
+        [
+            {"name": "nfd", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-nfd", "target_namespaces": "openshift-nfd", "operator_group":"openshift-nfd"}
+        ]
+      REGION: us-west-2
+    test:
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: nfd-tests-e2e
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: cluster-nfd-operator
+  variant: ocp4.17-lp-rosa-hypershift
