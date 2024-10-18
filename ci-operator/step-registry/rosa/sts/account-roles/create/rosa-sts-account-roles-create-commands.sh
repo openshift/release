@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -78,6 +79,7 @@ if [[ ! -z "$PERMISSIONS_BOUNDARY" ]]; then
 fi
 
 # Whatever the account roles with the prefix exist or not, do creation.
+echo "rosa -v $(rosa -v)"
 echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
 echo "rosa create account-roles -y --mode auto --prefix ${ACCOUNT_ROLES_PREFIX} ${CLUSTER_SWITCH} ${VERSION_SWITCH} ${ARN_PATH_SWITCH}"
 rosa create account-roles -y --mode auto \
