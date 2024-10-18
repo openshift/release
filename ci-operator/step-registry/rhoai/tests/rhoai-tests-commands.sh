@@ -63,10 +63,8 @@ function createHtpasswdIDP(){
 }
 
 function createIDP(){
-  echo "Clone the ods-install repo"
-  git clone git@gitlab.cee.redhat.com:ods/ods-install.git
-  cd ods-install
-  ./odstest --install-identity-providers
+  echo "Create IDP"
+  cd ods-install && ./odstest --install-identity-providers
 }
 
 function updateTestConfig(){
@@ -125,4 +123,4 @@ echo "Update local test-variables.yml"
 updateTestConfig
 
 # running RHOAI testsuite
-./ods_ci/run_robot_test.sh --skip-install ${RUN_SCRIPT_ARGS} --extra-robot-args "${ROBOT_EXTRA_ARGS}"
+../run_robot_test.sh --skip-install ${RUN_SCRIPT_ARGS} --extra-robot-args "${ROBOT_EXTRA_ARGS}"
