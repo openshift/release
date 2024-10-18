@@ -50,8 +50,26 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:~/jetlag/pull_secret.txt
 
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
 
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} '
+  podman pod stop $(podman pod ps -q) || echo "No podman pods to stop"
+  podman pod rm $(podman pod ps -q)   || echo "No podman pods to delete"
+  podman stop $(podman ps -aq)        || echo "No podman containers to stop"
+  podman rm $(podman ps -aq)          || echo "No podman containers to delete"
+  rm -rf /opt/*
+
+  USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_password")
+  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:] .[].pm_addr")
+  for i in $HOSTS; do
+    badfish -v -H $i -u $USER -p $PWD --racreset
+  done
+  sleep 300
+  for i in $HOSTS; do
+    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml --boot-to-type foreman
+  done'
+
+rm -rf /opt/*
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
