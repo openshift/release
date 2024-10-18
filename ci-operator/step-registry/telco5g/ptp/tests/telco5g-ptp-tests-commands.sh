@@ -230,6 +230,7 @@ cd "$temp_dir" || exit 1
 # deploy ptp
 echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 
+echo "Test Run log for nishant-parekh"
 # build ptp operator and create catalog
 export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:${T5CI_VERSION}
 build_images
