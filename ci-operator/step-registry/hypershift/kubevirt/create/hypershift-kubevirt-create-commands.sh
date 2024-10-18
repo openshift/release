@@ -159,6 +159,10 @@ EOF
   fi
 fi
 
+if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
+fi
+
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # shellcheck disable=SC2086
@@ -171,7 +175,11 @@ echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
   --root-volume-size 64 \
   --release-image "${RELEASE_IMAGE}" \
   --pull-secret "${PULL_SECRET_PATH}" \
-  --generate-ssh
+  --generate-ssh \
+  --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
+  --infra-availability-policy "${INFRA_AVAILABILITY}" \
+  --service-cidr 172.32.0.0/16 \
+  --cluster-cidr 10.136.0.0/14
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then

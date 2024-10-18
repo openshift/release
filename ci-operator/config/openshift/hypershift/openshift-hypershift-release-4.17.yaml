@@ -7,6 +7,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -15,19 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.17_base-rhel9:
@@ -39,9 +38,7 @@ images:
   to: hypershift
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -93,7 +90,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -169,12 +166,13 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+      RHCOS_IMAGE_NAME: rhcos-4.17-hcp-nodepool
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

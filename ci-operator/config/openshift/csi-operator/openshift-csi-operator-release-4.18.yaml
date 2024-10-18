@@ -7,6 +7,14 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: csi-driver-smb-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   livenessprobe-operand:
     name: "4.18"
     namespace: ocp
@@ -133,6 +141,15 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: openstack-cinder-csi-driver-operator
+- dockerfile_path: Dockerfile.openstack-manila
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-driver-manila-operator
 - dockerfile_path: Dockerfile.samba
   inputs:
     ocp_4.17_base-rhel9:
@@ -163,6 +180,9 @@ images:
 - dockerfile_path: Dockerfile.test
   from: src
   to: smb-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: manila-csi-driver-operator-test
 operator:
   bundles:
   - as: smb-csi-driver-operator-bundle
@@ -309,7 +329,7 @@ tests:
     workflow: openshift-e2e-azure-csi-extended
 - as: e2e-openstack
   optional: true
-  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy/openstack-cinder-csi-driver-operator/.*)
+  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*|Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -318,13 +338,18 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-cinder-csi
-  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy/openstack-cinder-csi-driver-operator/.*)
+  run_if_changed: ^(Dockerfile\.openstack-cinder|legacy\/openstack-cinder-csi-driver-operator\/.*)
   steps:
     cluster_profile: openstack-vh-mecha-central
     env:
       TEST_SKIPS: should concurrently access the volume and restored snapshot from
         pods on the same node
     workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-manila-csi
+  run_if_changed: ^(Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
 - as: smb-operator-e2e
   optional: true
   steps:
@@ -332,7 +357,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-smb-csi-driver-operator-bundle
     env:
-      OO_CHANNEL: preview
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: smb-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -344,7 +369,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-smb-csi-driver-operator-bundle
     env:
-      OO_CHANNEL: preview
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: smb-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'

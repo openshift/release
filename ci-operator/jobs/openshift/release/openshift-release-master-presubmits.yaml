@@ -315,7 +315,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20240830-e645268
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20240926-c51c4d9
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -346,41 +346,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/build-clusters
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-clusters
-    rerun_command: /test build-clusters
-    spec:
-      containers:
-      - args:
-        - ./
-        - /etc/build-farm-credentials
-        - config
-        command:
-        - hack/validate-ci-build-clusters.sh
-        image: registry.ci.openshift.org/ci/cluster-init:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          secretName: cluster-init
-    trigger: ((?m)^/test build-clusters,?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -972,7 +937,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20240917-0ac691ea5
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20241017-573cf9adb
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1042,31 +1007,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )core-valid,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/deprecate-templates
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-deprecate-templates
-    rerun_command: /test deprecate-templates
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-template-deprecation.sh
-        image: registry.ci.openshift.org/ci/template-deprecator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )deprecate-templates,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

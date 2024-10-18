@@ -429,6 +429,16 @@ echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
+# reportedly even the above is not enough for etcd which can still require time to stabilize and rotate certs.
+# wait longer if the new command is available, but it won't be present in past releases.
+echo "$(date) - waiting for oc adm wait-for-stable-cluster..."
+if oc adm wait-for-stable-cluster --minimum-stable-period 2m &>/dev/null; then
+	echo "$(date) - oc adm reports cluster is stable."
+else
+	echo "$(date) - oc adm wait-for-stable-cluster is not available in this release"
+fi
+
+
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 count=1
 while :

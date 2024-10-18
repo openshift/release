@@ -152,6 +152,20 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-ibmcloud-operator
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-ibmcloud
 - as: e2e-aws-operator-techpreview
   optional: true
   steps:
@@ -167,6 +181,24 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-openstack-operator
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      NETWORK_TYPE: OVNKubernetes
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

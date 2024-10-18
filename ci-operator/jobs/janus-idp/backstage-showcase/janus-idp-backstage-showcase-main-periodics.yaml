@@ -74,6 +74,79 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: janus-idp
+    repo: backstage-showcase
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-aks
+  reporter_config:
+    slack:
+      channel: '#rhdh-e2e-test-alerts'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+        :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*. Open
+        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-aks/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-aks/janus-idp-backstage-showcase-helm-aks-nightly/artifacts/showcase-aks-ci-nightly/index.html|nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-aks/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-aks/janus-idp-backstage-showcase-helm-aks-nightly/artifacts/showcase-rbac-aks-ci-nightly/index.html|rbac-nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-aks/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-aks/janus-idp-backstage-showcase-helm-aks-nightly/artifacts/|Open
+        artifacts> | <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-tests-nightly-aks
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   cron: 0 3 * * *
   decorate: true
   decoration_config:
@@ -85,7 +158,7 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-13
+  name: periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14
   reporter_config:
     slack:
       channel: '#rhdh-e2e-test-alerts'
@@ -95,9 +168,9 @@ periodics:
       - error
       report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
         :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*. Open
-        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-13/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-13/janus-idp-backstage-showcase-nightly/artifacts/showcase-ci-nightly/index.html|nightly>
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-13/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-13/janus-idp-backstage-showcase-nightly/artifacts/showcase-rbac-nightly/index.html|rbac-nightly>
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-13/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-13/janus-idp-backstage-showcase-nightly/artifacts/|Open
+        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/showcase-ci-nightly/index.html|nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/showcase-rbac-nightly/index.html|rbac-nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/|Open
         artifacts> | <{{.Status.URL}}|View logs>'
   spec:
     containers:
@@ -106,7 +179,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-tests-nightly-ocp-v4-13
+      - --target=e2e-tests-nightly-ocp-v4-14
       command:
       - ci-operator
       image: ci-operator:latest
@@ -158,7 +231,7 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14
+  name: periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-15
   reporter_config:
     slack:
       channel: '#rhdh-e2e-test-alerts'
@@ -168,9 +241,9 @@ periodics:
       - error
       report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
         :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*. Open
-        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/showcase-ci-nightly/index.html|nightly>
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/showcase-rbac-nightly/index.html|rbac-nightly>
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-14/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-14/janus-idp-backstage-showcase-nightly/artifacts/|Open
+        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-15/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-15/janus-idp-backstage-showcase-nightly/artifacts/showcase-ci-nightly/index.html|nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-15/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-15/janus-idp-backstage-showcase-nightly/artifacts/showcase-rbac-nightly/index.html|rbac-nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-main-e2e-tests-nightly-ocp-v4-15/{{.Status.BuildID}}/artifacts/e2e-tests-nightly-ocp-v4-15/janus-idp-backstage-showcase-nightly/artifacts/|Open
         artifacts> | <{{.Status.URL}}|View logs>'
   spec:
     containers:
@@ -179,7 +252,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-tests-nightly-ocp-v4-14
+      - --target=e2e-tests-nightly-ocp-v4-15
       command:
       - ci-operator
       image: ci-operator:latest

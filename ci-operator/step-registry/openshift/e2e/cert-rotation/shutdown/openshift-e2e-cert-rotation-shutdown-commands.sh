@@ -94,17 +94,18 @@ set -x
 # Check that time on nodes has been updated
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
 
+pod-restart-workarounds
+
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 wait-for-nodes-to-be-ready
 
 # Wait for kube-apiserver operator to generate new lb-ext kubeconfig
 wait-for-valid-lb-ext-kubeconfig
 
-pod-restart-workarounds
+# Wait for kube-apiserver to become Progressing to avoid stale operator status
+wait-for-kubeapiserver-to-start-progressing
 
-# Additional sleep for operators to start updating their status
-sleep 300
-
+# Wait for operators to finish updates
 wait-for-operators-to-stabilize
 EOF
 chmod +x "${SHARED_DIR}"/time-skew-test.sh
