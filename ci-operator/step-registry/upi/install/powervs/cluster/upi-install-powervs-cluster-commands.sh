@@ -242,8 +242,8 @@ function configure_terraform() {
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
     echo "IC: Setup the keys"
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa.pub
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa.pub
     chmod 0600 "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
 
     echo "IC: domain and cis update"
@@ -305,12 +305,29 @@ EOF
 
 # Builds the cluster based on the set configuration / tfvars
 function build_upi_cluster() {
+    OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
     cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init && \
         "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -auto-approve \
             -var-file "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate
+            -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate \
+            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done || true
 
     if [ ! -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate ]
     then
