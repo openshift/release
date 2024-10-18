@@ -41,7 +41,8 @@ EOF
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" != *bootstrap-* ]] || [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
+  if [[ "${name}" != *bootstrap* ]]; then
+  if [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
     ADAPTED_YAML="
   role: ${name%%-[0-9]*}"
   else
@@ -108,6 +109,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
       "$SHARED_DIR/$CONFIG_FILE" - <<< "$ADAPTED_YAML"
+  fi
 done
 
 else
