@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
+
 function run_command_oc() {
     local try=0 max=40 ret_val
 
