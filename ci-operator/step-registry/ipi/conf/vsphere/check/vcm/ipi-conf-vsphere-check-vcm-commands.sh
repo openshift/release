@@ -262,9 +262,9 @@ for POOL in "${pools[@]}"; do
   networks_number=1
   if [[ -n "${VSPHERE_MULTI_NETWORKS}" ]]; then
     # seems only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, other pending create lease
-    if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    # if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
       networks_number=2
-    fi
+    # fi
   fi
 
   # shellcheck disable=SC1078
@@ -307,6 +307,8 @@ if [ "$n" -ge 5 ]; then
 fi
 
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
+
+sleep 3600
 
 declare -A vcenter_portgroups
 declare -A vcenter_portgroups_2
@@ -558,3 +560,6 @@ done
 log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+
+
+cat "${SHARED_DIR}"/platform.yaml
