@@ -38,9 +38,12 @@ ref:
     default: "3"
     documentation: |-
       The number of compute/worker nodes to create for the cluster.
-      Valid values include: 0, 1, 2, 3, 4, 5
-      Higher values than 5 will set 5 compute/worker nodes.
+      If SIZE_VARIANT is set to "compact", this is ignored and no workers are created.
       (default: 3)
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      The number of control plane nodes to create for the cluster. Useful for SNO cluster provision.
   - name: COMPUTE_NODE_ROOTVOLUME_SIZE
     default: "300"
     documentation: |-
@@ -51,11 +54,26 @@ ref:
     default: "amd64"
     documentation: |-
       The architecture of the control plane nodes (e.g., amd64, arm64).
-
+  - name: USER_TAGS
+    default: ""
+    documentation: |-
+      Add '${KEY} ${VALUE}\n' lines to declare additional user tags for the cluster.  For example 'keyA valueA\nkeyB valueB\n', but with actual newlines.
+  - name: PROPAGATE_USER_TAGS
+    default: ""
+    documentation: |-
+      Enable platform.aws.propagateUserTags
   - name: ZONES_COUNT
     default: "2"
     documentation: |-
       The number of Availability Zones to present in the cluster. This depends on the selected region.
+  - name: AWS_EDGE_POOL_ENABLED
+    default: ""
+    documentation: |-
+      Enable the edge compute pool deployment in AWS to deploy nodes in AWS Local Zones.
+  - name: ADD_ZONES
+    default: "yes"
+    documentation: |-
+      Add AZs to the install-config.yaml
   - name: BASE_DOMAIN
     default: "origin-ci-int-aws.dev.rhcloud.com"
     documentation: |-
@@ -72,6 +90,17 @@ ref:
       * "" (default) - corresponds to "Optional" behaviour. 
       * "Required" - sets IMDSv2 to Required for all machines in install-config, metadata service is not accessible without auth procedure.
       * "Optional" - auth procedure on metadata service is optional
-
+  - name: COMPUTE_ARCH
+    default: "amd64"
+    documentation: |-
+      Compute node architecture specification.  Used for multiarch compute clusters.
+  - name: CONTROL_ARCH
+    default: "amd64"
+    documentation: |-
+      Control plane node architecture specification.  Used for multiarch compute clusters.
+  - name: PRESERVE_BOOTSTRAP_IGNITION
+    default: ""
+    documentation: |-
+      Allow users to make S3 deletion optional
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.
