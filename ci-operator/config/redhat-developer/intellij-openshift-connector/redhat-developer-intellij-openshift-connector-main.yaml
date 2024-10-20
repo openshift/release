@@ -3,16 +3,12 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/ubi
       RUN yum install -y java-17-openjdk-devel git
-      RUN mkdir /tmp/work
-      RUN chmod +777 /tmp/work
-      RUN chmod ugo+rwx /tmp/work
-      RUN export GRADLE_USER_HOME=/tmp/work
 releases:
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.13"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -27,9 +23,13 @@ tests:
     test:
     - as: e2e
       commands: |
-        chmod ugo+rwx ./gradlew
-        echo $GRADLE_USER_HOME
-        ./gradlew integrationTest -Dgradle.user.home=/tmp/work --no-daemon
+        export GRADLE_USER_HOME=/var/tmp
+        sha256sum gradle/wrapper/gradle-wrapper.jar
+        curl -s --location --output gradle-wrapper.jar.sha256 https://services.gradle.org/distributions/gradle-8.5-wrapper.jar.sha256
+        echo " gradle/wrapper/gradle-wrapper.jar" >> gradle-wrapper.jar.sha256
+        sha256sum --check gradle-wrapper.jar.sha256
+        echo "Running gradle build"
+        NO_FS_ROOTS_ACCESS_CHECK=true ./gradlew integrationTest --no-daemon -Dplugin.verifier.home.dir=/var/tmp/ides -Dtools.dl.path=/var/tmp/tools
       from: src
       resources:
         requests:
