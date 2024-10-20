@@ -60,6 +60,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: baremetalds-ipi-ovn-f28
+  cron: 54 23 13 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_INTERMEDIATE413
+        name: release:intermediate413
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: vsphere-upi-f28
   cron: 44 15 8 * *
   steps:
