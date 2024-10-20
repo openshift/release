@@ -38,5 +38,6 @@ fi
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
   info 'INFO: Patching etcd cluster operator...'
   oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+  sleep 60 # Waiting time to apply the patch
   wait_for_etcd_patch_done
 fi
