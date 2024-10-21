@@ -144,7 +144,7 @@ resource "aws_instance" "quaybuilder" {
       "echo ${OMR_IMAGE_TAG}",
       "echo ${OMR_RELEASED_TEST}",
       "if [ ${OMR_RELEASED_TEST} = false ]; then podman cp \$(podman create --rm ${OMR_IMAGE_TAG}):/mirror-registry.tar.gz .; fi",
-      "if [ ${OMR_RELEASED_TEST} = true ]; then curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12; fi",
+      "if [ ${OMR_RELEASED_TEST} = true ]; then curl -L -o mirror-registry.tar.gz https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz --retry 12; fi",
       "tar -xzvf mirror-registry.tar.gz",
       "./mirror-registry --version",
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
