@@ -111,6 +111,7 @@ tests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
 - as: e2e-bundle-aws
+  run_if_changed: ^(config|bundle)
   steps:
     cluster_profile: aws
     test:
@@ -140,21 +141,36 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-bundle-aws-upgrade
+  run_if_changed: ^(config|bundle)
   steps:
     cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-file-integrity-operator-bundle
-    env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: file-integrity
-      OO_LATEST_CSV: file-integrity-operator.v1.3.0
-      OO_PACKAGE: file-integrity-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: test-bundle-upgrade
+    - as: install
       cli: latest
-      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
-        make e2e
+      commands: |
+        oc create namespace openshift-file-integrity
+        operator-sdk run bundle --security-context-config restricted -n openshift-file-integrity quay.io/file-integrity-operator/file-integrity-operator-bundle:latest
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config restricted -n openshift-file-integrity "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: file-integrity-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
       dependencies:
       - env: IMAGE_FROM_CI
         name: file-integrity-operator
@@ -162,7 +178,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws-upgrade
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
