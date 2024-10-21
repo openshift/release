@@ -1,21 +1,23 @@
 ref:
   as: wait
-  from: src
+  from: cli
   grace_period: 10s
   timeout: 72h0m0s
   env:
-  - name: PR_DEBUG_MODE_TIMEOUT
-    default: "+30 min"
+  - name: TIMEOUT
+    default: "+3 hours"
     documentation: |-
       Set the amount of time, the step must wait at most, before unconditionally forcing the workflow to continue
-      with the next steps (MIN: "1 min", default: "30 min", MAX: "72 hours").
+      with the next steps (MIN: "1 min", default: "+3 hours", MAX: "72 hours").
+  - name: PR_ONLY
+    default: "false"
+    documentation: |-
+      Only wait when running a presubmit. Default: false (wait always).
   commands: wait-commands.sh
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: |-
-    This step allows users to set a sleep duration for their workflows. 
-    It differs from the clusterbot-wait one as per the longer timeout allowed. 
-    It is to be used for workflows requiring time-intensive manual debugging as manual QE tests ceremonies.
-    It only works if you are in a Pull-Request.
+    This step allows jobs to stop until a timeout is reached.
+    By default it waits for 3 hours in any job. Users can configure it to run only in presubmits.

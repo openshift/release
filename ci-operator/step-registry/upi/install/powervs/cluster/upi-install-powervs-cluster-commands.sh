@@ -7,6 +7,52 @@ set -o nounset
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
+############################################################
+# Set PowerVS and VPC Zone and Region  
+POWERVS_ZONE="${LEASED_RESOURCE}"
+POWERVS_REGION=$(
+        case "$POWERVS_ZONE" in
+            ("dal10" | "dal12") echo "dal" ;;
+            ("us-south") echo "us-south" ;;
+            ("wdc06" | "wdc07") echo "wdc" ;;
+            ("us-east") echo "us-east" ;;
+            ("sao01" | "sao04") echo "sao" ;;
+            ("tor01") echo "tor" ;;
+            ("mon01") echo "mon" ;;
+            ("eu-de-1" | "eu-de-2") echo "eu-de" ;;
+            ("lon04" | "lon06") echo "lon" ;;
+            ("mad02" | "mad04") echo "mad" ;;
+            ("syd04" | "syd05") echo "syd" ;;
+            ("tok04") echo "tok" ;;
+            ("osa21") echo "osa" ;;
+            (*) echo "$POWERVS_ZONE" ;;
+        esac)
+
+VPC_REGION=$(
+        case "$POWERVS_ZONE" in
+            ("dal10" | "dal12" | "us-south") echo "us-south" ;;
+            ("wdc06" | "wdc07" | "us-east") echo "us-east" ;;
+            ("sao01" | "sao04") echo "br-sao" ;;
+            ("tor01") echo "ca-tor" ;;
+            ("mon01") echo "ca-mon" ;;
+            ("eu-de-1" | "eu-de-2") echo "eu-de" ;;
+            ("lon04" | "lon06") echo "eu-gb" ;;
+            ("mad02" | "mad04") echo "eu-es" ;;
+            ("syd04" | "syd05") echo "au-syd" ;;
+            ("tok04") echo "jp-tok" ;;
+            ("osa21") echo "jp-osa" ;;
+            (*) echo "$POWERVS_ZONE" ;;
+        esac)
+VPC_ZONE="${VPC_REGION}-1"
+echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
+echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
+echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
+echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
+export POWERVS_REGION
+export POWERVS_ZONE
+export VPC_REGION
+export VPC_ZONE
+
 # PATH Override
 export PATH="${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/:"${PATH}"
 
@@ -79,6 +125,7 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # Download automation code
@@ -122,10 +169,9 @@ function fix_user_permissions() {
 #   COS: bucket, objects
 function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
-    workspace_name=
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+    for CRN in $(ic pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
         echo "Targetting power cloud instance"
         ic pi workspace target "${CRN}"
@@ -154,10 +200,10 @@ function cleanup_prior() {
     # VPC LBs
     # TODO: FIXME - need to be selective so as not to blow out other workflows being run
     echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for RESOURCE_TGT in $(ic is subnets --output json | jq -r '.[].id')
+    ic target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+    for SUB in $(ic is subnets --output json | jq -r '.[].id')
     do
-        VALID_SUB=$(ic is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
+        VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
         if [ -n "${VALID_SUB}" ]
         then
             # Searches the VSIs and LBs to delete them
@@ -178,7 +224,7 @@ function cleanup_prior() {
     # TODO: FIXME add filtering by date.... ?
     for RESOURCE_TGT in $(ic is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
     do
-        ibmcloud is image-delete "${}"
+        ic is image-delete "${RESOURCE_TGT}" -f
     done
 
     echo "Done cleaning up prior runs"
@@ -186,50 +232,6 @@ function cleanup_prior() {
 
 # creates the var file
 function configure_terraform() {
-    POWERVS_ZONE="${LEASED_RESOURCE}"
-    POWERVS_REGION=$(
-            case "$POWERVS_ZONE" in
-                ("dal10" | "dal12") echo "dal" ;;
-                ("us-south") echo "us-south" ;;
-                ("wdc06" | "wdc07") echo "wdc" ;;
-                ("us-east") echo "us-east" ;;
-                ("sao01" | "sao04") echo "sao" ;;
-                ("tor01") echo "tor" ;;
-                ("mon01") echo "mon" ;;
-                ("eu-de-1" | "eu-de-2") echo "eu-de" ;;
-                ("lon04" | "lon06") echo "lon" ;;
-                ("mad02" | "mad04") echo "mad" ;;
-                ("syd04" | "syd05") echo "syd" ;;
-                ("tok04") echo "tok" ;;
-                ("osa21") echo "osa" ;;
-                (*) echo "$POWERVS_ZONE" ;;
-            esac)
-
-    VPC_REGION=$(
-            case "$POWERVS_ZONE" in
-                ("dal10" | "dal12" | "us-south") echo "us-south" ;;
-                ("wdc06" | "wdc07" | "us-east") echo "us-east" ;;
-                ("sao01" | "sao04") echo "br-sao" ;;
-                ("tor01") echo "ca-tor" ;;
-                ("mon01") echo "ca-mon" ;;
-                ("eu-de-1" | "eu-de-2") echo "eu-de" ;;
-                ("lon04" | "lon06") echo "eu-gb" ;;
-                ("mad02" | "mad04") echo "eu-es" ;;
-                ("syd04" | "syd05") echo "au-syd" ;;
-                ("tok04") echo "jp-tok" ;;
-                ("osa21") echo "jp-osa" ;;
-                (*) echo "$POWERVS_ZONE" ;;
-            esac)
-    VPC_ZONE="${VPC_REGION}-1"
-
-    echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
-    echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
-    echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
-    echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
-    export POWERVS_REGION
-    export POWERVS_ZONE
-    export VPC_REGION
-    export VPC_ZONE
 
     OCP_STREAM="ocp"
     export OCP_STREAM
@@ -240,9 +242,9 @@ function configure_terraform() {
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
     echo "IC: Setup the keys"
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa.pub
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
-    chmod 0600 "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa.pub
+    chmod 0600 "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/id_rsa
 
     echo "IC: domain and cis update"
     CLUSTER_DOMAIN="${BASE_DOMAIN}"
@@ -257,12 +259,14 @@ function configure_terraform() {
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/data/pull-secret.txt
 
     WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}"
-    echo "IC: ${WORKSPACE_NAME}"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "IC workspace :  ${WORKSPACE_NAME}"
+    echo "IC VPC workspace :  ${VPC_NAME}"
     echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
     # Select the workspace ID 
-    POWERVS_SERVICE_INSTANCE_ID=$(ibmcloud pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
+    POWERVS_SERVICE_INSTANCE_ID=$(ic pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
+    echo "IC: PowerVS instance ID: ${POWERVS_SERVICE_INSTANCE_ID}"
     export POWERVS_SERVICE_INSTANCE_ID
 
 cat << EOF >${IBMCLOUD_HOME_FOLDER}/ocp-install-dir/var-multi-arch-upi.tfvars
@@ -286,7 +290,7 @@ openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi
 release_image_override    = "$(openshift-install version | grep 'release image' | awk '{print $3}')"
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
-ibm_cloud_vpc_name        = "${WORKSPACE_NAME}-vpc"
+ibm_cloud_vpc_name        = "${VPC_NAME}"
 private_network_mtu       = 9000
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
@@ -301,12 +305,29 @@ EOF
 
 # Builds the cluster based on the set configuration / tfvars
 function build_upi_cluster() {
+    OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
     cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init && \
         "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -auto-approve \
             -var-file "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate
+            -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate \
+            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done || true
 
     if [ ! -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate ]
     then
@@ -341,6 +362,7 @@ function build_upi_cluster() {
 # Execution Path
 
 trap 'error_handler $? $LINENO' ERR
+
 
 report_build
 setup_home
