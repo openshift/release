@@ -15,6 +15,10 @@ export STATIC_CONFIG_MANIFEST_DIR=/tmp/manifests
 mkdir "${STATIC_CONFIG_MANIFEST_DIR}"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+mkdir ${HOME}/.docker
+cp /secrets/import-secret/.dockerconfigjson ${HOME}/.docker/config.json
+
+env
 
 # The base image for this step is incapable of ssh-ing to MicroShift's VM because
 # of user configuration. Since this image comes from promotion of origin we would
