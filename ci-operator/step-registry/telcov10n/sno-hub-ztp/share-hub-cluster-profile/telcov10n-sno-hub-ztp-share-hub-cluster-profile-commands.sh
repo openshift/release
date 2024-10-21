@@ -25,11 +25,13 @@ function setup_aux_host_ssh_access {
 
 function append_pr_tag_cluster_profile_artifacts {
 
+  telco_qe_preserved_dir=/var/builds/telco-qe-preserved
+
   # Just in case of running this script being part of a Pull Request
   if [ -n "${PULL_NUMBER:-}" ]; then
-    echo "************ telcov10n Append the 'pr-${PULL_NUMBER}' tag to '${SHARED_HUB_CLUSTER_PROFILE}' folder ************"
+    echo "************ telcov10n Append the 'pr-${PULL_NUMBER}' tag to '${telco_qe_preserved_dir}' folder ************"
     # shellcheck disable=SC2153
-    SHARED_HUB_CLUSTER_PROFILE="${SHARED_HUB_CLUSTER_PROFILE}-pr-${PULL_NUMBER}"
+    telco_qe_preserved_dir="${telco_qe_preserved_dir}-pr-${PULL_NUMBER}"
   fi
 }
 
@@ -66,30 +68,27 @@ function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
   echo
   set -x
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
-    "${NAMESPACE}" "${SHARED_HUB_CLUSTER_PROFILE}" << 'EOF'
+    "${NAMESPACE}" "${telco_qe_preserved_dir}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
 
-telco_qe_preserved_dir=/var/builds/telco-qe-preserved
-
-# Create the directory if it does not exist
-# (which is the case the first time this code runs)
-mkdir -pv ${telco_qe_preserved_dir}
+telco_qe_preserved_dir=${2}
 
 set -x
-if [[ -e ${telco_qe_preserved_dir}/${2} && ! -h ${telco_qe_preserved_dir}/${2} ]]; then
-  file ${telco_qe_preserved_dir}/${2}
+if [[ -e ${telco_qe_preserved_dir} && ! -h ${telco_qe_preserved_dir} ]]; then
+  file ${telco_qe_preserved_dir}
   set +x
-  echo "Unexpected wrong condition found!!! The ${telco_qe_preserved_dir}/${2} file already exists and is not a symbolic link."
+  echo "Unexpected wrong condition found!!! The ${telco_qe_preserved_dir} file already exists and is not a symbolic link."
   exit 1
 else
-  rm -fv ${telco_qe_preserved_dir}/${2}
-  ln -s /var/builds/${1}/${2} ${telco_qe_preserved_dir}/${2}
-  ls -l ${telco_qe_preserved_dir}/${2} | grep "/var/builds/${1}/${2}" || \
+  rm -fv ${telco_qe_preserved_dir}
+  ln -s /var/builds/${1} ${telco_qe_preserved_dir}
+  find ${telco_qe_preserved_dir}/ | grep "/hub-kubeconfig" || \
     {
       set +x ;
-      echo "Wrong generated '${telco_qe_preserved_dir}/${2}' symbolic link detected" ;
+      echo "Wrong generated '${telco_qe_preserved_dir}' symbolic link detected" ;
+      echo "Missing 'hub-kubeconfig' file" ;
       exit 1 ;
     }
 fi
