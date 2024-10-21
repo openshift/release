@@ -13,6 +13,19 @@ export PATH=/usr/libexec/origin:$PATH
 
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
+# We need openshift-tests to be able to access the release payload with
+# anonymous access to extract external binaries.
+echo "Add policies to allow the test cluster access to images on the build farm..."
+# This step wants to always talk to the build farm (via service account credentials) but ci-operator
+# gives steps KUBECONFIG pointing to cluster under test under some circumstances, which is never
+# the correct cluster to interact with for this step.  Save/restore the
+# KUBECONFIG.
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
