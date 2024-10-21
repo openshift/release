@@ -19,22 +19,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: che-operator-update
+- as: chectl
   steps:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
     test:
-    - as: test
+    - as: chectl
       cli: latest
-      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      commands: .ci/oc-test-chectl.sh
       from: src
       resources:
         requests:
           cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: chectl-devworkspace-happy-path
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: chectl-devworkspace-happy-path
+      cli: latest
+      commands: .ci/oc-test-happy-path.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: 7.87.x
-  org: eclipse-che
-  repo: che-operator
+  branch: 7.100.x
+  org: che-incubator
+  repo: chectl
   variant: v14
