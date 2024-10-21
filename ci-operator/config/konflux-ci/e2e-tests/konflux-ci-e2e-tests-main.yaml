@@ -10,12 +10,15 @@ images:
 
     ENV YQ_VERSION=v4.25.2
     ENV KUBELOGIN_VERSION=v1.25.3
+    ENV ROSA_CLI_VERSION=1.2.46
 
+    RUN yum clean packages && yum install -y httpd-tools graphviz python
     # Install jq, yq and kubectl
     RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
     RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
-    RUN yum clean packages && yum install -y httpd-tools graphviz
+    RUN curl -Ls "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/rosa/${ROSA_CLI_VERSION}/rosa-linux.tar.gz" | tar xvz && chmod +x rosa && mv rosa /usr/local/bin
+    RUN curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip && unzip awscli-bundle.zip && ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
   from: src
   to: e2e-test-runner
 promotion:
@@ -89,7 +92,7 @@ tests:
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - as: load-test-ci-daily-100u
-  cron: 0 4 * * sun
+  cron: 0 4 * * *
   steps:
     cluster_profile: aws-rhtap-performance
     env:
@@ -97,7 +100,7 @@ tests:
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - as: load-test-max-concurrency
-  cron: 0 0 * * sun
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws-rhtap-performance
     env:
@@ -112,6 +115,12 @@ tests:
       SCENARIO: max-concurrency
     workflow: redhat-appstudio-load-test-max-concurrency
   timeout: 8h0m0s
+- as: rosa-old-clusters-cleanup
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - ref: konflux-ci-rosa-cleanup
+  timeout: 1h0m0s
 zz_generated_metadata:
   branch: main
   org: konflux-ci
