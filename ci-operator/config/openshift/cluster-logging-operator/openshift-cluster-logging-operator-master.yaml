@@ -2,7 +2,7 @@ base_images:
   base:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
@@ -16,9 +16,13 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-vector:
-    name: "6.0"
+    name: "6.1"
     namespace: logging
     tag: vector
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -27,13 +31,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - from: ubi9-minimal
   inputs:
     base:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -71,17 +78,14 @@ operator:
     with: pipeline:log-file-metric-exporter
 promotion:
   to:
-  - name: "6.0"
+  - name: "6.1"
     namespace: logging
 releases:
-  initial:
-    integration:
-      name: "4.14"
-      namespace: ocp
   latest:
-    release:
-      channel: stable
-      version: "4.15"
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -106,7 +110,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.17"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -141,7 +145,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.17"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -170,11 +174,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-east-1
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.17"
   optional: true
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:

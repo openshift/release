@@ -32,6 +32,7 @@ hosts: []
 EOF
 
 cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+cpuArchitecture: ${day2_arch}
 hosts: []
 EOF
 
@@ -41,17 +42,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   if [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
     ADAPTED_YAML="
-  role: ${name%%-[0-9]*}
+  role: ${name%%-[0-9]*}"
+  else
+    ADAPTED_YAML=""
+  fi
+
+  ADAPTED_YAML+="
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
-  "
-  else
-    ADAPTED_YAML="
-  CPUArchitecture: ${day2_arch}
-  "
-  fi
-  ADAPTED_YAML+="
   hostname: ${name}
   interfaces:
   - macAddress: ${mac}

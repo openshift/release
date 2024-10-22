@@ -229,8 +229,17 @@ spec:
       - name: release
         emptyDir: {}
       - name: build-cluster-kubeconfigs
-        secret:
-          secretName: ci-chat-bot-kubeconfigs
+        projected:
+          sources:
+          - secret:
+              name: ci-chat-bot-kubeconfigs
+          - secret:
+              name: ci-chat-bot-slack-app
+              items:
+                - key: sa.ci-chat-bot-mce.dpcr.config
+                  path: sa.ci-chat-bot-mce.dpcr.config
+                - key: sa.ci-chat-bot-mce.dpcr.token.txt
+                  path: sa.ci-chat-bot-mce.dpcr.token.txt
       - name: workflows-config
         configMap:
           name: ci-chat-bot-workflows-config
@@ -278,13 +287,11 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
+        - --ref=master
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
+        - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release
@@ -295,13 +302,11 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
-        - --wait=30
+        - --ref=master
+        - --period=30s
         - --root=/tmp/git-sync
-        - --max-sync-failures=3
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
+        - --max-failures=3
+        - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
         volumeMounts:
         - name: release
@@ -387,26 +392,30 @@ spec:
               name: ci-chat-bot-slack-app
               key: rosa-aws-secret-access-key
         - name: OCM_CONFIG
-          value: /etc/ocmcred/rosa-admin-ocm
+          value: /tmp/rosa-admin-ocm
         - name: AWS_REGION
           value: us-east-1
         - name: XDG_RUNTIME_DIR
           value: /runtimedir
-        command:
-        - /usr/bin/ci-chat-bot
-        - --prow-config=/etc/config/config.yaml
-        - --supplemental-prow-config-dir=/etc/config
-        - --job-config=/var/repo/release/ci-operator/jobs
-        - --github-endpoint=http://ghproxy
-        - --github-endpoint=https://api.github.com
-        - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
-        - --workflow-config-path=/etc/workflows-config/workflows-config.yaml
-        - --kubeconfig-dir=/var/build-cluster-kubeconfigs
-        - --kubeconfig-suffix=.config
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/jira-token
-        - --rosa-cluster-limit=30
-        - --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids
-        - --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id
-        - --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - >-
+          /usr/bin/cp /etc/ocmcred/rosa-admin-ocm /tmp/rosa-admin-ocm &&
+          /usr/bin/ci-chat-bot \\
+          --prow-config=/etc/config/config.yaml \\
+          --supplemental-prow-config-dir=/etc/config \\
+          --job-config=/var/repo/release/ci-operator/jobs \\
+          --github-endpoint=http://ghproxy \\
+          --github-endpoint=https://api.github.com \\
+          --force-pr-owner=system:serviceaccount:ci:ci-chat-bot \\
+          --workflow-config-path=/etc/workflows-config/workflows-config.yaml \\
+          --kubeconfig-dir=/var/build-cluster-kubeconfigs \\
+          --kubeconfig-suffix=.config \\
+          --lease-server-credentials-file=/etc/boskos/credentials \\
+          --jira-endpoint=https://issues.redhat.com \\
+          --jira-bearer-token-file=/etc/jira/jira-token \\
+          --rosa-cluster-limit=30 \\
+          --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids \\
+          --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id \\
+          --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
