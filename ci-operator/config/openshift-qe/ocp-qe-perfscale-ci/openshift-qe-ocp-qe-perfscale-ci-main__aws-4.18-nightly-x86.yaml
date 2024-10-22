@@ -42,8 +42,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
+      ADDITIONAL_WORKER_NODES: "249"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "252"
       COMPUTE_NODE_TYPE: m5.xlarge
       EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
@@ -54,7 +54,28 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-kube-burner-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 7h0m0s
+- as: kube-burner-workers-autoscale-252nodes
+  cron: 0 12 27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "249"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALER: "true"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-kube-burner-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-120nodes
@@ -63,8 +84,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
+      ADDITIONAL_WORKER_NODES: "117"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
       EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: reporting
@@ -73,7 +94,26 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-kube-burner-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 7h0m0s
+- as: kube-burner-workers-autoscale-120nodes
+  cron: 0 4 27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "117"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALER: "true"
+      SIZE_VARIANT: large
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-kube-burner-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-24nodes
@@ -82,11 +122,25 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "21"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "24"
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-kube-burner-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+- as: kube-burner-workers-autoscale-24nodes
+  cron: 0 0 27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_AUTOSCALER: "true"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-kube-burner-workers-scale
     workflow: openshift-qe-installer-aws
 - as: control-plane-etcdencrypt-24nodes
   cron: 0 3 2,9,16,23 * *

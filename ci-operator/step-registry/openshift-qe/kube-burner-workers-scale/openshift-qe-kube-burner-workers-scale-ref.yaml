@@ -1,0 +1,56 @@
+ref:
+  as: openshift-qe-kube-burner-workers-scale
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  timeout: 8h0m0s
+  commands: openshift-qe-kube-burner-workers-scale-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: E2E_VERSION
+    default: "v2.2.6"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: ADDITIONAL_WORKER_NODES
+    default: "3"
+    documentation: |-
+      Default is 3
+  - name: GARBAGE_COLLECTION
+    default: "false"
+    documentation: |-
+      Default is false
+  - name: ENABLE_AUTOSCALER
+    default: "false"
+    documentation: |-
+      Default is false
+  - name: METRIC_PROFILES
+    default: " --metrics-profile=metrics-profiles/workers-scale/metrics.yml,metrics-profiles/workers-scale/metrics-report.yml"
+    documentation: |-
+      Default is both the metric profiles
+  - name: START_TIME
+    default: "0"
+    documentation: |-
+      Default is 0, which means it will look for start time in the shared directory
+  - name: END_TIME
+    default: "0"
+    documentation: |-
+      Default is 0, which means it will look for end time in the shared directory
+  documentation: >-
+    This step runs the perfscale loaded-upgrade workload in the deployed cluster
