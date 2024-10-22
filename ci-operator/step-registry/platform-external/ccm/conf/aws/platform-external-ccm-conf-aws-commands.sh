@@ -21,13 +21,13 @@ fi
 # Setup CCM deployment manifests
 #
 
-# Discovering the CCM image from OpenShift release payload to prevent extra discovery for
-# compatibility matrix between upstream images and kubernetes used to this dynamic OpenShift
-# deployment.
+# Discovering the AWS CCM image from OpenShift release payload.
 log "Discovering controller image 'aws-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
 
-# Build from: https://github.com/openshift/cloud-provider-aws/blob/master/Dockerfile.openshift
-CCM_IMAGE="$(oc adm release info -a "${SHARED_DIR}/pull-secret-with-ci" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='aws-cloud-controller-manager')"
+# tmp forcing to use in this step a different path.
+REGISTRY_AUTH_FILE=/tmp/secret/pull-secret-with-ci
+
+CCM_IMAGE="$(oc adm release info -a "${REGISTRY_AUTH_FILE}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='aws-cloud-controller-manager')"
 CCM_MANIFEST=ccm-00-deployment.yaml
 CCM_MANIFEST_PATH="${SHARED_DIR}"/${CCM_MANIFEST}
 
