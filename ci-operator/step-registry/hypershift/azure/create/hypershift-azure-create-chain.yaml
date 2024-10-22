@@ -18,6 +18,12 @@ chain:
       documentation: |-
         Specifies the Azure location of the cluster. If intentionally left as an empty string, 
         it defaults to that of the management cluster.
+    - name: HYPERSHIFT_HC_ZONES
+      default: ""
+      documentation: |-
+        The availability zones in which NodePools will be created. 
+        Must be left unspecified if the region does not support AZs. 
+        If set, one nodepool per zone will be created.
     - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
       default: ""
       documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
@@ -178,6 +184,10 @@ chain:
       
       if [[ -n $HYPERSHIFT_INFRA_AVAILABILITY_POLICY ]]; then
         EXTRA_ARGS+=" --infra-availability-policy=${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_HC_ZONES ]]; then
+        EXTRA_ARGS+=" --availability-zones=${HYPERSHIFT_HC_ZONES}"
       fi
       
       if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
