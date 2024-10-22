@@ -25,11 +25,13 @@ function setup_aux_host_ssh_access {
 
 function append_pr_tag_cluster_profile_artifacts {
 
+  telco_qe_preserved_dir=/var/builds/telco-qe-preserved
+
   # Just in case of running this script being part of a Pull Request
   if [ -n "${PULL_NUMBER:-}" ]; then
     echo "************ telcov10n Append the 'pr-${PULL_NUMBER}' tag to '${SHARED_HUB_CLUSTER_PROFILE}' folder ************"
     # shellcheck disable=SC2153
-    SHARED_HUB_CLUSTER_PROFILE="${SHARED_HUB_CLUSTER_PROFILE}-pr-${PULL_NUMBER}"
+    telco_qe_preserved_dir="${telco_qe_preserved_dir}-pr-${PULL_NUMBER}"
   fi
 }
 
@@ -41,7 +43,7 @@ function get_hub_cluster_profile_artifacts {
   set -x
   rsync -avP \
     -e "ssh $(echo "${SSHOPTS[@]}")" \
-    "root@${AUX_HOST}":/var/builds/telco-qe-preserved/${SHARED_HUB_CLUSTER_PROFILE}/ \
+    "root@${AUX_HOST}":${telco_qe_preserved_dir}/${SHARED_HUB_CLUSTER_PROFILE}/ \
     ${HOME}/${SHARED_HUB_CLUSTER_PROFILE}
   set +x
   echo
