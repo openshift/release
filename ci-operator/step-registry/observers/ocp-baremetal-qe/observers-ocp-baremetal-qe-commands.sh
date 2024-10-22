@@ -239,8 +239,8 @@ EOF
 function isNodeReachable(){
   # Check if node is reachable poking SSH port using netcat
   local host="${1}"
-  ssh_port=$((12000 + $host))
-  status=$(timeout 5s nc ${AUX_HOST} "${ssh_port}" || true;)
+  ssh_port=$((13000 + $host))
+  status=$(timeout 5s nc ${LB_HOST} "${ssh_port}" || true;)
   echo "isNodeReachable: $status"
   if [[ $status == *"SSH"* ]]; then
       echo $NODE_IS_REACHABLE
@@ -256,8 +256,8 @@ function isNodeAlive(){
   echo "Starting isNodeAlive for ${host}"
   for i in $(seq 1 $MAX_RETRY); do
     printf "%s: Checking SSH connectivity for %s %s/${MAX_RETRY}\n" "$(date --utc --iso=s)" "${ip}" "${i}"
-    ssh_port=$((12000 + $host))
-    status="$(timeout 5s nc ${AUX_HOST} "${ssh_port}" || true;)"
+    ssh_port=$((13000 + $host))
+    status="$(timeout 5s nc ${LB_HOST} "${ssh_port}" || true;)"
     echo "isNodeReachable: $status"
     if [[ $status == *"SSH"* ]]; then
       writeFSMFile $host "${NODE_IS_REACHABLE}"
@@ -284,12 +284,12 @@ function handleReboot(){
     echo "host $host rebooted, waiting 30s for services shutdown..."
     # Wait for sshd to shutdown completely, avoid immediate check when node has yet to reboot
     sleep 30
-    ssh_port=$((12000 + $host))
-    status=$(timeout 5s nc ${AUX_HOST} "${ssh_port}" || true;)
+    ssh_port=$((13000 + $host))
+    status=$(timeout 5s nc ${LB_HOST} "${ssh_port}" || true;)
     until [[ $status == *"SSH"* ]]; do
       echo "$host rebooting, please wait..."
       sleep 30
-      status=$(timeout 5s nc ${AUX_HOST} "${ssh_port}" || true;)
+      status=$(timeout 5s nc ${LB_HOST} "${ssh_port}" || true;)
     done
     writeFSMFile $host "${NODE_REBOOTED}"
   fi
@@ -298,10 +298,10 @@ function handleReboot(){
 function journalRecord(){
       local bmhost="${1}"
       . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-      ssh_port=$((12000 + $host))
+      ssh_port=$((13000 + $host))
       echo "journalctl host $host"
       writeFSMFile $host "${NODE_INSTALLING}"
-      ssh "${SSHOPTS[@]}" -t -p "${ssh_port}" "core@${AUX_HOST}" << EOF > "${ARTIFACT_DIR}/${name}_${ip}_journalctl.txt"
+      ssh "${SSHOPTS[@]}" -t -p "${ssh_port}" "core@${LB_HOST}" << EOF > "${ARTIFACT_DIR}/${name}_${ip}_journalctl.txt"
       journalctl -f | grep -E 'level=info|level=warning|level=error|level=fatal' &
 EOF
       # We can assume the host rebooted if the ssh connection gets closed by remote host
@@ -323,8 +323,8 @@ function checkBootedImage(){
   local bmhost="${2}"
   # shellcheck disable=SC2154
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  ssh_port=$((12000 + $host))
-  cmdline=$(timeout -s 9 5m ssh -q "${SSHOPTS[@]}" -t -p "${ssh_port}" "core@${AUX_HOST}" "cat /proc/cmdline" || true;)
+  ssh_port=$((13000 + $host))
+  cmdline=$(timeout -s 9 5m ssh -q "${SSHOPTS[@]}" -t -p "${ssh_port}" "core@${LB_HOST}" "cat /proc/cmdline" || true;)
   echo $cmdline >> "${ARTIFACT_DIR}/cmdline_${host}.txt"
   echo "checking $whatToCheck for host ${host}"
   if [[ $whatToCheck == "boot" ]]; then
@@ -553,11 +553,21 @@ function monitorFSM(){
   done
 }
 
+function setConnectionVars(){
+  NODE_ZERO=$(<"/var/run/secrets/ci.openshift.io/multi-stage/cluster_name").$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
+  echo "Node zero: $NODE_ZERO"
+  HOST_ID=$(<"/var/run/secrets/ci.openshift.io/multi-stage/host-id.txt")
+  echo "Host ID: $HOST_ID"
+  LB_HOST="api.${NODE_ZERO}"
+  echo "LOAD BALANCER HOST: $LB_HOST"
+}
+
 
 function initObserverPod(){
   waitFor $HOSTS_FILE
   waitFor $KUBECONFIG
   waitFor $COREOS_STREAM_FILE
+  setConnectionVars
   isPxeJob
   isIPv6Job
   recordIPMILog
