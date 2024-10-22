@@ -5,29 +5,14 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/' EXIT TERM INT
+trap 'rm -f /tmp/aws_cred_output' EXIT TERM INT
+
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 function run_command() {
 	local cmd="$1"
 	echo "Running Command: ${cmd}"
 	eval "${cmd}"
-}
-
-function installer_generate_policies() {
-	local dir=/tmp/min_perms/
-
-	mkdir -p ${dir}
-
-	# Make a copy of the install-config.yaml since the installer will consume it.
-	cp "${SHARED_DIR}/install-config.yaml" ${dir}/
-
-	cmd="openshift-install create permissions-policy --dir ${dir}"
-	run_command "${cmd}" || return 1
-
-	# Save policies to shared dir so later steps have access to it.
-	mv ${dir}/*-creds.json ${SHARED_DIR}/
-
-	return 0
 }
 
 function aws_create_policy() {
@@ -63,39 +48,22 @@ function aws_create_user() {
 	return 0
 }
 
-if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" != "yes" ]]; then
-	echo "Custom AWS user with minimal permissions is disabled. Using AWS user from cluster profile."
+REGION="${LEASED_RESOURCE}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
+PERMISSIONS_POLICY_FILENAME="aws-permissions-policy-creds.json"
+USER_POLICY_FILE="${SHARED_DIR}/${PERMISSIONS_POLICY_FILENAME}"
+USER_CREDENTIALS_OUTPUT_FILENAME="aws_minimal_permission"
+
+if [ ! -f ${USER_POLICY_FILE} ]; then
+	echo "User permission policy file not found. Skipping user creation"
 	exit 0
 fi
 
-RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
-if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
-	# If there is no initial release, we will be installing latest.
-	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
-fi
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
-rm /tmp/pull-secret
+echo "Policy file:"
+jq . $USER_POLICY_FILE
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-
-REGION="${LEASED_RESOURCE}"
-CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-
-if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
-	# FIXME: generate an ad-hoc policy here
-	echo "Openshift installer cannot generate permissions policy prior to release 4.18"
-	exit 1
-else
-	installer_generate_policies
-fi
-
-USER_POLICY_FILE="${SHARED_DIR}/aws-permissions-policy-creds.json"
 POLICY_NAME="${CLUSTER_NAME}-required-policy"
-POLICY_DOC=$(jq -c <${USER_POLICY_FILE})
+POLICY_DOC=$(cat "${USER_POLICY_FILE}" | jq -c .)
 POLICY_OUTOUT=/tmp/aws_policy_output
 
 echo "Creating policy ${POLICY_NAME}"
@@ -118,7 +86,7 @@ if [[ "${key_id}" == "" ]] || [[ "${key_sec}" == "" ]]; then
 fi
 
 echo "Key id: ${key_id} sec: ${key_sec:0:5}"
-cat <<EOF >"${SHARED_DIR}/aws_minimal_permission"
+cat <<EOF >"${SHARED_DIR}/${USER_CREDENTIALS_OUTPUT_FILENAME}"
 [default]
 aws_access_key_id     = ${key_id}
 aws_secret_access_key = ${key_sec}
