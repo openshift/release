@@ -50,7 +50,7 @@ Parameters:
     Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
     Type: Number
   DhcpOptionSet:
-    Default: "no"
+    Default: "yes"
     AllowedValues:
     - "yes"
     - "no"
