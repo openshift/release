@@ -74,9 +74,9 @@ cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export PROXYPORT=${PROXYPORT}
 export HTTP_PROXY=http://${IP}:${PROXYPORT}/
 export HTTPS_PROXY=http://${IP}:${PROXYPORT}/
-export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,r2.cloudflarestorage.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
 export http_proxy=http://${IP}:${PROXYPORT}/
 export https_proxy=http://${IP}:${PROXYPORT}/
-export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,r2.cloudflarestorage.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
