@@ -322,6 +322,22 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-longrun-mco-tp-ocl-f7
+  cron: 19 21 4,11,18,27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~ocb&;~Layering&
+      TEST_SCENARIOS: 42361|42364
+      TEST_TIMEOUT: "120"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-longduration-mco-g1-f9
   cron: 16 8 4,16,25 * *
   steps:
@@ -1383,6 +1399,13 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
+- as: azure-aks-hypershift-ext-oidc-guest-f7
+  cron: 17 21 1,8,16,24 * *
+  steps:
+    cluster_profile: azure-qe
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-ext-oidc
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-guest
 - as: azure-aks-hypershift-full-cert-guest-f14
   cron: 26 15 12,27 * *
   steps:

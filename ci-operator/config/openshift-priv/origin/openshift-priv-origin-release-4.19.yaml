@@ -1,4 +1,8 @@
 base_images:
+  assisted-test-infra:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -309,6 +313,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
   timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-virt-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-ovn-virt
 - as: e2e-aws-csi
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -433,6 +448,24 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
   timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ovn-single-node-live-iso
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      PACKET_OS: rocky_9
+    workflow: baremetalds-sno
+- always_run: false
+  as: e2e-metal-ovn-single-node-with-worker-live-iso
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      PACKET_OS: rocky_9
+      PACKET_PLAN: c3.medium.x86
+      TEST_FUNC: test_bip_add_worker
+    workflow: baremetalds-sno
 - as: e2e-aws-ovn-single-node
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
