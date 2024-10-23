@@ -306,7 +306,9 @@ dptp_member_aliases='[
   "psalajov",
   "dmistry",
   "prucek",
-  "hvidosil"
+  "hvidosil",
+  "pruan",
+  "lxia"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \
