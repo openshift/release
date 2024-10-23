@@ -622,7 +622,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: vsphere-cloud-controller-manager
-          image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
+          image: quay.io/ocp-splat/cloud-provider-vsphere:v1.28.0
           env:
           - name: "KUBERNETES_SERVICE_HOST"
             value: "api-int.${cluster_domain}"
