@@ -62,11 +62,11 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
   PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r '.nodes[0].pm_password')
   HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r '.nodes[1:] .[].pm_addr')
   for i in $HOSTS; do
-    badfish -v -H $i -u $USER -p $PWD --racreset
+    badfish -v -H \$i -u $USER -p $PWD --racreset
   done
   sleep 300
   for i in $HOSTS; do
-    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
+    badfish -H \$i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
   done"
 
 # Setup Bastion
