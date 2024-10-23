@@ -937,19 +937,33 @@ tests:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
+  restrict_network_access: true
   cluster: build10
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
+  restrict_network_access: true
   cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
   node_architecture: arm64
 - as: lint
+  restrict_network_access: false
   commands: make lint
+  container:
+    from: golangci-lint
+- as: brand-new-lint
+  restrict_network_access: false
+  commands: make lint
+  container:
+    from: golangci-lint
+- as: brand-new-periodic
+  restrict_network_access: false
+  commands: make something of yourself
+  cron: '@yearly'
   container:
     from: golangci-lint
 - as: canary-build09
@@ -964,7 +978,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: security
+- as: security-changed-name
   optional: true
   steps:
     env:
