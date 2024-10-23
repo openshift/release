@@ -53,25 +53,26 @@ then
 fi
 
 validation_result_file=$(mktemp)
+current_tags_file=$(mktemp)
 
 # User-defined tags validation. It will check if each user-defined tag is applied. 
 # Return non-zero is one or more user-defined tag absent. 
-# $1 - the current tags of the resource under question
 function validate_user_tags() {
-  local -r current_tags="$1";  shift
+  echo "$(date -u --rfc-3339=seconds) - Current tags of the resource: "
+  cat "${current_tags_file}"
 
-  local cnt=1 a_tag_value
+  local cnt=0 a_tag_value
   echo "" > "${validation_result_file}"
   printf '%s' "${USER_TAGS:-}" | while read -r PARENT KEY VALUE || [ -n "${PARENT}" ]
   do
     a_tag_value="namespacedTagValue: ${PARENT}/${KEY}/${VALUE}"
-    if echo "${current_tags}" | grep -Fq "${a_tag_value}"; then
+    cnt=$(( $cnt + 1 ))
+    if grep -Fq "${a_tag_value}" "${current_tags_file}"; then
       echo "$(date -u --rfc-3339=seconds) - Found tag ${cnt} '${a_tag_value}' (PARENT/KEY/VALUE)."
-      cnt=$(( $cnt + 1 ))
       echo 0 >> "${validation_result_file}"
       continue
     else
-      echo "$(date -u --rfc-3339=seconds) - Failed to find tag '${a_tag_value}' (PARENT/KEY/VALUE)."
+      echo "$(date -u --rfc-3339=seconds) - Failed to find ${cnt} tag '${a_tag_value}' (PARENT/KEY/VALUE)."
       echo 1 >> "${validation_result_file}"
     fi
   done
@@ -121,9 +122,8 @@ if version_check "4.17"; then
   for line in "${items[@]}"; do
     name="${line%% *}"
     zone="${line##* }"
-    current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective)"
-    echo "${current_tags}"
-    validate_user_tags "${current_tags}"
+    gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective > "${current_tags_file}"
+    validate_user_tags
     if grep -q "1" "${validation_result_file}"; then
       echo "$(date -u --rfc-3339=seconds) - FAILED for machine '${name}'."
       ret=1
@@ -139,9 +139,8 @@ if version_check "4.17"; then
     zone="${line##* }"
     zone=$(basename ${zone})
     disk_id=$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .id)
-    current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective)"
-    echo "${current_tags}"
-    validate_user_tags "${current_tags}"
+    gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective > "${current_tags_file}"
+    validate_user_tags
     if grep -q "1" "${validation_result_file}"; then
       echo "$(date -u --rfc-3339=seconds) - FAILED for disk '${name}'."
       ret=1
@@ -158,9 +157,8 @@ echo "$(date -u --rfc-3339=seconds) - Checking userTags of image-registry bucket
 readarray -t items < <(gsutil ls | grep "${INFRA_ID}-image-registry")
 for line in "${items[@]}"; do
   name=$(basename "${line}")
-  current_tags="$(gcloud resource-manager tags bindings list --parent=//storage.googleapis.com/projects/_/buckets/${name} --location=${GCP_REGION} --effective)"
-  echo "${current_tags}"
-  validate_user_tags "${current_tags}"
+  gcloud resource-manager tags bindings list --parent=//storage.googleapis.com/projects/_/buckets/${name} --location=${GCP_REGION} --effective > "${current_tags_file}"
+  validate_user_tags
   if grep -q "1" "${validation_result_file}"; then
     echo "$(date -u --rfc-3339=seconds) - FAILED for bucket '${name}'."
     ret=1
@@ -169,6 +167,6 @@ for line in "${items[@]}"; do
   fi
 done
 
-rm -f "${validation_result_file}"
+rm -f "${validation_result_file}" "${current_tags_file}"
 echo "$(date -u --rfc-3339=seconds) - exit code '${ret}'"
 exit ${ret}

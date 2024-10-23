@@ -84,6 +84,12 @@ chain:
     - name: HYPERSHIFT_NP_AUTOREPAIR
       default: "false"
       documentation: "Enables machine autorepair with machine health checks."
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+      default: "false"
+      documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml."
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE
+      default: "false"
+      documentation: "When used along --render it enables rendering of secrets."
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra arguments to pass to the hypershift create cluster azure command."
@@ -104,11 +110,6 @@ chain:
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
       if [[ -f "${SHARED_DIR}/hypershift-pull-secret" ]]; then
         PULL_SECRET_PATH="${SHARED_DIR}/hypershift-pull-secret"
-      fi
-      
-      ICSP_COMMAND=""
-      if [[ $ENABLE_ICSP == "true" ]]; then
-        ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
       ENCRYPTION_KEY_ID=""
@@ -139,6 +140,28 @@ chain:
       NSG_ID=""
       if [[ $HYPERSHIFT_CUSTOM_NSG == "true" ]]; then
         NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
+      fi
+      
+      COMMAND=(
+        /usr/bin/hypershift create cluster azure \
+        --name ${CLUSTER_NAME} \
+        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
+        --pull-secret ${PULL_SECRET_PATH} \
+        --azure-creds ${AZURE_CREDS} \
+        --location ${HC_LOCATION} \
+        --release-image ${RELEASE_IMAGE} \
+        --encryption-key-id=${ENCRYPTION_KEY_ID} \
+        --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
+        --resource-group-name=${RESOURCE_GROUP_NAME} \
+        --vnet-id=${VNET_ID} \
+        --subnet-id=${SUBNET_ID} \
+        --network-security-group-id=${NSG_ID}
+      )
+      
+      if [[ $ENABLE_ICSP == "true" ]]; then
+        COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
@@ -198,21 +221,20 @@ chain:
         EXTRA_ARGS+=" --encryption-at-host=Disabled"
       fi
       
-      /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
-        --name ${CLUSTER_NAME} \
-        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
-        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
-        --pull-secret ${PULL_SECRET_PATH} \
-        --azure-creds ${AZURE_CREDS} \
-        --location ${HC_LOCATION} \
-        --release-image ${RELEASE_IMAGE} \
-        --encryption-key-id=${ENCRYPTION_KEY_ID} \
-        --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
-        --resource-group-name=${RESOURCE_GROUP_NAME} \
-        --vnet-id=${VNET_ID} \
-        --subnet-id=${SUBNET_ID} \
-        --network-security-group-id=${NSG_ID}
+      if [[ -n $EXTRA_ARGS ]]; then
+        COMMAND+=(${EXTRA_ARGS})
+      fi
+      
+      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+        COMMAND+=(--render)
+        if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
+          COMMAND+=(--render-sensitive)
+        fi
+        "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+        exit 0
+      fi
+      
+      "${COMMAND[@]}"
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"

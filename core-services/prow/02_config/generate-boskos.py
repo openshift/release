@@ -323,6 +323,9 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
+    'ibmcloud-gpu-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-east': 3,
     },
@@ -437,6 +440,9 @@ CONFIG = {
     },
     'aro-redhat-tenant-quota-slice': {
         'default': 1,
+    },
+    'aws-ovn-perfscale-quota-slice': {
+        'us-west-2': 4,
     }
 }
 

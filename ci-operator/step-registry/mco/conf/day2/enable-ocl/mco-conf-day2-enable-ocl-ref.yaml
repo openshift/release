@@ -1,0 +1,25 @@
+ref:
+  as: mco-conf-day2-enable-ocl
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: mco-conf-day2-enable-ocl-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: MCO_CONF_DAY2_OCL_POOLS
+      default: ""
+      documentation: |
+        A space splitted array with the pools that will be configured with OCL
+    - name: MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
+      default: "24h"
+      documentation: |
+        The time after which the images will be automatically deleted from the quay repository
+  documentation: |-
+    Configures OCL in the MachineConfigPools provided in the MCO_CONF_DAY2_OCL_POOLS list.
+    The secret used to push and pull the images will be the cluster's pull-secret.
+    The repository used to store the images will be quay.io/mcoqe/layering
+    All images will be labeled with  `LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME` so that they are automatically removed.

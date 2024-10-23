@@ -3,10 +3,6 @@ base_images:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-enterprise-base-multi-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.18
   ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
@@ -26,9 +22,9 @@ images:
   to: dpu-operator
 - dockerfile_path: Dockerfile.CNI.rhel
   inputs:
-    ocp_builder_rhel-9-enterprise-base-multi-openshift-4.18:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-enterprise-base-multi-openshift-4.18
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
@@ -74,6 +70,10 @@ tests:
   commands: HOME=/tmp make fmt-check
   container:
     from: custom-src
+- as: make-vendor-check
+  commands: HOME=/tmp make vendor-check
+  container:
+    from: custom-src
 - as: make-generate-check
   commands: HOME=/tmp make generate-check
   container:
@@ -88,11 +88,16 @@ tests:
     workflow: dpu-operator-tests-workflow
   timeout: 1h0m0s
 - always_run: false
-  as: e2e-dpu-operator-tests
+  as: make-e2e-test
   cluster: build05
   steps:
     workflow: dpu-operator-e2e-tests-workflow
-  timeout: 6h0m0s
+  timeout: 8h0m0s
+- as: make-fast-e2e-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-fast-e2e-tests-workflow
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

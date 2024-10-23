@@ -22,12 +22,15 @@ install_yq4
 #
 # Append CI credentials to pull-secret
 #
-export PULL_SECRET="${SHARED_DIR}/pull-secret-with-ci"
-cp -v "${CLUSTER_PROFILE_DIR}"/pull-secret ${PULL_SECRET}
+# The REGISTRY_AUTH_FILE environment variable is used to authenticate
+# openshift-tests to the CI registry.
+# We must clone the CI-operator provided credentials to the shared directory
+# to be used by the openshift-tests and upper steps to consumed CI image.
+cp -v "${CLUSTER_PROFILE_DIR}"/pull-secret "${REGISTRY_AUTH_FILE}"
 
 if [[ $(dirname "$(dirname "${RELEASE_IMAGE_LATEST}" )") != "quay.io" ]]; then
   log "Logging to CI registry to later to extract CCM image info: $(dirname "$(dirname $RELEASE_IMAGE_LATEST )")"
-  oc registry login --to $PULL_SECRET
+  oc registry login --to "${REGISTRY_AUTH_FILE}"
 fi
 #
 # Enable CCM
@@ -58,7 +61,7 @@ controlPlane:
   replicas: 3
   architecture: amd64
 publish: External
-pullSecret: '$(cat ${PULL_SECRET} | awk -v ORS= -v OFS= '{$1=$1}1')'
+pullSecret: '$(cat ${REGISTRY_AUTH_FILE} | awk -v ORS= -v OFS= '{$1=$1}1')'
 EOF
 
 log "Patching install-config.yaml"

@@ -112,7 +112,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $api_dns_target
       }
     },{
@@ -127,7 +127,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $apps_dns_target
       }
 }]}

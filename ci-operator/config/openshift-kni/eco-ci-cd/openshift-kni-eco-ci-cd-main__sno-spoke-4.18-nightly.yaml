@@ -1,0 +1,60 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM registry.redhat.io/openshift4/ztp-site-generate-rhel8 AS ztp-gen
+      WORKDIR /home/ztp
+      FROM registry.ci.openshift.org/ci/telco-runner
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY --from=ztp-gen /home/ztp /output/ztp
+      RUN \
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+        chmod 700 /tmp/get_helm.sh && \
+        /tmp/get_helm.sh && \
+        rm -f /tmp/get_helm.sh
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-sno-spoke-f360
+  cluster: build05
+  cron: '* 4,8,12,16,20 * * *'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "0"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      B64_INSTALL_CONFIG_OVERRIDES: e1wiY2FwYWJpbGl0aWVzXCI6e1wiYmFzZWxpbmVDYXBhYmlsaXR5U2V0XCI6IFwiTm9uZVwiLCBcImFkZGl0aW9uYWxFbmFibGVkQ2FwYWJpbGl0aWVzXCI6IFsgXCJtYXJrZXRwbGFjZVwiLCBcIk5vZGVUdW5pbmdcIiBdIH19Cg==
+      B64_NODE_IGNITION_CONF_OVERRIDE: e1wiaWduaXRpb25cIjp7XCJ2ZXJzaW9uXCI6XCIzLjIuMFwifSxcInN0b3JhZ2VcIjp7XCJkaXNrc1wiOlt7XCJkZXZpY2VcIjpcIi9kZXYvbnZtZTFuMVwiLFwid2lwZVRhYmxlXCI6dHJ1ZSwgXCJwYXJ0aXRpb25zXCI6IFtdfSwge1wiZGV2aWNlXCI6XCIvZGV2L252bWUybjFcIixcIndpcGVUYWJsZVwiOnRydWUsIFwicGFydGl0aW9uc1wiOiBbXX1dfX0K
+      DISCONNECTED: "false"
+      DU_PROFILE: v4.18
+      GITEA_NAMESPACE: ztp-gitea
+      GLOBAL_IGNITION_CONF_OVERRIDE: '{\"ignition\": {\"version\": \"3.2.0\"}, \"storage\":
+        {\"files\": [{\"overwrite\": true, \"path\": \"/etc/containers/policy.json\",
+        \"contents\": {\"source\":\"data:text/plain;base64,ewogICAgImRlZmF1bHQiOiBbCiAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIgogICAgICAgIH0KICAgIF0sCiAgICAidHJhbnNwb3J0cyI6CiAgICAgICAgewogICAgICAgICAgICAiZG9ja2VyLWRhZW1vbiI6CiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgIiI6IFt7InR5cGUiOiJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIn1dCiAgICAgICAgICAgICAgICB9CiAgICAgICAgfQp9Cgo=\"}}]}}'
+      RESERVE_BOOTSTRAP: "false"
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: telcov10n-sno-spoke-tests
+    workflow: telcov10n-sno-spoke
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: sno-spoke-4.18-nightly

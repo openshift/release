@@ -1,0 +1,40 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: che-operator-update
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+    test:
+    - as: test
+      cli: latest
+      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: 7.94.x
+  org: eclipse-che
+  repo: che-operator
+  variant: v14
