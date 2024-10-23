@@ -7,6 +7,15 @@ set -o pipefail
 # shellcheck disable=SC1091
 source "$SHARED_DIR/main.env"
 
+cat << EOF > $ARTIFACT_DIR/custom-link-e2etelco.html
+<h3>custom-link-e2etelco</h3>
+<p> these tests finsihed here <b>some test <i>result</i></b></p>
+<br><br>
+<p>Link to reports in artifact: <a href="/blabla/test.html">test report, working??</a></p>
+<br><br>
+EOF
+
+
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
