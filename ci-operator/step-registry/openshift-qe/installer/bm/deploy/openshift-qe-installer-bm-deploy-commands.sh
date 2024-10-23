@@ -67,7 +67,7 @@ ssh ${SSH_ARGS} root@${bastion} '
   PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_password")
   HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:] .[].pm_addr")
   for i in $HOSTS; do
-    badfish -v -H $i -u $USER -p $PWD --racreset
+    badfish -v -H \$i -u $USER -p $PWD --racreset
   done
   sleep 300
   for i in $HOSTS; do
