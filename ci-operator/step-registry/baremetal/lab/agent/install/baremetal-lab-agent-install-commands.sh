@@ -130,6 +130,14 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+echo -e "\nGenerating coreOS stream file..."
+
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+# Yet another workaround for SHARED_DIR propagation issues to observer pod
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/coreos-stream.json "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
+
 ### TODO check if we can support the following
 ### Create manifests
 #echo "Creating manifests..."
@@ -208,12 +216,9 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
-# Copy coreos stream file so the observer pod can check if the correct live image was booted
-echo -e "\nGenerating coreOS stream file..."
 
-# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
-oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
-cp "${INSTALL_DIR}/coreos-stream.json" "${SHARED_DIR}/"
+
+#cp "${INSTALL_DIR}/coreos-stream.json" "${SHARED_DIR}/"
 
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
