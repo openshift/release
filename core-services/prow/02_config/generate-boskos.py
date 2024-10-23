@@ -371,6 +371,9 @@ CONFIG = {
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'gcp-chaos-quota-slice': {
+        'us-central1': 10,
+    },
     'aws-kubevirt-quota-slice': {
         'us-east-2': 10,
     },
