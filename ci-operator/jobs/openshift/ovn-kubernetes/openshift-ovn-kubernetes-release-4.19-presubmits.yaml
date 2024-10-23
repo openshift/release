@@ -1,10 +1,280 @@
 presubmits:
   openshift/ovn-kubernetes:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/4.16-upgrade-from-stable-4.15-e2e-aws-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: 4.16-upgrade-from-stable-4.15
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-4.16-upgrade-from-stable-4.15-e2e-aws-ovn-upgrade
+    rerun_command: /test 4.16-upgrade-from-stable-4.15-e2e-aws-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+        - --target=e2e-aws-ovn-upgrade
+        - --variant=4.16-upgrade-from-stable-4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-upgrade-from-stable-4.15-e2e-aws-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/4.16-upgrade-from-stable-4.15-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.16-upgrade-from-stable-4.15
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-4.16-upgrade-from-stable-4.15-images
+    rerun_command: /test 4.16-upgrade-from-stable-4.15-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.16-upgrade-from-stable-4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-upgrade-from-stable-4.15-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/4.16-upgrade-from-stable-4.15-local-gateway-e2e-aws-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: 4.16-upgrade-from-stable-4.15-local-gateway
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-4.16-upgrade-from-stable-4.15-local-gateway-e2e-aws-ovn-upgrade
+    rerun_command: /test 4.16-upgrade-from-stable-4.15-local-gateway-e2e-aws-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+        - --target=e2e-aws-ovn-upgrade
+        - --variant=4.16-upgrade-from-stable-4.15-local-gateway
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-upgrade-from-stable-4.15-local-gateway-e2e-aws-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/4.16-upgrade-from-stable-4.15-local-gateway-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.16-upgrade-from-stable-4.15-local-gateway
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-4.16-upgrade-from-stable-4.15-local-gateway-images
+    rerun_command: /test 4.16-upgrade-from-stable-4.15-local-gateway-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.16-upgrade-from-stable-4.15-local-gateway
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-upgrade-from-stable-4.15-local-gateway-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build05
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
@@ -17,7 +287,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-agent-compact-ipv4
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-agent-compact-ipv4
     optional: true
     rerun_command: /test e2e-agent-compact-ipv4
     spec:
@@ -86,8 +356,171 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/e2e-aws-live-migration-sdn-ovn
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 3h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-live-migration-sdn-ovn
+    rerun_command: /test e2e-aws-live-migration-sdn-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-live-migration-sdn-ovn-cluster-profile
+        - --target=e2e-aws-live-migration-sdn-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-live-migration-sdn-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-live-migration-sdn-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/e2e-aws-live-migration-sdn-ovn-rollback
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 4h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-live-migration-sdn-ovn-rollback
+    optional: true
+    rerun_command: /test e2e-aws-live-migration-sdn-ovn-rollback
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-live-migration-sdn-ovn-rollback-cluster-profile
+        - --target=e2e-aws-live-migration-sdn-ovn-rollback
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-live-migration-sdn-ovn-rollback-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-live-migration-sdn-ovn-rollback,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
@@ -98,7 +531,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
     spec:
       containers:
@@ -166,8 +599,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion
     decorate: true
@@ -178,7 +611,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-clusternetwork-cidr-expansion
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-clusternetwork-cidr-expansion
     optional: true
     rerun_command: /test e2e-aws-ovn-clusternetwork-cidr-expansion
     spec:
@@ -247,8 +680,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-fdp-qe
     decorate: true
@@ -259,7 +692,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-fdp-qe
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-fdp-qe
     optional: true
     rerun_command: /test e2e-aws-ovn-fdp-qe
     spec:
@@ -328,8 +761,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
@@ -340,7 +773,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-hypershift
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-hypershift
     rerun_command: /test e2e-aws-ovn-hypershift
     spec:
       containers:
@@ -408,8 +841,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-kubevirt
     decorate: true
@@ -420,7 +853,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-kubevirt
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-kubevirt
     optional: true
     rerun_command: /test e2e-aws-ovn-kubevirt
     spec:
@@ -489,8 +922,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
@@ -501,7 +934,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-local-gateway
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-local-gateway
     rerun_command: /test e2e-aws-ovn-local-gateway
     spec:
       containers:
@@ -569,8 +1002,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
@@ -581,7 +1014,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-local-to-shared-gateway-mode-migration
     rerun_command: /test e2e-aws-ovn-local-to-shared-gateway-mode-migration
     spec:
       containers:
@@ -647,10 +1080,91 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-local-to-shared-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/e2e-aws-ovn-network-migration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-network-migration
+    optional: true
+    rerun_command: /test e2e-aws-ovn-network-migration
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-network-migration-cluster-profile
+        - --target=e2e-aws-ovn-network-migration
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-network-migration-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-network-migration,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
@@ -661,7 +1175,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-serial
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-serial
     rerun_command: /test e2e-aws-ovn-serial
     spec:
       containers:
@@ -729,8 +1243,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
@@ -741,7 +1255,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-shared-to-local-gateway-mode-migration
     rerun_command: /test e2e-aws-ovn-shared-to-local-gateway-mode-migration
     spec:
       containers:
@@ -809,170 +1323,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build09
-    context: ci/prow/e2e-aws-ovn-single-node-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-single-node-techpreview
-    optional: true
-    rerun_command: /test e2e-aws-ovn-single-node-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-single-node-techpreview-cluster-profile
-        - --target=e2e-aws-ovn-single-node-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-single-node-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-single-node-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build09
-    context: ci/prow/e2e-aws-ovn-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-techpreview
-    optional: true
-    rerun_command: /test e2e-aws-ovn-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-techpreview-cluster-profile
-        - --target=e2e-aws-ovn-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
@@ -983,7 +1335,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-upgrade
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-upgrade
     rerun_command: /test e2e-aws-ovn-upgrade
     spec:
       containers:
@@ -1051,8 +1403,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-local-gateway
     decorate: true
@@ -1063,7 +1415,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-upgrade-local-gateway
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-upgrade-local-gateway
     rerun_command: /test e2e-aws-ovn-upgrade-local-gateway
     spec:
       containers:
@@ -1129,91 +1481,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade-local-gateway,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build09
-    context: ci/prow/e2e-aws-ovn-virt-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-virt-techpreview
-    optional: true
-    rerun_command: /test e2e-aws-ovn-virt-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-virt-techpreview-cluster-profile
-        - --target=e2e-aws-ovn-virt-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-virt-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-virt-techpreview,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
@@ -1224,7 +1495,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-aws-ovn-windows
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-aws-ovn-windows
     rerun_command: /test e2e-aws-ovn-windows
     spec:
       containers:
@@ -1292,8 +1563,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-azure-ovn
     decorate: true
@@ -1304,7 +1575,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-azure-ovn
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-azure-ovn
     optional: true
     rerun_command: /test e2e-azure-ovn
     spec:
@@ -1373,89 +1644,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build09
-    context: ci/prow/e2e-azure-ovn-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-azure-ovn-techpreview
-    optional: true
-    rerun_command: /test e2e-azure-ovn-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-azure-ovn-techpreview-cluster-profile
-        - --target=e2e-azure-ovn-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-ovn-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure4
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-ovn-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
@@ -1466,7 +1656,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: azure-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-azure-ovn-upgrade
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-azure-ovn-upgrade
     rerun_command: /test e2e-azure-ovn-upgrade
     spec:
       containers:
@@ -1534,8 +1724,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
@@ -1546,7 +1736,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-gcp-ovn
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-gcp-ovn
     rerun_command: /test e2e-gcp-ovn
     spec:
       containers:
@@ -1618,92 +1808,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build02
-    context: ci/prow/e2e-gcp-ovn-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-gcp-ovn-techpreview
-    rerun_command: /test e2e-gcp-ovn-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-ovn-techpreview-cluster-profile
-        - --target=e2e-gcp-ovn-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-ovn-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
@@ -1715,7 +1821,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-dualstack
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-metal-ipi-ovn-dualstack
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
     spec:
       containers:
@@ -1781,10 +1887,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
@@ -1796,7 +1902,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-dualstack-local-gateway
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-metal-ipi-ovn-dualstack-local-gateway
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway
     spec:
@@ -1863,174 +1969,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-local-gateway,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build05
-    context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
-    optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview-cluster-profile
-        - --target=e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build05
-    context: ci/prow/e2e-metal-ipi-ovn-dualstack-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-dualstack-techpreview
-    optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-dualstack-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-techpreview-cluster-profile
-        - --target=e2e-metal-ipi-ovn-dualstack-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-techpreview,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
@@ -2042,7 +1984,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-ipv4
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-metal-ipi-ovn-ipv4
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv4
     spec:
@@ -2111,8 +2053,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
@@ -2124,7 +2066,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-ipv6
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-metal-ipi-ovn-ipv6
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
     spec:
       containers:
@@ -2192,172 +2134,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build05
-    context: ci/prow/e2e-metal-ipi-ovn-ipv6-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-ipv6-techpreview
-    optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-ipv6-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-techpreview-cluster-profile
-        - --target=e2e-metal-ipi-ovn-ipv6-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build05
-    context: ci/prow/e2e-metal-ipi-ovn-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-metal-ipi-ovn-techpreview
-    optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-techpreview-cluster-profile
-        - --target=e2e-metal-ipi-ovn-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-techpreview,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-openstack-ovn
     decorate: true
@@ -2368,7 +2146,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-openstack-ovn
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-openstack-ovn
     optional: true
     rerun_command: /test e2e-openstack-ovn
     spec:
@@ -2437,8 +2215,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
@@ -2449,7 +2227,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-ovn-hybrid-step-registry
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-ovn-hybrid-step-registry
     optional: true
     rerun_command: /test e2e-ovn-hybrid-step-registry
     spec:
@@ -2518,8 +2296,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -2530,7 +2308,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-vsphere-ovn
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-vsphere-ovn
     optional: true
     rerun_command: /test e2e-vsphere-ovn
     spec:
@@ -2597,91 +2375,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: vsphere02
-    context: ci/prow/e2e-vsphere-ovn-techpreview
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-vsphere-ovn-techpreview
-    optional: true
-    rerun_command: /test e2e-vsphere-ovn-techpreview
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-ovn-techpreview-cluster-profile
-        - --target=e2e-vsphere-ovn-techpreview
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-ovn-techpreview-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-ovn-techpreview,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-windows
     decorate: true
@@ -2692,7 +2389,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-e2e-vsphere-windows
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-e2e-vsphere-windows
     optional: true
     rerun_command: /test e2e-vsphere-windows
     spec:
@@ -2761,8 +2458,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/gofmt
     decorate: true
@@ -2771,7 +2468,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-gofmt
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-gofmt
     rerun_command: /test gofmt
     spec:
       containers:
@@ -2816,8 +2513,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/images
     decorate: true
@@ -2826,7 +2523,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-images
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-images
     rerun_command: /test images
     spec:
       containers:
@@ -2872,8 +2569,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/lint
     decorate: true
@@ -2882,7 +2579,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-lint
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-lint
     rerun_command: /test lint
     spec:
       containers:
@@ -2925,23 +2622,82 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
-    cluster: build02
-    context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-openshift-e2e-gcp-ovn-techpreview-upgrade
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-okd-scos-images
     optional: true
-    rerun_command: /test openshift-e2e-gcp-ovn-techpreview-upgrade
+    rerun_command: /test okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-large-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
       - args:
@@ -2950,8 +2706,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/openshift-e2e-gcp-ovn-techpreview-upgrade-cluster-profile
-        - --target=openshift-e2e-gcp-ovn-techpreview-upgrade
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-large-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-large-cluster-density-v2
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2967,7 +2723,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/openshift-e2e-gcp-ovn-techpreview-upgrade-cluster-profile
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-large-cluster-density-v2-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -2993,12 +2749,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3008,12 +2760,579 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-e2e-gcp-ovn-techpreview-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-large-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-large-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-large-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-large-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-large-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-large-node-density-cni,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-medium-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-medium-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-medium-cluster-density-v2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-medium-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-medium-cluster-density-v2
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-medium-cluster-density-v2-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-medium-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-medium-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-medium-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-medium-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-medium-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-medium-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-medium-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-medium-node-density-cni,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-small-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-small-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-small-cluster-density-v2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-small-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-small-cluster-density-v2
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-small-cluster-density-v2-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-small-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-small-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-small-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-small-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-small-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-small-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-small-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-small-node-density-cni,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-xlarge-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-xlarge-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-xlarge-node-density-cni,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
     decorate: true
@@ -3025,7 +3344,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-medium-cluster-density
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-qe-perfscale-aws-ovn-medium-cluster-density
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-medium-cluster-density
     spec:
@@ -3094,8 +3413,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
     decorate: true
@@ -3107,7 +3426,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-medium-node-density-cni
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-qe-perfscale-aws-ovn-medium-node-density-cni
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-medium-node-density-cni
     spec:
@@ -3176,8 +3495,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
     decorate: true
@@ -3189,7 +3508,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-small-cluster-density
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-qe-perfscale-aws-ovn-small-cluster-density
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-cluster-density
     spec:
@@ -3258,8 +3577,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
     decorate: true
@@ -3271,7 +3590,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-small-node-density-cni
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-qe-perfscale-aws-ovn-small-node-density-cni
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-node-density-cni
     spec:
@@ -3340,8 +3659,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/security
     decorate: true
@@ -3350,7 +3669,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-security
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-security
     optional: true
     rerun_command: /test security
     spec:
@@ -3403,8 +3722,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.19$
-    - ^release-4\.19-
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build09
     context: ci/prow/unit
     decorate: true
@@ -3413,7 +3732,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-unit
+    name: pull-ci-openshift-ovn-kubernetes-release-4.16-unit
     rerun_command: /test unit
     spec:
       containers:
