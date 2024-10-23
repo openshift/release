@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+sleep 1200
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
