@@ -69,7 +69,6 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
     badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
   done'
 
-rm -rf /opt/*
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
