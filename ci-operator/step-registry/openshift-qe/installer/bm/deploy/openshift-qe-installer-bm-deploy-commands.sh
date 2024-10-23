@@ -66,7 +66,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
   done
   sleep 300
   for i in $HOSTS; do
-    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml --boot-to-type foreman
+    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
   done'
 
 rm -rf /opt/*
