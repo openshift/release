@@ -1,0 +1,70 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+
+    # Workaround to resolve mirrorlist issue from broken links
+    RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+    RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+    RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+
+    # Install tools
+    RUN yum install -y httpd-tools parallel
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-linux64 && chmod +x /usr/local/bin/jq
+    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.42.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+    RUN curl -L https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+    RUN python3 -m pip install kubernetes
+  from: src
+  to: openshift-pipelines-performance-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: tekton-results-downstream-1-15-results-1hr-s3-locust
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_WAIT_TIME: "0"
+      DEPLOYMENT_RESULTS_DOWNSTREAM_VERSION: "1.15"
+      DEPLOYMENT_VERSION: "1.15"
+      INSTALL_RESULTS: "true"
+      LOCUST_DURATION: 15m
+      LOCUST_SPAWN_RATE: "50"
+      LOCUST_USERS: "500"
+      LOCUST_WORKERS: "5"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNER_WAIT_TIME: "0"
+      RUN_LOCUST: "true"
+      STORE_LOGS_IN_S3: "true"
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "5"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "5"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "50"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: timebased-sign-pruner
+      TOTAL_TIMEOUT: "3600"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: test
+  org: openshift-pipelines
+  repo: performance
