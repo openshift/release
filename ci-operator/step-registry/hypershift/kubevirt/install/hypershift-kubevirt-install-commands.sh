@@ -154,6 +154,18 @@ spec:
       virtController: 8
       virtApi: 8
       virtOperator: 8
+  infra:
+    nodePlacement:
+      tolerations:
+      - effect: NoSchedule
+        key: taint-test
+        operator: Exists
+  workloads:
+    nodePlacement:
+      tolerations:
+      - effect: NoSchedule
+        key: taint-test
+        operator: Exists
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
