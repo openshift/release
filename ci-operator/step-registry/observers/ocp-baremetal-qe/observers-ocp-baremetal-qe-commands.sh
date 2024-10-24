@@ -573,9 +573,9 @@ function retriveCoreOSVersionFile(){
 function initObserverPod(){
   waitFor $HOSTS_FILE
   waitFor $KUBECONFIG
+  setConnectionVars
   retriveCoreOSVersionFile
   waitFor $COREOS_STREAM_FILE
-  setConnectionVars
   isPxeJob
   isIPv6Job
   recordIPMILog
