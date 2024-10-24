@@ -18,6 +18,7 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
 
+
 # Set the dynamic vars based on provisioned hub cluster.
 OCP_HUB_CONSOLE_URL=$(oc whoami --show-console)
 export OCP_HUB_CONSOLE_URL
@@ -32,8 +33,13 @@ CLC_OCP_IMAGE_VERSION=$(cat $SECRETS_DIR/clc/ocp_image_version)
 export CLC_OCP_IMAGE_VERSION
 
 CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
+echo $CLOUD_PROVIDERS
 export CLOUD_PROVIDERS
 
+GH_TOKEN=$(cat $SECRETS_DIR/clc/token)
+export GH_TOKEN 
+
+echo "TEST_STAGE = $TEST_STAGE"
 # run the test execution script
 bash +x ./execute_clc_nonui_interop_commands.sh
 
