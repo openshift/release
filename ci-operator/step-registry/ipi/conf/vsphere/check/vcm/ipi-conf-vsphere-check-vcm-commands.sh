@@ -299,7 +299,7 @@ if [ "$n" -ge 5 ]; then
   exit 1
 fi
 
-oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
+# oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
 
