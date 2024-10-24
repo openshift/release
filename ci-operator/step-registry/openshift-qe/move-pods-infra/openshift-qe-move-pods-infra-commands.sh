@@ -278,6 +278,16 @@ data:
       baseImage: grafana/grafana
     auth:
       baseImage: openshift/oauth-proxy
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoExecute
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
@@ -398,6 +408,16 @@ data:
       baseImage: grafana/grafana
     auth:
       baseImage: openshift/oauth-proxy
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/infra
+        value: reserved
+        effect: NoExecute
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
