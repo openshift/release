@@ -1,0 +1,61 @@
+presubmits:
+  stackrox/stackrox:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^nightlies$
+    - ^nightlies-
+    cluster: build03
+    context: ci/prow/ocp-4-17-step-stackrox-install-helm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 2h0m0s
+    labels:
+      ci-operator.openshift.io/variant: ocp-4-17
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-nightlies-ocp-4-17-step-stackrox-install-helm
+    optional: true
+    rerun_command: /test ocp-4-17-step-stackrox-install-helm
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=step-stackrox-install-helm
+        - --variant=ocp-4-17
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp-4-17-step-stackrox-install-helm,?($|\s.*)

@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+cat <<EOF
+>>> Install ACS using helm into a single cluster [$(date -u)].
+* Run roxctl image to create helm template with it
+* Install central from generated helm template
+  * Wait for Central to start.
+  * Request init-bundle from Central.
+  * Create secured-cluster custom resource with init-bundle.
+  * Wait for all services minimal running state.
+EOF
+
+echo ">>> Prepare script environment"
+export SHARED_DIR=${SHARED_DIR:-/tmp}
+echo "SHARED_DIR=${SHARED_DIR}"
+
+export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+echo "KUBECONFIG=${KUBECONFIG}"
+
+TMP_CI_NAMESPACE="acs-ci-temp"
+echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
+
+ACS_VERSION_TAG=""
+
+# TODO: Ensure not leaking!!!
+ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+
+SCRATCH=$(mktemp -d)
+echo "SCRATCH=${SCRATCH}"
+cd "${SCRATCH}"
+
+function exit_handler() {
+  exitcode=$?
+  set +e
+  echo ">>> End ACS install"
+  echo "[$(date -u)] SECONDS=${SECONDS}"
+  rm -rf "${SCRATCH}"
+  if [[ ${exitcode} -ne 0 ]]; then
+    echo "Failed install with helm"
+  else
+    echo "Successfully installed with helm"
+  fi
+}
+trap 'exit_handler' EXIT
+trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+
+function retry() {
+  for (( i = 0; i < 10; i++ )); do
+    "$@" && return 0
+    sleep 30
+  done
+  return 1
+}
+
+function wait_deploy() {
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
+    || {
+      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
+      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
+      exit 1
+    }
+}
+
+function fetch_last_nigthly_tag() {
+  # Support Linux and MacOS (requires brew coreutils)
+  local acs_tag_suffix=""
+  acs_tag_suffix="$(date -d "-1 day" +"%Y%m%d" || gdate -d "-1 day" +"%Y%m%d")"
+  echo "acs_tag_suffix=${acs_tag_suffix}"
+
+  # Quay API info: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
+  ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-${acs_tag_suffix}" | jq '.tags[1].name' --raw-output)
+  if [[ "${ACS_VERSION_TAG}" == "" || "${ACS_VERSION_TAG}" == "null" ]]; then
+    echo "Error: Unable to fetch the last nightly tag"
+    exit 1
+  fi
+  echo "ACS_VERSION_TAG=${ACS_VERSION_TAG}"
+}
+
+function install_helm() {
+  mkdir /tmp/helm
+  curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz
+  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz" | sha256sum --check --status
+  (cd /tmp/helm && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
+  chmod +x /tmp/helm/linux-amd64/helm
+}
+
+function prepare_helm_templates() {
+  retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null || true
+
+  cat <<EOF > "${SCRATCH}/roxctl-extract-pod.yaml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: roxctl-extract-pod
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: main
+    image: quay.io/stackrox-io/main:${ACS_VERSION_TAG}
+    command: ["tail", "-f", "/dev/null"]
+    volumeMounts:
+    - mountPath: "/tmp/helm-templates"
+      name: helm-template-volume
+  - name: rh-ubi
+    image: registry.access.redhat.com/ubi9/ubi:9.4
+    command: ["tail", "-f", "/dev/null"]
+    volumeMounts:
+    - mountPath: "/tmp/helm-templates"
+      name: helm-template-volume
+  volumes:
+    - name: helm-template-volume
+      emptyDir:
+        sizeLimit: 50Mi
+EOF
+
+  echo "Content of: roxctl-extract-pod.yaml"
+  cat "${SCRATCH}/roxctl-extract-pod.yaml"
+
+  retry oc apply --namespace "${TMP_CI_NAMESPACE}" --filename "${SCRATCH}/roxctl-extract-pod.yaml"
+  retry oc wait --namespace "${TMP_CI_NAMESPACE}" --for=condition=Ready --timeout=60s pod/roxctl-extract-pod
+
+  retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output central-services --image-defaults opensource --output-dir /tmp/helm-templates/central-services
+  retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output secured-cluster-services --image-defaults opensource --output-dir /tmp/helm-templates/secured-cluster-services
+
+  retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/central-services "${SCRATCH}/central-services"
+  retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/secured-cluster-services "${SCRATCH}/secured-cluster-services"
+
+  retry oc delete pod --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod
+  retry oc delete project "${TMP_CI_NAMESPACE}"
+}
+
+function install_central_with_helm() {
+  /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
+    --version "${ACS_VERSION_TAG}" \
+    --set imagePullSecrets.allowNone=true \
+    --set central.persistence.none=true \
+    --set central.adminPassword.value="${ROX_PASSWORD}"
+}
+
+function get_init_bundle() {
+  echo ">>> Get init-bundle and save to local helm values file"
+  function init_bundle() {
+    oc -n stackrox exec deploy/central -- \
+      roxctl central init-bundles generate my-test-bundle \
+        --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output - > "${SCRATCH}/helm-init-bundle-values.yaml"
+  }
+  retry init_bundle
+}
+
+function install_secured_cluster_with_helm() {
+  /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
+  --values "${SCRATCH}/helm-init-bundle-values.yaml" \
+  --set clusterName=remote \
+  --set imagePullSecrets.allowNone=true
+}
+
+fetch_last_nigthly_tag
+prepare_helm_templates
+install_helm
+
+install_central_with_helm
+echo ">>> Wait for 'stackrox-central-services' deployments"
+wait_deploy central-db
+wait_deploy central
+
+get_init_bundle
+install_secured_cluster_with_helm
+echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
+wait_deploy scanner
+wait_deploy scanner-db
+wait_deploy sensor
+wait_deploy admission-control
+
+retry oc get pods --namespace stackrox
