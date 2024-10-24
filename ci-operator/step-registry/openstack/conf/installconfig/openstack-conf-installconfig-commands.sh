@@ -59,6 +59,7 @@ case "$CONFIG_TYPE" in
 		yq --yaml-output --in-place ".
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
+			| .networking.machineNetwork[0].cidr = \"$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)\"
 			| .platform.openstack.ingressFloatingIP = \"${INGRESS_IP}\"
 			| .platform.openstack.apiFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
@@ -92,7 +93,7 @@ case "$CONFIG_TYPE" in
 		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
 		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
 		yq --yaml-output --in-place ".
-			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v4_RANGE:?}\"
+			| .networking.machineNetwork[0].cidr = \"$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)\"
 			| .networking.machineNetwork[1].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
 			| .networking.clusterNetwork[0].cidr = \"10.128.0.0/14\"
 			| .networking.clusterNetwork[0].hostPrefix = 23
