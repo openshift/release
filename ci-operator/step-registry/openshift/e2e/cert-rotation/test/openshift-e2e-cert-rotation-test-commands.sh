@@ -23,6 +23,10 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/l
 
 cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-apps] Deployment RollingUpdateDeployment should delete old pods and create new ones [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-network] Services should serve a basic endpoint from pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-cli] oc adm new-project [apigroup:project.openshift.io][apigroup:authorization.openshift.io] [Suite:openshift/conformance/parallel]"
+"[Conformance][sig-api-machinery][Feature:APIServer] local kubeconfig \"localhost-recovery.kubeconfig\" should be present on all masters and work [apigroup:config.openshift.io] [Suite:openshift/conformance/parallel/minimal]'"
 EOF
 echo "### Copying test-list file"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
