@@ -560,7 +560,7 @@ function setConnectionVars(){
   echo "Node zero: $NODE_ZERO"
   HOST_ID=$(<"/var/run/secrets/ci.openshift.io/multi-stage/host-id.txt")
   echo "Host ID: $HOST_ID"
-  LB_HOST="api${NODE_ZERO}"
+  LB_HOST="api.${NODE_ZERO}"
   echo "LOAD BALANCER HOST: $LB_HOST"
 }
 
