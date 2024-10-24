@@ -388,6 +388,12 @@ function check_upgrade_status() {
         echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
         end_time=$(date "+%s")
         echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        echo "WAITING FOR DEBUG..."
+        while [ ! -f "/tmp/continue" ]
+        do
+            sleep 10
+        done
+        
         return 1
     fi
 }
