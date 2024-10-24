@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+sleep 3600
 if [ -z "${CONTROL_ARCH}" ] || [ -z "${COMPUTE_ARCH}" ]; then
   echo "[WARN] Skipping this test as either CONTROL_ARCH or COMPUTE_ARCH are not set."
   exit 0
