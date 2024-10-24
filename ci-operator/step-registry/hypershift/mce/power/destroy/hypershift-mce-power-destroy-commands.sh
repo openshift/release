@@ -7,7 +7,7 @@ set +e
 HOSTED_CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 
 # PowerVS VSI(Virtual Server Instance) configs
-POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
+POWERVS_VSI_NAME="power-${HOSTED_CLUSTER_NAME}-worker"
 
 # Installing required tools
 mkdir /tmp/bin
