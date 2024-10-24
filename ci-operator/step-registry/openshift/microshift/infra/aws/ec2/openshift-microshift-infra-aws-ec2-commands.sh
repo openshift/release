@@ -424,7 +424,6 @@ for aws_region in "${regions[@]}"; do
 
       echo "Stack created"
       set -e
-
       # shellcheck disable=SC2016
       INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
       echo "Instance ${INSTANCE_ID}"
