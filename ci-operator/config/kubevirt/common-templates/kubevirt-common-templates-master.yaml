@@ -253,6 +253,30 @@ tests:
           memory: 400Mi
       timeout: 3h0m0s
     workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows2025
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-tests-windows2025
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2025 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: windows-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
 - as: e2e-gcp-common-templates-fedora
   steps:
     cluster_profile: gcp-virtualization
