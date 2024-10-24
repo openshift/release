@@ -112,7 +112,7 @@ objects:
           - -https-address=:8443
           - -http-address=
           - -email-domain=*
-          - -upstream=http://localhost:32001
+          - -upstream=http://localhost:31999
           - -client-id=system:serviceaccount:ci:gangway
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -131,8 +131,15 @@ objects:
         - name: envoyproxy
           imagePullPolicy: IfNotPresent
           image: registry.ci.openshift.org/ci/tp-envoyproxy:1.26.4-prefix-rewrite-status-replace
+        - name: nginx-rate-limit
+          image: registry.ci.openshift.org/ci/nging-rate-limit:latest
+          volumeMounts:
+          - mountPath: /var/cache/nginx
+            name: nginx-cache
+          - mountPath: /tmp
+            name: nginx-tmp
         - name: gangway
-          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20240923-efb534162
+          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20241021-9efd512d9
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -209,6 +216,11 @@ objects:
             secretName: gangway-tls
         - name: release
           emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-tmp
+          emptyDir: {}
+
 - apiVersion: v1
   kind: Secret
   metadata:

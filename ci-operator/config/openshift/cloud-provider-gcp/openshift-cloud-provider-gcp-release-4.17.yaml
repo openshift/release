@@ -19,6 +19,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: rhel-coreos
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
   from_repository: true
@@ -100,6 +104,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upgrade
+- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+  optional: true
+  steps:
+    cluster_profile: gcp-3
+    env:
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 7h0m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

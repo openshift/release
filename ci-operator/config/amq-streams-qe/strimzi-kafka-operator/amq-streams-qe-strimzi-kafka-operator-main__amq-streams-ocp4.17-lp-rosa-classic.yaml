@@ -1,0 +1,64 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  test-image:
+    name: strimzi-tests
+    namespace: ci
+    tag: release-0.40.x
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: amq-streams-2-7-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "rosa-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "strimzi-run-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "strimzi-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTMQST", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","rosa-classic-lp","amq-streams-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      GROUPS: sanity
+      OCM_LOGIN_ENV: staging
+      OLM_OPERATOR_VERSION: 2.7.0-5
+      OPENSHIFT_VERSION: "4.17"
+    test:
+    - ref: strimzi-run-tests
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: amq-streams-qe
+  repo: strimzi-kafka-operator
+  variant: amq-streams-ocp4.17-lp-rosa-classic

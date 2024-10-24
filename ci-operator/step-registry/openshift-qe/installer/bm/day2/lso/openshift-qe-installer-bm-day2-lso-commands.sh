@@ -8,7 +8,7 @@ cat /etc/os-release
 if [ ${BAREMETAL} == "true" ]; then
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
@@ -21,13 +21,13 @@ oc config view
 oc projects
 
 # Disk cleaning
-#sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
-#  for i in $(oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'); do
-#    for j in {0..7}; do
-#      ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@${i} sudo sgdisk --zap-all /dev/nvme${j}\n1
-#    done
-#  done"
-# sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in `oc get node --no-headers -o wide -l node-role.kubernetes.io/worker | awk '{print $6}'`; do for j in {0..7}; do ssh -t -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' core@$i sudo wipefs -a /dev/nvme$j\n1; done; done
+sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} '
+  for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+    for j in {0..7}; do
+      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo sgdisk --zap-all /dev/nvme$j\n1
+      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo wipefs -a /dev/nvme$j\n1
+    done
+  done'
 
 # Install the LSO operator
 cat <<EOF | oc apply -f -
@@ -72,7 +72,9 @@ kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshi
 sleep 60
 
 # Node labeling
-#sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} for i in $(oc get node -l node-role.kubernetes.io/worker -oname | grep -oP "^node/\K.*"); do oc label node $i openshift-storage='' --overwrite; done
+for i in $(oc get node -l node-role.kubernetes.io/worker -oname | grep -oP "^node/\K.*"); do
+  oc label node $i cluster.ocs.openshift.io/openshift-storage='' --overwrite
+done
 
 # Auto Discovering Devices and creating Persistent Volumes
 

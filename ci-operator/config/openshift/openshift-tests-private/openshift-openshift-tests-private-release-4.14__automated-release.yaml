@@ -1,0 +1,134 @@
+base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.14"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-ipi-f360
+  cron: 16 2 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOGSOURCE_NAME: auto-release-app-registry
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-f360
+  cron: 3 1 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOGSOURCE_NAME: auto-release-app-registry
+      E2E_RUN_TAGS: '@level0'
+      FIPS_ENABLED: "true"
+      TEST_IMPORTANCE: LEVEL0
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-upi-f360
+  cron: 23 20 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-autorelease-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOGSOURCE_NAME: auto-release-app-registry
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: gcp-ipi-f360
+  cron: 10 0 16 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-autorelease-qe
+    env:
+      CATALOGSOURCE_NAME: auto-release-app-registry
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: openshift-tests-private
+  variant: automated-release
