@@ -556,11 +556,11 @@ function monitorFSM(){
 function setConnectionVars(){
   CLUSTER_NAME=$(<"/var/run/secrets/ci.openshift.io/multi-stage/cluster_name")
   echo "Cluster name: $CLUSTER_NAME"
-  NODE_ZERO=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
+  NODE_ZERO=$(<"/var/run/secrets/ci.openshift.io/multi-stage/cluster_name").$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
   echo "Node zero: $NODE_ZERO"
   HOST_ID=$(<"/var/run/secrets/ci.openshift.io/multi-stage/host-id.txt")
   echo "Host ID: $HOST_ID"
-  LB_HOST="api.${NODE_ZERO}"
+  LB_HOST="api${NODE_ZERO}"
   echo "LOAD BALANCER HOST: $LB_HOST"
 }
 
