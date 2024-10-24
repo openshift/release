@@ -627,7 +627,12 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+    cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
+    if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
+      echo "additional CA bundle found, appending it to the bundle from vault"
+      cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
+    fi
+    export SSL_CERT_FILE=/tmp/ca-bundle.pem
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
