@@ -46,8 +46,8 @@ function verify {
       exit 1
   fi
 
-  if [[ -z "${ARO_VERSION_OPENSHIFT_PULLSPEC}" ]]; then
-      echo ">> ARO_VERSION_OPENSHIFT_PULLSPEC is not set"
+  if [[ -z "${RELEASE_IMAGE_LATEST}" ]]; then
+      echo ">> RELEASE_IMAGE_LATEST is not set"
       exit 1
   fi
 
@@ -65,11 +65,18 @@ function login {
 function create-cluster {
   echo "Create ARO cluster with RP"
   echo "Creating cluster service principal with name ${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}"
-  az ad sp create-for-rbac --name "${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}" > cluster-service-principal.json
-  CSP_CLIENTID=$(jq -r '.appId' cluster-service-principal.json)
-  CSP_CLIENTSECRET=$(jq -r '.password' cluster-service-principal.json)
-  CSP_OBJECTID=$(az ad sp show --id ${CSP_CLIENTID} -o json | jq -r '.id')
-  rm cluster-service-principal.json
+
+  # We currently can't create a new service principal, use the CI sp...
+  # TODO figure out how to allow sp creation, and revert this, and delete sp_password and sp_objectid from vault
+  #az ad sp create-for-rbac --name "${ARO_CLUSTER_SERVICE_PRINCIPAL_NAME}" > cluster-service-principal.json
+  #CSP_CLIENTID=$(jq -r '.appId' cluster-service-principal.json)
+  #CSP_CLIENTSECRET=$(jq -r '.password' cluster-service-principal.json)
+  #CSP_OBJECTID=$(az ad sp show --id ${CSP_CLIENTID} -o json | jq -r '.id')
+  #rm cluster-service-principal.json
+
+  CSP_CLIENTID="$(<"${CLUSTER_PROFILE_DIR}/sp_id")"
+  CSP_CLIENTSECRET="$(<"${CLUSTER_PROFILE_DIR}/sp_password")"
+  CSP_OBJECTID="$(<"${CLUSTER_PROFILE_DIR}/sp_objectid")"
 
   echo "Creating role assignments for cluster service principal"
   SCOPE="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_CLUSTER_RESOURCE_GROUP}"
@@ -86,7 +93,7 @@ function create-cluster {
       --assignee-principal-type 'ServicePrincipal'
 
   echo "Registering cluster version ${ARO_VERSION} to the RP"
-  curl -X PUT "${CURL_ADDITIONAL_ARGS}" \
+  curl -X PUT -x "${CURL_PROXY}" \
       -k "${RP_ENDPOINT}/admin/versions" \
       --cert ${CERT} \
       --header "Content-Type: application/json" \
@@ -95,7 +102,7 @@ function create-cluster {
     "properties": {
         "version": "${ARO_VERSION}",
         "enabled": true,
-        "openShiftPullspec": "${ARO_VERSION_OPENSHIFT_PULLSPEC}",
+        "openShiftPullspec": "${RELEASE_IMAGE_LATEST}",
         "installerPullspec": "${ARO_VERSION_INSTALLER_PULLSPEC}"
     }
 }
@@ -109,7 +116,7 @@ EOF
   MASTER_SUBNET_ID="${VNET_ID}/subnets/master"
   WORKER_SUBNET_ID="${VNET_ID}/subnets/worker"
 
-  curl -X PUT "${CURL_ADDITIONAL_ARGS}" \
+  curl -X PUT -x "${CURL_PROXY}" \
       -k "${RP_ENDPOINT}${RESOURCE_ID}?api-version=2023-11-22" \
       --cert ${CERT} \
       --header "Content-Type: application/json" \
@@ -139,7 +146,7 @@ EOF
   echo "Waiting for cluster creation to complete..."
   while true
   do
-      STATE=$(curl -X GET "${CURL_ADDITIONAL_ARGS}" \
+      STATE=$(curl -X GET -x "${CURL_PROXY}" \
           -k "${RP_ENDPOINT}${RESOURCE_ID}?api-version=2023-11-22" \
           --cert ${CERT} \
           --silent | jq -r '.properties.provisioningState')
@@ -157,7 +164,7 @@ EOF
               echo "Cluster creation failed"
               echo "Getting install logs"
 
-              curl -X GET "${CURL_ADDITIONAL_ARGS}" \
+              curl -X GET -x "${CURL_PROXY}" \
                   -k "${RP_ENDPOINT}/admin${RESOURCE_ID}/clusterdeployment?api-version=2023-11-22" \
                   --cert ${CERT} \
                   --silent \
@@ -177,12 +184,15 @@ EOF
 function get-kubeconfig {
     echo "Getting cluster kubeconfig"
     RESOURCE_ID="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_CLUSTER_RESOURCE_GROUP}/providers/Microsoft.RedHatOpenShift/openShiftClusters/${ARO_CLUSTER_NAME}"
-    curl -X POST "${CURL_ADDITIONAL_ARGS}" \
+    curl -X POST -x "${CURL_PROXY}" \
         -k "${RP_ENDPOINT}${RESOURCE_ID}/listadmincredentials?api-version=2023-11-22" \
         --cert ${CERT} \
         --header "Content-Type: application/json" \
         --silent | jq -r .kubeconfig | base64 -d > ${SHARED_DIR}/kubeconfig
 }
+
+# for saving files...
+cd /tmp
 
 vars
 verify
