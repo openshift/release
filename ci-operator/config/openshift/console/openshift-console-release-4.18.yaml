@@ -7,6 +7,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.18_cli-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: cli-artifacts
   ocp_builder_rhel-9-base-nodejs-openshift-4.18:
     name: builder
     namespace: ocp
@@ -33,9 +37,22 @@ images:
 - dockerfile_path: Dockerfile.plugins.demo
   from: nodejs-10
   to: console-plugin-demo
+- dockerfile_path: Dockerfile.downloads
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_cli-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:cli-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: console-downloads
 promotion:
   to:
   - additional_images:
+      console-downloads: console-downloads
       console-tests: src
     disabled: true
     name: "4.18"
