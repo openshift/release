@@ -441,6 +441,7 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      ci_script_prologue
       scp "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
 
       echo "Waiting up to 5 min for RHEL host to be up."
