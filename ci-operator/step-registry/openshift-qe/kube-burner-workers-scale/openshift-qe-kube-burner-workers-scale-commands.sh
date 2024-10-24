@@ -38,5 +38,7 @@ if [ -z "$END_TIME" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; the
 fi
 
 export EXTRA_FLAGS
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+rosa login --env "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 ./run.sh
