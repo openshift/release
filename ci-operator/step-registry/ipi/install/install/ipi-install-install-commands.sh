@@ -753,6 +753,10 @@ case $JOB_NAME in
     # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
+  *azure)
+    # Do not retry because azure resources always collide when re-using installer assets
+    max=1
+    ;;
   *)
     max=3
     ;;
