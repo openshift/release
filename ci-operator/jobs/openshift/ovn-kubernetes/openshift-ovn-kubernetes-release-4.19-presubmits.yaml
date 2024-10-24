@@ -164,7 +164,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -1781,7 +1781,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -2027,7 +2027,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-techpreview,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -3010,24 +3010,23 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-e2e-gcp-ovn-techpreview-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: build09
-    context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
+    context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 8h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-medium-cluster-density
-    optional: true
-    rerun_command: /test qe-perfscale-aws-ovn-medium-cluster-density
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-ovncore-perfscale-aws-ovn-large-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
       - args:
@@ -3036,8 +3035,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qe-perfscale-aws-ovn-medium-cluster-density-cluster-profile
-        - --target=qe-perfscale-aws-ovn-medium-cluster-density
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-large-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-large-cluster-density-v2
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3053,7 +3052,331 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qe-perfscale-aws-ovn-medium-cluster-density-cluster-profile
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-large-cluster-density-v2-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-large-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-ovncore-perfscale-aws-ovn-large-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-large-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-large-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-large-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-large-node-density-cni,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build09
+    context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ovncore-perfscale-aws-ovn-xlarge-node-density-cni-cluster-profile
+        - --target=ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ovncore-perfscale-aws-ovn-xlarge-node-density-cni-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-ovn-perfscale
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ovncore-perfscale-aws-ovn-xlarge-node-density-cni,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build09
+    context: ci/prow/perfscale-aws-ovn-medium-cluster-density-v2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-perfscale-aws-ovn-medium-cluster-density-v2
+    rerun_command: /test perfscale-aws-ovn-medium-cluster-density-v2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/perfscale-aws-ovn-medium-cluster-density-v2-cluster-profile
+        - --target=perfscale-aws-ovn-medium-cluster-density-v2
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/perfscale-aws-ovn-medium-cluster-density-v2-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3090,26 +3413,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-medium-cluster-density,?($|\s.*)
+    trigger: (?m)^/test( | .* )perfscale-aws-ovn-medium-cluster-density-v2,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: build09
-    context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
+    context: ci/prow/perfscale-aws-ovn-medium-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 8h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-medium-node-density-cni
-    optional: true
-    rerun_command: /test qe-perfscale-aws-ovn-medium-node-density-cni
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-perfscale-aws-ovn-medium-node-density-cni
+    rerun_command: /test perfscale-aws-ovn-medium-node-density-cni
     spec:
       containers:
       - args:
@@ -3118,8 +3440,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qe-perfscale-aws-ovn-medium-node-density-cni-cluster-profile
-        - --target=qe-perfscale-aws-ovn-medium-node-density-cni
+        - --secret-dir=/usr/local/perfscale-aws-ovn-medium-node-density-cni-cluster-profile
+        - --target=perfscale-aws-ovn-medium-node-density-cni
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3135,7 +3457,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qe-perfscale-aws-ovn-medium-node-density-cni-cluster-profile
+        - mountPath: /usr/local/perfscale-aws-ovn-medium-node-density-cni-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3172,26 +3494,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-medium-node-density-cni,?($|\s.*)
+    trigger: (?m)^/test( | .* )perfscale-aws-ovn-medium-node-density-cni,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: build09
-    context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
+    context: ci/prow/perfscale-aws-ovn-small-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-small-cluster-density
-    optional: true
-    rerun_command: /test qe-perfscale-aws-ovn-small-cluster-density
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-perfscale-aws-ovn-small-cluster-density-v2
+    rerun_command: /test perfscale-aws-ovn-small-cluster-density-v2
     spec:
       containers:
       - args:
@@ -3200,8 +3521,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qe-perfscale-aws-ovn-small-cluster-density-cluster-profile
-        - --target=qe-perfscale-aws-ovn-small-cluster-density
+        - --secret-dir=/usr/local/perfscale-aws-ovn-small-cluster-density-v2-cluster-profile
+        - --target=perfscale-aws-ovn-small-cluster-density-v2
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3217,7 +3538,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qe-perfscale-aws-ovn-small-cluster-density-cluster-profile
+        - mountPath: /usr/local/perfscale-aws-ovn-small-cluster-density-v2-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3244,7 +3565,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-aws-perfscale-qe
+          secretName: cluster-secrets-aws-perfscale
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3254,26 +3575,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-cluster-density,?($|\s.*)
+    trigger: (?m)^/test( | .* )perfscale-aws-ovn-small-cluster-density-v2,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: build09
-    context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
+    context: ci/prow/perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.19-qe-perfscale-aws-ovn-small-node-density-cni
-    optional: true
-    rerun_command: /test qe-perfscale-aws-ovn-small-node-density-cni
+    name: pull-ci-openshift-ovn-kubernetes-release-4.19-perfscale-aws-ovn-small-node-density-cni
+    rerun_command: /test perfscale-aws-ovn-small-node-density-cni
     spec:
       containers:
       - args:
@@ -3282,8 +3602,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qe-perfscale-aws-ovn-small-node-density-cni-cluster-profile
-        - --target=qe-perfscale-aws-ovn-small-node-density-cni
+        - --secret-dir=/usr/local/perfscale-aws-ovn-small-node-density-cni-cluster-profile
+        - --target=perfscale-aws-ovn-small-node-density-cni
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3299,7 +3619,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qe-perfscale-aws-ovn-small-node-density-cni-cluster-profile
+        - mountPath: /usr/local/perfscale-aws-ovn-small-node-density-cni-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3326,7 +3646,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-aws-perfscale-qe
+          secretName: cluster-secrets-aws-perfscale
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3336,7 +3656,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-node-density-cni,?($|\s.*)
+    trigger: (?m)^/test( | .* )perfscale-aws-ovn-small-node-density-cni,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
