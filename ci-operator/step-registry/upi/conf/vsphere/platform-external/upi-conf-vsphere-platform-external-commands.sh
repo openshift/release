@@ -96,7 +96,7 @@ export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_
 
 echo "$(date -u --rfc-3339=seconds) - Discovering controller image 'vsphere-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
 
-PULL_SECRET="/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret"
+PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
 CCM_IMAGE="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='vsphere-cloud-controller-manager')"
 
 echo "$(date -u --rfc-3339=seconds) - Using CCM image=${CCM_IMAGE}"
