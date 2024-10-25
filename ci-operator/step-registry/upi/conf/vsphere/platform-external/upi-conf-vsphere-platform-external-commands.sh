@@ -94,6 +94,13 @@ export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
+echo "$(date -u --rfc-3339=seconds) - Discovering controller image 'vsphere-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
+
+PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
+CCM_IMAGE="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='vsphere-cloud-controller-manager')"
+
+echo "$(date -u --rfc-3339=seconds) - Using CCM image=${CCM_IMAGE}"
+
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create basedomain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/basedomain.txt
@@ -622,7 +629,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: vsphere-cloud-controller-manager
-          image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
+          image: ${CCM_IMAGE}
           env:
           - name: "KUBERNETES_SERVICE_HOST"
             value: "api-int.${cluster_domain}"
