@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -7,7 +8,8 @@ echo HyperShift CLI version
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 
-RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+#RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release-nightly@sha256:d5655be83fdcb19c0cd98853266b413e6d80cc110d24edcc92f80aaad32c0ca9"
 
 # is the image multiarch?
 MULTI_ARCH_IMAGE="false"
@@ -106,8 +108,8 @@ case "${PLATFORM}" in
     if [[ -z "${POWERVS_VPC}" ]]; then
       POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
-    if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
-      POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
+      POWERVS_TRANSIT_GATEWAY=$(jq -r '.transitGateway' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
     if [[ -z "${POWERVS_REGION}" ]]; then
       POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -138,7 +140,8 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --cloud-connection ${POWERVS_CLOUD_CONNECTION} \
+      --power-edge-router true \
+      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --debug
