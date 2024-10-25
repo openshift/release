@@ -39,6 +39,7 @@ elif [[ $IP_STACK == "v6" ]]; then
   echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/fd2e:6f44:5dd8:c956::1e" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
 elif [[ $IP_STACK == "v4" ]]; then
+  echo "address=/oauth.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/192.168.111.4" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/api.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/192.168.111.30" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
