@@ -102,6 +102,17 @@ chain:
         exit 0
       fi
       
+      # add cluster-info tags if exists
+      hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
+      if [[ -f "${hosted_cluster_info_file}" ]] ; then
+        while read -r TAG VALUE
+        do
+          printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"
+          COMMAND+=(--additional-tags="${TAG}=${VALUE}")
+        done < "${hosted_cluster_info_file}"
+        cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
+      fi
+
       "${COMMAND[@]}"
 
       set +e
