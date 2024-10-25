@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#set -o nounset
-#set -o errexit
-#set -o pipefail
+set -o nounset
+set -o errexit
+set -o pipefail
 
 function log() {
   echo "$(date -u --rfc-3339=seconds) - " + "$1"
@@ -37,13 +37,16 @@ vc_tag_association:
       object_type: "Datacenter",
       object_name: "${NESTED_DATACENTER}"
     }
-
-# when defined, each of the tag names will be associated with 
-# a host. the list of tags is iterated and assigned to a given
-# host. the number of hosts and number of tags should be the same.
-vc_host_tags:
- - us-east-1
- - us-east-2
+ -  {
+      tag: "us-east-1",
+      object_type: "HostSystem",
+      object_name: "{{ hostvars[groups['esxi'][0]].NESTEDVMIP }}"
+    }
+ -  {
+      tag: "us-east-2",
+      object_type: "HostSystem",
+      object_name: "{{ hostvars[groups['esxi'][1]].NESTEDVMIP }}"
+    }
 
 # when defined, a host group will be created for each host group listed
 # below. a single host will be placed in each host group. The number of
