@@ -20,7 +20,8 @@ images:
   to: governance-policy-propagator
 promotion:
   to:
-  - name: "2.13"
+  - disabled: true
+    name: "2.13"
     namespace: stolostron
 resources:
   '*':
@@ -43,10 +44,34 @@ tests:
       SOURCE_IMAGE_REF: governance-policy-propagator
     env:
       IMAGE_REPO: governance-policy-propagator
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.13
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: governance-policy-propagator
+    env:
+      IMAGE_REPO: governance-policy-propagator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
   repo: governance-policy-propagator
