@@ -16,6 +16,13 @@ if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
     exit 1
 fi
 
+# If the base domain is not set, default to the origin-ci-int-aws.dev.rhcloud.com domain
+# which is the domain used by the management cluster running on AWS and therefore the
+# credentials we have access to.
+if [ -z "${HYPERSHIFT_BASE_DOMAIN}" ]; then
+  HYPERSHIFT_BASE_DOMAIN="origin-ci-int-aws.dev.rhcloud.com"
+fi
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
