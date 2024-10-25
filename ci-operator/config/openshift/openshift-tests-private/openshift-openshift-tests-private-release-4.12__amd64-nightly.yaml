@@ -591,6 +591,34 @@ tests:
     test:
     - ref: fips-check-optional-operator-images-scan
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-proxy-fips-f360-compliance-operator
+  cron: 25 19 16 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;Compliance_Operator&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-proxy-fips-f360-compliance-operator-destructive
+  cron: 8 18 16 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@complianceoperator'
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;Compliance_Operator&;Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+    test:
+    - ref: openshift-extended-isc-test-web-tests
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-proxy-workers-rhel8-etcd-encryption-f60
   cron: 27 7 24 2,4,6,8,10,12 *
   steps:
