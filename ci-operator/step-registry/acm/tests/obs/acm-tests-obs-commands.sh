@@ -46,7 +46,8 @@ metadata=$(cat $SHARED_DIR/metadata.json)
 echo $metadata
 
 # BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
-BASE_DOMAIN=$(oc get ingress.config.openshift.io/cluster -ojson | jq -r '.spec.domain')
+DOMAIN=$(oc get ingress.config.openshift.io/cluster -ojson | jq -r '.spec.domain')
+BASE_DOMAIN=$(echo $DOMAIN | sed 's/apps.//g')
 echo $BASE_DOMAIN
 export BASE_DOMAIN
 
