@@ -47,4 +47,5 @@ quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
 yarn run smoke || true
+sleep 21600 
 
