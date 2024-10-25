@@ -336,6 +336,35 @@ function upgrade() {
         clear_upgrade
         check_upgrade_status "${cluster_src_ver}"
     fi
+    if check_ota_case_enabled "OCP-25473"; then
+        local retry=0
+        if [[ -n "${RELEASE_IMAGE_PREVIOUS:-}" ]]; then
+            run_command "oc adm upgrade --to-image=${RELEASE_IMAGE_PREVIOUS} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
+        else
+            echo "The intermediate image is not given, break the job"
+            exit 1
+        fi
+        
+        echo "OCP-25473: Wait for the first time upgrade to start"
+        while [[ "$(oc get clusterversion version -o json|jq '.status.conditions[]|select(.type=="Progressing")'|jq -r '.status')" -ne "True" ]]; do
+            if [[ retry -ge 5 ]]; then
+                echo "OCP-25473: First time upgrade not started, break the job"
+                exit 1
+            fi
+            retry=$(( retry+1 ))
+            sleep 1m
+        done
+        echo "OCP-25473: Upgrade is processing"
+
+        if [[ "$(oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE})" == *"error: Already upgrading, pass --allow-upgrade-with-warnings to override."* ]]; then
+            echo "OCP-25473: The upgrade should not start and raise error when there is already an upgrade is processing"
+            exit 1
+        fi
+
+        run_command "oc adm upgrade --to-image=${TARGET} -allow-explicit-upgrade --allow-upgrade-with-warnings=true --force=${FORCE_UPDATE}"
+        echo "Upgrading cluster to ${TARGET} gets started..."
+        return
+    fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
