@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#set -o nounset
-#set -o errexit
-#set -o pipefail
+set -o nounset
+set -o errexit
+set -o pipefail
 
 function log() {
   echo "$(date -u --rfc-3339=seconds) - " + "$1"
@@ -82,13 +82,15 @@ cat "${SHARED_DIR}/nested-ansible-group-vars.yaml" | envsubst >> /tmp/additional
 log "starting provisioning playbook"
 ansible-playbook -i hosts main.yml --extra-var "@/tmp/additional-vars.yml" --extra-var version="${VCENTER_VERSION}" --extra-var='{"target_hosts": ['$TARGET_HOSTS']}' --extra-var='{"target_vcs": ['$VCENTER_NAME']}' --extra-var esximemory="${MEMORY_PER_HOST}" --extra-var esxicpu="${VCPUS_PER_HOST}"
 
+
 export NESTED_VCENTER_IP="$(cat /tmp/vcenterip)"
+echo "nested IP: ${NESTED_VCENTER_IP}" 
+dig -x "${NESTED_VCENTER_IP}" +short
+
 export NESTED_VCENTER="$(dig -x "${NESTED_VCENTER_IP}" +short)"
 export NESTED_VCENTER="${NESTED_VCENTER::-1}"
 
 log "updating installation artifacts to use the nested vCenter ${NESTED_VCENTER}"
-
-# to-do: get CA cert(we may need to patch the cluster-profile or vault certificate)
 
 if [ -f "${SHARED_DIR}/nested-ansible-platform.yaml" ]; then
   log "replacing the platform spec with the nested platform spec"
@@ -98,5 +100,5 @@ if [ -f "${SHARED_DIR}/nested-ansible-platform.yaml" ]; then
 
   log "updating platform.json and platform.yaml"
   yq -o=json .platform.vsphere < /tmp/install-config.yaml > "${SHARED_DIR}/platform.json"
-  yq -P . < "${SHARED_DIR}/_platform.json" | sed -e 's/^/    /' | envsubst > "${SHARED_DIR}/platform.yaml"
+  yq -P . < "${SHARED_DIR}/platform.json" | sed -e 's/^/    /' | envsubst > "${SHARED_DIR}/platform.yaml"
 fi

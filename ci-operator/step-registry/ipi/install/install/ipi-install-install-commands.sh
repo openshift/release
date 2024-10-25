@@ -632,6 +632,7 @@ vsphere*)
     cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
     if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
       echo "additional CA bundle found, appending it to the bundle from vault"
+      echo -n $'\n' >> /tmp/ca-bundle.pem
       cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
     fi
     export SSL_CERT_FILE=/tmp/ca-bundle.pem
