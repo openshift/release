@@ -143,6 +143,14 @@ if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Su
   exit 1
 fi
 
+# Silence CDIDefaultStorageClassDegraded alert: http://kubevirt.io/monitoring/runbooks/CDIDefaultStorageClassDegraded.html
+# It is not straight forward to configure a ReadWriteMany storage class and neither CDI nor PVCs are being used in the kubevirt CI lanes.
+oc -n openshift-monitoring exec -ti alertmanager-main-0 -c alertmanager -- \
+    amtool silence add alertname=CDIDefaultStorageClassDegraded \
+    --alertmanager.url=http://localhost:9093 \
+    --duration="300d" \
+    --comment="OCPKubeVirt no ReadWriteMany storage class"
+
 # Deploy HyperConverged custom resource to complete kubevirt's installation
 oc create -f - <<EOF
 apiVersion: hco.kubevirt.io/v1beta1
@@ -155,6 +163,8 @@ spec:
     deployKubevirtIpamController: true
     enableCommonBootImageImport: false
     primaryUserDefinedNetworkBinding: true
+  virtualMachineOptions:
+    disableSerialConsoleLog: false
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8
@@ -165,6 +175,3 @@ spec:
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
-
-echo "Installing VM console logger in order to aid debugging potential VM boot issues"
-oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
