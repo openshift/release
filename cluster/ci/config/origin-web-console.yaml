@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: origin-web-console
+  annotations:
+    description: >-
+      Automatically build and deploy the OpenShift Management Console in its development (non-production) mode.
+objects:
+  - kind: BuildConfig
+    apiVersion: v1
+    metadata:
+      name: '${APP_NAME}'
+    spec:
+      successfulBuildsHistoryLimit: 1
+      failedBuildsHistoryLimit: 2
+      triggers:
+        - type: ConfigChange
+        - type: ImageChange
+      source:
+        type: Git
+        git:
+          uri: '${GIT_REPO}'
+          ref: '${GIT_REF}'
+        secrets: null
+      strategy:
+        type: Source
+        sourceStrategy:
+          from:
+            kind: DockerImage
+            name: 'openshift/origin-web-console-release:latest'
+      output:
+        to:
+          kind: ImageStreamTag
+          name: 'origin-web-console:latest'
+  - kind: ImageStream
+    apiVersion: v1
+    metadata:
+      name: '${APP_NAME}'
+    spec: {}
+  - kind: DeploymentConfig
+    apiVersion: v1
+    metadata:
+      name: '${APP_NAME}'
+    spec:
+      revisionHistoryLimit: 2
+      strategy:
+        type: Rolling
+        rollingParams:
+          updatePeriodSeconds: 1
+          intervalSeconds: 1
+          timeoutSeconds: 120
+        resources: {}
+      triggers:
+        - type: ImageChange
+          imageChangeParams:
+            automatic: true
+            containerNames:
+              - origin-web-console
+            from:
+              kind: ImageStreamTag
+              name: 'origin-web-console:latest'
+        - type: ConfigChange
+      replicas: 1
+      selector:
+        name: '${APP_NAME}'
+      template:
+        metadata:
+          labels:
+            name: '${APP_NAME}'
+        spec:
+          volumes:
+            - name: config-js
+              configMap:
+                name: '${APP_NAME}'
+                defaultMode: 420
+            - name: svc-cert
+              secret:
+                secretName: ${APP_NAME}-svc-cert
+                defaultMode: 420
+          containers:
+            - name: origin-web-console
+              image: origin-web-console
+              ports:
+                - containerPort: 9000
+                  protocol: TCP
+              env:
+                - name: CONSOLE_CONTEXT_ROOT
+                  value: '${CONSOLE_CONTEXT_ROOT}'             
+              resources: {}
+              volumeMounts:
+                - name: config-js
+                  mountPath: /origin-web-console-config
+                - name: svc-cert
+                  readOnly: true
+                  mountPath: /opt/app-root/src/tls
+              terminationMessagePath: /dev/termination-log
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                capabilities: {}
+                privileged: false
+          restartPolicy: Always
+          dnsPolicy: ClusterFirst
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      name: '${GIT_REF}'
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: ${APP_NAME}-svc-cert
+    spec:
+      ports:
+        - name: console
+          protocol: TCP
+          port: 9000
+          targetPort: 9000
+      selector:
+        name: '${APP_NAME}'
+      type: ClusterIP
+      sessionAffinity: None
+  - kind: Route
+    apiVersion: v1
+    metadata:
+      name: '${APP_NAME}'
+    spec:
+      host: '${CONSOLE_HOSTNAME}'
+      path: /${CONSOLE_CONTEXT_ROOT}
+      to:
+        kind: Service
+        name: '${APP_NAME}'
+        weight: 100
+      port:
+        targetPort: console
+      tls:
+        termination: reencrypt
+        destinationCACertificate: |
+          ${DESTINATION_CA_CERT}
+      wildcardPolicy: None
+  - kind: ConfigMap
+    apiVersion: v1
+    metadata:
+      name: '${APP_NAME}'
+    data:
+      config.js: |-
+        window.OPENSHIFT_CONFIG = {
+          apis: {
+            hostPort: '${PUBLIC_MASTER_HOSTPORT}',
+            prefix: "/apis"
+          },
+          api: {
+            openshift: {
+              hostPort: "${PUBLIC_MASTER_HOSTPORT}",
+              prefix: "/oapi"
+            },
+            k8s: {
+              hostPort: "${PUBLIC_MASTER_HOSTPORT}",
+              prefix: "/api"
+            }
+          },
+          auth: {
+            oauth_authorize_uri: "https://${PUBLIC_MASTER_HOSTPORT}/oauth/authorize",
+            oauth_redirect_base: "https://${GIT_REF}-origin-web-console.svc.ci.openshift.org/${CONSOLE_CONTEXT_ROOT}",
+            oauth_client_id: "${GIT_REF}-openshift-web-console",
+            logout_uri: ""
+          },
+          loggingURL: "",
+          metricsURL: ""
+        };
+
+        window.OPENSHIFT_VERSION = {
+          openshift: "dev-mode",
+          kubernetes: "dev-mode"
+        };      
+parameters:
+  - name: APP_NAME
+    description: >-
+      Unique name for the objects created for this application.
+    value: 'origin-web-console'
+    required: true
+  - name: GIT_REF
+    description: >-
+      Git ref of the console that is being tested.  Must match the version of
+      the console being tested so the right tests and test dependencies are
+      being used.
+    value: master
+    required: true
+  - name: GIT_REPO
+    description: >-
+      Git repo URL for the fork of the console that is being tested.  Must match
+      the version of the console being tested so the right tests and test
+      dependencies are being used.
+    value: 'https://github.com/openshift/origin-web-console.git'
+    required: true
+  - name: PUBLIC_MASTER_HOSTPORT
+    description: >-
+      The public host and port for the OpenShift master API the console should
+      use.
+    value: 'api.ci.openshift.org'
+    required: true
+  - name: CONSOLE_HOSTNAME
+    description: >-
+      The hostname for the console's Route object, if you want a generated hostname leave blank.
+  - name: CONSOLE_CONTEXT_ROOT
+    description: >-
+      The context root for the console. Do not include leading or trailing slash.
+    value: 'console'
+    required: true
+  - name: DESTINATION_CA_CERT
+    description: >-
+      The destination CA certificate for the console's Route object.
+    required: true
+    
