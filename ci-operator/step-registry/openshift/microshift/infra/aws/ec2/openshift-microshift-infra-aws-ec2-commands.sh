@@ -443,6 +443,9 @@ for aws_region in "${regions[@]}"; do
 
       echo "Waiting up to 5 min for RHEL host to be up."
       timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
+
+      sleep 60m
+
       exit 0
   fi
   save_stack_events_to_shared
