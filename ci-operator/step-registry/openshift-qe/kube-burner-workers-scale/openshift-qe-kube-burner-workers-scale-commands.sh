@@ -21,8 +21,10 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=workers-scale
 export GC=$GARBAGE_COLLECTION
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-rosa login --env "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+export ROSA_LOGIN_ENV=$OCM_LOGIN_ENV
+ROSA_SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id")
+ROSA_SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret")
+ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
@@ -39,7 +41,9 @@ if [ -z "$END_TIME" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; the
   rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
 fi
 
+export ROSA_SSO_CLIENT_ID
+export ROSA_SSO_CLIENT_SECRET
+export ROSA_TOKEN
 export EXTRA_FLAGS
-
 
 ./run.sh
