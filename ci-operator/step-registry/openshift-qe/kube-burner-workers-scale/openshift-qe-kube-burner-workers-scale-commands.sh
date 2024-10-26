@@ -21,29 +21,51 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=workers-scale
 export GC=$GARBAGE_COLLECTION
-export ROSA_LOGIN_ENV=$OCM_LOGIN_ENV
-ROSA_SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id")
-ROSA_SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret")
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
+ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+  export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+else
+  echo "Did not find compatible cloud provider cluster_profile"
+  exit 1
+fi
+
+if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
+  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+else
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  exit 1
+fi
+
 EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-if [ -z "$START_TIME" ] && [ -f "${SHARED_DIR}/workers_scale_event_epoch.txt" ]; then
+if [ "$DEPLOY_AUTOSCALER" = "false" ] && [ -f "${SHARED_DIR}/workers_scale_event_epoch.txt" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; then
   START_TIME=$(cat "${SHARED_DIR}/workers_scale_event_epoch.txt")
   export START_TIME
-  rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
-fi
-
-if [ -z "$END_TIME" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; then
   END_TIME=$(cat "${SHARED_DIR}/workers_scale_end_epoch.txt")
   export END_TIME
+  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME}" 
+  rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
   rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
 fi
 
-export ROSA_SSO_CLIENT_ID
-export ROSA_SSO_CLIENT_SECRET
-export ROSA_TOKEN
 export EXTRA_FLAGS
 
 ./run.sh
