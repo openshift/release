@@ -323,6 +323,9 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
+    'ibmcloud-gpu-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-east': 3,
     },
@@ -370,6 +373,9 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
+    },
+    'gcp-chaos-quota-slice': {
+        'us-central1': 10,
     },
     'aws-kubevirt-quota-slice': {
         'us-east-2': 10,

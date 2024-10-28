@@ -1,0 +1,22 @@
+chain:
+  as: hypershift-openstack-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    commands: |-
+      set -euo pipefail
+
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+      bin/hypershift destroy cluster openstack \
+        --name ${CLUSTER_NAME} \
+        --cluster-grace-period 40m
+      echo "$(date) Finished deleting cluster"
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
+  - ref: openstack-deprovision-dnsrecords

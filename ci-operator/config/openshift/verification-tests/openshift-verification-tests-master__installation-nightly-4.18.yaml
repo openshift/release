@@ -56,6 +56,25 @@ resources:
       cpu: 400m
       memory: 800Mi
 tests:
+- as: aws-ipi-multi-cidr-arm-f14
+  cron: 37 3 3,17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-cases-multi-cidr
+- as: aws-ipi-valid-endpoints-f14
+  cron: 39 17 1,17 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-aws-cases-valid-endpoints
 - as: aws-ipi-proxy-whitelist-arm-f14
   cron: 31 13 9,25 * *
   steps:
@@ -113,6 +132,27 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
+- as: azure-ipi-confidentialvm-vmgueststateonly-compute-f28
+  cron: 15 21 17 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_DC4ads_v5
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
+- as: azure-ipi-confidential-trustedlaunch-compute-f28
+  cron: 47 21 27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
 - as: azure-ipi-custom-nsg-f28
   cron: 49 13 27 * *
   steps:
