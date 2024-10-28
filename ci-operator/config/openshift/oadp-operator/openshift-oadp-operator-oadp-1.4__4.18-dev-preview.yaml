@@ -32,6 +32,7 @@ resources:
 tests:
 - always_run: false
   as: e2e-test-aws
+  optional: true
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
   steps:
     cluster_profile: aws
@@ -46,58 +47,6 @@ tests:
     - as: e2e
       cli: latest
       commands: make test-e2e
-      credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
-      from: test-oadp-operator-1.4
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-aws
-- always_run: false
-  as: e2e-test-kubevirt-aws
-  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable-1.4
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      cli: latest
-      commands: make TEST_VIRT=true test-e2e
-      credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
-      from: test-oadp-operator-1.4
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-aws
-- always_run: false
-  as: e2e-test-kubevirt-aws-periodic
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable-1.4
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      cli: latest
-      commands: make TEST_VIRT=true test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials

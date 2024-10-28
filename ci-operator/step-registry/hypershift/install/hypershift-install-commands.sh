@@ -14,6 +14,10 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
+fi
+
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi

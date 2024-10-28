@@ -1,0 +1,20 @@
+workflow:
+  as: telcov10n-sno-spoke
+  steps:
+    pre:
+    - ref: baremetal-lab-pre-reserve-nodes
+    - ref: baremetal-lab-pre-dhcp-conf
+    - chain: baremetal-lab-pre-load-balancer
+    - ref: baremetal-lab-pre-dns
+    - ref: baremetal-lab-pre-firewall
+    - ref: telcov10n-sno-spoke-get-and-share-hub-cluster-profile
+    - chain: telcov10n-sno-spoke-deploy
+    post:
+    - ref: wait
+    - chain: telcov10n-sno-spoke-clean-up-hub-services
+    - chain: baremetal-lab-post
+    env:
+      TIMEOUT: "+10 hour"
+      PR_ONLY: "true"
+  documentation: |-
+    Setup ZTP environment to install a Spoke cluster using a preserved Hub cluster.

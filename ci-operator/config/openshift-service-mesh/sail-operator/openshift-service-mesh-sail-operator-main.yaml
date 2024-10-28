@@ -34,24 +34,30 @@ resources:
 tests:
 - as: unit
   commands: |
-    make test.unit \
-    BUILD_WITH_CONTAINER="0" \
-    GOBIN="/gobin" \
-    GOCACHE="/tmp/cache" \
-    GOMODCACHE="/tmp/cache" \
-    XDG_CACHE_HOME="/tmp/cache" \
-    TEST_FLAGS="-v"
+    export BUILD_WITH_CONTAINER="0"
+    export VERSIONS_YAML_FILE="versions.yaml"
+    export GOBIN="/gobin"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export TEST_FLAGS="-v "
+    # generate everything using versions.yaml not ossm/versions.yaml
+    make gen
+    make test.unit
   container:
     from: src
   timeout: 1h0m0s
 - as: integration
   commands: |
-    make test.integration \
-    BUILD_WITH_CONTAINER="0" \
-    GOBIN="/gobin" \
-    GOCACHE="/tmp/cache" \
-    GOMODCACHE="/tmp/cache" \
-    XDG_CACHE_HOME="/tmp/cache"
+    export BUILD_WITH_CONTAINER="0"
+    export VERSIONS_YAML_FILE="versions.yaml"
+    export GOBIN="/gobin"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    export XDG_CACHE_HOME="/tmp/cache"
+    # generate everything using versions.yaml not ossm/versions.yaml
+    make gen
+    make test.integration
   container:
     from: src
   timeout: 1h0m0s
@@ -134,12 +140,15 @@ tests:
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c "\
+          export VERSIONS_YAML_FILE=versions.yaml && \
           export KUBECONFIG=/work/ci-kubeconfig && \
           oc version && \
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -187,11 +196,14 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
           oc version && \
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -241,11 +253,14 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
           oc version && \
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -295,6 +310,9 @@ tests:
           "export TAG=PR-${PULL_NUMBER} && \
           cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.e2e.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -344,77 +362,15 @@ tests:
           "export KUBECONFIG=/work/ci-kubeconfig && \
           cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.scorecard"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: nightly-images
-  cron: 00 03 * * *
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
-      MAISTRA_NAMESPACE: maistra-nightly-images
-      MAISTRA_SC_POD: maistra-nightly-images-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # copy the script to privileged pod
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: build
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /quay-secret/password)
-        export GITHUB_TOKEN=$(cat /creds-github/token)
-        # login to quay.io in the privileged pod
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          docker login -u='maistra-dev+prow' \
-          -p=${QUAY_PASS} quay.io
-        # build and push images and publish the bundle into OperatorHub
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "git config --global user.email 'jwendell@redhat.com'; \
-           git config --global user.name 'Jonh Wendell'; \
-           cd /work && \
-           export BUILD_WITH_CONTAINER="0" && \
-           rm Makefile.vendor.mk bundle/**/*.yaml && \
-           make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
-      - mount_path: /creds-github
-        name: ossm-github
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:

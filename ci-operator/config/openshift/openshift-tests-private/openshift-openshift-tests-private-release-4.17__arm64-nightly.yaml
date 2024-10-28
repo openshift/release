@@ -289,7 +289,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-part2-3
   cron: 15 13 6,18,27 * *
@@ -304,7 +304,7 @@ tests:
       OCP_ARCH: arm64
       TEST_SCENARIOS: MCO|Cluster_Infrastructure
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-longduration-reliability-test-f14
   cron: 25 0 12,26 * *
@@ -397,7 +397,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-hypershift-qe-longduration
+    - chain: openshift-e2e-test-hypershift-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-mgmt-f7
   cron: 58 16 2,9,16,25 * *
@@ -437,7 +437,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt-longduration
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-private-f28-disasterrecovery
   cron: 11 11 19 * *
@@ -604,6 +604,27 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
+- as: baremetal-compact-agent-ipv4-static-fips-day2-f14
+  cluster: build05
+  cron: 47 13 5,19 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "2"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-day2
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
   cluster: build05
   cron: 0 16 1,17 * *
@@ -706,8 +727,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv4-f4
-  cron: 5 11 3,7,13,17,21,25,29 * *
+- as: baremetalds-ipi-ovn-ipv4-f14
+  cron: 6 21 11,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:

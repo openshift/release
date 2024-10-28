@@ -7,22 +7,26 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
-build_root:
-  image_stream_tag:
-    name: builder-priv
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
     namespace: ocp-private
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
 canonical_go_repository: github.com/openshift/azure-kubernetes-kms
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: azure-kms-encryption-provider
 promotion:
   to:

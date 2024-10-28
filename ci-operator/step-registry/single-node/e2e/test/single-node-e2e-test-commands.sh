@@ -11,6 +11,16 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+# In order for openshift-tests to pull external binary images from the
+# payload, we need access enabled to the images on the build farm. In
+# order to do that, we need to unset the KUBECONFIG so we talk to the
+# build farm, not the cluster under test.
+echo "Granting access for image pulling from the build farm..."
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until

@@ -31,7 +31,7 @@ export WORKLOAD=cluster-density-v2
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # Run a non-indexed warmup for scheduling inconsistencies
-ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
+ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false EXTRA_FLAGS='--pod-ready-threshold=2m' ./run.sh
 
 # The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))

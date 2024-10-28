@@ -41,6 +41,8 @@ chain:
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
       EOF
 
         TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
@@ -136,6 +138,10 @@ chain:
         TEST_SKIPS="${TEST_SKIPS:+${TEST_SKIPS}\|}\[Suite:openshift/conformance/parallel\]"
         TEST_SUITE="openshift/conformance/parallel"
       fi
+
+      if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
+        export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+      fi
       
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
@@ -202,6 +208,12 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+        program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+        details. The file must be present in ${SHARED_DIR}.
     resources:
       requests:
         cpu: "3"
