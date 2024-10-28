@@ -82292,7 +82292,18 @@ periodics:
     ci-operator.openshift.io/variant: multi-stable-openshift-logging-6.0
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.17-multi-stable-openshift-logging-6.0-aws-ipi-proxy-sts-mixarch-f7
+  name: periodic-ci-openshift-openshift-tests-private-release-4.17-multi-stable-openshift-logging-6.0-aws-ipi-proxy-sts-mixarch-f7-logging
+  reporter_config:
+    slack:
+      channel: '#aos-qe-logging'
+      job_states_to_report:
+      - aborted
+      - error
+      - failure
+      - pending
+      - success
+      report_template: Job {{.Spec.Job}} state is *{{.Status.State}}* <{{.Status.URL}}|View
+        logs>
   spec:
     containers:
     - args:
@@ -82302,8 +82313,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-ipi-proxy-sts-mixarch-f7-cluster-profile
-      - --target=aws-ipi-proxy-sts-mixarch-f7
+      - --secret-dir=/usr/local/aws-ipi-proxy-sts-mixarch-f7-logging-cluster-profile
+      - --target=aws-ipi-proxy-sts-mixarch-f7-logging
       - --variant=multi-stable-openshift-logging-6.0
       command:
       - ci-operator
@@ -82320,7 +82331,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-ipi-proxy-sts-mixarch-f7-cluster-profile
+      - mountPath: /usr/local/aws-ipi-proxy-sts-mixarch-f7-logging-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
