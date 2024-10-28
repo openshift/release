@@ -9,9 +9,9 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.22-openshift-4.17
 images:
-  - context_dir: .
-    dockerfile_path: Dockerfile
-    to: distributed-tracing-tests-runner
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: distributed-tracing-tests-runner
 releases:
   latest:
     candidate:
@@ -24,32 +24,32 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-  - always_run: false
-    as: distributed-tracing-tests-dast
-    cluster_claim:
-      architecture: amd64
-      cloud: aws
-      labels:
-        region: us-east-2
-      owner: obs-tracing
-      product: ocp
-      timeout: 1h0m0s
-      version: "4.14"
-    steps:
-      env:
-        OPERATORS: |
-          [
-              {"name": "elasticsearch-operator", "source": "dt-catalogsource", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-              {"name": "amq-streams", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-              {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
-              {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
-              {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
-          ]
-      test:
-        - ref: enable-stage-catalogsource
-        - ref: install-operators
-        - ref: distributed-tracing-tests-dast
-      workflow: generic-claim
+- always_run: false
+  as: distributed-tracing-tests-dast
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
+    env:
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "dt-catalogsource", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "amq-streams", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-dast
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
