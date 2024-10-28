@@ -332,6 +332,7 @@ fi
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
+  PROVISION_SHARD_ID=$(read_profile_file "${HOSTED_CP_PROVISION_SHARD_ID_SECRET}")
   if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
     psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
     if [[ -z "$psList" ]]; then
@@ -344,7 +345,6 @@ if [[ "$HOSTED_CP" == "true" ]]; then
       fi
     fi
 
-    PROVISION_SHARD_ID=""
     # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
@@ -361,7 +361,10 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
-
+  
+  if [[ ! -z "$PROVISION_SHARD_ID" ]]; then
+    HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+  fi
   ENABLE_BYOVPC="true"
   BYO_OIDC="true"
 fi

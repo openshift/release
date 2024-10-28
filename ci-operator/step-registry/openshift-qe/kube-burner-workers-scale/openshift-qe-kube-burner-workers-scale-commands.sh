@@ -32,6 +32,7 @@ read_profile_file() {
 ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
+HCP_MC_CLUSTER_ID=$(read_profile_file "${HCP_MC_CLUSTER_ID_SECRET}")
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -44,15 +45,22 @@ fi
 if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
   echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
   rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
+  ocm login --url "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
 elif [[ -n "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
   rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  ocm login --url "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 
 EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
+
+if [ "$KB_WS_HCP" = "true" ] && [ -n "${HCP_MC_CLUSTER_ID}" ]; then
+  ocm get /api/clusters_mgmt/v1/clusters/${HCP_MC_CLUSTER_ID}/credentials | jq -r '.kubeconfig' > "${SHARED_DIR}/kube_burner_mc_kubeconfig"
+  EXTRA_FLAGS="${EXTRA_FLAGS} --mc-kubeconfig ${SHARED_DIR}/kube_burner_mc_kubeconfig"
+fi
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 

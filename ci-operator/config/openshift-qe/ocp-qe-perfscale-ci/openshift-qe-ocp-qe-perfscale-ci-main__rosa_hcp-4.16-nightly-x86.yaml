@@ -6,7 +6,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -28,21 +28,52 @@ tests:
   cron: 0 1 9,23 * *
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
+      ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
+      HOSTED_CP_PROVISION_SHARD_ID_SECRET: hcp-provision-shard-id
       INDEX_ENABLED: "true"
+      KB_WS_HCP: "true"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.16"
       READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "24"
+      REGION: us-east-2
+      REPLICAS: "3"
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-kube-burner-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+- as: kube-burner-workers-autoscale-24nodes
+  cron: 0 8 29 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DEPLOY_AUTOSCALER: "true"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      HOSTED_CP_PROVISION_SHARD_ID_SECRET: hcp-provision-shard-id
+      INDEX_ENABLED: "true"
+      KB_WS_HCP: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.16"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-east-2
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-kube-burner-workers-scale
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
 - as: node-density-heavy-24nodes
