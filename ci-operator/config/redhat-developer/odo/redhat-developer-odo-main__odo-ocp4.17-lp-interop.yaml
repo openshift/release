@@ -18,22 +18,24 @@ images:
   to: oc-bin-image
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.17"
+      version_bounds:
+        lower: 4.17.0-0
+        stream: 4-stable
+        upper: 4.18.0-0
 resources:
   '*':
     requests:
       cpu: 800m
       memory: 6Gi
 tests:
-- as: odo-scenario-aws
+- as: odo-scenario-ibmcloud
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -42,14 +44,12 @@ tests:
               {"step": "odo-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ODO", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","odo-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      USER_TAGS: |
-        scenario odo
     test:
     - ref: odo-tests
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 - as: odo-scenario-aws-fips
   cron: 0 6 11 2 *
   steps:
