@@ -347,6 +347,7 @@ function run {
 
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
+    create_must-gather_dir_for_case
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -588,6 +589,23 @@ function check_case_selected {
         echo "find case"
     else
         echo "do not find case"
+    fi
+}
+function create_must-gather_dir_for_case {
+    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
+    # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
+
+    if echo ${test_scenarios} | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
+        mkdir -p "${ARTIFACT_DIR}/must-gather" || true
+        if [ -d "${ARTIFACT_DIR}/must-gather" ]; then
+            export QE_MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
+        else
+            unset QE_MUST_GATHER_DIR
+        fi
+        # need to check if QE_MUST_GATHER_DIR is empty in case code. 
+        # if empty, it means there is no such dir, can not put must-gather file into there.
+        # if it is not empty, it means there is such dir. and need to check the existing dir size + must-gather file size is 
+        # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
 run

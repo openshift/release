@@ -448,6 +448,19 @@ tests:
       AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-min-perms
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
@@ -651,6 +664,13 @@ tests:
         function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-singlestackv6
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-singlestackv6
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -885,6 +905,17 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
   timeout: 6h0m0s
+- as: integration-tests-nodejoiner
+  run_if_changed: ^(cmd|pkg|data).*/(agent|node-joiner)/
+  steps:
+    test:
+    - as: integration-tests-nodejoiner
+      commands: |
+        hack/go-integration-test-nodejoiner.sh
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
 - as: integration-tests
   run_if_changed: ^(cmd|pkg|data).*/(agent|imagebased)/
   steps:
@@ -1014,7 +1045,7 @@ tests:
     env:
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
-      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+      OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
     post:
     - chain: gather-network
     - chain: gather-core-dump

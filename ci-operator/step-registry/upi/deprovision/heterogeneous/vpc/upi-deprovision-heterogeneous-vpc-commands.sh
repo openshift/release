@@ -74,7 +74,6 @@ function setup_terraform_cli() {
 
 function cleanup_ibmcloud_vpc() {
   cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
-
   echo "Cleaning up Instances"
   for INS in $(ic is instances --output json | jq -r '.[].id')
   do
@@ -85,17 +84,15 @@ function cleanup_ibmcloud_vpc() {
       sleep 60
     fi
   done
-
   echo "Cleaning up COS Instances"
-  VALID_COS=$(ic resource service-instances 2> /dev/null | grep "${cos_name}" || true)
-  if [ -n "${VALID_COS}" ]
-  then
-    for COS in $(ic resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
-    do
-      retry "ic resource service-instance-delete ${COS} --force --recursive"
-    done
-  fi
-
+   VALID_COS=$(ic resource service-instances 2> /dev/null | grep "${cos_name}" || true)
+   if [ -n "${VALID_COS}" ]
+   then
+     for COS in $(ic resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
+     do
+       retry "ic resource service-instance-delete ${COS} --force --recursive"
+     done
+   fi
   echo "Done cleaning up prior runs"
 }
 

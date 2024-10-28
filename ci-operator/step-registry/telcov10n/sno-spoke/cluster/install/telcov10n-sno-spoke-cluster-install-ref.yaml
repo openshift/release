@@ -1,0 +1,34 @@
+ref:
+  as: telcov10n-sno-spoke-cluster-install
+  commands: telcov10n-sno-spoke-cluster-install-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: GITEA_HELPER_IMG
+    default: "quay.io/ccardenosa/sno-spoke-helper"
+    documentation: |-
+      Gitea helper image to connect to the Git repo via SSH
+  - name: AUX_HOST
+    default: ""
+  - name: REFRESH_TIME
+    default: "3m"
+    documentation: |-
+      The rate at which the cluster installation progress logs are displayed.
+  - name: ABORT_INSTALLATION_TIMEOUT
+    default: "2 hours + 20 min"
+    documentation: |-
+      Set the amount of time, the step must wait at most, before unconditionally forcing the workflow to continue
+      with the next steps which will clean up and free all resources used in the deployment of this cluster
+      (MIN: "REFRESH_TIME value", default: "2 hours + 20 min" min", MAX: "2 hours + 40 min").
+  documentation: |-
+    This step allows to setup the artifacts need to deploy a SNO Spoke cluster 
