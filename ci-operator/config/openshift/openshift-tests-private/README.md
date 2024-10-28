@@ -50,6 +50,7 @@ Job frequency is defined by cron according to the test requirements
 - f4: every 4 days
 - f5: every 5 days
 - ...
+- f999: disable the job temporarely
 
 ~~~
 NOTE: We can use below script to generate cron settings against the frequency:
