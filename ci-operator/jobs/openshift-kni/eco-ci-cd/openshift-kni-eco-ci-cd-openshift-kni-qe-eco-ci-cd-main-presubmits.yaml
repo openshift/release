@@ -3,8 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
+    - ^openshift-kni-qe-eco-ci-cd-main$
+    - ^openshift-kni-qe-eco-ci-cd-main-
     cluster: build03
     context: ci/prow/ocp-4.16-Telco-dast-distributed-tracing-tests-dast
     decorate: true
@@ -15,7 +15,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-eco-ci-cd-main-ocp-4.16-Telco-dast-distributed-tracing-tests-dast
+    name: pull-ci-openshift-kni-eco-ci-cd-openshift-kni-qe-eco-ci-cd-main-ocp-4.16-Telco-dast-distributed-tracing-tests-dast
     rerun_command: /test ocp-4.16-Telco-dast-distributed-tracing-tests-dast
     spec:
       containers:
@@ -72,61 +72,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ocp-4.16-Telco-dast-distributed-tracing-tests-dast,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/telco-operators-dast-4.16-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: telco-operators-dast-4.16
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-eco-ci-cd-main-telco-operators-dast-4.16-images
-    rerun_command: /test telco-operators-dast-4.16-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=telco-operators-dast-4.16
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )telco-operators-dast-4.16-images,?($|\s.*)

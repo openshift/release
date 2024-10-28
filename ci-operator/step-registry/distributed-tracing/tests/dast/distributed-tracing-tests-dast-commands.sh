@@ -14,6 +14,8 @@ then
 fi
 
 #Copy the distributed-tracing-qe repo files to a writable directory.
+cd /tmp/
+git clone https://github.com/obochan-rh/distributed-tracing-qe.git # test from obochan fork
 cp -R /tmp/distributed-tracing-qe /tmp/distributed-tracing-tests && cd /tmp/distributed-tracing-tests
 
 # Execute Distributed Tracing tests

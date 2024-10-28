@@ -1,0 +1,78 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM golang:1.21
+
+      # Copy the repository files
+      COPY . /tmp/distributed-tracing-qe
+
+      WORKDIR /tmp
+
+      # Set the Go path and Go cache environment variables
+      ENV GOPATH=/tmp/go
+      ENV GOBIN=/tmp/go/bin
+      ENV GOCACHE=/tmp/.cache/go-build
+      ENV PATH=$PATH:$GOBIN
+
+      # Create the /tmp/go/bin and build cache directories, and grant read and write permissions to all users
+      RUN mkdir -p /tmp/go/bin $GOCACHE \
+      && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
+
+      # Install dependencies required by test cases and debugging
+      RUN apt-get update && apt-get install -y jq vim libreadline-dev
+
+      # Install Chainsaw e2e testing tool
+      RUN go install github.com/kyverno/chainsaw@v0.2.0
+
+      # Install kubectl and oc
+      RUN curl -LO https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz \
+      && tar -xzf openshift-client-linux.tar.gz \
+      && chmod +x oc kubectl \
+      && mv oc kubectl /usr/local/bin/
+
+      # Set the working directory
+      WORKDIR /tmp/distributed-tracing-qe
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: distributed-tracing-tests-dast
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    env:
+      OPERATORS: |
+        [
+         {"name": "ptp-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-ptp","target_namespaces": "openshift-ptp", "operator_group": "ptp-operators"},
+         {"name": "numaresources-operator", "source": "redhat-operators", "channel": "4.16", "install_namespace": "openshift-numaresources","target_namespaces": "openshift-numaresources", "operator_group": "numaresources-operator"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-dast
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: ocp-4.16-Telco-dast
