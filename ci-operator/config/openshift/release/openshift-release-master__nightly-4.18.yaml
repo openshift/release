@@ -67,6 +67,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
   vsphere-csi-driver-operator-test:
     name: "4.18"
     namespace: ocp
@@ -208,9 +212,6 @@ tests:
     cluster_profile: packet-sno
     env:
       PACKET_OS: rocky_9
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
@@ -220,9 +221,6 @@ tests:
       PACKET_OS: rocky_9
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: baremetalds-sno
 - as: e2e-metal-ipi-ovn-ipv4
   cluster: build05
@@ -899,6 +897,7 @@ tests:
     cluster_profile: aws
     test:
     - ref: network-flow-matrix-tests
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 23 * * 3
@@ -906,6 +905,7 @@ tests:
     cluster_profile: aws
     test:
     - ref: network-flow-matrix-tests
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
@@ -1051,7 +1051,7 @@ tests:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-agent-compact-ipv4-conformance
+- as: e2e-agent-compact-fips
   cluster: build05
   cron: 0 */12 * * *
   steps:
@@ -1167,6 +1167,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-4y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1177,6 +1178,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-5y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1187,6 +1189,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-6y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1197,6 +1200,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-7y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1207,6 +1211,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-8y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1217,6 +1222,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-9y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1227,6 +1233,7 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-10y-age-90d
   cron: 0 8 * * Fri
   steps:
@@ -1237,6 +1244,112 @@ tests:
       PACKET_OS: rocky_9
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-1y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "365"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-2y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "730"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-3y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "1100"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-4y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "1470"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-5y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "1830"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-6y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "2190"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-7y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "2560"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-8y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "2930"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-9y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "3290"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+  timeout: 6h0m0s
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown-10y-age-90d
+  cron: 0 16 * * Fri
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "3650"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
   cron: 0 8 * * Fri
   steps:
@@ -1394,7 +1507,6 @@ tests:
   steps:
     cluster_profile: packet-sno
     test:
-    - ref: baremetalds-sno-conf
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
