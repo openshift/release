@@ -39,14 +39,22 @@ vc_tag_association:
     }
  -  {
       tag: "us-east-1",
-      object_type: "HostSystem",
-      object_name: "{{ hostvars[groups['esxi'][0]].NESTEDVMIP }}"
+      object_type: "ClusterComputeResource",
+      object_name: "${NESTED_CLUSTER}"
     }
- -  {
-      tag: "us-east-2",
-      object_type: "HostSystem",
-      object_name: "{{ hostvars[groups['esxi'][1]].NESTEDVMIP }}"
-    }
+
+#  -  {
+#       tag: "us-east-1",
+#       object_type: "HostSystem",
+#       object_name: "{{ hostvars[groups['esxi'][0]].NESTEDVMIP }}"
+#     }
+#  -  {
+#       tag: "us-east-2",
+#       object_type: "HostSystem",
+#       object_name: "{{ hostvars[groups['esxi'][1]].NESTEDVMIP }}"
+#     }
+
+vc_host_tags: []
 
 # when defined, a host group will be created for each host group listed
 # below. a single host will be placed in each host group. The number of
@@ -71,17 +79,6 @@ platform:
     failureDomains:
       - server: ${NESTED_VCENTER}
         name: "nested-host-group-1"
-        zone: us-central-1a
-        region: us-central
-        topology:
-          resourcePool: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}/Resources/ipi-ci-clusters
-          computeCluster: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}
-          datacenter: ${NESTED_DATACENTER}
-          datastore: /${NESTED_DATACENTER}/datastore/dsnested
-          networks:
-            - ${GOVC_NETWORK}
-      - server: ${NESTED_VCENTER}
-        name: "nested-host-group-2"
         zone: us-central-1a
         region: us-central
         topology:
