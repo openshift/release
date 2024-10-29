@@ -6,7 +6,7 @@ set -o pipefail
 
 # enable for debug
 # exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+set -x
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
@@ -63,6 +63,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
+# shellcheck disable=SC2034
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -70,6 +71,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfqe1": {"port": 6443, "ip": "10.46.100.20", "hvip": 10.46.100.1}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -80,7 +84,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster | to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -103,8 +107,8 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   gather_facts: false
   tasks:
 
-  - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+  # - name: Release cluster from job
+  #   command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME -s
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -208,7 +212,8 @@ cp $SHARED_DIR/inventory inventory/billerica_inventory
 # Run the playbook to remove SNO
 echo "Run the playbook to remove SNO management cluster"
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-    $SHARED_DIR/delete-sno.yml
+    $SHARED_DIR/delete-sno.yml \
+    -vvvv
 
 # shellcheck disable=SC1083
 SNO_IP=$(ansible-playbook -vv ~/freeip.yml 2>/dev/null | grep '"free_ip": ' | tail -1  | awk {'print $2'} | tr -d '"')
@@ -310,11 +315,16 @@ fi
 
 if [[ "$status" == "0" ]]; then
     echo "Run fetch kubeconfig playbook"
-    ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
+    ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vvvvv || eval $PROCEED_AFTER_FAILURES
 
     echo "Run fetching information for clusters"
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
+    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vvvvv || eval $PROCEED_AFTER_FAILURES
 fi
+
+ansible-playbook -vv playbooks/performance_profile.yml -e kubeconfig=$SHARED_DIR/mgmt-kubeconfig
+
+cat $SHARED_DIR/kubeconfig || true
+cp $SHARED_DIR/kubeconfig ${ARTIFACT_DIR}/mykubeconf || true
 
 echo "Exiting with status ${status}"
 exit ${status}
