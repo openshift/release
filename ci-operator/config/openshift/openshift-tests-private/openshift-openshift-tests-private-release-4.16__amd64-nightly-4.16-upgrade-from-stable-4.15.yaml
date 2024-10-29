@@ -15,6 +15,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,6 +35,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -238,6 +246,29 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift-full
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-rosa-hcp-upgrade-cp-stage-f7
+  cron: 21 12 1,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      AVAILABLE_UPGRADE: "yes"
+      CHANNEL_GROUP: stable
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HCP_NODE_UPGRADE_ENABLED: "false"
+      HOSTED_CP: "true"
+      NODE_UPGRADE_TIMEOUT: "14400"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "3"
+      UPGRADED_TO_VERSION: "4.16"
+      ZONES_COUNT: "3"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    workflow: rosa-aws-sts-hcp
 - as: aws-ipi-shared-vpc-phz-f14
   cron: 59 6 14,28 * *
   steps:
