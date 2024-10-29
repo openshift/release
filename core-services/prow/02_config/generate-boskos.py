@@ -91,6 +91,10 @@ CONFIG = {
         'us-east-1': 5,
         'us-east-2': 5,
     },
+    'aws-sustaining-autorelease-412-quota-slice': {
+        # We can re-configure later as per requirement
+        'us-east-1': 2,
+    },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
     },
@@ -323,6 +327,9 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
+    'ibmcloud-gpu-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-east': 3,
     },
@@ -370,6 +377,9 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
+    },
+    'gcp-chaos-quota-slice': {
+        'us-central1': 10,
     },
     'aws-kubevirt-quota-slice': {
         'us-east-2': 10,

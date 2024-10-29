@@ -29,8 +29,13 @@ elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
   then
   CNV_RELEASE_CHANNEL=stable
 else
-  CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
-  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
+  if [ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]; then
+    cnv_version=4.99
+  else
+    cnv_version=$(ocp_version)
+  fi
+  CNV_RELEASE_CHANNEL=nightly-${cnv_version}
+  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
@@ -150,6 +155,8 @@ spec:
     deployKubevirtIpamController: true
     enableCommonBootImageImport: false
     primaryUserDefinedNetworkBinding: true
+  virtualMachineOptions:
+    disableSerialConsoleLog: false
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8
@@ -160,6 +167,3 @@ spec:
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
-
-echo "Installing VM console logger in order to aid debugging potential VM boot issues"
-oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
