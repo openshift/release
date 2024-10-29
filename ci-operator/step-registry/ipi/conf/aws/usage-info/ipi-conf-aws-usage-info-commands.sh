@@ -8,15 +8,6 @@ set +e
 
 env > "${ARTIFACT_DIR}/prow-ci-env.log"
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
-
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-rm /tmp/pull-secret
-
 job_type="${JOB_TYPE:-}"
 user=""
 pull_number="null"
@@ -44,6 +35,21 @@ usage-pull-request ${pull_number}
 usage-ci-type ${ci_type}
 EOF
 
+# for hypershift mgmt cluster, store one more cluster info file for the hosted cluster
+if [[ "${USAGE_CLUSTER_TYPE}" == "hypershift-mgmt" ]]; then
+  hosted_cluster_file="${SHARED_DIR}/hosted_cluster_info_file"
+  cp "${cluster_info_file}" "${hosted_cluster_file}"
+  sed -ie 's|usage-cluster-type.*|usage-cluster-type hypershift-hosted|' "${hosted_cluster_file}"
+fi
+
+CONFIG="${SHARED_DIR}/install-config.yaml"
+
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
 
 if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
     while read -r TAG VALUE
