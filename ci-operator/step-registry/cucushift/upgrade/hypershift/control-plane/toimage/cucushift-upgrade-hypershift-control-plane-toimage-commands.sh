@@ -134,7 +134,7 @@ fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-echo "Monitoring for node recreation for 5 minutes..."
+echo "Monitoring for node recreation for 10 minutes..."
 END_TIME=$((SECONDS + 600))
 while [ $SECONDS -lt $END_TIME ]; do
   check_node
