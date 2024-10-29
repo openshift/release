@@ -56,6 +56,8 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 
+sleep 3600
+
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required by oc-mirror since 4.18.
 if ! whoami &> /dev/null; then
     if [[ -w /etc/passwd ]]; then
