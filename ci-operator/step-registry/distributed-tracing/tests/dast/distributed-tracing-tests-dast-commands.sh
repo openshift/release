@@ -15,7 +15,7 @@ fi
 
 #Copy the distributed-tracing-qe repo files to a writable directory.
 cd /tmp/
-git clone -b /nrop-test https://github.com/obochan-rh/distributed-tracing-qe.git /tmp/dastnrop/ # test from obochan fork
+git clone -b nrop-test https://github.com/obochan-rh/distributed-tracing-qe.git /tmp/dastnrop/ # test from obochan fork
 cp -R /tmp/dastnrop/ /tmp/distributed-tracing-tests && cd /tmp/distributed-tracing-tests
 
 # Execute Distributed Tracing tests
