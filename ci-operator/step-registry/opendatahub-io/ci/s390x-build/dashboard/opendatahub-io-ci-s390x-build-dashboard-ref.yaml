@@ -1,16 +1,9 @@
 ref:
-  as: opendatahub-io-ci-s390x-build
-  commands: opendatahub-io-ci-s390x-build-commands.sh
-  credentials:
-    - mount_path: /secrets/opendatahub-io-push-secret
-      name: opendatahub-io-push-secret
-      namespace: test-credentials
-  dependencies:
-    - env: SOURCE_IMAGE_REF
-      name: src
-  documentation: |-
-    This workflow builds and pushes a s390x architecture image for the specified platforms.
+  as: opendatahub-io-ci-s390x-build-dashboard
+  from: dev-scripts
   env:
+    - name: AGENT_IBMZ_CREDENTIALS
+      default: /etc/hypershift-agent-ibmz-credentials
     - name: IMAGE_REPO
       default: ""
       documentation: |-
@@ -48,16 +41,17 @@ ref:
       documentation: |-
         The directory where credentials will be mounted.
     - name: PLATFORMS
-      default: "linux/s390x"
+      default: "linux/s390x,linux/amd64"
       documentation: |-
-        The platforms for which the s390x architecture image will be built.
-  from_image:
-    name: "odh-dind"
-    namespace: odh-multi
-    tag: latest
+        The platforms for which the specified architecture image will be built.
+  commands: opendatahub-io-ci-s390x-build-dashboard-commands.sh
   resources:
     requests:
-      cpu: 200m
-      memory: 400Mi
-  timeout: 2h0m0s
-
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  timeout: 60m
+  grace_period: 60s
