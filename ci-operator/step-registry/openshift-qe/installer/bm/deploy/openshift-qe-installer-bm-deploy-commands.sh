@@ -28,15 +28,15 @@ ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 smcipmitool_url:
-bastion_lab_interface: eno12399
-bastion_controlplane_interface: ens6f0
+bastion_lab_interface: $BASTION_LAB_INTERFACE
+bastion_controlplane_interface: $BASTION_CP_INTERFACE
 controlplane_network: 192.168.216.1/21
 controlplane_network_prefix: 21
-bastion_vlaned_interface: ens1f1
+bastion_vlaned_interface: $BASTION_VLANED_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-controlplane_lab_interface: eno1np0
+controlplane_lab_interface: $CONTROLPLANE_LAB_INTERFACE
 controlplane_pub_network_cidr:
 controlplane_pub_network_gateway:
 jumbo_mtu: false
