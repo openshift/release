@@ -56,6 +56,36 @@ resources:
       cpu: 400m
       memory: 800Mi
 tests:
+- as: aws-ipi-byo-iam-profile-master-f28
+  cron: 51 19 15 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_PROFILE_CONTROL_PLANE: "true"
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "false"
+      ENABLE_BYO_IAM_PROFILE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
+- as: aws-ipi-byo-iam-profile-worker-f28
+  cron: 21 3 16 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_PROFILE_CONTROL_PLANE: "false"
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "true"
+      ENABLE_BYO_IAM_PROFILE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
 - as: aws-ipi-multi-cidr-arm-f14
   cron: 37 3 3,17 * *
   steps:
