@@ -56,17 +56,35 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 
-sleep 3600
 
-# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required by oc-mirror since 4.18.
+# This is required by oc-mirror since 4.18.
 if ! whoami &> /dev/null; then
-    if [[ -w /etc/passwd ]]; then
-        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    else
-        echo "/etc/passwd is not writeable, and user matching this uid is not found."
-        exit 1
-    fi
+    user_name=$(id -u)
+else
+    user_name=$(whoami)
 fi
+for file in /etc/subuid /etc/subgid; do
+    if grep -q "$user_name" $file; then
+        echo "$user_name is already set in $file"
+    else
+        last_line=$(tail -1 $file)
+        if [[ -n "$last_line" ]]; then
+            n=$(echo "$last_line" | awk -F: '{print $2}')
+            m=$(echo "$last_line" | awk -F: '{print $3}')
+            start_id=$((n + m))
+        else
+            echo "no any existing users in $file"
+            start_id="100000"
+        fi
+        if [[ -w $file ]]; then
+            echo "${user_name}:${start_id}:65536" >> $file
+            echo "successfully updated $file"
+        else
+            echo "$file is not writeable, and user matching this uid is not found."
+            exit 1
+        fi
+    fi
+done
 oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
