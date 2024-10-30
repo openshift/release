@@ -7,18 +7,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.18_base-rhel9:
+  manila-csi-driver-operator-test:
     name: "4.18"
     namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: manila-csi-driver-operator-test
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.18
+  openstack-cinder-csi-driver-operator-test:
+    name: "4.18"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
   use_build_cache: true
@@ -29,13 +29,6 @@ images:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   inputs:
@@ -220,6 +213,50 @@ tests:
     test:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-openstack-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: experimental/reliability/minimal
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vexxhost-quota-slice
+    workflow: hypershift-openstack-conformance
+- always_run: false
+  as: e2e-openstack-csi-cinder
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
+- always_run: false
+  as: e2e-openstack-csi-manila
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift
