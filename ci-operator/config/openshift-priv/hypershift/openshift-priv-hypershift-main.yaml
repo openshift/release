@@ -11,14 +11,6 @@ base_images:
     name: 4.18-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
-  ocp_4.18_base-rhel9:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
@@ -38,13 +30,6 @@ images:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   inputs:
@@ -89,6 +74,16 @@ releases:
       product: ocp
       stream: ci
       version: "4.17"
+  n1minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
+  n2minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -117,6 +112,9 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
@@ -124,6 +122,9 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
