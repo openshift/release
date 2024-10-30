@@ -335,6 +335,7 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
+    sleep 3h
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
