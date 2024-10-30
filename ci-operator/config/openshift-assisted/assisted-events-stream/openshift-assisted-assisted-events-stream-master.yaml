@@ -5,8 +5,9 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.build
-  from: src
   to: assisted-events-stream-build
+- dockerfile_path: Dockerfile
+  to: assisted-events-stream
 resources:
   '*':
     limits:
@@ -18,10 +19,12 @@ tests:
 - as: unit-test
   commands: make unit-test
   container:
+    clone: true
     from: assisted-events-stream-build
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && make lint
   container:
+    clone: true
     from: assisted-events-stream-build
 zz_generated_metadata:
   branch: master
