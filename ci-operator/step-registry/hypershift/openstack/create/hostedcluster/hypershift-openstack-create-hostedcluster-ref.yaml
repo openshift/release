@@ -1,0 +1,47 @@
+ref:
+  as: hypershift-openstack-create-hostedcluster
+  cli: latest
+  commands: hypershift-openstack-create-hostedcluster-commands.sh
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: HYPERSHIFT_NODE_COUNT
+    default: "3"
+    documentation: "The number nodes to automatically create and join to the cluster."
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ""
+    documentation: "The cluster's FQDN will be a subdomain of the base domain."
+  - name: EXTRA_ARGS
+    default: ""
+    documentation: "Extra args to pass to the create cluster openstack command"
+  - name: ENABLE_ICSP
+    default: "false"
+    documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+  - name: HYPERSHIFT_HC_RELEASE_IMAGE
+    default: ""
+    documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+  - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+    default: "SingleReplica"
+    documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+  - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+    default: "SingleReplica"
+    documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+  - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+    default: "false"
+    documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+  - name: RHCOS_IMAGE_NAME
+    default: "rhcos-latest-hcp-nodepool"
+  from: hypershift-operator
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m0s
+  documentation: |-
+    Create a HostedCluster on the OpenStack platform.
