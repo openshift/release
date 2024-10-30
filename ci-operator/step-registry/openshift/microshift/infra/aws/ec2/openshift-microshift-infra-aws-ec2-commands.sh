@@ -6,9 +6,6 @@ source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
 trap_install_status_exit_code $EXIT_CODE_AWS_EC2_FAILURE
 
-cf_gen=$(mktemp /tmp/cf_gen.XXXXXXXX.yaml)
-curl -o "${cf_gen}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/aws/scripts/aws/cf-gen.yaml
-
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
 declare regions=(us-west-2 us-east-1 eu-central-1)
 # Use the first region in the list, as it should be the most stable, as the one where to push/pull caching
@@ -61,6 +58,8 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
+curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
+
 ec2Type="VirtualMachine"
 if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
   ec2Type="MetalMachine"
@@ -73,8 +72,6 @@ function save_stack_events_to_shared()
   aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
   set -o errexit
 }
-
-cat "${cf_gen}" > "${cf_tpl_file}"
 
 for aws_region in "${regions[@]}"; do
   REGION="${aws_region}"
