@@ -201,7 +201,7 @@ else
 
   # Check if we need to update the source volume
   CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
-  if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
+  if [[ -z "${CURRENT_SOURCE_VOLUME}" || "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
     # Delete the old source volume
     if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
       echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
@@ -222,7 +222,8 @@ else
       --name ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       --format qcow2 \
-      --capacity ${VOLUME_CAPACITY}
+      --capacity ${VOLUME_CAPACITY} \
+      --prealloc-metadata
 
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
@@ -258,7 +259,7 @@ if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
-if [ "$INSTALLER_TYPE" == "default" ]; then
+if [ "${INSTALLER_TYPE}" == "default" ]; then
   # Generating ignition configs
   echo "Generating ignition configs..."
   ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}
@@ -312,6 +313,7 @@ clone_volume () {
   ${VIRSH} vol-clone \
     --pool ${POOL_NAME} \
     --vol ${VOLUME_NAME} \
+    --prealloc-metadata \
     --newname ${1}
 }
 
