@@ -16,6 +16,9 @@ EOF
 chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$tmp_ssh_key")
 
+# Get current date
+current_date=$(date +%F)
+echo "Current date is $current_date"
 
 # Get IMAGE_TAG if not provided
 if [[ -z "$IMAGE_TAG" ]]; then
@@ -30,11 +33,11 @@ if [[ -z "$IMAGE_TAG" ]]; then
         postsubmit)
             echo "Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_VERSION}-${PULL_BASE_SHA:0:7}"
-            IMAGE_FLOATING_TAG="${RELEASE_VERSION}"
             ;;
         periodic)
             echo "Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_VERSION}-nightly-${current_date}"
+            IMAGE_FLOATING_TAG="${RELEASE_VERSION}-${YEAR_INDEX}"
             ;;
         *)
             echo "ERROR Cannot publish an image from a $JOB_TYPE job"
@@ -70,12 +73,20 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
     esac
 fi
 
-echo "Image tag is $IMAGE_TAG"
+# Build destination image reference
+DESTINATION_REGISTRY_REPO="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO"
+DESTINATION_IMAGE_REF="$DESTINATION_REGISTRY_REPO:$IMAGE_TAG"
+if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
+    FLOATING_IMAGE_REF="$DESTINATION_REGISTRY_REPO:$IMAGE_FLOATING_TAG"
+    DESTINATION_IMAGE_REF="$DESTINATION_IMAGE_REF $FLOATING_IMAGE_REF"
+fi
+
+echo "Image is $DESTINATION_IMAGE_REF"
 echo "commit hash is ${PULL_BASE_SHA:0:7}"
 echo "Entire commit has is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
 
-ALL_VARS ="IMAGE_TAG='$IMAGE_TAG' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'"
+ALL_VARS="DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'"
 export ALL_VARS
 
 # create ssh session to zvsi and pass the script
@@ -113,14 +124,14 @@ DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${
 docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}" "${REGISTRY_HOST}"
 
 # Build and push the multiarch image
-echo "pushing image ${IMAGE_REPO}:${IMAGE_TAG} to ${REGISTRY_HOST}/${REGISTRY_ORG} "
+echo "pushing image $DESTINATION_IMAGE_REF "
 docker buildx build --platform "${PLATFORMS}" \
-                    -t "${REGISTRY_HOST}/${REGISTRY_ORG}/${IMAGE_REPO}:${IMAGE_TAG}" \
+                    -t "$DESTINATION_IMAGE_REF" \
                     --push .
 
 if [ $? -eq 0 ]; then
-    echo "Build and publish has been successful for s390x with Image tag $IMAGAE_TAG"
+    echo "Build and publish has been successful for multiarch image $DESTINATION_IMAGE_REF "
 else
-    echo "Build and publish failed for s390x"
+    echo "Build and publish failed for multiarch image $DESTINATION_IMAGE_REF "
 fi
 EOF

@@ -84,7 +84,6 @@ if [ "$vpc_status" != "available" ]; then
 else 
   echo "VPC $infra_name-vpc is created successfully in the $IC_REGION region."
 fi
-vpc_crn=$(ibmcloud is vpc $infra_name-vpc | awk '/CRN/{print $2}')
 
 # Create subnet
 set -e
@@ -98,7 +97,6 @@ if [ "$sn_status" != "available" ]; then
 else 
   echo "Subnet $infra_name-sn is created successfully in the $infra_name-vpc VPC."
 fi
-sn_cidr=$(ibmcloud is subnet $infra_name-sn --vpc $infra_name-vpc --output JSON | jq -r '.ipv4_cidr_block')
 
 # Create zVSI compute nodes
 set -e
@@ -114,7 +112,6 @@ if [ "$zvsi_state" != "running" ]; then
   exit 1
 else 
   echo "Instance $infra_name-vm is created successfully in the $infra_name-vpc VPC."
-  zvsi_rip=$(ibmcloud is instance $infra_name-vm --output json | jq -r '.primary_network_interface.primary_ip.address')
 fi
 sg_name=$(ibmcloud is instance $infra_name-vm --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
 echo "Adding an inbound rule in the $infra_name-vm instance security group for ssh and scp."
