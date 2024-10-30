@@ -4,6 +4,10 @@ chain:
   - as: create-hostedcluster
     cli: latest
     env:
+    - name: FEATURE_SET
+      default: ""
+      documentation: |
+        This field sets the cluster feature set. This is used to enable custom features such as tech preview features
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
@@ -93,10 +97,14 @@ chain:
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
+      if [[ $FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+        COMMAND+=(--feature-set=TechPreviewNoUpgrade)
+      fi
+
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
       fi
-     
+      
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
