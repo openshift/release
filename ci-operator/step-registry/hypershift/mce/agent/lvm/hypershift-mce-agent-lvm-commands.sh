@@ -5,9 +5,16 @@ set -o errexit
 set -o pipefail
 set -x
 
-source "${SHARED_DIR}/packet-conf.sh"
+if [ -f "${SHARED_DIR}/packet-conf.sh" ]; then
+  source "${SHARED_DIR}/packet-conf.sh"
+fi
 
-cat <<EOF | oc apply -f -
+LVM_DEVICE_PATH="/dev/vda"
+if [ -f "${SHARED_DIR}/lvmdevice" ]; then
+  LVM_DEVICE_PATH=$(<"${SHARED_DIR}/lvmdevice")
+fi
+
+oc apply -f - <<EOF
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
@@ -18,8 +25,8 @@ spec:
     deviceClasses:
     - name: vg1
       deviceSelector:
-      paths:
-      - /dev/vda
+        paths:
+        - ${LVM_DEVICE_PATH}
       default: true
       thinPoolConfig:
         name: thin-pool-1
@@ -40,5 +47,12 @@ while true; do
     echo "All pods are running."
     break
 done
+
+# Ensure no storage class is the default one for the cluster
+for sc in $(oc get storageclass -o name); do
+    oc annotate "$sc" storageclass.kubernetes.io/is-default-class-
+done
+# Ensure the lvm storage class is the default one for the cluster
+oc annotate sc lvms-vg1 storageclass.kubernetes.io/is-default-class=true --overwrite
 
 #oc wait lvmcluster -n openshift-storage my-lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout=20m

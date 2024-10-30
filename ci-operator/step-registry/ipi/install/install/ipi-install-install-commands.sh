@@ -101,13 +101,15 @@ function set-cluster-version-spec-update-service() {
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
+
+  current_time=$(date +%s)
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
 
   # terraform may not exist now
   if [ -f "${dir}/terraform.txt" ]; then
@@ -116,7 +118,7 @@ function populate_artifact_dir() {
       s/X-Auth-Token.*/X-Auth-Token REDACTED/;
       s/UserData:.*,/UserData: REDACTED,/;
       ' "${dir}/terraform.txt"
-    tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-${current_time}.tar.gz" --remove-files "${dir}/terraform.txt"
   fi
   case "${CLUSTER_TYPE}" in
     alibabacloud)
@@ -127,8 +129,8 @@ function populate_artifact_dir() {
   # Copy CAPI-generated artifacts if they exist
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
-    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
-    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
   fi
 }
 
@@ -426,14 +428,18 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
+function get_yq() {
+  if [ ! -f /tmp/yq ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq || exit 1
+  fi
+}
+
 # inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
 function inject_boot_diagnostics() {
   local dir=${1}
 
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq
-  fi
+  get_yq
 
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
   cat > "${PATCH}" << EOF
@@ -452,31 +458,89 @@ EOF
   done
 }
 
-# inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
+# inject_spot_instance_config is an AWS specific option that enables the
+# use of AWS spot instances.
+# PARAMS:
+# $1: Path to base output directory of `openshift-install create manifests`
+# $2: Either "workers" or "masters" to enable spot instances on the
+#     compute or control machines, respectively.
 function inject_spot_instance_config() {
   local dir=${1}
+  local mtype=${2}
 
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq
-  fi
+  get_yq
 
-  PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
-  cat > "${PATCH}" << EOF
-spec:
-  template:
-    spec:
-      providerSpec:
-        value:
-          spotMarketOptions: {}
-EOF
+  # Find manifest files
+  local manifests=
+  case "${mtype}" in
+    masters)
+      manifests="${dir}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml \
+        ${dir}/openshift/99_openshift-cluster-api_*-machines-*.yaml"
+      # Spot masters works for
+      # - CAPA, always -- discover by existence of the cluster-api directory
+      # - Terraform, only for newer installer binaries containing https://github.com/openshift/installer/pull/8349
+      if [[ -d ${dir}/cluster-api/machines ]]; then
+        echo "Spot masters supported via CAPA"
+        manifests="${dir}/cluster-api/machines/10_inframachine_*.yaml $manifests"
+      elif openshift-install list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
+        echo "Spot masters supported via terraform"
+      else
+        echo "Spot masters are not supported in this configuration!"
+        exit 1
+      fi
+      ;;
+    workers)
+      manifests="${dir}/openshift/99_openshift-cluster-api_*-machineset-*.yaml"
+      ;;
+    *)
+      echo "ERROR: Invalid machine type '$mtype' passed to inject_spot_instance_config; expected 'masters' or 'workers'"
+      exit 1
+      ;;
+  esac
 
-  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
-    /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
-    echo "Patched spotMarketOptions into ${MACHINESET}"
+  # Inject spotMarketOptions into the appropriate manifests
+  local prefix=
+  local found=false
+  # Don't rely on file names; iterate through all the manifests and match
+  # by kind.
+  for manifest in $manifests; do
+    # E.g, CPMS is not present for single node clusters
+    if [[ ! -f ${manifest} ]]; then
+      continue
+    fi
+    kind=$(/tmp/yq r "${manifest}" kind)
+    case "${kind}" in
+      MachineSet)  # Workers, both tf and CAPA, run through MachineSet today.
+          [[ "${mtype}" == "workers" ]] || continue
+          prefix='spec.template.spec.providerSpec.value'
+          ;;
+      AWSMachine)  # CAPA masters
+          [[ "${mtype}" == "masters" ]] || continue
+          prefix='spec'
+          ;;
+      Machine)  # tf masters during install
+          [[ "${mtype}" == "masters" ]] || continue
+          prefix='spec.providerSpec.value'
+          ;;
+      ControlPlaneMachineSet)  # masters reconciled after install
+          [[ "${mtype}" == "masters" ]] || continue
+          prefix='spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value'
+          ;;
+      *)
+          continue
+          ;;
+    esac
+    found=true
+    echo "Using spot instances for ${kind} in ${manifest}"
+    /tmp/yq w -i --tag '!!str' "${manifest}" "${prefix}.spotMarketOptions.maxPrice" ''
   done
 
-  echo "Enabled AWS Spot instances for worker nodes"
+  if $found; then
+    echo "Enabled AWS Spot instances for ${mtype}"
+  else
+    echo "ERROR: Spot instances were requested for ${mtype}, but no such manifests were found!"
+    exit 1
+  fi
 }
 
 function get_arch() {
@@ -536,6 +600,9 @@ gcp)
     if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+    elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
     elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
@@ -605,7 +672,26 @@ case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
-      inject_spot_instance_config ${dir}
+      inject_spot_instance_config "${dir}" "workers"
+    fi
+    if [[ "${SPOT_MASTERS:-}" == 'true' ]]; then
+      inject_spot_instance_config "${dir}" "masters"
+    fi
+    ;;
+vsphere*)
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+apiVersion: samples.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  architectures:
+  - x86_64
+  skippedImagestreams:
+  - openliberty
+EOF
     fi
     ;;
 esac
@@ -667,6 +753,10 @@ case $JOB_NAME in
     # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
+  *azure)
+    # Do not retry because azure resources always collide when re-using installer assets
+    max=1
+    ;;
   *)
     max=3
     ;;
@@ -681,7 +771,7 @@ do
   echo "Install attempt $tries of $max"
   if [ $tries -gt 1 ]; then
     write_install_status
-    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+    populate_artifact_dir
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"

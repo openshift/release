@@ -1,0 +1,52 @@
+chain:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-provision
+  steps:
+  - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vault-key
+  - ref: azure-provision-disk-encryption-set
+  - ref: azure-provision-storage-account
+  - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
+  - ref: cucushift-hypershift-extended-install-private
+  - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+  - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
+  - chain: hypershift-azure-create
+  - ref: cucushift-hypershift-extended-etcd-encryption-health-check-azure
+  - ref: cucushift-hypershift-extended-vm-encryption-azure-server-side-encryption-customer-managed-keys-health-check
+  - ref: cucushift-hypershift-extended-vm-encryption-azure-encryption-at-host-health-check
+  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+  env:
+  - name: ENABLE_DES_DEFAULT_MACHINE
+    default: "true"
+  - name: ENABLE_ICSP
+    default: "true"
+  - name: EXTRA_ARGS
+    default: "--fips"
+  - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+    default: "UserManaged"
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: ""
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+    default: "true"
+  - name: HYPERSHIFT_DISK_ENCRYPTION
+    default: "true"
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "false"
+  - name: HYPERSHIFT_ENCRYPTION_AT_HOST
+    default: "true"
+  - name: HYPERSHIFT_ETCD_ENCRYPTION
+    default: "true"
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: "qe1.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_MANAGED_SERVICE
+    default: "ARO-HCP"
+  - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  documentation: |-
+    Provisions an aks management cluster and a public hosted cluster utilizing ETCD encryption, 
+    Azure OS disk encryption with customer managed key and encryption at host. 
+    The aks management cluster is created in the managed resource group. 
+    The vault key, disk encryption set and the hosted cluster are created in customer resource group. 
+    See https://hypershift-docs.netlify.app/how-to/azure/create-azure-cluster_on_aks/ for details. 

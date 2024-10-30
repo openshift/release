@@ -14,7 +14,7 @@ NFS_CLIENT_MIRRORED_IMAGE_URL="quay.io/openshifttest/nfs-subdir-external-provisi
 
 
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
-NFS_SERVER=${NFS_SERVER:-${AUX_HOST}}
+NFS_SERVER=${NFS_SERVER:-$(<"${CLUSTER_PROFILE_DIR}/aux-host-internal-name")}
 DIR=/tmp/nfs-provisioner
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 mkdir -p ${DIR}

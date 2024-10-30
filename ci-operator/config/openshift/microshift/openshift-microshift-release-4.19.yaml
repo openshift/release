@@ -1,0 +1,201 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+  inputs:
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift
+  optional: true
+  to: microshift-test-rpm
+promotion:
+  to:
+  - excluded_images:
+    - microshift-test-rpm
+    name: "4.19"
+    namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  steps:
+    test:
+    - as: verify
+      commands: make verify-ci
+      env:
+      - default: /tmp/
+        name: GOLANGCI_LINT_CACHE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: test-unit
+  commands: make test-unit
+  container:
+    from: src
+- as: test-rpm
+  commands: RPM_INFO=true make rpm srpm
+  container:
+    from: microshift-test-rpm
+  run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
+- as: test-rebase
+  optional: true
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
+  steps:
+    env:
+      DRY_RUN: "y"
+    workflow: openshift-microshift-rebase
+- as: e2e-aws-tests
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-cache
+  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-cache-arm
+  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-periodic
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-periodic-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: ocp-full-conformance-rhel-eus
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-serial-rhel-eus
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-rhel-eus-arm
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-serial-rhel-eus-arm
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-footprint-and-performance
+  run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-footprint-and-performance
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: microshift

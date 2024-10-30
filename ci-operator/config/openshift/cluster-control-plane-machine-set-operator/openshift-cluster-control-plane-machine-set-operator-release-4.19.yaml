@@ -1,0 +1,299 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-control-plane-machine-set-operator
+promotion:
+  to:
+  - additional_images:
+      cluster-control-plane-machine-set-tests: src
+    name: "4.19"
+    namespace: ocp
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: fmt
+  commands: make verify-fmt
+  container:
+    from: src
+- as: vet
+  commands: make verify-vet
+  container:
+    from: src
+- as: generate
+  commands: make verify-generate
+  container:
+    from: src
+- as: vendor
+  commands: make verify-vendor
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: e2e-azure-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-azure-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
+- as: e2e-gcp-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-vsphere-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-multi-zone-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-openstack-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      commands: |
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-operator-zone
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    test:
+    - as: test
+      commands: |
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-aws-ovn-etcd-scaling
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-scaling
+- as: e2e-gcp-ovn-etcd-scaling
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-azure-ovn-etcd-scaling
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-etcd-scaling
+- as: e2e-vsphere-ovn-etcd-scaling
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-etcd-scaling
+- as: e2e-nutanix-ovn
+  cluster: build01
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*nutanix.*
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-nutanix
+- as: regression-clusterinfra-aws-ipi-cpms-allcases
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h30m0s
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: cluster-control-plane-machineset-operator
+    workflow: openshift-ci-security
+  timeout: 7h45m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-control-plane-machine-set-operator

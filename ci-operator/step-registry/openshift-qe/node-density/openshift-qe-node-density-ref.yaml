@@ -4,11 +4,15 @@ ref:
     namespace: ci
     name: ocp-qe-perfscale-ci
     tag: latest
+  cli: latest
   commands: openshift-qe-node-density-commands.sh
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
     mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
   - namespace: test-credentials
     name: ocp-perfscale-horreum-poc
     mount_path: /horreum-secret
@@ -17,8 +21,12 @@ ref:
       cpu: 100m
       memory: 100Mi
   env:
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
   - name: E2E_VERSION
-    default: "v2.1.8"
+    default: "v2.2.5"
     documentation: |-
       Override the e2e version
   - name: KUBE_BURNER_VERSION
@@ -28,7 +36,7 @@ ref:
   - name: PODS_PER_NODE
     default: "245"
     documentation: |-
-      Define the maximum number of pods to deploy on each labeled node.  
+      Define the maximum number of pods to deploy on each labeled node.
   - name: POD_READY_THRESHOLD
     default: "180000ms"
     documentation: |-
@@ -41,5 +49,13 @@ ref:
     default: "false"
     documentation: |-
       Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
   documentation: >-
     This step runs the perfscale node-density workload in the deployed cluster

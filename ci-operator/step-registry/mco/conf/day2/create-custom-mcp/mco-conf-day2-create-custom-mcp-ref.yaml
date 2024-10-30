@@ -1,32 +1,23 @@
 ref:
   as: mco-conf-day2-create-custom-mcp
-  from: cli
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
   commands: mco-conf-day2-create-custom-mcp-commands.sh
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
   env:
-    - name: MCO_CONF_DAY2_CUSTOM_MCP_NAME
+    - name: MCO_CONF_DAY2_CUSTOM_MCP
       default: ""
       documentation: |
-        The name of the custom MachineConfigPool that will be created
+        A json format of list string to define multiple custom MCPs. For example, '[{"mcp_name": "infra", "mcp_node_num": "1", "mcp_node_label": "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'. 'mcp_name' element is required; 'mcp_node_num' element is '1' by default; 'mcp_node_label' element is 'node-role.kubernetes.io/worker' by default.
         If the name is empty, then no custom MCP will be created and this step will be skipped
-    - name: MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES
-      default: "1"
-      documentation: |
-        The number of nodes that will be removed from the worker pool and added to the new custom pool
-        If the value is an empty string "" all nodes matching the MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL label will be added to the pool
     - name: MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT
       default: "20m"
       documentation: |
         Maximum time that we will wait for the new custom pool to be updated
-    - name: MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL
-      default: "node-role.kubernetes.io/worker"
-      documentation: |
-        The label used to filter the nodes that can be added to the new pool. 
-        By default we take any node fomr the worker pool, but we can narrow it by adding more lables
-        For example, "node-role.kubernetes.io/worker,beta.kubernetes.io/arch=amd64" will take only worker nodes with arch=amd64
-        We should always specify the worker role, to make sure that we don't try to add a master node
   documentation: |-
-    Creates a new custom MachineConfigPool and add nodes to this new pool
+    Creates new custom MachineConfigPools and add nodes to this new pool

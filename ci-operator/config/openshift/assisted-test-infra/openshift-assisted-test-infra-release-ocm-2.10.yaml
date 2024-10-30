@@ -23,10 +23,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  govc:
-    name: govc
-    namespace: ci
-    tag: v0.29.0
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -40,10 +36,6 @@ images:
   from: src
   to: assisted-test-infra
 - dockerfile_path: Dockerfile.assisted-test-infra
-  inputs:
-    govc:
-      as:
-      - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
   to:
@@ -118,7 +110,7 @@ tests:
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: 30 03 * * 1,4
+  cron: 30 05 * * 2
   steps:
     cluster_profile: packet-assisted
     env:
@@ -132,7 +124,6 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api

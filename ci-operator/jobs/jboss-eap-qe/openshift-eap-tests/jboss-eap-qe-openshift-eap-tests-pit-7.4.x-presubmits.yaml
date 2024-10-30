@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^pit-7\.4\.x$
     - ^pit-7\.4\.x-
-    cluster: build03
+    cluster: build09
     context: ci/prow/eap-ocp4.14-lp-interop-images
     decorate: true
     decoration_config:
@@ -69,7 +69,7 @@ presubmits:
     branches:
     - ^pit-7\.4\.x$
     - ^pit-7\.4\.x-
-    cluster: build03
+    cluster: build09
     context: ci/prow/eap-ocp4.15-lp-interop-images
     decorate: true
     decoration_config:
@@ -133,7 +133,7 @@ presubmits:
     branches:
     - ^pit-7\.4\.x$
     - ^pit-7\.4\.x-
-    cluster: build03
+    cluster: build09
     context: ci/prow/eap-ocp4.16-lp-interop-images
     decorate: true
     decoration_config:
@@ -141,7 +141,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: eap-ocp4.16-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-jboss-eap-qe-openshift-eap-tests-pit-7.4.x-eap-ocp4.16-lp-interop-images
     rerun_command: /test eap-ocp4.16-lp-interop-images
@@ -198,7 +197,7 @@ presubmits:
     branches:
     - ^pit-7\.4\.x$
     - ^pit-7\.4\.x-
-    cluster: build03
+    cluster: build09
     context: ci/prow/eap-ocp4.17-lp-interop-images
     decorate: true
     decoration_config:
@@ -258,3 +257,68 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )eap-ocp4.17-lp-interop-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^pit-7\.4\.x$
+    - ^pit-7\.4\.x-
+    cluster: build09
+    context: ci/prow/eap-ocp4.18-lp-interop-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: eap-ocp4.18-lp-interop
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-jboss-eap-qe-openshift-eap-tests-pit-7.4.x-eap-ocp4.18-lp-interop-images
+    rerun_command: /test eap-ocp4.18-lp-interop-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=eap-ocp4.18-lp-interop
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )eap-ocp4.18-lp-interop-images,?($|\s.*)

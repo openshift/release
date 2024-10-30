@@ -7,29 +7,30 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
 - inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: insights-operator
 promotion:
   to:
-  - name: 4.18-priv
+  - disabled: true
+    name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -120,9 +121,11 @@ tests:
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
   steps:

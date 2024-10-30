@@ -4,17 +4,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-tests
-  test-bin:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   upi-installer:
     name: "4.14"
     namespace: ocp
@@ -46,59 +42,39 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-ovn
-  cron: 0 */6 * * *
+  cron: 6 15 22 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
-  cron: 0 1 * * *
+  cron: 31 3 7 * *
   steps:
     cluster_profile: hypershift
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
-  cron: 0 2 * * *
+  cron: 44 3 1 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
-  cron: 0 3 * * *
+  cron: 44 7 21 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-powervs
-  cron: 0 2 * * *
+  cron: 5 1 14 * *
   steps:
     cluster_profile: hypershift-powervs
     workflow: hypershift-powervs-e2e
-- as: e2e-ibmcloud-iks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.10.26_openshift
-      MANAGED_CLUSTER_TYPE: iks
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
-    workflow: hypershift-ibmcloud-e2e
-- as: e2e-ibmcloud-roks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.11.0_openshift
-      MANAGED_CLUSTER_TYPE: openshift
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
-    workflow: hypershift-ibmcloud-e2e
 - as: e2e-kubevirt-aws-csi
-  cron: 0 4 * * *
+  cron: 30 18 9 * *
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-kubevirt-aws-ovn
-  cron: 0 3,9,15,21 * * *
+  cron: 41 23 8 * *
   steps:
     cluster_profile: aws
     env:

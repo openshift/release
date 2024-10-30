@@ -64,6 +64,22 @@ function create_sp_with_custom_role() {
     run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP Version: $ocp_version"
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+
 # az should already be there
 command -v az
 az --version
@@ -206,6 +222,22 @@ required_permissions="""
 \"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",
 ${required_permissions}
 """
+
+# New permissions are instroduced when using CAPZ to provision IPI cluster
+if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    # routeTables relevant perssions can be removed once OCPBUGS-37663 is fixed.
+    required_permissions="""
+\"Microsoft.Network/routeTables/read\",
+\"Microsoft.Network/routeTables/write\",
+\"Microsoft.Network/routeTables/join/action\",
+\"Microsoft.Network/loadBalancers/inboundNatRules/read\",
+\"Microsoft.Network/loadBalancers/inboundNatRules/write\",
+\"Microsoft.Network/loadBalancers/inboundNatRules/join/action\",
+\"Microsoft.Network/loadBalancers/inboundNatRules/delete\",
+${required_permissions}
+"""
+fi
+
 
 if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
     required_permissions="""

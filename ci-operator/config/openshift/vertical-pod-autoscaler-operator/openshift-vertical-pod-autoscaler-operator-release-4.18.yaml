@@ -1,35 +1,71 @@
 base_images:
-  ocp_4.17_base-rhel9:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.1
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: "4.17"
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: vertical-pod-autoscaler-operator-bundle
+  previous-vpa-operator:
+    name: "4.17"
+    namespace: ocp
+    tag: vertical-pod-autoscaler-operator
+  ubi-python-311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
 build_root:
   from_repository: true
+  use_build_cache: true
 images:
-- inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: vertical-pod-autoscaler-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: vpa-operator-registry
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+  to: vertical-pod-autoscaler-operator
+- dockerfile_literal: |
+    FROM ubi-python-311
+    RUN pip3 install yamllint
+  from: ubi-python-311
+  to: vpa-yamllint
+operator:
+  bundles:
+  - as: vertical-pod-autoscaler-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-vertical-pod-autoscaler-operator.*
+    with: pipeline:vertical-pod-autoscaler-operator
+  - pullspec: quay.io/openshift/origin-vertical-pod-autoscaler.*
+    with: stable:vertical-pod-autoscaler
 promotion:
   to:
-  - name: "4.18"
+  - additional_images:
+      vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
+    disabled: true
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -41,6 +77,11 @@ releases:
       include_built_images: true
       name: "4.18"
       namespace: ocp
+  multilatest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -48,25 +89,41 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: NO_DOCKER=1 make test
+  commands: make test
   container:
     from: src
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: manifest-diff
-  commands: IS_CONTAINER=TRUE make manifest-diff
+  commands: make manifest-diff
   container:
     from: src
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
+  commands: make fmt
   container:
     from: src
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: govet
-  commands: IS_CONTAINER=TRUE make vet
+  commands: make vet
   container:
     from: src
-- as: golint
-  commands: IS_CONTAINER=TRUE make lint
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
   container:
-    from: src
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: yamllint
+  commands: IS_CONTAINER=true make yamllint
+  container:
+    clone: true
+    from: vpa-yamllint
+  skip_if_only_changed: \.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
   optional: true
   steps:
@@ -81,12 +138,8 @@ tests:
       cli: latest
       commands: make e2e-ci
       dependencies:
-      - env: CI_OPERATOR_IMAGE
+      - env: OPERATOR_IMG
         name: vertical-pod-autoscaler-operator
-      - env: CI_OPERAND_IMAGE
-        name: vertical-pod-autoscaler
-      - env: CI_REGISTRY_IMAGE
-        name: vpa-operator-registry
       from: src
       resources:
         requests:
@@ -96,21 +149,107 @@ tests:
   steps:
     cluster_profile: aws
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create ns openshift-vertical-pod-autoscaler
+        operator-sdk run bundle --timeout=10m -n openshift-vertical-pod-autoscaler --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-vertical-pod-autoscaler deployment/vertical-pod-autoscaler-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: vertical-pod-autoscaler-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make e2e-olm-ci
-      dependencies:
-      - env: CI_OPERATOR_IMAGE
-        name: vertical-pod-autoscaler-operator
-      - env: CI_OPERAND_IMAGE
-        name: vertical-pod-autoscaler
-      - env: CI_REGISTRY_IMAGE
-        name: vpa-operator-registry
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export VPA_NS=openshift-vertical-pod-autoscaler
+        oc create ns $VPA_NS
+
+        # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
+        # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
+        operator-sdk run bundle --timeout=10m -n $VPA_NS --security-context-config restricted "$PREVIOUS_BUNDLE" || true
+        export OLD_CSV_NAME=$(oc get csv -n $VPA_NS -o jsonpath='{.items[0].metadata.name}')
+
+        # When 4.19 is in dev, we need to change "containers/0" to "containers/1" because of new container added to the deployment.
+        oc patch csv -n $VPA_NS $OLD_CSV_NAME --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
+        sleep 10
+
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image.
+        oc delete deployment -n $VPA_NS vertical-pod-autoscaler-operator
+
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is created by the subscription controller.
+        # "oc wait --for=create" is not available yet (ships with kubectl v1.31), so we have to poll the deployment with "oc get". https://github.com/kubernetes/kubernetes/pull/122994
+        retries=0
+        while ! oc get -n $VPA_NS deployment vertical-pod-autoscaler-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $VPA_NS deployment vertical-pod-autoscaler-operator
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+      - env: PREVIOUS_OPERATOR
+        name: previous-vpa-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        export VPA_NS=openshift-vertical-pod-autoscaler
+        operator-sdk run bundle-upgrade --timeout 10m -n $VPA_NS --security-context-config restricted "$OO_BUNDLE"
+      dependencies:
+      - env: OO_BUNDLE
+        name: vertical-pod-autoscaler-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make e2e-olm-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: scorecard
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multilatest
+    test:
+    - as: test
+      cli: latest
+      commands: make test-scorecard
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

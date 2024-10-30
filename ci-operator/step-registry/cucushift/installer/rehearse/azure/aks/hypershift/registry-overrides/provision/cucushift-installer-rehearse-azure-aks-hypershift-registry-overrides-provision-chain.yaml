@@ -1,0 +1,41 @@
+chain:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-registry-overrides-provision
+  steps:
+  - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: cucushift-hypershift-extended-enable-qe-pull-secret-day-one
+  - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
+  - ref: cucushift-hypershift-extended-install-private
+  - ref: cucushift-hypershift-extended-registry-overrides-patch-hypershift-operator
+  - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+  - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
+  - chain: hypershift-azure-create
+  - ref: cucushift-hypershift-extended-registry-overrides-health-check
+  - ref: cucushift-hypershift-extended-enable-qe-catalogsource
+  env:
+  - name: AKS_ZONES
+    default: "1 2 3"
+  - name: ENABLE_ICSP
+    default: "true"
+  - name: EXTRA_ARGS
+    default: "--fips"
+  - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+    default: "Managed"
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: "eastus"
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "false"
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: "qe1.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_MANAGED_SERVICE
+    default: "ARO-HCP"
+  - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  documentation: |-
+    Provisions an AKS management cluster and a public hosted cluster. 
+    Control plane images are sourced from an Azure Container Registry (ACR).

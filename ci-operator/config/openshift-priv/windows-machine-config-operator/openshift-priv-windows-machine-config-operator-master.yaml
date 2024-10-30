@@ -1,18 +1,18 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    tag: rhel-9-release-golang-1.22-openshift-4.18
   operator-sdk:
-    name: "4.17"
+    name: "4.18"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -23,9 +23,9 @@ canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -40,13 +40,13 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
 releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -146,7 +146,7 @@ tests:
         # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
         # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
         # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
         || oc get csv -n $WMCO_NS |awk {'print $1'} | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
         -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
         sleep 10
@@ -191,7 +191,7 @@ tests:
       cli: latest
       commands: |
         export WMCO_NS=openshift-windows-machine-config-operator
-        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
         sleep 5m
         oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
       dependencies:
@@ -215,6 +215,7 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: platform-none-vsphere-e2e-operator
   steps:
@@ -240,7 +241,7 @@ tests:
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
     - ref: ipi-conf-vsphere-check-vcm
-    - ref: upi-conf-vsphere
+    - ref: upi-conf-vsphere-vcm
     - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
     test:

@@ -7,10 +7,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -19,14 +19,14 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile.ci
   from: base
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: compliance-operator
 - dockerfile_path: images/testcontent/Dockerfile.ci
   to: testcontent
@@ -71,7 +71,7 @@ tests:
     from: src
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
 - as: e2e-aws-parallel
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: quay-aws
     env:
@@ -93,7 +93,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-serial
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: quay-aws
     env:
@@ -115,16 +115,18 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-rosa
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: quay-aws
     env:
       BYO_OIDC: "true"
       CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
       OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: 4.15.8
+      OPENSHIFT_VERSION: 4.15.21
       REGION: us-east-2
     test:
+    - ref: ipi-install-rbac
     - as: test-ocp4-pci-dss-node
       cli: latest
       commands: make e2e-rosa

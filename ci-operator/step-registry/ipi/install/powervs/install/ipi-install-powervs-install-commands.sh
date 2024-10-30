@@ -81,7 +81,7 @@ function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
   export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
   export PROMTAIL_VERSION="v2.4.1"
-
+DNS record
   config_dir=/tmp/promtail
   mkdir "${config_dir}"
   cp /var/run/loki-grafanacloud-secret/client-secret "${config_dir}/grafanacom-secrets-password"
@@ -422,9 +422,14 @@ function destroy_resources() {
   # Create a fake cluster metadata file
   #
   mkdir /tmp/ocp-test
+
   cat > "/tmp/ocp-test/metadata.json" << EOF
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
+
+  if [ -n "${PERSISTENT_TG}" ]; then
+    jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
+  fi
 
   #
   # Call destroy cluster on fake metadata file
@@ -476,8 +481,6 @@ function dump_resources() {
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
-# "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
-
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
@@ -493,9 +496,12 @@ function dump_resources() {
   ibmcloud tg connections ${GATEWAY_ID}
 )
 
-# "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
+  echo "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
 (
+  echo "NOTE: There should be three LBs found"
+  ibmcloud is load-balancers --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id) - \(.provisioning_status)"'
+
   LB_INT_FILE=$(mktemp)
   LB_MCS_POOL_FILE=$(mktemp)
   trap '/bin/rm "${LB_INT_FILE}" "${LB_MCS_POOL_FILE}"' EXIT
@@ -505,6 +511,7 @@ function dump_resources() {
   if [ -z "${LB_INT_ID}" ]
   then
     echo "Error: LB_INT_ID is empty"
+    echo "Error: The internal load balancer was not found!"
     exit
   fi
 
@@ -514,8 +521,13 @@ function dump_resources() {
   LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("machine-config-server")) | .id' ${LB_INT_FILE})
   if [ -z "${LB_MCS_ID}" ]
   then
-    echo "Error: LB_MCS_ID is empty"
-    exit
+    LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("additional-pool-22623")) | .id' ${LB_INT_FILE})
+    if [ -z "${LB_MCS_ID}" ]
+    then
+      echo "Error: LB_MCS_ID is empty"
+      echo "Error: The machine config server pool under the internal LB was not found!"
+      exit
+    fi
   fi
 
   echo "8<--------8<--------8<--------8<-------- LB Machine Config Server 8<--------8<--------8<--------8<--------"
@@ -565,6 +577,32 @@ function dump_resources() {
     fi
 
   done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
+
+(
+  echo "8<--------8<--------8<--------8<-------- DNS records 8<--------8<--------8<--------8<--------"
+
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
+  fi
+
+  FILE=$(mktemp)
+  trap '/bin/rm -rf ${FILE}' EXIT
+  ibmcloud cis instance-set ${CIS_INSTANCE_CRN};
+  DNS_DOMAIN_ID=$(ibmcloud cis domains --output json | jq -r '.[].id')
+  echo "DNS_DOMAIN_ID=${DNS_DOMAIN_ID}"
+  PAGE=1
+  while true
+  do
+    ibmcloud cis dns-records ${DNS_DOMAIN_ID} --page ${PAGE} --output json > ${FILE}
+    if (( $(jq -r 'length' < ${FILE}) == 0 ))
+    then
+      break
+    fi
+    jq -r '.[] | select (.name|test("'${CLUSTER_NAME}'")) | "\(.id) \(.name)"' < ${FILE}
+    PAGE=$((PAGE+1))
+   done
+)
 
   echo "8<--------8<--------8<--------8<-------- oc get clusterversion 8<--------8<--------8<--------8<--------"
 
@@ -713,6 +751,10 @@ POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "PERSISTENT_TG=${PERSISTENT_TG}"
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -722,6 +764,9 @@ export POWERVS_RESOURCE_GROUP
 export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
+
+echo "tgName in ${SHARED_DIR}/install-config.yaml"
+grep tgName "${SHARED_DIR}/install-config.yaml" || true
 
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -885,24 +930,30 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
+if [ ${ret} -gt 0 ]; then
+  SKIP_WAIT_FOR=false
+else
+  SKIP_WAIT_FOR=true
+fi
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
 # If we need to try again, then does the CAPI cluster status yaml file exist?
 if [ ${ret} -gt 0 ]; then
-  SFILE="/tmp/installer/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests*yaml"
-  ls -l ${SFILE} || true
-  if [ -f ${SFILE} ]; then
-    # How many statuses are False?
-    SLINES=$(yq-v4 eval .status.conditions ${SFILE} -o json | jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
-    echo "Skip? SLINES=${SLINES}"
-    if [ ${SLINES} -gt 0 ]; then
-      echo "Skipping wait-for install-complete since detected CAPI problem"
-      ret=0
+  echo "Checking CAPI cluster status:"
+  ls -l /tmp/installer/.clusterapi_output/IBMPowerVS*yaml || true
+  for SFILE in /tmp/installer/.clusterapi_output/IBMPowerVS*yaml
+  do
+    echo "${SFILE}"
+    yq-v4 eval .status.ready ${SFILE}
+    RESULT=$(yq-v4 eval .status.ready ${SFILE})
+    if [ "${RESULT}" == "false" ]; then
+      SKIP_WAIT_FOR=true
     fi
-  fi
+  done
 fi
 
-if [ ${ret} -gt 0 ]; then
+echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
+if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'

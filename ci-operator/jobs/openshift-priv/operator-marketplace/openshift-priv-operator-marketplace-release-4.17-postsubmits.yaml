@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-4\.17$
-    cluster: build02
+    cluster: build01
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -72,19 +72,17 @@ postsubmits:
     always_run: true
     branches:
     - ^release-4\.17$
-    cluster: build02
+    cluster: build01
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/variant: okd
+      ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-priv-operator-marketplace-release-4.17-okd-images
+    name: branch-ci-openshift-priv-operator-marketplace-release-4.17-okd-scos-images
     path_alias: github.com/operator-framework/operator-marketplace
     spec:
       containers:
@@ -96,7 +94,7 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=okd
+        - --variant=okd-scos
         command:
         - ci-operator
         image: ci-operator:latest
@@ -126,6 +124,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

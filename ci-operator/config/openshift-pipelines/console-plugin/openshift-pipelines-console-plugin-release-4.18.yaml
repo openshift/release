@@ -2,13 +2,14 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: console-plugin-test-cypress
+    tag: tectonic-console-builder-v28
 images:
 - dockerfile_path: Dockerfile
   to: console-pipelines-plugin
 promotion:
   to:
-  - name: "4.18"
+  - disabled: true
+    name: "4.18"
     namespace: ocp
 releases:
   latest:
@@ -45,6 +46,13 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-openshift-ecosystem
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
   steps:
     test:
     - as: e2e
@@ -54,6 +62,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-pipelines

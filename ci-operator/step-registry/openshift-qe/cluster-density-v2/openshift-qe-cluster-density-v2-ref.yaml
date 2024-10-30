@@ -4,9 +4,10 @@ ref:
     namespace: ci
     name: ocp-qe-perfscale-ci
     tag: latest
+  cli: latest
   env:
   - name: E2E_VERSION
-    default: "v2.1.8"
+    default: "v2.2.5"
     documentation: |-
       Override the e2e version
   - name: KUBE_BURNER_VERSION
@@ -18,7 +19,7 @@ ref:
     documentation: |-
       Default is true, which means the workload with delete and recreate a set number of namespaces
   - name: EXTRA_FLAGS
-    default: "--churn-duration=20m"
+    default: "--churn-duration=20m --timeout=5h"
     documentation: |-
       Default is Churn Duration for 20 minutes
   - name: PROFILE_TYPE
@@ -37,12 +38,19 @@ ref:
     default: "false"
     documentation: |-
       Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
   commands: openshift-qe-cluster-density-v2-commands.sh
   timeout: 6h
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
     mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
   - namespace: test-credentials
     name: ocp-perfscale-horreum-poc
     mount_path: /horreum-secret

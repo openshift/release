@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-kind
     decorate: true
     decoration_config:
@@ -25,7 +25,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-kind-cluster-profile
         - --target=e2e-kind
         command:
         - ci-operator
@@ -42,8 +41,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-kind-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -67,9 +64,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -85,7 +79,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-ocp-4-16
     decorate: true
     decoration_config:
@@ -105,7 +99,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ocp-4-16-cluster-profile
         - --target=e2e-ocp-4-16
         command:
         - ci-operator
@@ -122,8 +115,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ocp-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -147,9 +138,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -165,7 +153,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-ocp-4-16-arm
     decorate: true
     decoration_config:
@@ -185,7 +173,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ocp-4-16-arm-cluster-profile
         - --target=e2e-ocp-4-16-arm
         command:
         - ci-operator
@@ -202,8 +189,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ocp-4-16-arm-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -227,9 +212,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -245,7 +227,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build03
+    cluster: build09
     context: ci/prow/e2e-ocp-4-17
     decorate: true
     decoration_config:
@@ -266,7 +248,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ocp-4-17-cluster-profile
         - --target=e2e-ocp-4-17
         command:
         - ci-operator
@@ -283,8 +264,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ocp-4-17-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -308,9 +287,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -326,7 +302,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build05
+    cluster: build09
     context: ci/prow/gencheck
     decorate: true
     decoration_config:
@@ -382,7 +358,63 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build05
+    cluster: build09
+    context: ci/prow/integration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 1h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-tp1-integration
+    rerun_command: /test integration
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=integration
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-3\.0-tp1$
+    - ^release-3\.0-tp1-
+    cluster: build09
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -438,7 +470,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build03
+    cluster: build09
     context: ci/prow/scorecard
     decorate: true
     decoration_config:
@@ -458,7 +490,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/scorecard-cluster-profile
         - --target=scorecard
         command:
         - ci-operator
@@ -475,8 +506,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/scorecard-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -500,9 +529,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -518,7 +544,7 @@ presubmits:
     branches:
     - ^release-3\.0-tp1$
     - ^release-3\.0-tp1-
-    cluster: build05
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     decoration_config:

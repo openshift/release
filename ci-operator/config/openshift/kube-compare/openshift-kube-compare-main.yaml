@@ -3,50 +3,50 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.59.0
-  ocp_4.17_cli:
-    name: "4.17"
+  ocp_4.18_cli:
+    name: "4.18"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.22-builder-multi-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-builder-multi-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+    tag: rhel-8-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: GOFLAGS="-mod=readonly" make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_cli:
+    ocp_4.18_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.17:cli
-    ocp_builder_rhel-8-golang-1.22-builder-multi-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:cli
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-builder-multi-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-builder-multi-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: kube-compare-artifacts
 promotion:
   to:
-  - namespace: ocp
-    tag: "4.16"
+  - name: "4.18"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -69,6 +69,11 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: bin
+- as: system-test
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: bin
+  postsubmit: true
 - as: unit-report-creator
   commands: GOFLAGS="-mod=readonly" make test-report-creator
   container:

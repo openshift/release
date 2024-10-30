@@ -5,9 +5,16 @@ chain:
     cli: latest
     commands: |-
       set -exuo pipefail
+      
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
+      
+      # Dump resourced under the namespace for shared ingress if needed
+      if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
+        export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
+      fi
+      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
       --dump-guest-cluster=true \
@@ -16,5 +23,9 @@ chain:
     resources:
       requests:
         cpu: 100m
+    env:
+    - name: HYPERSHIFT_MANAGED_SERVICE
+      default: ""
+      documentation: The type of managed service the HyperShift Operator is installed on.
     timeout: 15m0s
   - ref: hypershift-debug

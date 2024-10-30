@@ -23,29 +23,16 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  coreos-centos-stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
-  from: coreos-centos-stream9
   to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
@@ -132,7 +119,7 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: subsystem-test-periodic
-  cron: 00 11 * * 1,4
+  cron: 00 13 * * 2
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent

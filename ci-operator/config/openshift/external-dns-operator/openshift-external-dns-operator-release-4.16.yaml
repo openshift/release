@@ -1,40 +1,21 @@
 base_images:
-  base:
-    name: "4.16"
+  cli-operator-sdk:
+    name: cli-operator-sdk
     namespace: ocp
-    tag: base
-  kube-rbac-proxy:
-    name: "4.16"
-    namespace: ocp
-    tag: kube-rbac-proxy
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
-  operator-index:
-    name: redhat-operator-index
-    namespace: ci
-    tag: v4.9
+    tag: v1.31.0
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+- dockerfile_path: Dockerfile
   to: external-dns-operator
 operator:
   bundles:
   - as: external-dns-operator-bundle
-    base_index: operator-index
     dockerfile_path: Dockerfile.bundle
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift/origin-external-dns-operator:latest
     with: pipeline:external-dns-operator
-  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
-    with: pipeline:kube-rbac-proxy
 promotion:
   to:
   - disabled: true
@@ -72,13 +53,19 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-external-dns-operator-bundle
+      OO_BUNDLE: external-dns-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: external-dns-operator
-      OO_PACKAGE: external-dns-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n external-dns-operator rollout status deployment external-dns-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e
@@ -86,18 +73,24 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-gcp-operator
   steps:
     cluster_profile: gcp
     dependencies:
-      OO_INDEX: ci-index-external-dns-operator-bundle
+      OO_BUNDLE: external-dns-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: external-dns-operator
-      OO_PACKAGE: external-dns-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n external-dns-operator rollout status deployment external-dns-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e
@@ -105,18 +98,24 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-operator-sdk-gcp
 - as: e2e-azure-operator
   steps:
     cluster_profile: azure4
     dependencies:
-      OO_INDEX: ci-index-external-dns-operator-bundle
+      OO_BUNDLE: external-dns-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: external-dns-operator
-      OO_PACKAGE: external-dns-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n external-dns-operator rollout status deployment external-dns-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e
@@ -124,18 +123,24 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-azure
-- as: e2e-infoblox-operator
+    workflow: optional-operators-ci-operator-sdk-azure
+- as: e2e-azure-infoblox-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: azure4
     dependencies:
-      OO_INDEX: ci-index-external-dns-operator-bundle
+      OO_BUNDLE: external-dns-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: external-dns-operator
-      OO_PACKAGE: external-dns-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n external-dns-operator rollout status deployment external-dns-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: |
@@ -150,7 +155,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-operator-sdk-azure
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

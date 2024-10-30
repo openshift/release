@@ -27,19 +27,36 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "insights-qe-iqe-*", "failure_type": "test_failure", "classification": "Cost Management Test Failure", "jira_project": "COST", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "insights-qe-iqe-*", "failure_type": "pod_failure", "classification": "Cost Management Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","cost-management-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dchorvat@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario cost-management
+    test:
+    - ref: insights-qe-iqe-cost-management-plugin
+    workflow: firewatch-ipi-aws
+- as: cost-management-interop-aws-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "insights-qe-iqe-*", "failure_type": "test_failure", "classification": "Cost Management Test Failure", "jira_project": "COST", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "insights-qe-iqe-*", "failure_type": "pod_failure", "classification": "Cost Management Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","cost-management-lp","fips"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dchorvat@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       USER_TAGS: |

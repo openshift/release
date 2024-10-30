@@ -12,8 +12,9 @@
 
 ## Purpose
 
-Use to execute the `Java` [strimzi/strimzi-kafka-operator](https://github.com/strimzi/strimzi-kafka-operator) using the provided arguments. 
-All XML results will be copied into `$ARTIFACT_DIR/junit_*.xml`.
+Use to execute the `Java` [strimzi/strimzi-kafka-operator](https://github.com/strimzi/strimzi-kafka-operator) using the provided arguments.
+All XML results will be copied into `$ARTIFACT_DIR/xunit/junit_*.xml`.
+All logs could be found at `$ARTIFACT_DIR/logs/`.
 
 ## Process
 
@@ -26,7 +27,7 @@ mvn verify -pl systemtest -P all \
 	-Dmaven.javadoc.skip=true \
 	-Dfailsafe.rerunFailingTestsCount=1
 ```
-2. Copies the XML files from result dir to `$ARTIFACT_DIR/junit_*.xml`.
+2. Copies the XML files from result dir to `$ARTIFACT_DIR/xunit/junit_*.xml`.
 
 ## Prerequisite(s)
 

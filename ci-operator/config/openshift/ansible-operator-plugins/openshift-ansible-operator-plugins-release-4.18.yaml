@@ -1,0 +1,76 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: openshift/Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: openshift-ansible-operator-plugins
+- dockerfile_path: openshift/ci/dockerfiles/ansible-e2e.Dockerfile
+  from: openshift-ansible-operator-plugins
+  to: ansible-operator-e2e
+promotion:
+  to:
+  - disabled: true
+    name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    # Set $HOME for sufficient permission
+    HOME=/tmp make test-unit
+  container:
+    from: src
+- as: sanity
+  commands: |
+    # Set $HOME for golangci-lint cache
+    HOME=/tmp make test-sanity
+  container:
+    from: src
+- as: e2e-ansible
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make -f openshift/Makefile test-e2e-ansible
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: ansible-operator-plugins

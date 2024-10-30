@@ -1,0 +1,389 @@
+base_images:
+  aws-efs-driver-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: aws-efs-csi-driver
+  csi-driver-smb-test:
+    name: "4.19"
+    namespace: ocp
+    tag: csi-driver-smb-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  livenessprobe-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: csi-livenessprobe
+  ocp_4.17_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  provisioner-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: csi-external-provisioner
+  proxy-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: kube-rbac-proxy
+  registrar-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: csi-node-driver-registrar
+  smb-driver-operand:
+    name: "4.19"
+    namespace: ocp
+    tag: csi-driver-smb
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.aws-ebs
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: aws-ebs-csi-driver-operator
+- dockerfile_path: Dockerfile.aws-efs
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: aws-efs-csi-driver-operator
+- dockerfile_path: Dockerfile.create_efs
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: aws-efs-csi-operator-create-efs
+- dockerfile_path: Dockerfile.azure-disk
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: azure-disk-csi-driver-operator
+- dockerfile_path: Dockerfile.azure-file
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: azure-file-csi-driver-operator
+- dockerfile_path: Dockerfile.openstack-cinder
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: openstack-cinder-csi-driver-operator
+- dockerfile_path: Dockerfile.openstack-manila
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-driver-manila-operator
+- dockerfile_path: Dockerfile.samba
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: smb-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: aws-ebs-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: azure-disk-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: azure-file-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: openstack-cinder-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: smb-csi-driver-operator-test
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: manila-csi-driver-operator-test
+operator:
+  bundles:
+  - as: smb-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config/samba
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  - as: aws-efs-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config/aws-efs
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver:latest
+    with: pipeline:aws-efs-driver-operand
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
+    with: pipeline:aws-efs-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-smb-csi-driver-operator:latest
+    with: pipeline:smb-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-csi-driver-smb:latest
+    with: pipeline:smb-driver-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:provisioner-operand
+  - pullspec: quay.io/openshift/origin-csi-node-driver-registrar:latest
+    with: pipeline:registrar-operand
+  - pullspec: quay.io/openshift/origin-csi-livenessprobe:latest
+    with: pipeline:livenessprobe-operand
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:proxy-operand
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    make verify
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
+  container:
+    from: src
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+- as: hypershift-aws-e2e-external
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-csi-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    workflow: openshift-e2e-aws-csi-extended
+- as: aws-efs-operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: aws-efs-operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
+- as: e2e-azure-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]|\[Azure-Disk-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
+- as: e2e-azurestack-csi
+  optional: true
+  steps:
+    cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
+    workflow: openshift-e2e-azurestack-upi-csi
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-azure-file-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
+- as: e2e-azure-file-nfs-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file-nfs
+- as: e2e-azure-file-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]|\[Azure-File-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
+- as: e2e-openstack
+  optional: true
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-cinder-csi
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-manila-csi
+  run_if_changed: ^(Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
+- as: smb-operator-e2e
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: smb-operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: csi-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: csi-operator

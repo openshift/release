@@ -9,7 +9,8 @@ build_root:
 canonical_go_repository: github.com/openshift/library-go
 promotion:
   to:
-  - name: 4.18-priv
+  - disabled: true
+    name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -52,6 +53,20 @@ tests:
       cli: latest
       commands: |
         make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-monitoring
+  run_if_changed: ^(pkg/operator/resource/resourceapply/monitoring.go)|^(test/e2e-monitoring)
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-monitoring JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:

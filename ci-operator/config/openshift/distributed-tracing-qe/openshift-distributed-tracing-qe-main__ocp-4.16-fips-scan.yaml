@@ -1,0 +1,43 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: distributed-tracing-operators
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-fips-scan
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: distributed-tracing-qe
+  variant: ocp-4.16-fips-scan

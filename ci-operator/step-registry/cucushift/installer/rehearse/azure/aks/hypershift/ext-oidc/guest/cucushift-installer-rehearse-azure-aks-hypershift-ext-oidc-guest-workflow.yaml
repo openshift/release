@@ -1,0 +1,15 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-guest
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-provision
+    - ref: cucushift-hypershift-extended-enable-guest
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-ext-oidc
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-deprovision
+  documentation: |-
+    This workflow creates and later destroys an aks management cluster and a public hosted cluster 
+    using external OIDC. oc commands in the tests will target the guest cluster. 
+    Note that it is impossible to run cucushift test cases against such a hosted cluster as it only has one (external) user.

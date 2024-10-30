@@ -37,14 +37,42 @@ tests:
               {"step": "mtr-deploy-windup", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Windup", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "mtr-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "mtr-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "WINDUP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","mtr-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MTR_TESTS_UI_SCOPE: interop
+      OPERATORS: |
+        [
+            {"name": "mtr-operator", "source": "redhat-operators", "channel": "alpha", "install_namespace": "mtr", "operator_group":"mtr-operator-group", "target_namespaces": "mtr"}
+        ]
+      USER_TAGS: |
+        scenario mtr
+    test:
+    - ref: install-operators
+    - ref: mtr-deploy-windup
+    - ref: mtr-tests-ui
+    workflow: firewatch-ipi-aws
+- as: mtr-interop-aws-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "mtr-deploy-windup", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Windup", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mtr-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mtr-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "WINDUP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","fips",mtr-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MTR_TESTS_UI_SCOPE: interop

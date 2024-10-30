@@ -70,6 +70,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-reboot-nodes-arm-f28
+  cron: 4 0 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_REBOOT_CHECK: "true"
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-phz-f14
   cron: 23 16 5,19 * *
   steps:
@@ -88,6 +103,16 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-upi-reboot-nodes-f28
+  cron: 35 23 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-custom-nsg-f28
   cron: 41 19 22 * *
   steps:
@@ -98,13 +123,14 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
-- as: azure-ipi-disc-fullyprivate-firewall-idms-f28
+- as: azure-ipi-disc-fullyprivate-firewall-idms-oc-mirror-f28
   cron: 58 22 12 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall
@@ -117,6 +143,7 @@ tests:
       AZURE_DEFAULT_MACHINE_DISK_SIZE: "256"
       AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXIT_ON_INSTALLER_CHECK_FAIL: "no"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype-disksize
@@ -131,6 +158,7 @@ tests:
       AZURE_DEFAULT_MACHINE_DISK_SIZE: "512"
       AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXIT_ON_INSTALLER_CHECK_FAIL: "no"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype-disksize
@@ -141,6 +169,7 @@ tests:
     env:
       AZURE_COMPUTE_DISK_TYPE: Standard_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXIT_ON_INSTALLER_CHECK_FAIL: "no"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype
@@ -162,7 +191,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -175,7 +204,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -216,8 +245,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -284,6 +313,11 @@ tests:
   cron: 55 11 25 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_TYPE: n4-standard-2
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: n4-standard-4
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
@@ -356,10 +390,28 @@ tests:
 - as: vsphere-ipi-customized-resource-f28
   cron: 25 5 23 * *
   steps:
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+- as: vsphere-ipi-disktype-eagerzeroedthick-f28
+  cron: 38 5 7 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: eagerZeroedThick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
+- as: vsphere-ipi-disktype-thick-f28
+  cron: 1 17 8 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: thick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
 - as: vsphere-ipi-invaid-fields-f28
   cron: 4 4 27 * *
   steps:

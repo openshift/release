@@ -1,0 +1,39 @@
+ref:
+  as: openshift-qe-network-vm-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.2.5"
+    documentation: |-
+      Override the e2e version
+  - name: NETPERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the k8s netperf
+  - name: BAREMETAL
+    default: "false"
+    documentation: |-
+      Run on baremetal
+  - name: TOLERANCE
+    default: "90"
+    documentation: |-
+      Tolerance of delta from hostNetwork to podNetwork - single stream
+  commands: openshift-qe-network-vm-perf-commands.sh
+  timeout: 4h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: perfscale-metal-bastion
+    mount_path: /bm
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale network-perf workload in the deployed cluster

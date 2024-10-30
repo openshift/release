@@ -3,22 +3,26 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
-  ci_tests-private-base_4.17:
+  ci_tests-private-base_4.18:
     name: tests-private-base
     namespace: ci
-    tag: "4.17"
-  ci_tests-private-baseui_4.17:
+    tag: "4.18"
+  ci_tests-private-baseui_4.18:
     name: tests-private-baseui
     namespace: ci
-    tag: "4.17"
-  ci_tests-private-builder_4.17:
+    tag: "4.18"
+  ci_tests-private-builder_4.18:
     name: tests-private-builder
     namespace: ci
-    tag: "4.17"
+    tag: "4.18"
   cli:
     name: "4.18"
     namespace: ocp
     tag: cli
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   upi-installer:
     name: "4.18"
     namespace: ocp
@@ -28,39 +32,44 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.17
+  from: ci_tests-private-base_4.18
   inputs:
     ci_rosa-aws-cli_latest:
       as:
       - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_4.17:
+    ci_tests-private-builder_4.18:
       as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.17
+      - registry.ci.openshift.org/ci/tests-private-builder:4.18
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.17
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.18
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && \
         mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.17:
+    ci_tests-private-baseui_4.18:
       as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.17
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.18
     src:
       as:
       - src
   to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.17
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.18
     RUN mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
@@ -68,9 +77,12 @@ images:
     bin:
       as:
       - bin
-    ci_tests-private-base_4.17:
+    ci_tests-private-base_4.18:
       as:
-      - registry.ci.openshift.org/ci/tests-private-base:4.17
+      - registry.ci.openshift.org/ci/tests-private-base:4.18
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private-newpr
 - dockerfile_literal: |
     FROM bin
@@ -86,7 +98,8 @@ images:
   to: tests-private-pr
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - tests-private
     - tests-private-ui
     - tests-private-pr
@@ -99,12 +112,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -149,7 +162,7 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
+  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
   steps:
     cluster_profile: aws
     test:
@@ -169,21 +182,21 @@ tests:
 
         CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/candidate
         curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp-dev-preview/ -o pre.html
-        ecver=$(grep -E "<a href=\"candidate-4\.17" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V"
+        ecver=$(grep -E "<a href=\"candidate-4\.18" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V"
         if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp-dev-preview/${ecver}; fi
-        rcgaver=$(grep -E "<a href=\"4\.17" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"
+        rcgaver=$(grep -E "<a href=\"4\.18" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"
         if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi
-        curl -s -k -L ${CLIENTURL}/opm-linux.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && rm -fr opm.tar.gz
+        curl -s -k -L ${CLIENTURL}/opm-linux-rhel9.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && mv ${HOME}/opm-rhel9 ${HOME}/opm && rm -fr opm.tar.gz
         curl -s -k -L ${CLIENTURL}/oc-mirror.rhel9.tar.gz -o om.tar.gz && tar -C ${HOME} -xzvf om.tar.gz && chmod +x ${HOME}/oc-mirror && rm -f om.tar.gz
 
         SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release
         curl -s -k -L ${MIRROR2URL}/x86_64/clients/operator-sdk/ -o sdk.html
-        optsdkver=$(grep -E "<a href=\"4\.17" sdk.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo ${optsdkver}
+        optsdkver=$(grep -E "<a href=\"4\.18" sdk.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo ${optsdkver}
         if [ "V${optsdkver}V" != "VV"  ]; then SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/${optsdkver}; fi
         curl -s -k -L ${SDKURL}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
         tar -C ${HOME} -xzvf opt-sdk.tar.gz && mv ${HOME}/x86_64/operator-sdk ${HOME} && rm -fr opt-sdk.tar.gz ${HOME}/x86_64
 
-        oc image extract quay.io/openshifttest/hypershift-client:latest --file=/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
+        oc image extract quay.io/hypershift/hypershift-operator:latest --file=/usr/bin/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
         oc image extract quay.io/openshifttest/openshift4-tools:v2 --file=/tmp/OpenShift4-tools.tar && tar -C "${HOME}" -xf OpenShift4-tools.tar && rm -fr OpenShift4-tools.tar
 
         export PATH=$PATH:$HOME:${HOME}/OpenShift4-tools
@@ -198,14 +211,14 @@ tests:
       from: tests-private-newpr
       resources:
         limits:
-          memory: 6Gi
+          memory: 8Gi
         requests:
           cpu: "1"
           memory: 1Gi
     workflow: ipi-aws
 - as: e2e-console
   optional: true
-  run_if_changed: frontend/
+  run_if_changed: frontend/tests/.*.cy.ts
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     test:

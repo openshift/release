@@ -40,8 +40,8 @@ set -euo pipefail
 
 export SEED_IMAGE="${SEED_IMAGE}"
 export SEED_VERSION="${SEED_VERSION}"
-export LCA_IMAGE="${LCA_PULL_REF}"
 export IBI_VM_NAME="${TARGET_VM_NAME}"
+export OPENSHIFT_INSTALLER_BIN="/usr/bin/openshift-install"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
@@ -51,15 +51,36 @@ export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 
 sudo dnf -y install runc crun gcc-c++ zip
 
-echo "Starting the IBI cluster"
-make ibi-iso ibi-vm ibi-logs
+mkdir tmp
+podman run -v ./tmp:/tmp:Z --user root:root --rm --entrypoint='["/bin/sh","-c"]' ${INSTALLER_PULL_REF} "cp /bin/openshift-install /tmp/openshift-install"
+sudo mv ./tmp/openshift-install /usr/bin/openshift-install
+rm -rf tmp
+
+echo "Creating the IBI installation iso"
+SECONDS=0
+make ibi-iso
+t_ibi_iso_create=\$SECONDS
+
+echo "Installing via IBI"
+SECONDS=0
+make ibi-vm ibi-logs
+t_ibi_install=\$SECONDS
 
 echo "Attaching and configuring the cluster"
-make build-openshift-install imagebasedconfig.iso ibi-attach-config.iso
+SECONDS=0
+make imagebasedconfig.iso ibi-attach-config.iso
+t_ibi_config=\$SECONDS
 
 echo "Rebooting the cluster"
+SECONDS=0
 make ibi-reboot wait-for-ibi
+t_ibi_config_reboot=\$SECONDS
 
+echo "IBI Times:"
+echo "ISO Creation: \${t_ibi_iso_create} seconds"
+echo "Installation Time: \${t_ibi_install} seconds"
+echo "Config Time: \${t_ibi_config} seconds"
+echo "Config Reboot Time: \${t_ibi_config_reboot} seconds"
 EOF
 
 chmod +x ${SHARED_DIR}/image_based_install.sh

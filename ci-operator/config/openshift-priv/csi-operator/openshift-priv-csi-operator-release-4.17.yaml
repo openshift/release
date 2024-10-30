@@ -7,22 +7,22 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: csi-driver-smb-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   livenessprobe-operand:
     name: 4.17-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_4.16_base:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base
   ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -67,9 +67,6 @@ images:
   to: aws-ebs-csi-driver-operator
 - dockerfile_path: Dockerfile.aws-efs
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -79,12 +76,12 @@ images:
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
-    ocp_4.16_base:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: aws-efs-csi-operator-create-efs
 - dockerfile_path: Dockerfile.azure-disk
   inputs:
@@ -134,7 +131,7 @@ operator:
     update_graph: replaces
   - as: aws-efs-csi-driver-operator-bundle
     base_index: operator-index
-    context_dir: legacy/aws-efs-csi-driver-operator/config
+    context_dir: config/aws-efs
     dockerfile_path: bundle.Dockerfile
     update_graph: replaces
   substitutions:
@@ -156,8 +153,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -220,7 +216,7 @@ tests:
     env:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
-    workflow: openshift-e2e-aws-csi-efs-extended
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
 - as: e2e-azure
   steps:
     cluster_profile: azure4
@@ -233,6 +229,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
 - as: e2e-azure-csi-extended
   optional: true
   steps:

@@ -22,11 +22,11 @@ base_images:
   rosa:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-0.9.1
+    tag: rosa-0.10.28
   rosa-hcp:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-0.9.18
+    tag: rosa-0.10.28
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -35,7 +35,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.69
+    tag: stackrox-ui-test-0.4.4
 releases:
   latest:
     release:
@@ -77,6 +77,13 @@ tests:
   timeout: 5h0m0s
 - always_run: true
   as: gke-nongroovy-e2e-tests
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- always_run: false
+  as: gke-nongroovy-compatibility-tests
+  optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -197,13 +204,11 @@ tests:
     - ref: stackrox-initial
 - as: merge-gke-operator-e2e-tests
   postsubmit: true
-  skip_if_only_changed: ^ui/
   steps:
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - as: merge-gke-qa-e2e-tests
   postsubmit: true
-  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -218,6 +223,12 @@ tests:
   timeout: 5h0m0s
 - as: merge-gke-nongroovy-e2e-tests
   postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: merge-gke-nongroovy-compatibility-tests
+  postsubmit: true
   skip_if_only_changed: ^ui/
   steps:
     env:
@@ -225,37 +236,24 @@ tests:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-scanner-v4-tests
   postsubmit: true
-  run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-sensor-integration-tests
   postsubmit: true
-  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-upgrade-tests
   postsubmit: true
-  skip_if_only_changed: ^ui/
   steps:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-version-compatibility-tests
   postsubmit: true
-  skip_if_only_changed: ^ui/
   steps:
     workflow: stackrox-stackrox-e2e-job
-- always_run: false
-  as: powervs-qa-ebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
 - always_run: false
   as: powervs-qa-corebpf-e2e-tests
   optional: true
@@ -266,22 +264,12 @@ tests:
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
 - always_run: false
-  as: powervs-4-16-qa-corebpf-e2e-tests
+  as: powervs-4-15-qa-corebpf-e2e-tests
   optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_CLUSTER_VERSION: "4.16"
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
-- always_run: false
-  as: powervs-4-14-qa-ebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      OCP_CLUSTER_VERSION: "4.14"
+      OCP_CLUSTER_VERSION: "4.15"
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
@@ -296,50 +284,12 @@ tests:
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
 - always_run: false
-  as: powervs-4-13-qa-ebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      OCP_CLUSTER_VERSION: "4.13"
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
-- always_run: false
   as: powervs-4-13-qa-corebpf-e2e-tests
   optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
       OCP_CLUSTER_VERSION: "4.13"
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
-- always_run: false
-  as: powervs-4-12-qa-ebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      OCP_CLUSTER_VERSION: "4.12"
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
-- always_run: false
-  as: powervs-4-12-qa-corebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      OCP_CLUSTER_VERSION: "4.12"
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-  timeout: 5h0m0s
-- as: daily-powervs-latest-ebpf-qa-e2e-tests
-  cron: 30 00 * * *
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
@@ -351,12 +301,12 @@ tests:
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
-- as: daily-powervs-412-corebpf-qa-e2e-tests
+- as: daily-powervs-414-corebpf-qa-e2e-tests
   cron: 30 12 * * *
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_CLUSTER_VERSION: "4.12"
+      OCP_CLUSTER_VERSION: "4.14"
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s

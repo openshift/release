@@ -178,8 +178,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -263,29 +263,40 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
-- as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
-  cron: 23 5 3 * *
+- as: ibmcloud-ipi-private-sshkey-reboot-nodes-f28
+  cron: 41 20 6 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
       ENABLE_REBOOT_CHECK: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
-- as: ibmcloud-ipi-private-sshkey-f28
-  cron: 41 20 6 * *
-  steps:
-    cluster_profile: ibmcloud-qe
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
 - as: vsphere-ipi-customized-resource-f28
   cron: 56 22 18 * *
   steps:
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+- as: vsphere-ipi-disktype-eagerzeroedthick-f28
+  cron: 46 6 29 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: eagerZeroedThick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
+- as: vsphere-ipi-disktype-thick-f28
+  cron: 2 9 4 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: thick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -14,6 +14,14 @@ product_code="5bn121hij41332ueh3nn53tc5" # OCP
 aws_marketplace_images="${ARTIFACT_DIR}/aws_marketplace_images.json"
 selected_image="${ARTIFACT_DIR}/selected_image.json"
 
+function is_empty()
+{
+    local v="$1"
+    if [[ "$v" == "" ]] || [[ "$v" == "null" ]]; then
+        return 0
+    fi
+    return 1
+}
 
 # All available images on AWS Marketplace
 aws --region $REGION ec2 describe-images --owners aws-marketplace \
@@ -58,26 +66,49 @@ echo "get ocp version: ${version}"
 rm pull-secret
 popd
 
-image_name_prefix="rhcos-`echo ${version} | awk -F '.' '{print $1$2}'`" # e.g. rhcos-48, rhcos-412
+ocp_major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 
-jq --arg v "$image_name_prefix" '.Images[] | select(.Name | startswith($v))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name) | last' > $selected_image
-image_id=$(jq -r '.ImageId' $selected_image)
+v=$ocp_minor_version
+image_id=""
 
-if [[ "$image_id" == "" ]] || [[ "$image_id" == "null" ]]; then
-  # While in the new version development phase, generally, the AWS Marketplace image for this version is not available, so we choose the latest one instead
-  echo "WARN: No image is available that matches the current version, choosing the latest image ... "
-  jq '.Images[]' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name | sub("^rhcos-"; "") | split(".")[0] | tonumber) | last' > $selected_image
+# from current version to 4.11 select the latest compatible image
+#
+# e.g.for the image list
+# "rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
+# "rhcos-411.86.202207150124-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
+# "rhcos-x86_64-415.92.202402201450-0-59ead7de-2540-4653-a8b0-fa7926d5c845"
+# "rhcos-412.86.202212081411-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
+# 
+# 4.11 -> rhcos-411.86.202207150124-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
+# 4.13 -> rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
+# 4.14 -> rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
+# 4.15 -> rhcos-x86_64-415.92.202402201450-0-59ead7de-2540-4653-a8b0-fa7926d5c845
+# 4.16 -> rhcos-x86_64-415.92.202402201450-0-59ead7de-2540-4653-a8b0-fa7926d5c845
+#
+
+while [ $v -gt 10 ]
+do
+  v_xy="${ocp_major_version}${v}"
+  echo "Checking ${v_xy} ..."
+  jq --arg r "^rhcos-(x86_64-){0,1}${v_xy}\..*" '.Images[] | select(.Name | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name | sub("^rhcos-x86_64-"; "") | sub("^rhcos-"; "")) | last' > $selected_image
   image_id=$(jq -r '.ImageId' $selected_image)
-fi
 
-if [[ "$image_id" == "" ]] || [[ "$image_id" == "null" ]]; then
+  if ! is_empty "$image_id"; then
+    image_name=$(jq -r '.Name' $selected_image)
+    image_location=$(jq -r '.ImageLocation' $selected_image)
+    echo "Using AWS Marketplace image ${image_name} for compute nodes, image id: ${image_id}, location: ${image_location}"
+    break
+  fi
+  v=$((v-1))
+done
+
+if is_empty "$image_id"; then
   echo "ERROR: Can not find images on AWS Marketplace, region: $REGION, product code: $product_code, exit now"
   exit 1
 fi
 
 IMAGE_ID_PATCH="${ARTIFACT_DIR}/install-config-marketplace-image-id.yaml.patch"
-image_name=$(jq -r '.Name' $selected_image)
-echo "Using AWS Marketplace image ${image_name} for compute nodes, image id: ${image_id}"
 
 cat > "${IMAGE_ID_PATCH}" << EOF
 compute:

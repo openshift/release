@@ -18,9 +18,9 @@ spec:
   restartPolicy: Never
   containers:
   - name: run-nfd
-    image: quay.io/ocp-edge-qe/eco-gotests
+    image: quay.io/ocp-edge-qe/eco-gotests:latest
     command: [ "/bin/bash", "-c", "--" ]
-    args: [ "scripts/test-runner.sh && sleep 120" ]
+    args: [ "scripts/test-runner.sh && sleep 500" ]
     env:
     - name: KUBECONFIG
       value: "/kubeconfig/kubeconfig"
@@ -40,6 +40,8 @@ spec:
       value: "redhat-operators"
     - name: ECO_DUMP_FAILED_TESTS
       value: "true"
+    - name: ECO_HWACCEL_NFD_CPU_FLAGS_HELPER_IMAGE
+      value: quay.io/rh_ee_ggordani/cpuinfo:release-4.15
     - name: ECO_REPORTS_DUMP_DIR
       value: /home/testuser/reports
     imagePullPolicy: Always
@@ -86,6 +88,5 @@ while : ; do
 done
 
 echo "Retrieve test results..."
-oc exec testpod -- cat /home/testuser/reports/upgrade_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_upgrade_suite_test.xml 
 oc exec testpod -- cat /home/testuser/reports/nfd_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_nfd_suite_test.xml
 oc exec testpod -- cat /home/testuser/reports/report_testrun.xml > ${ARTIFACT_DIR}/junit_report_testrun.xml

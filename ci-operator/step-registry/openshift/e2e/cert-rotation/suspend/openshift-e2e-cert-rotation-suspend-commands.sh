@@ -43,13 +43,6 @@ source /usr/local/share/cert-rotation-functions.sh
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
-# Backup lb-ext kubeconfig so that it could be compared to a new one
-KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
-KUBECONFIG_LB_EXT="${KUBECONFIG_NODE_DIR}/lb-ext.kubeconfig"
-KUBECONFIG_REMOTE="/tmp/lb-ext.kubeconfig"
-run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
-copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
-
 # Set date for host
 sudo timedatectl status
 sudo timedatectl set-time +${SKEW}
@@ -62,21 +55,18 @@ run-on-all-nodes "timedatectl set-time +${SKEW} && timedatectl status"
 # Restart kubelet
 run-on-all-nodes "systemctl restart kubelet"
 
+pod-restart-workarounds
+
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 wait-for-nodes-to-be-ready
 
-# Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
-run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
+# Wait for kube-apiserver operator to generate valid lb-ext kubeconfig
+wait-for-valid-lb-ext-kubeconfig
 
-# Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
-run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
-copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
+# Wait for kube-apiserver to become Progressing to avoid stale operator status
+wait-for-kubeapiserver-to-start-progressing
 
-# Approve certificates for workers, so that all operators would complete
-wait-for-nodes-to-be-ready
-
-pod-restart-workarounds
-
+# Wait for operators to finish updates
 wait-for-operators-to-stabilize
 exit 0
 

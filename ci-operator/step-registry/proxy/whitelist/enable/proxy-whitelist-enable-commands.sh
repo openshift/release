@@ -79,6 +79,7 @@ EOF
 cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
 oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
+canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 api.openshift.com
 console.redhat.com
 mirror.openshift.com
@@ -86,6 +87,7 @@ quayio-production-s3.s3.amazonaws.com
 rhcos.mirror.openshift.com
 sso.redhat.com
 storage.googleapis.com/openshift-release
+.r2.cloudflarestorage.com
 EOF
 
 # # optional third-party content
@@ -104,7 +106,7 @@ EOF
 
 # for nightly test
 cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
-registry.ci.openshift.org
+.ci.openshift.org
 EOF
 
 cp ${SHARED_DIR}/proxy_whitelist.txt ${ARTIFACT_DIR}/

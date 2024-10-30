@@ -3,6 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.15"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.15"
     namespace: ocp
@@ -35,11 +39,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     prerelease:
@@ -60,8 +59,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-byo-route53-compact-arm-f28
-  cron: 25 4 11 * *
+- as: aws-ipi-byo-route53-compact-cloudfront-arm-f60
+  cron: 36 2 9 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -72,9 +71,9 @@ tests:
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-ingress-lbtype-nlb-arm-f28
-  cron: 10 3 23 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
+- as: aws-ipi-ingress-lbtype-nlb-arm-f60
+  cron: 17 14 24 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -85,8 +84,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
-  cron: 59 20 4 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f60
+  cron: 11 6 26 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -115,22 +114,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: azure-ipi-des-mini-perm-amd-mixarch-f28
-  cron: 15 8 30 * *
+- as: azure-ipi-des-mini-perm-arm-f60
+  cron: 42 2 10 2,4,6,8,10,12 *
   steps:
     cluster_profile: azure-qe
     env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
+      OCP_ARCH: arm64
     test:
-    - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
-- as: gcp-ipi-oidc-rt-fips-amd-f14
-  cron: 46 14 1,15 * *
+- as: gcp-ipi-oidc-rt-fips-amd-f28
+  cron: 34 13 5 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -140,8 +137,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: gcp-ipi-proxy-oidc-amd-mixarch-f28
-  cron: 35 0 23 * *
+- as: gcp-ipi-proxy-oidc-amd-mixarch-f60
+  cron: 4 7 10 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:

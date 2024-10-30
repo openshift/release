@@ -1,0 +1,75 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+- context_dir: .
+  dockerfile_path: ./tests/e2e-openshift/Dockerfile
+  to: opentelemetry-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opentelemetry-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "distributed-tracing-install-*", "failure_type": "pod_failure", "classification": "Distributed tracing operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-install-*", "failure_type": "test_failure", "classification": "Distributed tracing operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-tests-*", "failure_type": "pod_failure", "classification": "OpenTelemetry e2e tests", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "distributed-tracing-tests-*", "failure_type": "test_failure", "classification": "OpenTelemetry e2e tests", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operatorhub-subscribe-*", "failure_type": "pod_failure", "classification": "Distributed tracing dependency operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operatorhub-subscribe-*", "failure_type": "test_failure", "classification": "Distributed tracing dependency operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","rosa-classic-lp","opentelemetry-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_PRIVATE_DECK: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.16"
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
+        ]
+    test:
+    - chain: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-interop
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: opentelemetry-product-ocp-4.16-lp-rosa-classic

@@ -3,10 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 images:
@@ -14,22 +14,33 @@ images:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: vertical-pod-autoscaler-operator
 - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: vpa-operator-registry
+operator:
+  bundles:
+  - as: vertical-pod-autoscaler-operator-bundle
+    dockerfile_path: images/ci/bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler-operator.*
+    with: pipeline:vertical-pod-autoscaler-operator
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler.*
+    with: stable:vertical-pod-autoscaler
 promotion:
   to:
-  - disabled: true
+  - additional_images:
+      vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
     name: "4.17"
     namespace: ocp
 releases:

@@ -1,0 +1,266 @@
+base_images:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: "4.17"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  previous-wmco:
+    name: "4.17"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+binary_build_commands: make build
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_path: build/Dockerfile.ci
+  inputs:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+  to: windows-machine-config-operator-test
+operator:
+  bundles:
+  - as: wmco-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: pipeline:windows-machine-config-operator-test
+promotion:
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    name: "4.19"
+    namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+  src:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+  windows-machine-config-operator-test:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: build
+  commands: make build
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit
+  commands: make unit
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: security
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: windows-machine-config-operator
+    workflow: openshift-ci-security
+- always_run: false
+  as: aws-e2e-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: vsphere-disconnected-e2e-operator
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
+- always_run: false
+  as: azure-e2e-operator
+  steps:
+    cluster_profile: azure4
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: gcp-e2e-operator
+  steps:
+    cluster_profile: gcp
+    env:
+      WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
+  as: vsphere-e2e-operator
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: azure-e2e-upgrade
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
+        # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
+        || oc get csv -n $WMCO_NS |awk {'print $1'} | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
+        sleep 10
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+      - env: PREVIOUS_OPERATOR
+        name: previous-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
+- always_run: false
+  as: platform-none-vsphere-e2e-operator
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test-byoh
+    workflow: windows-e2e-operator-test-platform-none-vsphere
+- always_run: false
+  as: vsphere-proxy-e2e-operator
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+- always_run: false
+  as: wicd-unit-vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    post:
+    - chain: upi-vsphere-windows-post
+    pre:
+    - ref: ipi-install-rbac
+    - ref: ipi-conf
+    - ref: ipi-conf-vsphere-check
+    - ref: ipi-conf-vsphere-check-vcm
+    - ref: upi-conf-vsphere-vcm
+    - ref: upi-conf-vsphere-dns
+    - chain: upi-vsphere-windows-pre
+    test:
+    - ref: windows-unit-wicd
+- as: community-fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: community-4.18
+      SOURCE_BRANCH: release-4.18
+    workflow: windows-ci-fastforward
+- always_run: false
+  as: nutanix-e2e-operator
+  cluster: build01
+  steps:
+    cluster_profile: nutanix
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: windows-machine-config-operator

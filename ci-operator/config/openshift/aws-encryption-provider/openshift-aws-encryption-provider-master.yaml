@@ -1,34 +1,47 @@
 base_images:
-  base:
-    name: "4.17"
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
+    name: "4.18"
     namespace: ocp
-    tag: base
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
-build_root:
-  image_stream_tag:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: aws-kms-encryption-provider
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.18"
     namespace: ocp
 releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.18"
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -47,6 +60,10 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: master
   org: openshift

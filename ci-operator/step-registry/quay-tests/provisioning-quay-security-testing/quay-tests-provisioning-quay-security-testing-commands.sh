@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#How to install trivy
+#https://aquasecurity.github.io/trivy/v0.54/getting-started/installation/
+
 #Create new AWS EC2 Instatnce to run Quay Security Testing
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
@@ -87,7 +90,7 @@ resource "aws_security_group" "quaybuilder" {
 
 resource "aws_instance" "quaybuilder" {
   key_name = aws_key_pair.quaybuilder0710.key_name
-  ami      = "ami-0bfc536a37a52cfa2"
+  ami      = "ami-02b8534ff4b424939"
   instance_type = "m4.xlarge"
 
   associate_public_ip_address = true
@@ -101,21 +104,17 @@ resource "aws_instance" "quaybuilder" {
 
   provisioner "remote-exec" {
     inline = [
-      "sudo yum install -y yum-utils",
-      "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
-      "sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y",
-      "sudo systemctl start docker",
-      "sudo curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin || true",
-      "sudo docker login --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} brew.registry.redhat.io || true",
-      "sudo /usr/local/bin/grype --version || true",
-      "sudo /usr/local/bin/grype brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.10.3-5 --scope all-layers || true"
+      "sudo yum install -y podman",
+      "sudo rpm -ivh https://github.com/aquasecurity/trivy/releases/download/v0.54.1/trivy_0.54.1_Linux-64bit.rpm",
+      "sudo podman login -u '${QUAY_BREW_USERNAME}' -p ${QUAY_BREW_PASSWORD} brew.registry.redhat.io",
+      "sudo trivy image brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.12.1-8 --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} || true"
     ]
   }
 
   connection {
     type        = "ssh"
     host        = self.public_ip
-    user        = "centos"
+    user        = "ec2-user"
     private_key = file("./quaybuilder")
   }
   tags = {

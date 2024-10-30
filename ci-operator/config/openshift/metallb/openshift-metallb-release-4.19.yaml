@@ -1,0 +1,82 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-9-base-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: metallb
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: metallb-e2e-metal-frrk8s
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s
+    workflow: baremetalds-metallb-e2e
+- as: metallb-e2e-metal-frrk8s-cno
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
+    workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: metallb

@@ -1,0 +1,103 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/dpu-operator
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: dpu-operator
+- dockerfile_path: Dockerfile.CNI.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: dpu-cni
+- dockerfile_path: Dockerfile.daemon.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: dpu-daemon
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y python3-pip && pip3 install yq && dnf install -y podman
+  from: src
+  to: custom-src
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: make-fmt-check
+  commands: HOME=/tmp make fmt-check
+  container:
+    from: custom-src
+- as: make-vendor-check
+  commands: HOME=/tmp make vendor-check
+  container:
+    from: custom-src
+- as: make-generate-check
+  commands: HOME=/tmp make generate-check
+  container:
+    from: custom-src
+- as: make-prow-ci-manifests-check
+  commands: HOME=/tmp make prow-ci-manifests-check
+  container:
+    from: custom-src
+- as: make-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-tests-workflow
+  timeout: 1h0m0s
+- always_run: false
+  as: make-e2e-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-e2e-tests-workflow
+  timeout: 8h0m0s
+- as: make-fast-e2e-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-fast-e2e-tests-workflow
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: dpu-operator

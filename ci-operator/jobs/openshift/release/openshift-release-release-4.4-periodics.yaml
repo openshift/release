@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build09
   decorate: true
   interval: 8h
   labels:
@@ -18,7 +18,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -122,7 +122,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build09
   decorate: true
   interval: 8h
   labels:
@@ -140,7 +140,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -244,7 +244,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build09
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -282,8 +282,8 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L https://github.com/stedolan/jq/releases/download/jq-1.7/jq-linux-$(uname -m | sed 's/aarch64/amd64/;s/x86_64/amd64/') 2>/dev/null >/tmp/bin/jq
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
         # guard against starting if no okd stream exists yet
@@ -336,7 +336,7 @@ periodics:
           exit 0
         fi
 
-        curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
+        curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/' 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
 
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
@@ -512,7 +512,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build10
   cron: 24 21 24 */12 *
   decorate: true
   labels:

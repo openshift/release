@@ -32,7 +32,11 @@ else
 fi
 
 if [[ "$HYPERSHIFT_OPERATOR_PULL_SECRET" == "true" ]]; then
-    COMMAND+=(--pull-secret="${CLUSTER_PROFILE_DIR}/pull-secret")
+    PULL_SECRET_PATH="${CLUSTER_PROFILE_DIR}/pull-secret"
+    if [[ -f "${SHARED_DIR}/hypershift-pull-secret" ]]; then
+        PULL_SECRET_PATH="${SHARED_DIR}/hypershift-pull-secret"
+    fi
+    COMMAND+=(--pull-secret="$PULL_SECRET_PATH")
 fi
 
 case "${CLUSTER_TYPE,,}" in

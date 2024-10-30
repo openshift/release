@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.15
+    tag: rhel-9-release-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: images/Dockerfile.ci
   from: src
@@ -14,12 +14,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -34,7 +34,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-sdn-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-bm-bond
   cluster: build05
   optional: true
@@ -44,10 +44,9 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
         BOND_PRIMARY_INTERFACE=true
         NETWORK_CONFIG_FOLDER=./network-configs/bond
-    workflow: baremetalds-e2e-sdn-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-upgrade
   cluster: build05
   optional: true
@@ -56,11 +55,10 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
       RUN_UPGRADE_TEST: "true"
       TEST_SUITE: ""
       TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade-sdn
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
@@ -73,6 +71,15 @@ tests:
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-v6
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
   cluster: build05
@@ -87,7 +94,7 @@ tests:
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-serial-ipv4
+    workflow: baremetalds-e2e-serial-ovn-ipv4
   timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
@@ -109,6 +116,22 @@ tests:
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4-add-nodes
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_DISK=100
+      DEVSCRIPTS_TARGET: agent_plus_add_node
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6

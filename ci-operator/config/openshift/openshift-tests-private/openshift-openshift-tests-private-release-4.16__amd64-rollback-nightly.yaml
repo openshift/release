@@ -1,0 +1,242 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  openstack-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: 4.16.0
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-ipi-byo-route53-f7
+  cron: 29 16 6,14,21,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-ovn-hypershift-inplace-f7
+  cron: 44 3 1,8,15,23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=inplace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-rollback
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: azure-upi-f7
+  cron: 16 4 5,12,20,28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetal-ipi-ovn-ipv4-f7
+  cluster: build05
+  cron: 41 4 3,10,17,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: baremetal-lab-ipi
+- as: gcp-ipi-ovn-ipsec-f7
+  cron: 14 3 4,12,19,26 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: ibmcloud-ipi-f7
+  cron: 36 11 7,15,22,29 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: nutanix-ipi-boot-categories-project-rt-f28
+  cluster: build01
+  cron: 6 20 16 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      RT_ENABLED: "true"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: nutanix-upgrade-pre-config
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: vsphere-upi-f7
+  cron: 13 17 7,14,21,29 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-vsphere-upi
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-rollback-nightly

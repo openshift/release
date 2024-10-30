@@ -1,12 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen message
-
-message:
-	@printf '\e[1mThis Makefile was recently migrated to use QCI as respository of images. Please make sure you are logged in to QCI before executing targets. Copy the token from https://oauth-openshift.apps.ci.l2s4.p1.openshiftapps.com/oauth/token/request and run `oc login`\e[0m\n'
-	@printf '\e[1mTo login, use your container engine, example for podman: podman login -u=$$(oc whoami) -p=$$(oc whoami -t) quay-proxy.ci.openshift.org\e[0m\n'
-	@printf '\n\e[1mMore info: https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/\e[0m\n\n'
-
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -26,7 +20,7 @@ endif
 help:
 	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
 
-all: message core services
+all:  core services
 
 check: check-core check-services check-boskos
 	@echo "Service config check: PASS"
@@ -64,50 +58,47 @@ update:
 	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
-	$(MAKE) template-allowlist
-
-template-allowlist:
-	VOLUME_MOUNT_FLAGS="${VOLUME_MOUNT_FLAGS}" ./hack/generate-template-allowlist.sh
+	$(MAKE) release-controllers
 
 release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
-checkconfig: message
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240711-e49eac682 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+checkconfig: 
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20241021-9efd512d9 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
-jobs: message ci-operator-checkconfig
+jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
 	$(MAKE) sanitize-prow-jobs
 
-ci-operator-checkconfig: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-checkconfig_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-checkconfig_latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml
+ci-operator-checkconfig: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml
 .PHONY: ci-operator-checkconfig
 
-ci-operator-config: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-ci-operator_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-ci-operator_latest --config-dir /ci-operator/config --confirm
+ci-operator-config: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_determinize-ci-operator_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_determinize-ci-operator_latest --config-dir /ci-operator/config --confirm
 
-ci-operator-prowgen: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-prowgen_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-prowgen_latest --from-release-repo --to-release-repo --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
+ci-operator-prowgen: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest --from-release-repo --to-release-repo --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
 
-sanitize-prow-jobs: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_sanitize-prow-jobs_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_sanitize-prow-jobs_latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
+sanitize-prow-jobs: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_sanitize-prow-jobs_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_sanitize-prow-jobs_latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
 
-registry-metadata: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_generate-registry-metadata_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_generate-registry-metadata_latest --registry /ci-operator/step-registry
+registry-metadata: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_generate-registry-metadata_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_generate-registry-metadata_latest --registry /ci-operator/step-registry
 
 boskos-config:
 	cd core-services/prow/02_config && ./generate-boskos.py
 
-prow-config: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-prow-config_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-prow-config_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
+prow-config: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_determinize-prow-config_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_determinize-prow-config_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
-acknowledge-critical-fixes-only: message
+acknowledge-critical-fixes-only: 
 	@if [ -z "$(RELEASE)" ]; then \
 		echo "RELEASE is not specified. Please specify RELEASE=x.y"; \
 		exit 1; \
@@ -116,33 +107,33 @@ acknowledge-critical-fixes-only: message
 	# ocp-build-data is special
 	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --apply
 	$(eval REPOS ?= ./hack/acknowledge-critical-fix-repos.txt)
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_tide-config-manager_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
-revert-acknowledge-critical-fixes-only: message
+revert-acknowledge-critical-fixes-only: 
 	@if [ -z "$(RELEASE)" ]; then \
 		echo "RELEASE is not specified. Please specify RELEASE=x.y"; \
 		exit 1; \
 	fi
 	# ocp-build-data is special
 	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --revert
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_tide-config-manager_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
 	$(MAKE) prow-config
 
-new-repo: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest --release-repo /release
+new-repo: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_repo-init_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_repo-init_latest --release-repo /release
 	$(MAKE) update
 
-validate-step-registry: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-configresolver_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-configresolver_latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
+validate-step-registry: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
 
-python-validation: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
+python-validation: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_python-validation_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_python-validation_latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -277,17 +268,29 @@ build_farm_credentials_folder:
 	oc --context app.ci -n ci extract secret/config-updater --to=$(build_farm_credentials_folder) --confirm
 .PHONY: build_farm_credentials_folder
 
-update-ci-build-clusters:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-init_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-init_latest -release-repo=/release -create-pr=false -update=true
+cluster_install_yaml?= /tmp/cluster-install.yaml
+
+cluster-install-yaml: build_farm_credentials_folder
+	printf 'onboard:\n  releaseRepo: %s\n  kubeconfigDir: %s\n  kubeconfigSuffix: config\n' "/release" "$(build_farm_credentials_folder)" >$(cluster_install_yaml)
+.PHONY: cluster-install-yaml
+
+update-ci-build-clusters: cluster-install-yaml
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_cluster-init_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm \
+		-v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(cluster_install_yaml):/etc/cluster-install.yaml$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(build_farm_credentials_folder):$(build_farm_credentials_folder)$(VOLUME_MOUNT_FLAGS)" \
+		quay.io/openshift/ci-public:ci_cluster-init_latest \
+		onboard config generate \
+		--cluster-install=/etc/cluster-install.yaml --create-pr=false --update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:
 	true
 
 mixins:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_dashboards-validation_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_dashboards-validation_latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_dashboards-validation_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_dashboards-validation_latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 
 # Runs e2e secrets generation and sync to clusters.
@@ -309,19 +312,19 @@ new-pool-admins:
 	hack/generate_new_pool_admins.sh $(TEAM)
 .PHONY: new-pool-admins
 
-openshift-image-mirror-mappings: message
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
+openshift-image-mirror-mappings: 
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_promoted-image-governor_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_promoted-image-governor_latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
 
-config_updater_vault_secret: message build_farm_credentials_folder
+config_updater_vault_secret:  build_farm_credentials_folder
 	@[[ $$CLUSTER ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_applyconfig_latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_applyconfig_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
 		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
-		quay-proxy.ci.openshift.org/openshift/ci:ci_applyconfig_latest \
+		quay.io/openshift/ci-public:ci_applyconfig_latest \
 		--config-dir=/manifests \
 		--context=$(CLUSTER) \
 		--confirm \
@@ -348,13 +351,13 @@ build_farm_day2:
 .PHONY: build_farm_day2
 
 # Need to run inside Red Had network
-update_github_ldap_mapping_config_map: message
+update_github_ldap_mapping_config_map: 
 	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_ldap-users-from-github-owners-files_latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ldap-users-from-github-owners-files_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
 		-v "/tmp:/tmp$(VOLUME_MOUNT_FLAGS)" \
-		quay-proxy.ci.openshift.org/openshift/ci:ci_ldap-users-from-github-owners-files_latest \
+		quay.io/openshift/ci-public:ci_ldap-users-from-github-owners-files_latest \
 		-ldap-file /tmp/out \
 		-mapping-file /tmp/mapping.yaml
 	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping.yaml=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
@@ -458,19 +461,19 @@ __check_defined = \
 
 generate-hypershift-deployment: yq ?= yq
 generate-hypershift-deployment: TAG ?= latest
-generate-hypershift-deployment: message
+generate-hypershift-deployment: 
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG}
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
 	$(CONTAINER_ENGINE) run $(CONTAINER_USER) ${CONTAINER_ENGINE_OPTS} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
-		quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG} \
+		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG} \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/SS_hypershift-install.yaml
 .PHONY: generate-hypershift-deployment

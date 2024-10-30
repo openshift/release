@@ -4,11 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.22-openshift-4.17:
@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: golang-1.22
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
@@ -54,17 +54,17 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -340,6 +340,34 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-single-node-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-hypershift-conformance-techpreview
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: hypershift-aws-conformance
+- as: e2e-azure-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
 - always_run: true
   as: e2e-gcp-ovn-techpreview
   steps:
@@ -347,6 +375,72 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
+- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp-upgrade
+- as: e2e-metal-ipi-ovn-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: baremetalds-e2e
+- as: e2e-vsphere-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-aws-ovn-virt-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-ovn-virt
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -15,10 +15,6 @@ base_images:
     name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-controller
-  cli:
-    name: "4.16"
-    namespace: ocp
-    tag: cli
   cluster-api-provider-agent:
     name: ocm-2.11
     namespace: edge-infrastructure
@@ -27,30 +23,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  edge_infrastructure_swagger_codegen_cli:
-    name: edge-infrastructure-swagger-codegen-cli
-    namespace: ci
-    tag: 2.4.18
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
-  postgresql-12-c8s:
-    name: postgresql-12-centos7
-    namespace: edge-infrastructure
+    name: hypershift-operator
+    namespace: hypershift
     tag: latest
+  postgresql-12-c8s:
+    name: postgresql
+    namespace: ci
+    tag: postgresql-12-c8s
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ci-images/Dockerfile.base
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
@@ -60,22 +44,11 @@ images:
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
-  inputs:
-    cli:
-      as:
-      - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
   to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service-build
-  inputs:
-    edge_infrastructure_swagger_codegen_cli:
-      as:
-      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -90,28 +63,24 @@ images:
         source_path: /go/src/github.com/openshift/assisted-service/.
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - build_args:
-  - name: BASE_TAG
-    value: stream8
+  - name: RHEL_VERSION
+    value: "8"
   dockerfile_path: Dockerfile.assisted-service
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-el8
 - dockerfile_literal: |
-    FROM coreos/centos
+    FROM quay.io/multi-arch/yq:4.30.5 as yq4
+    FROM coreos/stream9:9
+    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
     COPY . .
   from: src
   to: assisted-service-scripts
+- dockerfile_path: Dockerfile.assisted-service-debug
+  to: assisted-service-debug
 - dockerfile_literal: |
-    FROM coreos/centos
-    RUN yum install -y --skip-broken skopeo pip
+    FROM coreos/stream9:9
+    RUN dnf install -y --skip-broken skopeo pip
   from: src
   to: assisted-service-publish-index
 operator:
@@ -141,13 +110,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -259,7 +228,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -294,8 +263,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
-  cron: 00 02 * * 0-5
+    version: "4.16"
+  cron: 00 00 * * 1,4
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -329,7 +298,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -365,8 +334,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
-  cron: 00 03 * * 0-5
+    version: "4.16"
+  cron: 00 04 * * 1,4
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -405,7 +374,7 @@ tests:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: 00 11 * * 0-5
+  cron: 00 05 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -429,7 +398,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 00 12 * * 0-5
+  cron: 00 01 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -454,7 +423,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 00 13 * * 0-5
+  cron: 00 02 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -507,7 +476,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 00 14 * * 0-5
+  cron: 00 03 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -521,7 +490,7 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-node-labels-periodic
-  cron: 00 15 * * 1,4
+  cron: 00 04 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -572,7 +541,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 00 16 * * 0-5
+  cron: 00 05 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -631,7 +600,7 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 17 * * 0-5
+  cron: 00 06 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -662,7 +631,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-disconnected-capi-periodic
-  cron: 00 18 * * 0-5
+  cron: 00 07 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -718,7 +687,7 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-hypershift
 - as: e2e-ai-operator-ztp-remove-node-periodic
-  cron: 00 19 * * 0-5
+  cron: 00 08 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:

@@ -3,14 +3,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
+  ocp_4.18_base-rhel9:
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -18,26 +18,26 @@ canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: gcp-filestore-csi-driver
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -56,6 +56,18 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: e2e-gcp-csi-c3
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: e2e-gcp-csi-n4
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+    workflow: openshift-e2e-gcp-csi-custom-worker
 - always_run: false
   as: security
   optional: true

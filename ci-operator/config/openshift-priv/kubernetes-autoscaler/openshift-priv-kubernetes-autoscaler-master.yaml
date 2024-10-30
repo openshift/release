@@ -1,24 +1,32 @@
 base_images:
   hypershift-operator:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-base-openshift-4.17:
+  ocp_builder_rhel-9-base-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    tag: rhel-9-base-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -26,36 +34,36 @@ canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.17:
+    ocp_builder_rhel-9-base-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.rhel
+  dockerfile_path: Dockerfile.openshift
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: vertical-pod-autoscaler
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.18-priv
       namespace: ocp-private
 resources:
   '*':
@@ -223,6 +231,29 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- as: regression-clusterinfra-aws-ipi-proxy-autoscaler
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@cas'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure CAS
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kubernetes-autoscaler
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv

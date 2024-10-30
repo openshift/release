@@ -154,7 +154,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-powervs-ovn-multi-ppc64le
-  cron: 20 13 * * *
+  cron: 30 23 3,6,9,12,15,18,21,24,27,30 * *
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
@@ -163,6 +163,7 @@ tests:
       BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       IBMCLOUD_CIS_CRN: 'crn:v1:bluemix:public:internet-svcs:global:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:8a93b3a8-b109-4c74-952c-7578dca2c4ee::'
       JQ_VERSION: "1.6"
+      OCP_VERSION: "4.16"
       RESOURCE_GROUP: multi-arch-cicd-resource-group
       TERRAFORM_VERSION: 1.5.5
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -327,7 +328,7 @@ tests:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-serial
 - as: ocp-e2e-ibmcloud-ovn-multi-ppc64le
-  cron: 20 18 * * *
+  cron: 0 23 3,6,9,12,15,18,21,24,27,30 * *
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     dependencies:
@@ -386,9 +387,9 @@ tests:
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 0 4 * * 1-5
+  cron: 0 20 * * 1,4
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -396,6 +397,21 @@ tests:
       BRANCH: "4.16"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt-upi
+- as: ocp-e2e-ovn-agent-remote-libvirt-s390x
+  cluster: build01
+  cron: 0 20 * * 0
+  steps:
+    cluster_profile: libvirt-s390x-1
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.16"
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      TEST_TYPE: conformance-parallel
+      VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-s390x-heterogeneous
   cluster: build01
@@ -412,9 +428,9 @@ tests:
     workflow: openshift-e2e-libvirt-upi-heterogeneous
 - as: ocp-heavy-build-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 0 12 * * 1-5
+  cron: 0 20 * * 3
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -427,7 +443,7 @@ tests:
   cluster: build01
   cron: 0 18 * * 0
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
@@ -439,7 +455,7 @@ tests:
   cluster: build01
   cron: 0 19 * * 0
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
@@ -451,7 +467,7 @@ tests:
   cluster: build01
   cron: 0 18 * * 6
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -463,7 +479,7 @@ tests:
   cluster: build01
   cron: 0 19 * * 6
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -477,7 +493,7 @@ tests:
   cluster: build01
   cron: 0 20 * * 6
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: libvirt-s390x-1
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -490,7 +506,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 4 * * 1-5
+  cron: 0 20 * * 1,4
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -501,9 +517,24 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
+- as: ocp-e2e-ovn-agent-remote-libvirt-ppc64le
+  cluster: build01
+  cron: 0 20 * * 0
+  steps:
+    cluster_profile: libvirt-ppc64le
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      INSTALLER_TYPE: agent
+      TEST_TYPE: conformance-parallel
+      USE_RAMFS: "true"
+      VOLUME_CAPACITY: 120G
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 12 * * 1-5
+  cron: 0 20 * * 3
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:

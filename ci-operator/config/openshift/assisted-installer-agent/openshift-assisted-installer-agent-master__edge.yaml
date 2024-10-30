@@ -1,18 +1,18 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,52 +20,35 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
-  coreos-centos-stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
   tests:
+    name: "4.17"
+    namespace: ocp
+    tag: tests
+  tests-4.16:
     name: "4.16"
-    namespace: ocp
-    tag: tests
-  tests-4.14:
-    name: "4.14"
-    namespace: ocp
-    tag: tests
-  tests-4.15:
-    name: "4.15"
     namespace: ocp
     tag: tests
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
-  from: coreos-centos-stream9
   to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
@@ -74,14 +57,14 @@ images:
   to: assisted-installer-agent-src
 promotion:
   to:
-  - name: ocm-2.12
+  - name: ocm-2.13
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -189,21 +172,23 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
+- as: e2e-metal-assisted-cnv-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.16
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-        MASTER_MEMORY=17408
-        MASTER_CPU=8
+        MASTER_MEMORY=18700
+        MASTER_CPU=9
         WORKER_MEMORY=9216
-        WORKER_CPU=4
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=5
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   optional: true
@@ -218,12 +203,12 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf
+- as: e2e-metal-assisted-odf-4-16
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -265,15 +250,15 @@ tests:
     cluster_profile: oci-assisted
     workflow: assisted-oci
 - always_run: false
-  as: e2e-oci-assisted-4-14
+  as: e2e-oci-assisted-4-16
   optional: true
   steps:
     cluster_profile: oci-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
+      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_VERSION=4.16
       PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
@@ -284,6 +269,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

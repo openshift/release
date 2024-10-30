@@ -34,13 +34,24 @@ resources:
 tests:
 - as: unit
   commands: |
-    make test \
+    make test.unit \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
+  container:
+    from: src
+  timeout: 1h0m0s
+- as: integration
+  commands: |
+    make test.integration \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
   timeout: 1h0m0s
@@ -99,7 +110,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.3-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -152,7 +163,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
       RELEASE_IMAGE_LATEST: release:next
     env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache

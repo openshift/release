@@ -10,9 +10,9 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   upi-installer:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -34,7 +34,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -125,10 +125,37 @@ tests:
   steps:
     cluster_profile: packet-sno
     test:
-    - ref: baremetalds-sno-conf
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: e2e-baremetal-pxe-sno-agent-ipv4-fips-recert
+  cluster: build05
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@level0'
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      TEST_IMPORTANCE: LEVEL0
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: single-node-recert
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: baremetal-lab-agent-install-pxe
 zz_generated_metadata:
   branch: release-4.15
   org: rh-ecosystem-edge

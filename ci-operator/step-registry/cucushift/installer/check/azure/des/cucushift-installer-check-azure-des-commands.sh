@@ -99,7 +99,7 @@ for master_node in ${master_nodes_list}; do
 done
 
 #check that worker node os disk is encrypted
-echo "Expected des on master node: ${DES_COMPUTE}"
+echo "Expected des on worker node: ${DES_COMPUTE}"
 worker_nodes_list=$(oc get nodes --no-headers | grep "worker" | awk '{print $1}')
 for worker_node in ${worker_nodes_list}; do
     echo "--- check worker node ${worker_node} ---"
@@ -112,8 +112,31 @@ for worker_node in ${worker_nodes_list}; do
     fi
 done
 
+# Check property encryptionAtHost is enabled on each node
+encrypt_at_host_default=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.encryptionAtHost')
+encrypt_at_host_master=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.encryptionAtHost')
+encrypt_at_host_master=${encrypt_at_host_master:-$encrypt_at_host_default}
+encrypt_at_host_worker=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.encryptionAtHost')
+encrypt_at_host_worker=${encrypt_at_host_worker:-$encrypt_at_host_default}
+node_list=""
+[[ "${encrypt_at_host_master}" == "true" ]] && node_list="${master_nodes_list}"
+[[ "${encrypt_at_host_worker}" == "true" ]] && node_list="${node_list} ${worker_nodes_list}"
+
+if [[ -n "${node_list}" ]]; then
+    echo -e "\n********** Check property encryptionAtHost is enabled on each node **********"
+    for node in ${node_list}; do
+        status=$(az vm show -n "${node}" -g "${CLUSTER_RESOURCE_GROUP}" -ojson | jq -r  '.securityProfile.encryptionAtHost')
+        if [[ "${status}" == "true" ]]; then
+            echo "encryptionAtHost is set to true, check passed on node ${node}!"
+        else
+            echo "encryptionAtHost is set to ${status}, check failed on node ${node}!"
+            critical_check_result=1
+        fi
+    done
+fi
+
 #check des setting in default sc
-echo "--- check des setting in default sc ---"
+echo -e "\n--- check des setting in default sc ---"
 if (( ocp_minor_version < 13 )) || [[ "${ENABLE_DES_DEFAULT_MACHINE}" != "true" ]]; then
     echo "DES setting in default sc is only available on 4.13+ and requires ENABLE_DES_DEFAULT_MACHINE set to true, no need to check on current cluster, skip."
 else

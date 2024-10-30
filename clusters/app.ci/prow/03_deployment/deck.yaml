@@ -90,14 +90,12 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
+          - --ref=master
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -107,14 +105,12 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
-          - --wait=30
+          - --ref=master
+          - --period=30s
           - --root=/tmp/git-sync
-          - --max-sync-failures=3
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -123,7 +119,7 @@ objects:
               memory: "1Gi"
               cpu: "0.5"
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20240711-e49eac682
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20241021-9efd512d9
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -199,7 +195,7 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "7Gi"
+              memory: "11Gi"
               cpu: "500m"
         volumes:
         - name: github-app-credentials
@@ -295,14 +291,12 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
+          - --ref=master
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -312,14 +306,12 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
-          - --wait=30
+          - --ref=master
+          - --period=30s
           - --root=/tmp/git-sync
-          - --max-sync-failures=3
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -355,7 +347,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20240711-e49eac682
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20241021-9efd512d9
           args:
           - --github-oauth-config-file=/etc/oauth/config.json
           - --github-app-id=$(GITHUB_APP_ID)
@@ -433,7 +425,7 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "7Gi"
+              memory: "11Gi"
               cpu: "500m"
         volumes:
         - name: github-app-credentials

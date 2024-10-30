@@ -1,0 +1,64 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  to: odf-console
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  odf-console-e2e-aws:
+    requests:
+      cpu: 1000m
+      memory: 8Gi
+tests:
+- as: odf-console-e2e-aws
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: odf-aws
+    dependencies:
+      ODF_CONSOLE_FULL_IMG_NAME: odf-console
+    env:
+      BASE_DOMAIN: makestoragegreatagain.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ZONES_COUNT: "3"
+    test:
+    - as: tests
+      cli: latest
+      commands: |
+        export PULL_SECRET="$(cat /etc/odf-console-e2e/odf-e2e-credentials/config-pull-secret)"
+        node --version
+        ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME}
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
+      - mount_path: /etc/odf-console-e2e/odf-e2e-credentials
+        name: odf-e2e-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: ODF_CONSOLE_FULL_IMG_NAME
+        name: odf-console-img
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 8Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: red-hat-storage
+  repo: odf-console

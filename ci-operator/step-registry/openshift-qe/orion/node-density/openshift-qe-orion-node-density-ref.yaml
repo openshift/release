@@ -1,0 +1,76 @@
+ref:
+  as: openshift-qe-orion-node-density
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ORION_REPO
+    default: "https://github.com/cloud-bulldozer/orion.git"
+    documentation: |-
+      Override the e2e version
+  - name: TAG
+    default: "v0.0.1"
+    documentation: |-
+      Override branch of orion
+
+  - name: ES_BENCHMARK_INDEX
+    default: "ripsaw-kube-burner-*"
+    documentation:
+      Index which contains benchmark results
+  - name: ES_METADATA_INDEX
+    default: "perf_scale_ci-*"
+    documentation:
+      Index which contains metadata about runs.
+  - name: ES_TYPE
+    default: "qe"
+    documentation: |-
+      Set es type to internal or qe for getting data
+  - name: CONFIG
+    default: "examples/payload-scale-415.yaml"
+    documentation: |-
+      Configuration file to run orion on
+  - name: UUID
+    default: ""
+    documentation: |-
+      Default is blank, which means the uuid will not be applied to the command line args
+  - name: HUNTER_ANALYZE
+    default: "false"
+    documentation: |-
+      Use to look at regressions over time
+  - name: VERSION
+    default: ""
+    documentation:
+      Version of OCP to run Orion against, ex 4.18
+  - name: JUNIT
+    default: "false"
+    documentation:
+      Export JUNIT output
+  - name: LOOKBACK
+    default: "15"
+    documentation:
+      Number of days orion should lookback at results.
+  - name: RUN_ORION
+    default: "false"
+    documentation:
+      Determine if we should run Orion or not.
+  - name: ORION_CONFIG
+    default: "examples/trt-external-payload-node-density.yaml"
+    documentation:
+      Var used to tell the step which workload is calling Orion, like cluster-density, node-density, etc.
+  commands: openshift-qe-orion-node-density-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/qe
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-perfscale-es-creds
+    mount_path: /secret/internal
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale configmap-scale workload in the deployed cluster

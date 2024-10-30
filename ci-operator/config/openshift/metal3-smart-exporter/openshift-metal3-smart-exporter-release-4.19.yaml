@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.10:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+  to: metal3-smart-exporter
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: metal3-smart-exporter

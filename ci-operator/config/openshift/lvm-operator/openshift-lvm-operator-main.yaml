@@ -11,6 +11,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
@@ -83,6 +87,12 @@ releases:
       include_built_images: true
       name: "4.17"
       namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -181,6 +191,25 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-aws-hypershift
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: main
   org: openshift

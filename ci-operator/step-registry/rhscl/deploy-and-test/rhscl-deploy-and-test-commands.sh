@@ -12,6 +12,7 @@ echo "tempuser:x:$(id -G | cut -d' ' -f 2):" >> /etc/group
 cp $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
+export PATH=/cli:$PATH
 
 # Run tests
 echo "Executing rhscl tests..."

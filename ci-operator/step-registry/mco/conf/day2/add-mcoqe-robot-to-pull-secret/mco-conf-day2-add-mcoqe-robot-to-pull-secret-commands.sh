@@ -16,6 +16,7 @@ else
   exit 255
 fi
 
+NUM_WORKERS=$(oc get mcp worker -ojsonpath='{.status.machineCount}')
 
 # Get current pull-secret
 echo "Get current global cluster pull secret"
@@ -35,9 +36,19 @@ oc set data secret pull-secret -n openshift-config --from-file=.dockerconfigjson
 
 echo "Wait until the configuration is applied"
 # Wait for MCP to start updating
-oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s
+if [ "$NUM_WORKERS" != "0" ]
+then 
+  oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s
+else
+  echo "SNO or Compact cluster. We don't wait for the worker pool to start configuring"
+fi
 oc wait mcp master --for='condition=UPDATING=True' --timeout=300s
 
 # Wait for MCP to apply the new configuration
+if [ "$NUM_WORKERS" != "0" ]
+then 
+  oc wait mcp worker --for='condition=UPDATED=True' --timeout=600s
+else
+  echo "SNO or Compact cluster. We don't wait for the worker pool to be configured"
+fi
 oc wait mcp master --for='condition=UPDATED=True' --timeout=600s
-oc wait mcp worker --for='condition=UPDATED=True' --timeout=600s

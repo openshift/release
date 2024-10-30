@@ -1,0 +1,80 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.18"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: ingress-perf-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      COMPUTE_NODE_TYPE: bx2-8x32
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bx2d-16x64
+      SET_ENV_BY_PLATFORM: custom
+      WORKERS: "9"
+    test:
+    - chain: openshift-qe-ingress-perf
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: ingress-perf-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bx2d-16x64
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: openshift-qe-ingress-perf
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: control-plane-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      WORKERS: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: ibmcloud-4.18-nightly-x86

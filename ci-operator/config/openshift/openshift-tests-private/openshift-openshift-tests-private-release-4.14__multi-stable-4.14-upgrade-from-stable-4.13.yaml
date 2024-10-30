@@ -35,11 +35,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     prerelease:
@@ -62,7 +57,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-ovn-ipsec-amd-mixarch-day2-f28
-  cron: 25 20 16 * *
+  cron: 3 16 4 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -71,7 +66,7 @@ tests:
     - chain: openshift-upgrade-qe-sanity-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f28
-  cron: 1 8 25 * *
+  cron: 22 17 3 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -80,6 +75,31 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-proxy-sts-arm-f28
+  cron: 19 22 28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-24358
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: azure-ipi-fullyprivate-proxy-arm-f28
+  cron: 15 10 8 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-24358
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

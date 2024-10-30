@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
   ubi-min9:
     name: ubi-minimal
     namespace: ocp
@@ -6,11 +10,8 @@ base_images:
 binary_build_commands: make binary
 build_root:
   project_image:
-    dockerfile_path: Containerfile.tools
+    dockerfile_path: Dockerfile.tools
 images:
-- dockerfile_path: Containerfile
-  from: ubi-min9
-  to: oran-o2ims
 - dockerfile_path: Dockerfile
   from: ubi-min9
   to: oran-o2ims-operator
@@ -51,6 +52,34 @@ tests:
   commands: make ci-job
   container:
     from: src
+- as: scorecard
+  run_if_changed: ^bundle/
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: oran-o2ims-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-scorecard-oran-o2ims-main
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name oran-o2ims
+        ci-org-name openshift-kni
+    test:
+    - as: scorecard-test
+      cli: latest
+      commands: make scorecard-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

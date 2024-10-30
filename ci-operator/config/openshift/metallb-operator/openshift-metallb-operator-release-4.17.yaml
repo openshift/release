@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  kube-rbac-proxy:
+    name: "4.17"
+    namespace: ocp
+    tag: kube-rbac-proxy
   metallb:
     name: "4.17"
     namespace: ocp
@@ -49,10 +53,11 @@ operator:
     with: pipeline:metallb-operator
   - pullspec: quay.io/openshift/origin-metallb-frr:4.17
     with: pipeline:metallb-frr
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.17
+    with: pipeline:kube-rbac-proxy
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -79,13 +84,14 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.17"
   steps:
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
         operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server

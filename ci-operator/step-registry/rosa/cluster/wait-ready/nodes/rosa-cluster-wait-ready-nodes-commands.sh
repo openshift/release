@@ -142,9 +142,12 @@ function waitForReady() {
           echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
         else
           current_time=$(date +"%s")
+          echo $current_time > ${SHARED_DIR}/workers_scale_end_epoch.txt
           record_cluster "timers" "nodes_ready" $(( "${current_time}" - "${start_time}" ))
           echo "All nodes are ready to run workloads after $(( ${current_time} - ${start_time} )) seconds"
           FINAL_NODE_STATE="Pass"
+          record_cluster "timers" "global_end" "$(date +'%s')"
+
           break
         fi
       else
@@ -179,7 +182,7 @@ function getDesiredComputeCount {
     echo "Machinepool $MP_NAME desired compute node count is $mp_compute_count"
     desired_compute_count=$(expr $desired_compute_count + $mp_compute_count)
   done
- 
+
   export desired_compute_count
   echo "Total desired node count: $desired_compute_count"
 }
@@ -195,6 +198,8 @@ function fixNodeScaling {
     else
       rosa edit machinepool -c "$CLUSTER_ID" worker --enable-autoscaling=false --replicas "$REPLICAS"
     fi
+    workers_scale_event_epoch=$(date +"%s")
+    echo $workers_scale_event_epoch > ${SHARED_DIR}/workers_scale_event_epoch.txt
   fi
 }
 

@@ -3,31 +3,30 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.16_base-rhel9:
+  ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/external-provisioner
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: csi-external-provisioner
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -57,6 +56,20 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
 - as: verify-deps
   steps:
     test:

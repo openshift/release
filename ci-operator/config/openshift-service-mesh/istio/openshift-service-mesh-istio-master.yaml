@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,11 +14,11 @@ releases:
     release:
       architecture: arm64
       channel: stable
-      version: "4.15"
+      version: "4.16"
   latest:
     release:
       channel: stable
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -60,7 +60,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -95,7 +95,7 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestCustomGateway|TestCNIRaceRepair|TestGateway/managed-owner|TestProxyHeaders|TestCustomGateway/helm|TestCustomGateway/helm-simple|TestTcpProbe/rewrite-success|TestGRPCProbe|TestTunnelingOutboundTraffic|TestCNIVersionSkew|TestGateway|TestIngress|TestTraffic/jwt-claim-route|TestLabelChanges|TestLocality|TestMirroring/mirror-percent-absent|TestMirroring/mirror-50|TestMirroring/mirror-10|TestMirroringExternalService|TestTraffic/virtualservice|TestTraffic/serverfirst/tcp-server|TestTraffic/loop|TestTraffic/tls-origination|TestTraffic/externalname|TestTraffic/host|TestTraffic/envoyfilter|TestTraffic/consistent-hash|TestTraffic/externalservice|TestTraffic/upstreamproxy|TestTraffic/gateway/404|TestTraffic/gateway/https_redirect|TestTraffic/gateway/https_with_x-forwarded-proto|TestTraffic/gateway/cipher_suite|TestTraffic/gateway/optional_mTLS|TestTraffic/gateway/http_redirect_when_vs_port_specify_https|TestTraffic/gateway/http_return_400_with_with_x-forwarded-proto_https_when_vs_port_specify_https|'"
+          pilot 'TestGatewayConformance|TestCustomGateway|TestCNIRaceRepair|TestGateway/managed-owner|TestProxyHeaders|TestCustomGateway/helm|TestCustomGateway/helm-simple|TestTcpProbe/rewrite-success|TestGRPCProbe|TestTunnelingOutboundTraffic|TestCNIVersionSkew|TestGateway|TestIngress|TestLabelChanges|TestLocality|TestMirroring/mirror-percent-absent|TestMirroring/mirror-50|TestMirroring/mirror-10|TestMirroringExternalService'"
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -116,7 +116,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -172,7 +172,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -206,9 +206,9 @@ tests:
           export VARIANT=distroless
           export GCP_REGISTRIES=" "
           cd /work
-          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease'
+          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestDefaultInPlaceUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease'
         EOF
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6571
+        # Skipping all the upgrade tests for now. We need to wait until 1.23.1 is released to enable this test again. The progress is being tracked in https://issues.redhat.com/browse/OSSM-8126
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE

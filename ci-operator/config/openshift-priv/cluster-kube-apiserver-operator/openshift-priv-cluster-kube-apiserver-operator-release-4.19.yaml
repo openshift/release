@@ -1,0 +1,430 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-kube-apiserver-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-kube-apiserver-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 3Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: k8s-e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp
+- as: k8s-e2e-gcp-serial
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp-serial
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-operator
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-aescbc
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-operator-encryption-rotation-aescbc
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-rotation-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf-aescbc
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-perf-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-perf-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-aws-ovn-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-metal-single-node-live-iso
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    workflow: baremetalds-sno
+- as: e2e-aws-ovn-single-node
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-operator-disruptive-single-node
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-sno-disruptive JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-gcp-operator-single-node
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-gcp-operator-encryption-single-node
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-gcp-operator-encryption-rotation-single-node
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-gcp-operator-encryption-perf-single-node
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-perf JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-90d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-180d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 180d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-1y
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 1y
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-2y
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 2y
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-3y
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 3y
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-90d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-180d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 180d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 360d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 180d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: 360d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-180d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 180d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-360d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: 360d
+    workflow: openshift-e2e-cert-rotation-shutdown
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cluster-kube-apiserver-operator

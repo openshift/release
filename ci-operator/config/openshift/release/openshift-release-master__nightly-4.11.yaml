@@ -81,21 +81,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-single-node-workers
-  cron: 12 9 8,24 * *
+- as: e2e-aws-ovn-single-node-workers-serial
+  interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-workers
-  timeout: 3h0m0s
-- as: openshift-e2e-aws-single-node-workers-upgrade-conformance
-  cron: 58 4 8,23 * *
+- as: e2e-aws-ovn-single-node-workers
+  interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-    workflow: openshift-e2e-aws-single-node-workers-upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-workers
 - as: e2e-aws-single-node
   cron: 51 5 9,23 * *
   steps:
@@ -248,12 +254,12 @@ tests:
 - as: e2e-vsphere-upi
   interval: 346h
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-upi-serial
   interval: 348h
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi
   interval: 350h
@@ -287,11 +293,6 @@ tests:
     env:
       NETWORK_TYPE: OVNKubernetes
     workflow: openshift-e2e-ovirt-conformance
-- as: e2e-gcp-libvirt-cert-rotation
-  cron: 10 7 10,25 * *
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-e2e-gcp-libvirt-cert-rotation
 - as: e2e-azure-fips
   cron: 38 6 5,23 * *
   steps:
@@ -567,6 +568,7 @@ tests:
 - as: e2e-telco5g
   cluster: build05
   cron: 19 7 10,24 * *
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |

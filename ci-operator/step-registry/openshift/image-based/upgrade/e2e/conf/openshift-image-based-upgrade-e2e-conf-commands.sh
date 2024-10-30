@@ -15,13 +15,20 @@ remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
-TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
-target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
+
+if [[ "$TEST_CLUSTER" != "seed" && "$TEST_CLUSTER" != "target" ]]; then
+  echo "TEST_CLUSTER is an invalid value: '${TEST_CLUSTER}'"
+  exit 1
+fi
+
+TEST_VM_NAME="$(cat ${SHARED_DIR}/${TEST_CLUSTER}_vm_name)"
+
+test_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TEST_VM_NAME}/auth/kubeconfig
 
 cat <<EOF > ${SHARED_DIR}/e2e_test_config.sh
 #!/bin/bash
 set -euo pipefail
-export KUBECONFIG='${target_kubeconfig}'
+export KUBECONFIG='${test_kubeconfig}'
 
 date
 
@@ -38,7 +45,7 @@ done
 
 date
 
-oc adm wait-for-stable-cluster --minimum-stable-period 1m
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
 
 date
 

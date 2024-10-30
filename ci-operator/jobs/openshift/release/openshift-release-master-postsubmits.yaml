@@ -341,6 +341,50 @@ postsubmits:
     cluster: app.ci
     decorate: true
     labels:
+      ci.openshift.io/build-farm: build11
+      ci.openshift.io/generator: cluster-init
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-master-build11-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build11
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --confirm=true
+        command:
+        - applyconfig
+        env:
+        - name: build11_id
+          valueFrom:
+            secretKeyRef:
+              key: build11-id
+              name: build11-dex-oidc
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build11.config
+            path: kubeconfig
+          secretName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: app.ci
+    decorate: true
+    labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
     name: branch-ci-openshift-release-master-config-change-trigger
@@ -437,7 +481,7 @@ postsubmits:
         - --debug
         command:
         - /ko-app/label_sync
-        image: gcr.io/k8s-prow/label_sync:v20240513-a9bd71bf01
+        image: gcr.io/k8s-staging-test-infra/label_sync:v20241015-f5fd905349
         imagePullPolicy: Always
         name: ""
         resources:

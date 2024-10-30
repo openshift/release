@@ -1,58 +1,32 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
-  os:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.9
-  os-minimal:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.9
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ci/dockerfiles/builder.Dockerfile
   from: root
   to: osdk-builder
-- dockerfile_path: release/ansible/Dockerfile.ocp
-  from: os
-  inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-  to: ansible-operator
 - dockerfile_path: release/helm/Dockerfile
-  from: os-minimal
+  from: base-rhel9
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: helm-operator
 - dockerfile_path: release/sdk/Dockerfile
-  from: os-minimal
+  from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: operator-sdk
-- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
-  from: ansible-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-ansible-e2e
-- context_dir: test/ansible/advanced-molecule-operator
-  dockerfile_path: Dockerfile
-  from: ansible-operator
-  to: osdk-ansible-full-e2e
 - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
   from: helm-operator
   inputs:
@@ -64,22 +38,20 @@ promotion:
   to:
   - excluded_images:
     - osdk-builder
-    - osdk-ansible-e2e
-    - osdk-ansible-full-e2e
     - osdk-helm-e2e
     - memcached-operator
     - nginx-operator
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -108,23 +80,6 @@ tests:
     make test-sanity
   container:
     from: src
-- as: e2e-ansible
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make -f ci/prow.Makefile test-e2e-ansible
-      dependencies:
-      - env: ANSIBLE_IMAGE
-        name: osdk-ansible-e2e
-      - env: IMAGE_FORMAT
-        name: osdk-ansible-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
 - as: e2e-helm
   steps:
     cluster_profile: gcp

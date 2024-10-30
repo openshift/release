@@ -37,12 +37,30 @@ operator:
     with: pipeline:lightspeed-operator
   - pullspec: quay.io/openshift-lightspeed/lightspeed-service-api:latest
     with: pipeline:lightspeed-service-api
-  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-operator@sha256:[a-z0-9]{64}
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-operator.*
     with: pipeline:lightspeed-operator
-  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-service@sha256:[a-z0-9]{64}
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-service.*
     with: pipeline:lightspeed-service-api
-  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-console@sha256:[a-z0-9]{64}
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-console.*
     with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
 promotion:
   to:
   - namespace: ols
@@ -88,7 +106,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
     pre:
     - ref: ipi-install-rbac
@@ -135,7 +153,54 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.16"
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-bundle-test
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: bundle-e2e-4-17
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: ols
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
     pre:
     - ref: ipi-install-rbac

@@ -19,9 +19,8 @@ echo "Login cluster app.ci"
 oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
 
 echo -e "\n********* Start job controller *********\n"
-#VALID_RELEASES="4.11 4.12 4.13 4.14 4.15 4.16"
-VALID_RELEASES="4.12 4.16"
-for release in $VALID_RELEASES
+
+for release in $OCP_RELEASES
 do
   echo -e "\nstart job controller for $release - $OCP_ARCH"
   jobctl start-controller -r $release --arch $OCP_ARCH

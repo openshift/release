@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-aws-416
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -54,6 +47,24 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
+- as: control-plane-24nodes-acs
+  cron: 0 12 2,16 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "24"
+      ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=20m --timeout=5h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      KUBE_BURNER_VERSION: 1.4.0
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-acs
+  timeout: 5h0m0s
 - as: control-plane-etcdencrypt-24nodes
   cron: 0 8 2,16 * *
   steps:
@@ -80,7 +91,7 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
-  timeout: 2h30m0s
+  timeout: 3h30m0s
 - always_run: false
   as: conc-builds-3nodes
   steps:

@@ -1,0 +1,137 @@
+base_images:
+  ansible:
+    name: "4.9"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.9"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.9"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  custom:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  intermediate410:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.10"
+  intermediate411:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.11"
+  intermediate412:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  intermediate413:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  intermediate414:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  intermediate415:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  intermediate416:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.9"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-f28
+  cron: 34 5 5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      LOKI_ENABLED: "false"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_INTERMEDIATE413
+        name: release:intermediate413
+      - env: RELEASE_IMAGE_INTERMEDIATE412
+        name: release:intermediate412
+      - env: RELEASE_IMAGE_INTERMEDIATE411
+        name: release:intermediate411
+      - env: RELEASE_IMAGE_INTERMEDIATE410
+        name: release:intermediate410
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.17-upgrade-from-stable-4.9

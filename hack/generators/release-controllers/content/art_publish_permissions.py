@@ -233,6 +233,14 @@ in 3.11).''')
                         'namespace': f'ocp{config.get_suffix(arch, private)}'
                     }
                 })
+                gendoc.append({
+                    'apiVersion': 'image.openshift.io/v1',
+                    'kind': 'ImageStream',
+                    'metadata': {
+                        'name': f'{major_minor}-konflux-art-latest{config.get_suffix(arch, private)}',
+                        'namespace': f'ocp{config.get_suffix(arch, private)}'
+                    }
+                })
 
             gendoc.append({
                 'apiVersion': 'authorization.openshift.io/v1',

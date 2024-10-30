@@ -97,7 +97,7 @@ fi
 if [[ ${expected_compute_role} != "" ]]; then
   if [[ "${compute_role}" != "${expected_compute_role}" ]]; then
     echo "FAIL: Compute IAM role mismatch: current: ${compute_role}, expect: ${expected_compute_role}"
-    ret=$((ret+1))
+    ret=$((ret + 1))
   else
     echo "PASS: Compute IAM role"
   fi
@@ -106,22 +106,66 @@ else
 fi
 
 # check role tag
-aws --region $REGION iam get-role --role-name ${control_plane_role} --output text > $output
-if grep -iE "TAGS.*kubernetes.io/cluster/${INFRA_ID}" $output; then
-  echo "FAIL: tag check ${control_plane_role}: kubernetes.io/cluster/${INFRA_ID} tag was attactehd"
-  cat $output
-  ret=$((ret+1))
-else
-  echo "PASS: tag check ${control_plane_role}"
-fi
+# for 4.16 and above, shared tag is attached to BYO-Role, see https://github.com/openshift/installer/pull/8688
+# for 4.15 and below, no tag is attached to BYO-Role
 
-aws --region $REGION iam get-role --role-name ${compute_role} --output text > $output
-if grep -iE "TAGS.*kubernetes.io/cluster/${INFRA_ID}" $output; then
-  echo "FAIL: tag check ${compute_role}: kubernetes.io/cluster/${INFRA_ID} tag was attactehd"
-  cat $output
-  ret=$((ret+1))
+function has_tags() {
+  local txt="$1"
+  if grep -iE "TAGS.*kubernetes.io/cluster/${INFRA_ID}" "$txt"; then
+    return 0
+  fi
+  return 1
+}
+
+function has_shared_tags() {
+  local txt="$1"
+  if grep -iE "TAGS.*kubernetes.io/cluster/${INFRA_ID}.*shared" "$txt"; then
+    return 0
+  fi
+  return 1
+}
+
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+
+control_plane_role_output=$(mktemp)
+compute_role_output=$(mktemp)
+
+aws --region $REGION iam get-role --role-name ${control_plane_role} --output text >$control_plane_role_output
+aws --region $REGION iam get-role --role-name ${compute_role} --output text >$compute_role_output
+
+echo "Role: ${control_plane_role}"
+cat ${control_plane_role_output}
+echo "Role: ${compute_role}"
+cat ${compute_role_output}
+
+if ((ocp_minor_version >= 16)); then
+  if ! has_shared_tags ${control_plane_role_output}; then
+    echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${control_plane_role}"
+    ret=$((ret + 1))
+  else
+    echo "PASS: tag check: ${control_plane_role}"
+  fi
+
+  if ! has_shared_tags ${compute_role_output}; then
+    echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${compute_role}"
+    ret=$((ret + 1))
+  else
+    echo "PASS: tag check: ${compute_role}"
+  fi
 else
-  echo "PASS: tag check ${compute_role}"
+  if has_tags ${control_plane_role_output}; then
+    echo "FAIL: tag check: ${control_plane_role}: kubernetes.io/cluster/${INFRA_ID} tag was attactehd"
+    ret=$((ret + 1))
+  else
+    echo "PASS: tag check: ${control_plane_role}"
+  fi
+
+  if has_tags ${compute_role_output}; then
+    echo "FAIL: tag check: ${compute_role}: kubernetes.io/cluster/${INFRA_ID} tag was attactehd"
+    ret=$((ret + 1))
+  else
+    echo "PASS: tag check: ${compute_role}"
+  fi
 fi
 
 exit $ret

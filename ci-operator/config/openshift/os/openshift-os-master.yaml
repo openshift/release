@@ -38,17 +38,17 @@ promotion:
   to:
   - excluded_images:
     - build-image
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -69,6 +69,20 @@ resources:
       cpu: 2000m
       devices.kubevirt.io/kvm: "1"
       memory: 3Gi
+  rhcos-96-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  rhcos-96-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
   scos-9-build-test-metal:
     limits:
       devices.kubevirt.io/kvm: "1"
@@ -77,6 +91,20 @@ resources:
       devices.kubevirt.io/kvm: "1"
       memory: 3Gi
   scos-9-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  scos-10-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  scos-10-build-test-qemu:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -103,6 +131,20 @@ tests:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   timeout: 3h0m0s
+- as: rhcos-96-build-test-qemu
+  cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-96-build-test-qemu
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  timeout: 4h0m0s
+- as: rhcos-96-build-test-metal
+  cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-96-build-test-metal
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  timeout: 3h0m0s
 - as: scos-9-build-test-qemu
   cluster: build02
   commands: /src/ci/prow-entrypoint.sh scos-9-build-test-qemu
@@ -113,6 +155,20 @@ tests:
 - as: scos-9-build-test-metal
   cluster: build02
   commands: /src/ci/prow-entrypoint.sh scos-9-build-test-metal
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  timeout: 3h0m0s
+- as: scos-10-build-test-qemu
+  cluster: build02
+  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-qemu
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  timeout: 4h0m0s
+- as: scos-10-build-test-metal
+  cluster: build02
+  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-metal
   container:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

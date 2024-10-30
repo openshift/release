@@ -7,11 +7,15 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.21-linux
+  stolostron_builder_go1.22-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.22-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.20-linux
+    tag: go1.21-linux
 images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
@@ -19,6 +23,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
@@ -26,6 +33,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
@@ -33,6 +43,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
@@ -47,6 +60,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
@@ -54,6 +70,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: grafana-dashboard-loader
 promotion:
   to:
@@ -91,12 +110,13 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
+      ACM_RELEASE_VERSION: release-2.12
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-415
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-416
       CLUSTERPOOL_LIFETIME: 1h
-      CLUSTERPOOL_MANAGED_FILTER: sno-415
+      CLUSTERPOOL_MANAGED_FILTER: sno-416
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
@@ -310,6 +330,7 @@ tests:
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
+  optional: true
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token

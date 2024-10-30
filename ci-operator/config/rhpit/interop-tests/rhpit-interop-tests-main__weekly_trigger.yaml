@@ -3,64 +3,63 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-self-managed-layered-product-interop-417
+- as: ocp-self-managed-layered-product-interop-418
   cron: 0 6 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
       FIREWATCH_CONFIG: |
         {
-          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.17-lp","self-managed-lp","weekly-trigger-lp"]}]
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.18-lp","self-managed-lp","weekly-trigger-lp"]}]
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-417
-      SKIP_HEALTH_CHECK: "true"
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-418
     post:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: ocp-self-managed-lp-watcher-bot-message-417
+- as: ocp-self-managed-lp-watcher-bot-message-418
   cron: 0 14 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-417
+      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-418
       WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
-- as: ocp-self-managed-layered-product-interop-417-fips
-  cron: 0 6 * 8 3
+- as: ocp-self-managed-layered-product-interop-418-fips
+  cron: 0 6 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
       FIREWATCH_CONFIG: |
         {
-          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.17-lp","self-managed-lp","fips","weekly-trigger-lp"]}]
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.18-lp","self-managed-lp","fips","weekly-trigger-lp"]}]
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-417-fips
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-418-fips
     post:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: ocp-self-managed-lp-watcher-bot-message-417-fips
-  cron: 0 14 * * 3
+- as: ocp-self-managed-lp-watcher-bot-message-418-fips
+  cron: 0 14 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-417-fips
+      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-418-fips
       WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios - FIPS
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
-- as: rosa-sts-hypershift-layered-product-interop-415
-  cron: 0 0 * * 5
+- as: rosa-sts-hypershift-layered-product-interop-416
+  cron: 0 0 * * 4
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -74,8 +73,8 @@ tests:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: rosa-sts-hypershift-layered-product-interop-414
-  cron: 0 6 * * 5
+- as: rosa-sts-hypershift-layered-product-interop-415
+  cron: 0 6 * * 4
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -89,8 +88,8 @@ tests:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: rosa-sts-hypershift-lp-watcher-bot-message-415
-  cron: 0 18 * * 5
+- as: rosa-sts-hypershift-lp-watcher-bot-message-416
+  cron: 0 18 * * 4
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -98,8 +97,8 @@ tests:
       WATCHER_BOT_JOB_GROUP_NAME: ROSA STS Hypershift Layered Product Scenarios
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
-- as: rosa-sts-hypershift-lp-watcher-bot-message-414
-  cron: 0 18 * * 5
+- as: rosa-sts-hypershift-lp-watcher-bot-message-415
+  cron: 0 18 * * 4
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -137,6 +136,30 @@ tests:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
+- as: rosa-classic-sts-layered-product-interop-416
+  cron: 0 0 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":[{"step": "trigger-jobs", "failure_type": "all", "classification": "Rosa-classic-sts Trigger Failure"}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: rosa-classic-sts-lp-interop-jobs
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: rosa-classic-sts-lp-watcher-bot-message-416
+  cron: 0 8 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: rosa-classic-sts-lp-interop-jobs
+      WATCHER_BOT_JOB_GROUP_NAME: ROSA Classic STS Layered Product Scenarios
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
 zz_generated_metadata:
   branch: main
   org: rhpit

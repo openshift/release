@@ -1,0 +1,91 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: openshift/cloud-network-config-controller
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cloud-network-config-controller
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-azure-ovn
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws-ovn-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-openstack-ovn-serial-e2e-only
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      NETWORK_TYPE: OVNKubernetes
+      TEST_ARGS: --run \[sig-network\]\[Feature:EgressIP\]
+      TEST_SUITE: openshift/conformance/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-openstack-ipi
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cloud-network-config-controller
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cloud-network-config-controller

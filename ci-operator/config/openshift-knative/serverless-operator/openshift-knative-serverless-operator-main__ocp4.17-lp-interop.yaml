@@ -1,86 +1,58 @@
 base_images:
-  ocp_4.15_cli:
-    name: "4.15"
+  ocp_4.17_cli-artifacts:
+    name: "4.17"
     namespace: ocp
-    tag: cli
-  openshift_eventing-istio-src_knative-v1.14:
+    tag: cli-artifacts
+  openshift_eventing-istio-src_knative-v1.15:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_eventing-kafka-broker-src_knative-v1.14:
+    tag: knative-v1.15
+  openshift_eventing-kafka-broker-src_knative-v1.15:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_knative-eventing-src_knative-v1.14:
+    tag: knative-v1.15
+  openshift_knative-eventing-src_knative-v1.15:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_knative-serving-src_knative-v1.14:
+    tag: knative-v1.15
+  openshift_knative-serving-src_knative-v1.15:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.14
-  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.16
-  origin_4.15_operator-registry:
-    name: "4.15"
-    namespace: origin
-    tag: operator-registry
+    tag: knative-v1.15
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
 - dockerfile_path: knative-operator/Dockerfile
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
-  inputs:
-    origin_4.15_operator-registry:
-      as:
-      - registry.ci.openshift.org/origin/4.15:operator-registry
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
-    ocp_4.15_cli:
+    ocp_4.17_cli-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.15:cli
-    openshift_eventing-istio-src_knative-v1.14:
+      - registry.ci.openshift.org/ocp/4.17:cli-artifacts
+    openshift_eventing-istio-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.14
-    openshift_eventing-kafka-broker-src_knative-v1.14:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.15
+    openshift_eventing-kafka-broker-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.14
-    openshift_knative-eventing-src_knative-v1.14:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.15
+    openshift_knative-eventing-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.14
-    openshift_knative-serving-src_knative-v1.14:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.15
+    openshift_knative-serving-src_knative-v1.15:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.14
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -106,21 +78,14 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","serverless-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       USER_TAGS: |
@@ -194,7 +159,105 @@ tests:
       from: serverless-source-image
       resources:
         limits:
+          memory: 10Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: firewatch-ipi-aws
+  timeout: 8h0m0s
+- as: operator-e2e-interop-aws-ocp417-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","serverless-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario serverless
+    test:
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
           memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-serving-eventing-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-eventing-kafka-broker-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 10Gi
         requests:
           cpu: 100m
           memory: 200Mi

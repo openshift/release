@@ -200,7 +200,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -213,7 +213,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -254,8 +254,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -378,10 +378,28 @@ tests:
 - as: vsphere-ipi-customized-resource-f28
   cron: 3 19 5 * *
   steps:
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+- as: vsphere-ipi-disktype-eagerzeroedthick-f28
+  cron: 23 20 27 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: eagerZeroedThick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
+- as: vsphere-ipi-disktype-thick-f28
+  cron: 59 17 19 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: thick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
 zz_generated_metadata:
   branch: master
   org: openshift

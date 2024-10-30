@@ -4,17 +4,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-tests
-  test-bin:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   upi-installer:
     name: "4.16"
     namespace: ocp
@@ -46,59 +42,42 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-ovn
-  cron: 0 */6 * * *
+  cron: 31 8 6,28 * *
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
-  cron: 0 1 * * *
+  cron: 55 1 11,20 * *
   steps:
     cluster_profile: hypershift
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
-  cron: 0 2 * * *
+  cron: 48 11 10,23 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
-  cron: 0 3 * * *
+  cron: 0 22 8,26 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-powervs-ovn
-  cron: 0 6 * * *
+  cron: 41 2 7,28 * *
   steps:
     cluster_profile: hypershift-powervs
     workflow: hypershift-powervs-e2e
-- as: e2e-ibmcloud-ovn-iks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.10.26_openshift
-      MANAGED_CLUSTER_TYPE: iks
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
-    workflow: hypershift-ibmcloud-e2e
-- as: e2e-ibmcloud-ovn-roks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.11.0_openshift
-      MANAGED_CLUSTER_TYPE: openshift
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
-    workflow: hypershift-ibmcloud-e2e
 - as: e2e-kubevirt-aws-ovn-csi
-  cron: 0 4 * * *
+  cron: 43 20 5,19 * *
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-kubevirt-aws-ovn
-  cron: 0 1,7,13,19 * * *
+  cron: 12 4 6,25 * *
   steps:
     cluster_profile: aws
     env:
@@ -109,11 +88,13 @@ tests:
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
-- as: e2e-azure-ovn-conformance
-  cron: 0 2 * * *
+- as: e2e-kubevirt-azure
+  cron: 0 4 * * *
   steps:
-    cluster_profile: hypershift
-    workflow: hypershift-azure-conformance
+    cluster_profile: azure4
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    workflow: hypershift-kubevirt-azure-conformance
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

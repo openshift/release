@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build09
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -68,7 +68,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build09
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -131,8 +131,8 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/openshift-e2e-aws
+    cluster: build10
+    context: ci/prow/openshift-e2e-aws-techpreview
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -144,9 +144,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-platform-operators-main-openshift-e2e-aws
+    name: pull-ci-openshift-priv-platform-operators-main-openshift-e2e-aws-techpreview
     path_alias: github.com/openshift/platform-operators
-    rerun_command: /test openshift-e2e-aws
+    rerun_command: /test openshift-e2e-aws-techpreview
     spec:
       containers:
       - args:
@@ -156,8 +156,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/openshift-e2e-aws-cluster-profile
-        - --target=openshift-e2e-aws
+        - --target=openshift-e2e-aws-techpreview
         command:
         - ci-operator
         image: ci-operator:latest
@@ -173,8 +172,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/openshift-e2e-aws-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -201,9 +198,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -213,13 +207,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-e2e-aws-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -282,7 +276,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build09
     context: ci/prow/verify
     decorate: true
     decoration_config:

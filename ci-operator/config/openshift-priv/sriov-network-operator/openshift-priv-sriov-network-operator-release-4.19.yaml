@@ -1,0 +1,262 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  openstack-installer:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: openstack-installer
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  rdma-cni:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: rdma-cni
+  sriov-cni:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: sriov-cni
+  sriov-dp-admission-controller:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: sriov-dp-admission-controller
+  sriov-infiniband-cni:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: sriov-infiniband-cni
+  sriov-network-device-plugin:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: sriov-network-device-plugin
+  sriov-network-metrics-exporter:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: sriov-network-metrics-exporter
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/sriov-network-operator
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: sriov-network-operator
+- dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: sriov-network-config-daemon
+- dockerfile_path: Dockerfile.webhook.ocp
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: sriov-network-webhook
+- dockerfile_path: bundleci.Dockerfile
+  to: sriov-network-operator-bundle
+operator:
+  bundles:
+  - as: operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:.*
+    with: pipeline:sriov-dp-admission-controller
+  - pullspec: quay.io/openshift/origin-sriov-cni:.*
+    with: pipeline:sriov-cni
+  - pullspec: quay.io/openshift/origin-sriov-infiniband-cni:.*
+    with: pipeline:sriov-infiniband-cni
+  - pullspec: quay.io/openshift/origin-sriov-network-device-plugin:.*
+    with: pipeline:sriov-network-device-plugin
+  - pullspec: quay.io/openshift/origin-sriov-network-config-daemon:.*
+    with: pipeline:sriov-network-config-daemon
+  - pullspec: quay.io/openshift/origin-sriov-network-webhook:.*
+    with: pipeline:sriov-network-webhook
+  - pullspec: quay.io/openshift/origin-sriov-network-operator:.*
+    with: pipeline:sriov-network-operator
+  - pullspec: quay.io/openshift/origin-rdma-cni:.*
+    with: pipeline:rdma-cni
+  - pullspec: quay.io/openshift/origin-sriov-network-metrics-exporter:.*
+    with: pipeline:sriov-network-metrics-exporter
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: IS_CONTAINER=TRUE make fmt
+  container:
+    from: src
+- as: controllers
+  commands: CLUSTER_TYPE=openshift make test-controllers
+  container:
+    from: src
+- as: pkg
+  commands: make test-pkg
+  container:
+    from: src
+- as: api
+  commands: make test-api
+  container:
+    from: src
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e
+      commands: make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: e2e-openstack-nfv
+  optional: true
+  steps:
+    cluster_profile: openstack-nfv
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+- as: e2e-openstack-nfv-config-drive
+  optional: true
+  steps:
+    cluster_profile: openstack-nfv
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      CONFIG_DRIVE: "true"
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: sriov-network-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-telco5g-sriov
+  cluster: build05
+  optional: true
+  restrict_network_access: false
+  steps:
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      T5CI_JOB_TYPE: sriov
+      T5CI_VERSION: "4.17"
+    test:
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e-validation
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-conformance
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: telco5g-sriov
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: sriov-network-operator

@@ -27,35 +27,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay311-ocp417-lp-interop
+- as: quay-e2e-tests-quay312-ocp417-lp-interop
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.11
+      CSO_CHANNEL: stable-3.12
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "enable-*", "failure_type": "all", "classification": "Other", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "quay-tests-deploy-*", "failure_type": "all", "classification":  "Quay deployment", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "quay-tests-*", "failure_type": "all", "classification":  "Test Failure", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","quay-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      QBO_CHANNEL: stable-3.11
-      QUAY_OPERATOR_CHANNEL: stable-3.11
+      QBO_CHANNEL: stable-3.12
+      QUAY_OPERATOR_CHANNEL: stable-3.12
       USER_TAGS: |
         scenario quay
     test:
@@ -67,29 +60,22 @@ tests:
 - as: quay-e2e-tests-quay311-ocp417-lp-interop-fips
   cron: 0 6 11 2 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.11
+      CSO_CHANNEL: stable-3.12
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "enable-*", "failure_type": "all", "classification": "Other", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "quay-tests-deploy-*", "failure_type": "all", "classification":  "Quay deployment", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "quay-tests-*", "failure_type": "all", "classification":  "Test Failure", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","fips","quay-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       QBO_CHANNEL: stable-3.11
@@ -102,6 +88,121 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-fips
+  cron: 0 12 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.12
+      FIPS_ENABLED: "true"
+      QBO_CHANNEL: stable-3.12
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-gcp
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_STORAGE_PROVIDER: gcp
+    test:
+    - ref: quay-tests-deploy-quay-gcp
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-netappgrid
+  cron: 0 10 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+    test:
+    - ref: quay-tests-deploy-quay-netapp-storagegrid
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-ibmcos
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+    test:
+    - ref: quay-tests-deploy-quay-ibmcos
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-azure
+  cron: 0 12 * * 6
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_STORAGE_PROVIDER: azure
+    test:
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp417-aws-s3
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_STORAGE_PROVIDER: aws
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay310-ocp417
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.10
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QBO_CHANNEL: stable-3.10
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+    test:
+    - chain: quay-tests-quay-e2e-test
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay311-ocp417
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.11
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QBO_CHANNEL: stable-3.11
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+    test:
+    - chain: quay-tests-quay-e2e-test
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

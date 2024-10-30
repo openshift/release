@@ -217,7 +217,7 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-  source $HOME/golang-1.20
+    source $HOME/golang-1.20
 elif [[ "$T5CI_VERSION" == "4.16" ]]; then
     source $HOME/golang-1.21.11
 else
@@ -240,7 +240,7 @@ git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRA
 
 cd ptp-operator-under-test
 
-# force downloading fresh images 
+# force downloading fresh images
 grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
 
 # deploy ptp-operator
@@ -250,7 +250,19 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
+    export EVENT_API_VERSION="1.0"
+    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+else
+    export EVENT_API_VERSION="2.0"
+    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+fi
+
+if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
+    export ENABLE_V1_REGRESSION="true"
+else
+    export ENABLE_V1_REGRESSION="false"
+fi
 
 # wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
