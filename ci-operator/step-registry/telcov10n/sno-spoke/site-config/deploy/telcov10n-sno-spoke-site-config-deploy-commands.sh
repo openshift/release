@@ -120,7 +120,7 @@ function generate_site_config {
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     if [ "${root_device}" != "" ]; then
-      ignition_config_override=$(echo -E "ignitionConfigOverride: '{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"${root_device}\",\"wipeTable\":true, \"partitions\": []}]}}'")
+      ignition_config_override="'{\\\"ignition\\\":{\\\"version\\\":\\\"3.2.0\\\"},\\\"storage\\\":{\\\"disks\\\":[{\\\"device\\\":\\\"${root_device}\\\",\\\"wipeTable\\\":true, \\\"partitions\\\": []}]}}'"
     fi
 
     cat << EOF > ${site_config_file}
@@ -170,7 +170,7 @@ spec:
           ${root_device:+deviceName: ${root_device}}
           ${root_dev_hctl:+hctl: ${root_dev_hctl}}
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ${ignition_config_override:-}
+        ${ignition_config_override:+ignitionConfigOverride: "${ignition_config_override}"}
         nodeNetwork:
           interfaces:
             - name: "${baremetal_iface}"
