@@ -1,42 +1,38 @@
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
 images:
-- dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service
+- dockerfile_path: Dockerfile
+  to: cluster-api-provider-agent
 promotion:
   to:
-  - name: "2.4"
+  - name: "2.3"
     namespace: stolostron
-releases:
-  latest:
-    integration:
-      name: "4.14"
-      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: publish
+- as: mce-publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-service
+      SOURCE_IMAGE_REF: cluster-api-provider-agent
     env:
-      IMAGE_REPO: assisted-service
+      IMAGE_REPO: cluster-api-provider-agent
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         OSCI_PIPELINE_REPO=backplane-pipeline
-        OSCI_RELEASE_BRANCH=backplane-2.4
-      RELEASE_REF: backplane-2.4
+        OSCI_RELEASE_BRANCH=backplane-2.3
+      RELEASE_REF: backplane-2.3
     workflow: ocm-ci-manifest-update
 zz_generated_metadata:
-  branch: release-ocm-2.9
+  branch: release-ocm-2.8
   org: openshift
-  repo: assisted-service
+  repo: cluster-api-provider-agent
   variant: mce
