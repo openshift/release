@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2155
 
 set -o nounset
 set -o errexit
@@ -29,18 +30,21 @@ mapfile -t vips <"${SHARED_DIR}"/vips.txt
 export API_VIP="${vips[0]}"
 export INGRESS_VIP="${vips[1]}"
 
+declare HOSTS
 export VCPUS_PER_HOST=$((VCPUS / HOSTS))
 export MEMORY_PER_HOST=$(((MEMORY / HOSTS) * 1024))
-export GOVC_CLUSTER=$(basename $(jq -r .status.topology.computeCluster < ${SHARED_DIR}/LEASE_single.json))
-export GOVC_DATACENTER=$(basename $(jq -r .status.topology.datacenter < ${SHARED_DIR}/LEASE_single.json))
-export GOVC_NETWORK=$(basename $(jq -r .status.topology.networks[0] < ${SHARED_DIR}/LEASE_single.json))
-export MAINVCHOSTNAME=$(jq -r .status.server < ${SHARED_DIR}/LEASE_single.json)
+export GOVC_CLUSTER=$(basename "$(jq -r .status.topology.computeCluster < ${SHARED_DIR}/LEASE_single.json)")
+export GOVC_DATACENTER=$(basename "$(jq -r .status.topology.datacenter < ${SHARED_DIR}/LEASE_single.json)")
+export GOVC_DATASTORE=$(basename "$(jq -r .status.topology.datastore < ${SHARED_DIR}/LEASE_single.json)")
+export GOVC_NETWORK=$(basename "$(jq -r .status.topology.networks[0] < ${SHARED_DIR}/LEASE_single.json)")
+export MAINVCHOSTNAME="$(jq -r .status.server < ${SHARED_DIR}/LEASE_single.json)"
 export MAINVCUSERNAME="${vcenter_username}"
 export MAINVCPASSWORD="${vcenter_password}"
 
 log "provisioning to:"
 log " vCenter: ${MAINVCHOSTNAME}"
 log " datacenter: ${GOVC_DATACENTER}"
+log " datastore: ${GOVC_DATASTORE}"
 log " cluster: ${GOVC_CLUSTER}"
 log " network: ${GOVC_NETWORK}"
 log "provisioning: "
@@ -65,10 +69,11 @@ log " target_hosts: ${TARGET_HOSTS}"
 NESTED_DATACENTER_ARR=()
 NESTED_CLUSTER_ARR=()
 
+declare NESTED_DATACENTERS
+declare NESTED_CLUSTERS
 for i in $(seq 0 $((NESTED_DATACENTERS - 1))); do 
   NESTED_DATACENTER_ARR+=("cidatacenter-nested-${i}")
-  for c in $(seq 0 $((NESTED_CLUSTERS - 1))); do
-    c_idx=$((i * 2 + $c)) 
+  for c in $(seq 0 $((NESTED_CLUSTERS - 1))); do    
     NESTED_CLUSTER_ARR+=("cicluster-nested-${c}")
   done
 done
