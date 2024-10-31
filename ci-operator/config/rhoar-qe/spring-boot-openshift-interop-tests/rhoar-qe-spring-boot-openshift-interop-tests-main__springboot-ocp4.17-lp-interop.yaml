@@ -14,18 +14,43 @@ images:
   to: springboot-runner
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.17"
+      version_bounds:
+        lower: 4.17.0-0
+        stream: 4-stable
+        upper: 4.18.0-0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: springboot-interop-ibmcloud
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "springboot-prepare-cluster", "failure_type": "all", "classification":  "Infrastructure Provisioning - Cluster Preparation", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "springboot-tests-interop", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "springboot-tests-interop", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTSBT", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","springboot-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+    test:
+    - ref: springboot-prepare-cluster
+    - ref: springboot-tests-interop
+    workflow: firewatch-ipi-ibmcloud
 - as: springboot-interop-aws
-  cron: 0 6 11 2 *
+  cron: 0 6 25 12 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -50,7 +75,7 @@ tests:
     - ref: springboot-tests-interop
     workflow: firewatch-ipi-aws
 - as: springboot-interop-aws-fips
-  cron: 0 6 11 2 *
+  cron: 0 6 25 12 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
