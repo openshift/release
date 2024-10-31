@@ -39,22 +39,14 @@ vc_tag_association:
     }
  -  {
       tag: "us-east-1",
-      object_type: "ClusterComputeResource",
-      object_name: "${NESTED_CLUSTER}"
+      object_type: "HostSystem",
+      object_name: "{{ hostvars[groups['esxi'][0]].NESTEDVMIP }}"
     }
-
-#  -  {
-#       tag: "us-east-1",
-#       object_type: "HostSystem",
-#       object_name: "{{ hostvars[groups['esxi'][0]].NESTEDVMIP }}"
-#     }
-#  -  {
-#       tag: "us-east-2",
-#       object_type: "HostSystem",
-#       object_name: "{{ hostvars[groups['esxi'][1]].NESTEDVMIP }}"
-#     }
-
-vc_host_tags: []
+ -  {
+      tag: "us-east-2",
+      object_type: "HostSystem",
+      object_name: "{{ hostvars[groups['esxi'][1]].NESTEDVMIP }}"
+    }
 
 # when defined, a host group will be created for each host group listed
 # below. a single host will be placed in each host group. The number of
@@ -79,8 +71,9 @@ platform:
     failureDomains:
       - server: ${NESTED_VCENTER}
         name: "nested-host-group-1"
-        zone: us-central-1a
-        region: us-central
+        zone: us-east-1
+        zoneType: HostGroup
+        region: us-east
         topology:
           resourcePool: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}/Resources/ipi-ci-clusters
           computeCluster: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}
@@ -88,6 +81,20 @@ platform:
           datastore: /${NESTED_DATACENTER}/datastore/dsnested
           networks:
             - ${GOVC_NETWORK}
+          hostGroup: host-group-1
+      - server: ${NESTED_VCENTER}
+        name: "nested-host-group-2"
+        zone: us-east-2
+        zoneType: HostGroup
+        region: us-east
+        topology:
+          resourcePool: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}/Resources/ipi-ci-clusters
+          computeCluster: /${NESTED_DATACENTER}/host/${NESTED_CLUSTER}
+          datacenter: ${NESTED_DATACENTER}
+          datastore: /${NESTED_DATACENTER}/datastore/dsnested
+          networks:
+            - ${GOVC_NETWORK}
+          hostGroup: host-group-2
     apiVIP: "${API_VIP}"
     ingressVIP: "${INGRESS_VIP}"
 EOF
