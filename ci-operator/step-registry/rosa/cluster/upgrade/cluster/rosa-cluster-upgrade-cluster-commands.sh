@@ -124,6 +124,13 @@ function upgrade_cluster_to () {
       break
     fi
 
+    # for ROSA HCP, when control plane is upgrading, worker nodes should not be recreated
+    if [[ "$HOSTED_CP" == "true" ]]; then
+      set_proxy
+      check_worker_node_not_changed
+      unset_proxy
+    fi
+
     if (( $(date +"%s") - $start_time >= $CLUTER_UPGRADE_TIMEOUT )); then
       log "error: Timed out while waiting for the cluster upgrading to be ready"
       set_proxy
@@ -131,6 +138,13 @@ function upgrade_cluster_to () {
       exit 1
     fi
   done
+
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    echo "rosa hcp control plane upgrade done, check worker nodes status again"
+    set_proxy
+    check_worker_node_not_changed
+    unset_proxy
+  fi
 }
 
 function upgrade_machinepool_to () {
@@ -165,6 +179,39 @@ function upgrade_machinepool_to () {
         fi
     done
   done
+}
+
+# check if the nodes are Ready status
+function check_node() {
+    local node_number ready_number
+    node_number=$(oc get node --no-headers | grep -cv STATUS)
+    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
+    if (( node_number == ready_number )); then
+        echo "All nodes status Ready"
+        return 0
+    else
+        echo "Find Not Ready worker nodes, node recreated"
+        oc get no
+        exit 1
+    fi
+}
+
+function check_worker_node_not_changed() {
+  check_node
+  # ensure the worker node UIDs are not changed
+  current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  IFS=' ' read -r -a current_array <<< "$current_uids"
+  sorted_current_uids=$(printf "%s\n" "${current_array[@]}" | sort | tr '\n' ' ')
+
+  # compare the worker nodes UIDs
+  if [ "$sorted_initial_uids" == "$sorted_current_uids" ]; then
+      echo "No changes detected in node UIDs. $sorted_current_uids"
+  else
+      echo "Node UIDs have changed!"
+      echo "Initial UIDs: $sorted_initial_uids"
+      echo "Current UIDs: $sorted_current_uids"
+      exit 1
+  fi
 }
 
 # Configure aws
@@ -215,6 +262,19 @@ if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
   exit 1
 fi
 
+# initial worker nodes uids
+initial_uids=""
+sorted_initial_uids=""
+if [[ "$HOSTED_CP" == "true" ]]; then
+  set_proxy
+  initial_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  IFS=' ' read -r -a initial_array <<< "$initial_uids"
+  sorted_initial_uids=$(printf "%s\n" "${initial_array[@]}" | sort | tr '\n' ' ')
+  echo "initial worker node uids: $sorted_initial_uids"
+  oc get no -owide
+  unset_proxy
+fi
+
 end_version_x=$(echo ${UPGRADED_TO_VERSION} | cut -d '.' -f1)
 end_version_y=$(echo ${UPGRADED_TO_VERSION} | cut -d '.' -f2)
 current_version_x=$(echo $current_version | cut -d '.' -f1)
@@ -229,14 +289,14 @@ if [[ "$end_version_x" == "$current_version_x" ]]; then
 
   for y in $(seq $start_version_y $end_version_y); do
     upgrade_cluster_to "$start_version_x.$y"
-    if [[ "$HOSTED_CP" == "true" ]]; then
+    if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
       upgrade_machinepool_to "$start_version_x.$y"
     fi
   done
 else
   # For X-Stream upgrade, only support X+1
   upgrade_cluster_to $UPGRADED_TO_VERSION
-  if [[ "$HOSTED_CP" == "true" ]]; then
+  if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
     upgrade_machinepool_to "$start_version_x.$y"
   fi
 fi
