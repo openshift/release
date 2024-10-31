@@ -1,3 +1,8 @@
+base_images:
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 build_root:
   image_stream_tag:
     name: release
@@ -5,8 +10,13 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.build
-  from: src
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-events-stream-build
+- dockerfile_path: Dockerfile
+  to: assisted-events-stream
 resources:
   '*':
     limits:
@@ -18,10 +28,12 @@ tests:
 - as: unit-test
   commands: make unit-test
   container:
+    clone: true
     from: assisted-events-stream-build
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && make lint
   container:
+    clone: true
     from: assisted-events-stream-build
 zz_generated_metadata:
   branch: master

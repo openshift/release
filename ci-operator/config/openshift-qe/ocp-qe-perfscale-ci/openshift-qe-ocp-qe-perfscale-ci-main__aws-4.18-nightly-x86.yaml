@@ -264,6 +264,24 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
+- as: qe-perfscale-aws-ovn-small-udn-density-l3
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l3-pods
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe

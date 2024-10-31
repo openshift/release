@@ -7,7 +7,7 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: "4.19"
     namespace: ocp
     tag: base-rhel9
@@ -19,10 +19,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -40,12 +44,12 @@ images:
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: vertical-pod-autoscaler
 promotion:
   to:
@@ -227,6 +231,23 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- as: regression-clusterinfra-aws-ipi-proxy-autoscaler
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@cas'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure CAS
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: security
   optional: true
   steps:
