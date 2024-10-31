@@ -21,9 +21,12 @@ chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 
-# Use same version for mgmt and guest clusters for now
-# Switch to different if there is a problem
-MGMT_VERSION=$T5CI_VERSION
+# 4.18 management cluster is not ready for HCP yet
+if [[ "$T5CI_VERSION" == "4.18" ]]; then
+    MGMT_VERSION=4.17
+else
+    MGMT_VERSION=$T5CI_VERSION
+fi
 
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
