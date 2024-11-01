@@ -307,6 +307,7 @@ function test_execution_longduration() {
 }
 function test_execution_ui() {
     test_execution_cucumber 'ui1' 'not @destructive'
+    sleep 3600
     test_execution_cucumber 'ui2' '@destructive'
 }
 function test_execution_ui_destructive {
