@@ -3,8 +3,6 @@
 set -o nounset
 export REPORT_HANDLE_PATH="/usr/bin"
 
-# echo "list generated shared resources"
-# ls ${SHARED_DIR}
 echo "working dir..." 
 pwd
 
@@ -122,13 +120,11 @@ export quayregistry_redis_password=${quayregistry_postgresql_db_password}
 
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
-# export QUAY_OPERATOR_TESTCASE="${QUAY_OPERATOR_TESTCASE}"
 
 echo "Run extended-platform-tests" 
 echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpoint "..." $quayregistry_postgresql_db_hostname
 
-# Quay-Allns-Medium|Quay-Allns-High, Quay-High|Quay-Medium
-#extended-platform-tests run all --dry-run | grep -E "Quay-High|Quay-Medium"| extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
+# QUAY_OPERATOR_TESTCASE: Quay-Allns-Medium|Quay-Allns-High, Quay-High|Quay-Medium
 extended-platform-tests run all --dry-run | grep -E ${QUAY_OPERATOR_TESTCASE} | extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 function handle_result {
