@@ -57,7 +57,7 @@ function create_subnets() {
 
         for zone in "${zones[@]}"; do
             createSubnet "${preName}-compute" ${vpcName} ${id}
-            if [[ $id --eq $subnetCount ]] return
+            [[ $id --eq $subnetCount ]] && return
             ((id++))
         done
     done
