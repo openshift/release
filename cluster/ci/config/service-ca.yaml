@@ -1,0 +1,58 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: sync-service-ca
+  namespace: openshift-node
+spec:
+  selector:
+    matchLabels:
+      app: sync-service-ca
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        app: sync-service-ca
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      serviceAccountName: sync
+      terminationGracePeriodSeconds: 1
+      # Must be hostNetwork in order to schedule before any network plugins are loaded.
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      containers:
+
+      - name: sync
+        image: "centos:7"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+
+          # set by the node image
+          unset KUBECONFIG
+
+          trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+          while true; do
+            mkdir -p /etc/docker/certs.d/docker-registry.default.svc:5000/
+            cp /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt /etc/docker/certs.d/docker-registry.default.svc:5000/
+            sleep 180 &
+            wait $!
+          done
+
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        volumeMounts:
+        - mountPath: /etc/docker/certs.d/
+          name: host-config
+
+      volumes:
+      - name: host-config
+        hostPath:
+          path: /etc/docker/certs.d
