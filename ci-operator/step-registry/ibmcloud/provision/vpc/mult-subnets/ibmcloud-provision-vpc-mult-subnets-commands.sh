@@ -43,7 +43,7 @@ function createSubnet() {
 }
 
 function create_subnets() {
-    local preName="$1" vpc_name="$2" region="$3" subnetCount=$4
+    local preName="$1" vpcName="$2" region="$3" subnetCount=$4
     local zones pgwName id
 
     zones=("${region}-1" "${region}-2" "${region}-3")
