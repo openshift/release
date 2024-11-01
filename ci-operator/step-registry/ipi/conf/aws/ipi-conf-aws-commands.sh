@@ -263,16 +263,11 @@ rm /tmp/pull-secret
 
 # excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
 if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  MIRROR_REGION="us-east-1"
-  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
-    MIRROR_REGION="${REGION}"
-  fi
-
   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
   cat > "${PATCH}" << EOF
 imageContentSources:
 - mirrors:
-  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
+  - quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com
   source: quay.io
 EOF
 
@@ -280,7 +275,7 @@ EOF
 
   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
+  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
   PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
   cat > "${PATCH}" << EOF
