@@ -35,28 +35,30 @@ function waitAvailable() {
 }
 
 function createSubnet() {
-    local subnetPreName="$1" vpcName="$2" id="$3"
+    local subnetPreName="$1" vpcName="$2" pgwName="$3" id="$4"
     local subnetName
     subnetName="${subnetPreName}-${id}"
-    "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-address-count 16
+    "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --pgw ${pgwName} --ipv4-address-count 16
     waitAvailable "subnet" ${subnetName}
 }
 
 function create_subnets() {
     local preName="$1" vpc_name="$2" resource_group="$3" region="$4" subnetCount=$5
-    local zones prefix pgwName zid subnetName
+    local zones pgwName zid subnetName
 
     zones=("${region}-1" "${region}-2" "${region}-3")
     id=1
     while [[ $id -lt $subnetCount ]]; do
         for zone in "${zones[@]}"; do
-            createSubnet "${preName}-control-plane" ${vpcName} ${id}
+            pgwName=$(ibmcloud is subnets | grep control-plane-${zone} | awk '{print $7}')
+            createSubnet "${preName}-control-plane" ${vpcName} ${pgwName} ${id}
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
 
         for zone in "${zones[@]}"; do
-            createSubnet "${preName}-compute" ${vpcName} ${id}
+            pgwName=$(ibmcloud is subnets | grep compute-${zone} | awk '{print $7}')
+            createSubnet "${preName}-compute" ${vpcName} ${pgwName} ${id}
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
@@ -70,10 +72,12 @@ function check_vpc() {
     num=$("${IBMCLOUD_CLI}" is subnets  --output JSON | jq '. | length')
     echo "created ${num} subnets in the vpc."
     if [[ ${num} -ne ${expSubnetNum} ]]; then
-        echo "fail to created the expected subnets $num_subnets"
-        echo "succeed created subnet..."
+        echo "fail to created the expected subnets $expSubnetNum"
+        echo "created subnet..."
         "${IBMCLOUD_CLI}" is subnets
         return 1
+    else
+        echo "created $expSubnetNum subnets successfully."
     fi
 }
 
