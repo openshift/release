@@ -55,10 +55,10 @@ services:
 update: python-help
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
-	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
 	$(MAKE) release-controllers
+	$(MAKE) boskos-config
 
 .PHONY: python-help
 python-help:
