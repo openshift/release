@@ -39,7 +39,7 @@ function createSubnet() {
     local subnetName
     subnetName="${subnetPreName}-${id}"
     "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-address-count 16
-    return waitAvailable "subnet" ${subnetName}
+    waitAvailable "subnet" ${subnetName}
 }
 
 function create_subnets() {
@@ -57,7 +57,7 @@ function create_subnets() {
 
         for zone in "${zones[@]}"; do
             createSubnet "${preName}-compute" ${vpcName} ${id}
-            [[ $id --eq $subnetCount ]] && return
+            [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
     done
