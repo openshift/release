@@ -35,10 +35,11 @@ function waitAvailable() {
 }
 
 function createSubnet() {
-    local subnetPreName="$1" vpcName="$2" pgwName="$3" id="$4"
-    local subnetName
+    local subnetPreName="$1" vpcName="$2" zone="$3" id="$4"
+    local subnetName pgwName
+    pgwName=$(ibmcloud is subnets | grep ${subnetPreName}-${zone} | awk '{print $7}')
     subnetName="${subnetPreName}-${id}"
-    "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --pgw ${pgwName} --ipv4-address-count 16
+    "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --pgw ${pgwName} --ipv4-address-count 16 --zone ${zone}
     waitAvailable "subnet" ${subnetName}
 }
 
@@ -50,15 +51,13 @@ function create_subnets() {
     id=1
     while [[ $id -lt $subnetCount ]]; do
         for zone in "${zones[@]}"; do
-            pgwName=$(ibmcloud is subnets | grep control-plane-${zone} | awk '{print $7}')
-            createSubnet "${preName}-control-plane" "${vpcName}" "${pgwName}" "${id}"
+            createSubnet "${preName}-control-plane" "${vpcName}" "${zone}" "${id}"
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
 
         for zone in "${zones[@]}"; do
-            pgwName=$(ibmcloud is subnets | grep compute-${zone} | awk '{print $7}')
-            createSubnet "${preName}-compute" "${vpcName}" "${pgwName}" "${id}"
+            createSubnet "${preName}-compute" "${vpcName}" "${zone}" "${id}"
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
