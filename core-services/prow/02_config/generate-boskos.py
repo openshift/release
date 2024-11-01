@@ -91,6 +91,10 @@ CONFIG = {
         'us-east-1': 5,
         'us-east-2': 5,
     },
+    'aws-sustaining-autorelease-412-quota-slice': {
+        # We can re-configure later as per requirement
+        'us-east-1': 2,
+    },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
     },
@@ -223,7 +227,8 @@ CONFIG = {
     'gcp-telco-quota-slice': {
         'us-central1': 40,
     },
-    'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-1-quota-slice': {},
+    'libvirt-s390x-2-quota-slice': {},
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
@@ -451,7 +456,7 @@ CONFIG = {
 
 for i in range(2,7):
     for j in range(2):
-        CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+        CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
 for i in range(3):
     for j in range(4):
