@@ -70,8 +70,8 @@ function check_vpc() {
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
     num=$("${IBMCLOUD_CLI}" is subnets  --output JSON | jq '. | length')
     echo "created ${num} subnets in the vpc."
-    if [[ ${num} -ne ${expSubnetNum} ]]; then
-        echo "fail to created the expected subnets $expSubnetNum"
+    if [[ ${num} -ne $((expSubnetNum + 6)) ]]; then
+        echo "fail to created the extra expected subnets $expSubnetNum"
         echo "created subnet..."
         "${IBMCLOUD_CLI}" is subnets
         return 1
