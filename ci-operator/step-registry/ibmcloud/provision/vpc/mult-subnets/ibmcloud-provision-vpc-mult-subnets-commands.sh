@@ -43,7 +43,7 @@ function createSubnet() {
 }
 
 function create_subnets() {
-    local preName="$1" vpc_name="$2" resource_group="$3" region="$4" subnetCount=$5
+    local preName="$1" vpc_name="$2" region="$3" subnetCount=$4
     local zones pgwName id
 
     zones=("${region}-1" "${region}-2" "${region}-3")
@@ -51,14 +51,14 @@ function create_subnets() {
     while [[ $id -lt $subnetCount ]]; do
         for zone in "${zones[@]}"; do
             pgwName=$(ibmcloud is subnets | grep control-plane-${zone} | awk '{print $7}')
-            createSubnet "${preName}-control-plane" ${vpcName} ${pgwName} ${id}
+            createSubnet "${preName}-control-plane" "${vpcName}" "${pgwName}" "${id}"
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
 
         for zone in "${zones[@]}"; do
             pgwName=$(ibmcloud is subnets | grep compute-${zone} | awk '{print $7}')
-            createSubnet "${preName}-compute" ${vpcName} ${pgwName} ${id}
+            createSubnet "${preName}-compute" "${vpcName}" "${pgwName}" "${id}"
             [[ $id -eq $subnetCount ]] && return
             ((id++))
         done
@@ -98,7 +98,7 @@ fi
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name=$(cat "${SHARED_DIR}/ibmcloud_vpc_name")
 
-create_subnets "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${region}" ${extra_subnets_count}
+create_subnets "${CLUSTER_NAME}" "${vpc_name}" "${region}" ${extra_subnets_count}
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}" ${extra_subnets_count}
