@@ -12,12 +12,12 @@ job_type="${JOB_TYPE:-}"
 user=""
 pull_number="null"
 if [[ "${job_type}" == "presubmit" ]]; then
-    user=$(echo "${JOB_SPEC:-}" | jq -r '.refs.pulls[].author')
+    user=$(echo "${JOB_SPEC:-}" | jq -r '.refs.pulls[].author' | tr -d "[]")
     pull_number=${PULL_NUMBER:-unknown}
 elif [[ "${job_type}" == "periodic" ]]; then
     user=$(echo "${JOB_SPEC:-}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref')
 elif [[ "${job_type}" == "postsubmit" ]]; then
-    user=$(echo "${JOB_SPEC:-}" | jq -r '.refs' | jq -r '.repo + "-" + .base_ref')
+    user=$(echo "${JOB_SPEC:-}" | jq -r '.refs' | jq -r '.repo + "-" + .base_ref' | tr -d "[]")
 else
     echo "The job type - ${job_type} is not supported yet!"
 fi
