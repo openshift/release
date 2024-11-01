@@ -137,4 +137,23 @@ echo "**********Check an invalid instance type (installer uses vCPUsAvailable bu
 error_key_words='controlPlane.platform.azure.type: Invalid value: \"Standard_E8-2s_v4\": instance type does not meet minimum resource requirements of 4 vCPUsAvailable'
 check_invalid_instance_type "${patch_file}" "${error_key_words}" || check_result=1
 
+#---------------------------------------
+# Check that an invalid instance type(without capability netowrking accelerated) with the proper error message**********"
+# Standard_B4ms
+#---------------------------------------
+echo "**********Check an invalid instance type (without capability netowrking accelerated) for compute with the proper error message**********"
+cat > ${patch_file} << EOF
+controlPlane:
+  platform:
+    azure:
+      vmNetworkingType: Accelerated
+      type: Standard_B4ms
+platform:
+  azure:
+    region: eastus
+EOF
+echo "**********Check an invalid instance type (without capability netowrking accelerated) for compute with the proper error message**********"
+error_key_words='controlPlane.platform.azure.vmNetworkingType: Invalid value: \"Accelerated\": vm networking type is not supported for instance type Standard_B4ms'
+check_invalid_instance_type "${patch_file}" "${error_key_words}" || check_result=1
+
 exit ${check_result}
