@@ -39,7 +39,7 @@ use_bastion_registry: false
 controlplane_lab_interface: $CONTROLPLANE_LAB_INTERFACE
 controlplane_pub_network_cidr:
 controlplane_pub_network_gateway:
-jumbo_mtu: false
+jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
