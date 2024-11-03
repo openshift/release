@@ -1,23 +1,34 @@
 ref:
-  as: ipi-conf-azure-windows-machineset
-  from_image:
-    namespace: ocp
-    name: "4.12"
-    tag: upi-installer
-  commands: ipi-conf-azure-windows-machineset-commands.sh
-  resources:
-    requests:
-      cpu: 10m
-      memory: 100Mi
-  env:
-    - name: WINDOWS_USER_DATA_SECRET
-      default: "windows-user-data"
-    - name: WINDOWS_NODE_REPLICAS
-      default: "1"
-    - name: WIN_SKU
-      default: "2022-datacenter" 
-  documentation: |-
-    This IPI step adds a new machineSet to provision Windows instances in vsphere and depends on a secret with name 
-    `windows-user-data` in the `openshift-machine-api` namespace. The `windows-user-data` secret is created 
-    automatically by the Windows Machine Config Operator (WMCO), therefore the operator must be deployed and
-    running for this step to succeed.
+ as: ipi-conf-azure-windows-byoh
+ from_image:
+   namespace: ocp
+   name: "4.12"
+   tag: upi-installer
+ commands: ipi-conf-azure-windows-byoh-commands.sh
+ resources:
+   requests:
+     cpu: 10m
+     memory: 100Mi
+ env:
+   - name: WINDOWS_USER_DATA_SECRET
+     default: "windows-user-data"
+   - name: WINDOWS_NODE_REPLICAS
+     default: "1"
+   - name: WIN_SKU
+     default: "2022-datacenter"
+   - name: BYOH_INSTANCE_NAME
+     default: "byoh-winc"
+   - name: BYOH_NODE_COUNT
+     default: "2"
+   - name: WINDOWS_VERSION
+     default: "2022"
+ documentation: |-
+   This IPI step adds Windows BYOH nodes alongside Windows MachineSets in an Azure cluster. It requires Windows 
+   Machine Config Operator (WMCO) to be deployed and running as it depends on the `windows-user-data` secret in 
+   the `openshift-machine-api` namespace. The step will:
+   1. Create and scale Windows MachineSets
+   2. Deploy Windows BYOH nodes using byoh-auto tool
+   3. Verify all Windows nodes are properly joined to the cluster
+   
+   The number of nodes and Windows version can be configured through environment variables. Both MachineSets 
+   and BYOH nodes will use the same Windows version specified in WIN_SKU/WINDOWS_VERSION.
