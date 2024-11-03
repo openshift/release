@@ -11,6 +11,11 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
 
+az --version
+az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+set -x
+
 RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 CLUSTER_AUTOSCALER_ARGS=""
@@ -26,19 +31,10 @@ if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
     CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
 fi
 
-az --version
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
 az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
 echo "$RESOURCEGROUP" > "${SHARED_DIR}/resourcegroup_aks"
-
-K8S_VERSION_ARGS=""
-if [[ "${USE_LATEST_K8S_VERSION:-}" == "true" ]]; then
-  K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[*].orchestratorVersion)')
-  K8S_VERSION_ARGS="--kubernetes-version ${K8S_LATEST_VERSION}"
-fi
 
 echo "Building up the aks create command"
 CLUSTER="${RESOURCE_NAME_PREFIX}-aks-cluster"
@@ -49,10 +45,17 @@ AKS_CREATE_COMMAND=(
     --node-count "$AKS_NODE_COUNT"
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
-    "${CLUSTER_AUTOSCALER_ARGS:-}" \
-    "${K8S_VERSION_ARGS:-}" \
+    "${CLUSTER_AUTOSCALER_ARGS:-}"
     --location "$AZURE_LOCATION"
 )
+
+# Version prioritization: specific > latest > default
+if [[ -n "$AKS_K8S_VERSION" ]]; then
+    AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
+elif [[ "$USE_LATEST_K8S_VERSION" == "true" ]]; then
+    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[*].orchestratorVersion)')
+    AKS_CREATE_COMMAND+=(--kubernetes-version "$K8S_LATEST_VERSION")
+fi
 
 if [[ "$AKS_GENERATE_SSH_KEYS" == "true" ]]; then
     AKS_CREATE_COMMAND+=(--generate-ssh-keys)
@@ -89,4 +92,6 @@ echo "Getting kubeconfig to the AKS cluster"
 # shellcheck disable=SC2034
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 eval "${AKS_GET_CREDS_COMMAND[*]}"
+
 oc get nodes
+oc version

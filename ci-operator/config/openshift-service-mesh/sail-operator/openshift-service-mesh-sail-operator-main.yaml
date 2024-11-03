@@ -114,8 +114,8 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -170,7 +170,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
       RELEASE_IMAGE_LATEST: release:next
     env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -226,7 +226,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       OCP_ARCH: arm64
@@ -281,8 +281,8 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -331,8 +331,8 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -371,74 +371,6 @@ tests:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: nightly-images
-  cron: 00 03 * * *
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.5-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
-      MAISTRA_NAMESPACE: maistra-nightly-images
-      MAISTRA_SC_POD: maistra-nightly-images-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # copy the script to privileged pod
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: build
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /quay-secret/password)
-        export GITHUB_TOKEN=$(cat /creds-github/token)
-        # login to quay.io in the privileged pod
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          docker login -u='maistra-dev+prow' \
-          -p=${QUAY_PASS} quay.io
-        # build and push images and publish the bundle into OperatorHub
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "git config --global user.email 'jwendell@redhat.com'; \
-           git config --global user.name 'Jonh Wendell'; \
-           cd /work && \
-           export BUILD_WITH_CONTAINER="0" && \
-           export VERSIONS_YAML_FILE=versions.yaml && \
-           rm Makefile.vendor.mk bundle/**/*.yaml && \
-           # generate everything using versions.yaml not ossm/versions.yaml
-           make gen && \
-           make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
-      - mount_path: /creds-github
-        name: ossm-github
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:

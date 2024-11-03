@@ -1,0 +1,55 @@
+ref:
+  as: telcov10n-sno-spoke-site-config-deploy
+  commands: telcov10n-sno-spoke-site-config-deploy-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: INTERNAL_NET_CIDR
+    default: "192.168.80.0/22"
+    documentation: |-
+      CIDR is the IP block address pool for machines within the cluster
+  - name: B64_INSTALL_CONFIG_OVERRIDES
+    default: ""
+    documentation: |-
+      InstallConfigOverrides allows to pass install config parameters to be added as
+      annotation in the AgentClusterInstall CR. The values provided at InstallConfigOverrides
+      must be in json format code in base64. For example: "{\"controlPlane\":{\"hyperthreading\":\"Disabled\"}}".
+      This will transform installConfigOverrides and networkType as annotation for AgentClusterInstall as below:
+      agent-install.openshift.io/install-config-overrides: '{"networking":{"networkType":"OVNKubernetes"},"controlPlane":{"hyperthreading":"Disabled"}}'.
+  - name: DU_PROFILE
+    default: ""
+    documentation: |-
+      DU profile cluster label is one of the label to be used to specify the the day2 configuration policies
+      that will get applied on the cluster.
+  - name: GLOBAL_IGNITION_CONF_OVERRIDE
+    default: ""
+    documentation: |-
+      Json formatted string containing the user overrides for the initial ignition config.
+  - name: B64_NODE_IGNITION_CONF_OVERRIDE
+    default: ""
+    documentation: |-
+      Json formatted base64 string containing user overrides for the initial ignition config for this node.
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: GITEA_NAMESPACE
+    default: "ztp-gitea"
+    documentation: |-
+      Gitea k8s namespace where all its k8s related objects will be created
+  - name: GITEA_HELPER_IMG
+    default: "quay.io/ccardenosa/sno-spoke-helper"
+    documentation: |-
+      Gitea helper image to connect to the Git repo via SSH
+  - name: AUX_HOST
+    default: ""
+  documentation: |-
+    This step allows to generate and push the SiteConfig CR needed to deploy a ZTP SNO Spoke cluster
+    For further details about site-config CDR, see:
+    https://github.com/openshift-kni/cnf-features-deploy/blob/master/ztp/ran-crd/site-config-crd.yaml

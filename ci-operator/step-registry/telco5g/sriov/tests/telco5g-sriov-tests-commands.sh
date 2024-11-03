@@ -133,6 +133,7 @@ pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 [[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/unit_report.xml -o ${ARTIFACT_DIR}/test_results.html
 [[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/unit_report.xml -o ${ARTIFACT_DIR}/test_results.json
 [[ -f ${ARTIFACT_DIR}/unit_report.xml ]] && cp ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+[[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
 set +x

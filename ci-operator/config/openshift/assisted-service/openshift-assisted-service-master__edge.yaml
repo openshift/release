@@ -147,6 +147,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  latest-418:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
@@ -206,6 +211,11 @@ tests:
   steps:
     test:
     - ref: assisted-baremetal-operator-catalog-publish
+- always_run: false
+  as: operator-publish-verify
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-publish
 - as: assisted-operator-catalog-publish-verify
   run_if_changed: ^(deploy/olm-catalog/.*)$
   steps:
@@ -427,6 +437,34 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp-4masters
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=4
+        SPOKE_WORKER_AGENTS=0
+      NUM_EXTRA_WORKERS: "4"
+    workflow: assisted-baremetal-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp-5masters
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=5
+        SPOKE_WORKER_AGENTS=0
+      NUM_EXTRA_WORKERS: "5"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
   cron: 00 02 * * 0-5
@@ -979,6 +1017,24 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mtv-4-17
+  run_if_changed: ^(internal/operators/.*\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mtv
+        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=19724
+        MASTER_CPU=10
+        WORKER_MEMORY=10240
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$

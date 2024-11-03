@@ -10,7 +10,7 @@ function pr_debug_mode_waiting {
   echo "################################################################################"
 
   TZ=UTC
-  timeout=$(date -d "${PR_DEBUG_MODE_TIMEOUT}" +%s)
+  END_TIME=$(date -d "${TIMEOUT}" +%s)
   debug_done=/tmp/debug.done
 
   while sleep 1m; do
@@ -20,12 +20,12 @@ function pr_debug_mode_waiting {
     echo "-------------------------------------------------------------------"
     echo "'${debug_done}' not found. Debugging can continue... "
     now=$(date +%s)
-    if [ ${timeout} -lt ${now} ] ; then
+    if [ ${END_TIME} -lt ${now} ] ; then
       echo "Time out reached. Exiting by timeout..."
       break
     else
       echo "Now:     $(date -d @${now})"
-      echo "Timeout: $(date -d @${timeout})"
+      echo "Timeout: $(date -d @${TIMEOUT})"
     fi
     echo "Note: To exit from debug mode before the timeout is reached,"
     echo "just run the following command from the POD Terminal:"
@@ -37,4 +37,6 @@ function pr_debug_mode_waiting {
   echo "Exiting from Pull Request debug mode..."
 }
 
-test -n "${PULL_NUMBER:-}" && pr_debug_mode_waiting
+if [ "${PR_ONLY}" == "false" ] || [ -n "${PULL_NUMBER:-}" ]; then
+  pr_debug_mode_waiting
+fi
