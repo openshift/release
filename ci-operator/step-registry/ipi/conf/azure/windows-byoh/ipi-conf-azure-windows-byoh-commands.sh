@@ -1,6 +1,5 @@
 # ci-operator/step-registry/ipi/conf/azure/windows-byoh/ipi-conf-azure-windows-byoh-commands.sh
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
