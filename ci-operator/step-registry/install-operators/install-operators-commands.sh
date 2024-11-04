@@ -137,7 +137,7 @@ EOF
     kind: Subscription
     metadata:
         name: "${operator_name}"
-        namespace: "${operator_install_namespace}"
+        namespace: "${operator_install_namespace}-subscription"
     spec:
         channel: "${operator_channel}"
         installPlanApproval: Automatic
