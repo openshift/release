@@ -53,13 +53,26 @@ services:
 	applyconfig --config-dir services --confirm=true
 
 # these are useful for devs
-update:
+update: python-help
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
-	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
 	$(MAKE) release-controllers
+	$(MAKE) boskos-config
+
+.PHONY: python-help
+python-help:
+	# If the Python scripts fail, use the venv/ directory to establish a Python virtual environment by running these commands:
+	#
+	#   python3 -m venv venv/    # NOTE: This first command is only required the first time to initiate the directory.
+	#   source venv/bin/activate
+	#   python3 -m pip install pyyaml
+	#
+	# When complete, you can exit the virtual environment by running:
+	#
+	#   deactivate
+	#
 
 release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
