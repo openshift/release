@@ -231,7 +231,6 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.
 # Let's use a proxy here as the internal net is not routable from the container running the installer.
-http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
   echo "ERROR: Bootstrap failed. Aborting execution."
