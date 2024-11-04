@@ -1,0 +1,31 @@
+ref:
+  as: distributed-tracing-install-jaeger-konflux-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.10"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: distributed-tracing-install-jaeger-konflux-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: JAEGER_ICSP_NAME
+    documentation: The name of ImageContentSourcePolicy
+    default: jaeger-registry
+  - name: JAEGER_CATALOG_SOURCE
+    documentation: The name of catalogsource which will be created for operator
+    default: jaeger-catalogsource
+  - name: JAEGER_INDEX_IMAGE
+    documentation: The index image for creating the catalogsource
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: dt-secrets
+    mount_path: /var/run/vault/dt-secrets
+  documentation: |-
+    Enable the Jaeger Konflux catalogsource in a connected env.

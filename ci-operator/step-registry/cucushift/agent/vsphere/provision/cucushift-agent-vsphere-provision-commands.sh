@@ -118,3 +118,6 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+
+echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

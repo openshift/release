@@ -1,0 +1,95 @@
+base_images:
+  base:
+    name: "4.18"
+    namespace: ocp
+    tag: base
+binary_build_commands: make -f openshift-ci/Makefile build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tests
+images:
+- dockerfile_path: openshift-ci/Dockerfile.tests
+  from: base
+  to: helm
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: helm-interop-aws
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "helm-acceptance-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "helm-acceptance-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "HELM", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","helm-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: kmamgain@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario helm
+    test:
+    - as: helm-acceptance-test
+      commands: |
+        make -f openshift-ci/Makefile build test-acceptance
+        mv  acceptance-testing/.acceptance/results.xml acceptance-testing/.acceptance/junit_results.xml
+        cp -r acceptance-testing/.acceptance/junit_*.xml ${ARTIFACT_DIR}/
+        cp -r acceptance-testing/.acceptance/*.html ${ARTIFACT_DIR}/
+      from: helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: firewatch-ipi-aws
+- as: helm-interop-aws-fips
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "helm-acceptance-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "helm-acceptance-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "HELM", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","fips","helm-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: kmamgain@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario helm
+    test:
+    - as: helm-acceptance-test
+      commands: |
+        make -f openshift-ci/Makefile build test-acceptance
+        mv  acceptance-testing/.acceptance/results.xml acceptance-testing/.acceptance/junit_results.xml
+        cp -r acceptance-testing/.acceptance/junit_*.xml ${ARTIFACT_DIR}/
+        cp -r acceptance-testing/.acceptance/*.html ${ARTIFACT_DIR}/
+      from: helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: release-3.11
+  org: redhat-developer
+  repo: helm
+  variant: helm-ocp4.18-lp-interop

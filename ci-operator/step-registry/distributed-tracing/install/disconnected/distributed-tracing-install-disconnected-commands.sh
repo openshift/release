@@ -131,10 +131,10 @@ mirror:
       channels:
       - name: stable
   additionalImages:
-  # Used for running acceptance tests
-  - name: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+  # Used for running disconnected tests
+  - name: quay.io/minio/minio@sha256:7586fd4e11b48d7e41efdc6898b73147231da847cd0d4383d0a718ad2c98e6d8
   - name: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen@sha256:a036b2ec403f445adc68bfcc359d5040a6603af4081a76a6cf02a5de55138a4e
-  - name: docker.io/minio/minio@sha256:7cb3f11447d1ac7c4b73420dd8f3601afa16ea0cd7e929ecb00be1a8af1eac05
+  - name: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
   - name: docker.io/jaegertracing/vertx-create-span@sha256:6704312715644554fe4d51e0ce5cb0032e9231653ac61bdbdb5f290cb637d421
 EOF
 

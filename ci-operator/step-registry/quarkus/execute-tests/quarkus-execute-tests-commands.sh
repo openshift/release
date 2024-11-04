@@ -25,6 +25,7 @@ mvn -B -V clean verify -fae \
     -Dquarkus-plugin.version=$QUARKUS_VERSION \
     -Proot-modules,http-modules,sql-db-modules,monitoring-modules \
     -Dopenshift \
+    -Dreruns=0 -Doc.reruns=0 \
     -pl $PROJECTS
 
 # Copy test reports into $ARTIFACT_DIR

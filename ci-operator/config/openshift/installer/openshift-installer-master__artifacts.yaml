@@ -1,0 +1,71 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.18_installer-etcd-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.18_installer-terraform-providers:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-terraform-providers
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_4.18_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: installer-artifacts
+promotion:
+  to:
+  - name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: installer
+  variant: artifacts

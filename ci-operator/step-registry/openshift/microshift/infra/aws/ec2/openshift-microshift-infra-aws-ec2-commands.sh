@@ -1,14 +1,10 @@
 #!/bin/bash
+set -xeuo pipefail
 
-set -x
-set -o nounset
-set -o errexit
-set -o pipefail
-export PS4='+ $(date "+%T.%N") \011'
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save stacks events
-trap 'save_stack_events_to_shared' EXIT TERM INT
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+trap_subprocesses_on_term
+trap_install_status_exit_code $EXIT_CODE_AWS_EC2_FAILURE
 
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
 declare regions=(us-west-2 us-east-1 eu-central-1)

@@ -29,6 +29,7 @@
     - promoted-image-governor
     - github-ldap-user-group-creator
     - cluster-display
+    - cluster-init
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -76,7 +77,10 @@
     - release-controller-ocp-multi
     - release-controller-ocp-multi-priv
 - fields:
-  - cmd: "oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64"
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64
+      -w 0
     name: token_$(service_account)_$(cluster)_reg_auth_value.txt
   item_name: build_farm
   params:
@@ -198,7 +202,10 @@
     cluster:
     - app.ci
 - fields:
-  - cmd: "oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config create token -n ci multi-arch-builder-controller --duration=2419200s --bound-object-kind=Secret --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64"
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci multi-arch-builder-controller --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1 | sed 's/^/serviceaccount:/' | base64
+      -w 0
     name: token_multi-arch-builder-controller_$(cluster)_reg_auth_value.txt
   item_name: build_farm
   params:

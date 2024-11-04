@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-azure-416
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -26,12 +19,14 @@ tests:
   as: control-plane-ipsec-120nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: azure-qe
+    cluster_profile: azure-perfscale
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.hyp.azure.rhperfscale.org
+      BASE_DOMAIN_RESOURCE_GROUP: perfscale-prow
       COMPUTE_NODE_TYPE: Standard_D4s_v5
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
-      CUSTOM_AZURE_REGION: centralus
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v5
+      CUSTOM_AZURE_REGION: eastus
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       PROFILE_TYPE: reporting
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "120"
@@ -39,7 +34,7 @@ tests:
     - chain: workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
-  timeout: 5h0m0s
+  timeout: 8h0m0s
 - always_run: false
   as: control-plane-ipsec-3nodes
   steps:
@@ -50,7 +45,6 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
-      CUSTOM_AZURE_REGION: centralus
       PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-control-plane
@@ -62,9 +56,9 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      COMPUTE_NODE_TYPE: Standard_D8s_v5
       CUSTOM_AZURE_REGION: centralus
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       SET_ENV_BY_PLATFORM: custom
       TOLERANCE: "99"
       WORKER_REPLICA_COUNT: "9"
@@ -81,9 +75,9 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      COMPUTE_NODE_TYPE: Standard_D8s_v5
       CUSTOM_AZURE_REGION: centralus
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       SET_ENV_BY_PLATFORM: custom
       TOLERANCE: "99"
     test:
@@ -97,8 +91,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D8s_v3
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      COMPUTE_NODE_TYPE: Standard_D8s_v5
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       SET_ENV_BY_PLATFORM: custom
       TOLERANCE: "99"
       WORKER_REPLICA_COUNT: "9"
@@ -120,8 +114,8 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-      COMPUTE_NODE_TYPE: Standard_D4s_v3
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v3
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure

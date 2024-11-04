@@ -1,41 +1,42 @@
 #!/bin/bash
 
-SLEEP_DURATION="${SLEEP_DURATION:-3h}"
+echo "************ Fix user IDs in a container ************"
+[ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-# Get the suffix of the SLEEP_DURATION, if any.
-SLEEP_DURATION_SUFFIX="${SLEEP_DURATION//[0-9]/}"
+function pr_debug_mode_waiting {
 
-SLEEP_DURATION_S="${SLEEP_DURATION//[a-z]/}"
+  echo "################################################################################"
+  echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
+  echo "################################################################################"
 
-case "$SLEEP_DURATION_SUFFIX" in
-    s)
-        ;;
-    m)
-        SLEEP_DURATION_S="$((SLEEP_DURATION_S * 60))"
-        ;;
-    h)
-        SLEEP_DURATION_S="$((SLEEP_DURATION_S * 3600))"
-        ;;
-    d)
-        SLEEP_DURATION_S="$((SLEEP_DURATION_S * 86400))"
-        ;;
-    "")
-        SLEEP_DURATION_S="$SLEEP_DURATION_S"
-        ;;
-    *)
-        echo "Invalid suffix detected in SLEEP_DURATION: $SLEEP_DURATION_SUFFIX"
-        exit 1
-        ;;
-esac
+  TZ=UTC
+  END_TIME=$(date -d "${TIMEOUT}" +%s)
+  debug_done=/tmp/debug.done
 
-PERIOD=30
-N_PERIODS=$((SLEEP_DURATION_S / PERIOD))
+  while sleep 1m; do
 
-for i in $(seq 1 $N_PERIODS); do
-    echo "[$i/$N_PERIODS] Sleeping for $PERIOD seconds... (total: $((i * PERIOD))s/$SLEEP_DURATION)"
-    sleep "$PERIOD"
-    if [ -f "${SHARED_DIR}/done" ]; then
-        echo "File \${SHARED_DIR}/done found. Exiting."
-        exit 0
+    test -f ${debug_done} && break
+    echo
+    echo "-------------------------------------------------------------------"
+    echo "'${debug_done}' not found. Debugging can continue... "
+    now=$(date +%s)
+    if [ ${END_TIME} -lt ${now} ] ; then
+      echo "Time out reached. Exiting by timeout..."
+      break
+    else
+      echo "Now:     $(date -d @${now})"
+      echo "Timeout: $(date -d @${TIMEOUT})"
     fi
-done
+    echo "Note: To exit from debug mode before the timeout is reached,"
+    echo "just run the following command from the POD Terminal:"
+    echo "$ touch ${debug_done}"
+
+  done
+
+  echo
+  echo "Exiting from Pull Request debug mode..."
+}
+
+if [ "${PR_ONLY}" == "false" ] || [ -n "${PULL_NUMBER:-}" ]; then
+  pr_debug_mode_waiting
+fi

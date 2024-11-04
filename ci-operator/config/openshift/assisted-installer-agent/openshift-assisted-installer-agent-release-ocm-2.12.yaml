@@ -1,0 +1,140 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-controller:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: ocm-2.12
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.assisted_installer_agent
+  to: assisted-installer-agent
+- dockerfile_path: Dockerfile.assisted_installer_agent-build
+  to: assisted-installer-agent-build
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: src
+  to: assisted-installer-agent-src
+promotion:
+  to:
+  - name: ocm-2.12
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: assisted-installer-agent-build
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: unit-test
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    clone: true
+    from: assisted-installer-agent-build
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-agent-codecov-token
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: unit-test-postsubmit
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    clone: true
+    from: assisted-installer-agent-build
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-agent-codecov-token
+- as: subsystem-test
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
+- as: subsystem-test-periodic
+  cron: 00 10 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
+- as: e2e-ai-operator-ztp
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+    workflow: assisted-baremetal-operator-ztp
+zz_generated_metadata:
+  branch: release-ocm-2.12
+  org: openshift
+  repo: assisted-installer-agent

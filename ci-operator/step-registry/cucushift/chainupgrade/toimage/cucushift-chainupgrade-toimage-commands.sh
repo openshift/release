@@ -688,8 +688,9 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
-    echo "Starting the upgrade checking on $(date "+%F %T")"
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
+    echo -e "Upgrade checking start at $(date "+%F %T")\n"
+    start_time=$(date "+%s")
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -713,7 +714,9 @@ function check_upgrade_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
+            end_time=$(date "+%s")
+            echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
@@ -723,7 +726,10 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
+        end_time=$(date "+%s")
+        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        return 1
     fi
 }
 
@@ -981,6 +987,8 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export TARGET_MINOR_VERSION=""
+
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
 release_string="$(< "${SHARED_DIR}/upgrade-edge")"
 # shellcheck disable=SC2207
@@ -1003,7 +1011,6 @@ for target in "${TARGET_RELEASES[@]}"; do
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
     export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"

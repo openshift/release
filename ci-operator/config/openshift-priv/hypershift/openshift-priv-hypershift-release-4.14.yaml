@@ -3,6 +3,14 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.14_base:
     name: 4.14-priv
     namespace: ocp-private
@@ -11,20 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
-binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.14_base:
@@ -36,9 +34,7 @@ images:
   to: hypershift
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
-    name: 4.14-priv
+  - name: 4.14-priv
     namespace: ocp-private
 releases:
   initial:
@@ -64,7 +60,7 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
-test_binary_build_commands: make build e2e
+test_binary_build_commands: make e2e
 tests:
 - as: verify
   commands: make verify
@@ -80,7 +76,7 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -114,6 +110,13 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

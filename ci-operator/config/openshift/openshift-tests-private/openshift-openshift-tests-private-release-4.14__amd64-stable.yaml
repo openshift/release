@@ -20,9 +20,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -30,7 +34,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -55,27 +59,16 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     release:
       architecture: amd64
       channel: candidate
       version: "4.14"
-  multi-latest:
+  target:
     release:
       architecture: multi
       channel: candidate
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
       version: "4.14"
 resources:
   '*':
@@ -166,6 +159,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       CHANNEL_GROUP: candidate
+      COMPUTE_NODES: "3"
+      MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
       SUBSCRIPTION_TYPE: marketplace-gcp
     test:
@@ -447,6 +442,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
@@ -487,27 +483,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: nutanix-ipi-compact-f28
-  cluster: build01
-  cron: 23 12 2 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      SIZE_VARIANT: compact
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-disc-f28
-  cluster: build01
-  cron: 0 3 24 * *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
   cron: 44 13 4 * *
@@ -519,19 +494,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: aws-ocm-osd-ccs-fleet-manager-f7
-  cron: 53 10 4,13,20,27 * *
-  steps:
-    cluster_profile: fleet-manager-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - ref: osd-ccs-fleet-manager-test
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: osd-ccs-fleet-manager
 - as: vsphere-ipi-disc-f28
   cron: 1 22 23 * *
   steps:

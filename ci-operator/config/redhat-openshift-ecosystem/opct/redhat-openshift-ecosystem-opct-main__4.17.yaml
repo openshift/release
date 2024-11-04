@@ -1,0 +1,74 @@
+base_images:
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+binary_build_commands: make linux-amd64
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  initial-minor:
+    release:
+      channel: candidate
+      version: "4.16"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: platform-none-vsphere
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: opct-test-platform-none-vsphere
+  timeout: 6h0m0s
+- as: platform-none-vsphere-upgrade
+  cron: 0 5 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-test-platform-none-vsphere
+  timeout: 8h0m0s
+- as: platform-external-vsphere
+  cron: 0 10 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      PLATFORM_NAME: vsphere
+    workflow: opct-test-platform-external-vsphere
+  timeout: 6h0m0s
+- as: platform-external-vsphere-upgrade
+  cron: 0 15 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-test-platform-external-vsphere
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: opct
+  variant: "4.17"

@@ -21,12 +21,9 @@ chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 
-# 4.17 management cluster is not ready for HCP yet
-if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
-    MGMT_VERSION=4.16
-else
-    MGMT_VERSION=$T5CI_VERSION
-fi
+# Use same version for mgmt and guest clusters for now
+# Switch to different if there is a problem
+MGMT_VERSION=$T5CI_VERSION
 
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -127,7 +124,7 @@ echo "Change the host from localhost to hypervisor"
 sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/hosted_bm_cluster.yaml
 
 # shellcheck disable=SC1083
-HYPERV_HOST="$(grep "${CLUSTER_HV_IP} " inventory/allhosts | awk {'print $1'})"
+HYPERV_HOST="$(grep -h "${CLUSTER_HV_IP} " inventory/* | awk {'print $1'})"
 # In BOS2 we use a regular dnsmasq, not the NetworkManager based
 # Use ProxyJump if using BOS2
 if $BASTION_ENV; then
@@ -203,6 +200,8 @@ EOF
 
 # TODO: add this to image build
 pip3 install dnspython netaddr
+ansible-galaxy collection install -r ansible-requirements.yaml
+
 
 cp $SHARED_DIR/inventory inventory/billerica_inventory
 
@@ -296,8 +295,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_release=nightly \
-    -e hostedbm_bm_cpo_override_image=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
-    -e image_override=quay.io/hypershift/hypershift-operator:${T5CI_VERSION} \
+    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
 

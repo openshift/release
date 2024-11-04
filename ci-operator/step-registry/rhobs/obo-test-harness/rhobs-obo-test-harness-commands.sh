@@ -14,7 +14,7 @@ main() {
 
 	set -x
 	mkdir $TEST_RESULT_DIR
-	./e2e.test -test.v 2>"$TEST_RESULT_DIR/errors.log" |
+	./e2e.test -test.v -operatorInstallNS=coo 2>"$TEST_RESULT_DIR/errors.log" |
 		tee "$TEST_RESULT_DIR/tests.log" |
 		./go-junit-report -set-exit-code >"$TEST_RESULT_DIR/junit-obo.xml"
 

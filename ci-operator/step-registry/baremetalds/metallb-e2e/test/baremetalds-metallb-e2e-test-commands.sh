@@ -22,9 +22,13 @@ extract_version() {
 OC_VERSION=$(ssh "${SSHOPTS[@]}" "root@${IP}" "oc version")
 OC_BRANCH=$(extract_version "${OC_VERSION}" "Server Version:")
 METALLB_SRC_DIR="/go/src/github.com/openshift/metallb"
+FRRK8S_SRC_DIR="/go/src/github.com/openshift/frr"
 METALLB_OPERATOR_SRC_DIR="/go/src/github.com/openshift/metallb-operator"
 METALLB_REPO=${METALLB_REPO:-"https://github.com/openshift/metallb.git"}
+FRRK8S_REPO=${FRRK8S_REPO:-"https://github.com/openshift/frr.git"}
+
 METALLB_BRANCH="${OC_BRANCH}"
+FRRK8S_BRANCH="${OC_BRANCH}"
 DONT_DEPLOY_OPERATOR=${DONT_DEPLOY_OPERATOR:-}
 
 if [ -d "${METALLB_SRC_DIR}" ]; then
@@ -33,6 +37,14 @@ if [ -d "${METALLB_SRC_DIR}" ]; then
 else
   echo "### Cloning metallb"
   ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf metallb/ && git clone ${METALLB_REPO} && cd metallb/ && git checkout ${METALLB_BRANCH}"
+fi
+
+if [ -d "${FRRK8S_SRC_DIR}" ]; then
+  echo "### Copying frr directory"
+  scp "${SSHOPTS[@]}" -r "${FRRK8S_SRC_DIR}" "root@${IP}:/root/dev-scripts/"
+else
+  echo "### Cloning frr"
+  ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf frr/ && git clone ${FRRK8S_REPO} && cd frr/ && git checkout ${FRRK8S_BRANCH}"
 fi
 
 if [ -d "${METALLB_OPERATOR_SRC_DIR}" ]; then
@@ -56,4 +68,12 @@ if [[ -z $DONT_DEPLOY_OPERATOR ]]; then
   ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_metallb.sh"
 fi
 echo "### running metallb E2E tests"
+
+# setting +e so we won't exit in case of test failure and the artifacts are going to be copied
+set +e
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./run_e2e.sh"
+if [ $? -ne 0 ]; then
+  scp "${SSHOPTS[@]}" -r "root@${IP}:/logs/artifacts" "${ARTIFACT_DIR}"
+  exit 1
+fi
+set -e

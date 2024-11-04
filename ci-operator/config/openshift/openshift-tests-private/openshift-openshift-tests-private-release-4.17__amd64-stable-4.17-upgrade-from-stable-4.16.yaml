@@ -35,16 +35,11 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     release:
       architecture: amd64
-      channel: candidate
+      channel: fast
       version: "4.16"
   target:
     release:
@@ -164,30 +159,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: nutanix-ipi-compact-f28
-  cluster: build01
-  cron: 37 1 7 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      SIZE_VARIANT: compact
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-disc-rt-f28
-  cluster: build01
-  cron: 13 7 4 * *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      ENABLE_OTA_TEST: OCP-30832
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      RT_ENABLED: "true"
-    test:
-    - ref: nutanix-upgrade-pre-config
-    - chain: openshift-upgrade-qe-sanity-disconnected
-    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
   cron: 38 9 5 * *

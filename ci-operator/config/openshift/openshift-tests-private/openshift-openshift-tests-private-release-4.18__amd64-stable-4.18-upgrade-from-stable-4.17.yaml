@@ -1,0 +1,211 @@
+base_images:
+  ansible:
+    name: "4.17"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.17"
+  target:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-c2s-ipi-disc-priv-fips-f28
+  cron: 20 16 6 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-disc-priv-localzone-fips-f28
+  cron: 47 4 26 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
+- as: aws-ipi-disc-priv-sts-ep-fips-f28
+  cron: 53 21 28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-30832
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-shared-vpc-phz-sts-fips-f28
+  cron: 27 15 3 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: aws-usgov-ipi-private-sts-f28
+  cron: 22 14 4 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+- as: azure-ipi-disc-fullyprivate-f28
+  cron: 30 14 27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-27986
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-mag-ipi-fips-f28
+  cron: 4 18 24 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-mag-ipi
+- as: azure-stack-ipi-proxy-fips-f28
+  cluster: build01
+  cron: 1 5 5 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: gcp-ipi-disc-priv-oidc-fips-f28
+  cron: 30 22 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-30832
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+- as: ibmcloud-ipi-proxy-private-fips-rt-f28
+  cron: 46 10 13 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      ENABLE_OTA_TEST: OCP-56083
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: nutanix-ipi-proxy-fips-mini-perm-f28
+  cluster: build01
+  cron: 38 9 5 * *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      ENABLE_OTA_TEST: OCP-24358
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - ref: nutanix-upgrade-pre-config
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
+- as: vsphere-ipi-disc-f28
+  cron: 10 0 27 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      ENABLE_OTA_TEST: OCP-30832
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
+- as: vsphere-ipi-ovn-dualstack-f28
+  cron: 14 16 23 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 21 9 26 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      ENABLE_OTA_TEST: OCP-24358
+      FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-stable-4.18-upgrade-from-stable-4.17

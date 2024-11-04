@@ -18,6 +18,11 @@ CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
 CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
 CYPRESS_SNYK_TOKEN=$(cat /usr/local/ci-secrets/github/snyk_token)
 
+#Vault Secrets for RH Trusted Profile Analyzer (testing SBOM)
+export CYPRESS_ATLAS_PASSWORD CYPRESS_ATLAS_USERNAME
+CYPRESS_ATLAS_USERNAME=$(cat /usr/local/ci-secrets/github/atlas_stage_acc)
+CYPRESS_ATLAS_PASSWORD=$(cat /usr/local/ci-secrets/github/atlas_stage_pass)
+
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/github/QONTRACT_PASSWORD)
