@@ -8,6 +8,8 @@ cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
 
+cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/ip-conf-install-config.yaml
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
@@ -76,3 +78,5 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/ip-conf-last-install-config.yaml

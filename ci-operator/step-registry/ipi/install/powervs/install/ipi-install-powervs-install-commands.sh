@@ -930,6 +930,9 @@ done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -p
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
+echo "Printing install-config.yaml"
+grep -v "password\|username\|pullSecret\|sshKey\|ssh-rsa" "${SHARED_DIR}/install-config.yaml" > ${SHARED_DIR}/new-install-config.yaml
+cp ${SHARED_DIR}/new-install-config.yaml ${ARTIFACT_DIR}/new-install-config.yaml
 export TF_LOG=debug
 # Uncomment for even more debugging!
 #export TF_LOG_PROVIDER=TRACE
