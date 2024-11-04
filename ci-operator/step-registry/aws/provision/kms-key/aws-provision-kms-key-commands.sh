@@ -12,10 +12,10 @@ REGION="${LEASED_RESOURCE}"
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # get user arn
-user_arn=$(aws sts get-caller-identity --output json | jq -r .Arn)
-key_policy=${ARTIFACT_DIR}/key_policy.json
+USER_ARN=$(aws sts get-caller-identity --output json | jq -r .Arn)
+KEY_POLICY=${ARTIFACT_DIR}/key_policy.json
 
-cat > ${key_policy} << EOF
+cat > ${KEY_POLICY} << EOF
 {
     "Id": "key-consolepolicy-3",
     "Version": "2012-10-17",
@@ -24,7 +24,7 @@ cat > ${key_policy} << EOF
             "Sid": "Enable IAM User Permissions",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "${user_arn/user*/root}"
+                "AWS": "${USER_ARN/user*/root}"
             },
             "Action": "kms:*",
             "Resource": "*"
@@ -33,7 +33,7 @@ cat > ${key_policy} << EOF
             "Sid": "Allow use of the key",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "${user_arn}"
+                "AWS": "${USER_ARN}"
             },
             "Action": [
                 "kms:Encrypt",
@@ -48,7 +48,7 @@ cat > ${key_policy} << EOF
             "Sid": "Allow attachment of persistent resources",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "${user_arn}"
+                "AWS": "${USER_ARN}"
             },
             "Action": [
                 "kms:CreateGrant",
@@ -67,33 +67,45 @@ cat > ${key_policy} << EOF
 EOF
 
 
-ts=$(date +%m%d%H%M%S)
-alias_name="${CLUSTER_NAME}-${ts}"
-echo "Creating KMS key: $alias_name"
-echo "Policy:"
-cat $key_policy
+function create_kms_key()
+{
+    local id_output=$1
+    local arn_output=$2
 
-key_output=${ARTIFACT_DIR}/key_output.json
+    local key_arn key_id output ts
 
-aws --region $REGION kms create-key --description "Prow CI $alias_name" \
-  --output json \
-  --policy "$(cat $key_policy | jq -c)" > "${key_output}" || exit 1
+    ts=$(date +%m%d%H%M%S)
+    key_alias="alias/prowci-${CLUSTER_NAME}-${ts}-${RANDOM}"
+    output=$(mktemp)
 
-key_arn=$(cat "${key_output}" | jq -r '.KeyMetadata.Arn')
-key_id=$(cat "${key_output}" | jq -r '.KeyMetadata.KeyId')
+    echo "Creating KMS key: $key_alias"
+    aws --region $REGION kms create-key --description "Prow CI $key_alias" --output json \
+        --policy "$(cat $KEY_POLICY | jq -c)" > "${output}" || return 1
+    
+    key_arn=$(cat "${output}" | jq -r '.KeyMetadata.Arn')
+    key_id=$(cat "${output}" | jq -r '.KeyMetadata.KeyId')
 
-if [[ "${key_arn}" == "" ]] || [[ "${key_arn}" == "null" ]] || [[ "${key_id}" == "" ]] || [[ "${key_id}" == "null" ]]; then
-  echo "Failed to create KMS key."
-  exit 1
+    if [[ "${key_arn}" == "" ]] || [[ "${key_arn}" == "null" ]] || [[ "${key_id}" == "" ]] || [[ "${key_id}" == "null" ]]; then
+        echo "Failed to create KMS key."
+        return 1
+    fi
+
+    echo $key_arn > "${arn_output}"
+    echo $key_id > "${id_output}"
+
+    echo "Created key $key_id"
+    aws --region $REGION kms create-alias --alias-name "${key_alias}" --target-key-id "${key_id}"
+    echo "Created key alias $key_alias"
+}
+
+if [[ "${ENABLE_AWS_KMS_KEY_DEFAULT_MACHINE}" == "yes" ]]; then
+    create_kms_key "${SHARED_DIR}/aws_kms_key_id" "${SHARED_DIR}/aws_kms_key_arn"
 fi
 
-echo "Created key $key_arn"
+if [[ "${ENABLE_AWS_KMS_KEY_CONTROL_PLANE}" == "yes" ]]; then
+    create_kms_key "${SHARED_DIR}/aws_kms_key_id_control_plane" "${SHARED_DIR}/aws_kms_key_arn_control_plane"
+fi
 
-echo $key_arn > ${SHARED_DIR}/aws_kms_key_arn
-echo $key_id > ${SHARED_DIR}/aws_kms_key_id
-
-key_alias="alias/prowci-${alias_name}"
-echo $key_alias > ${SHARED_DIR}/aws_kms_key_alias
-
-aws --region $REGION kms create-alias --alias-name "${key_alias}" --target-key-id "${key_id}"
-echo "Created key alias $key_alias"
+if [[ "${ENABLE_AWS_KMS_KEY_COMPUTE}" == "yes" ]]; then
+    create_kms_key "${SHARED_DIR}/aws_kms_key_id_compute" "${SHARED_DIR}/aws_kms_key_arn_compute"
+fi
