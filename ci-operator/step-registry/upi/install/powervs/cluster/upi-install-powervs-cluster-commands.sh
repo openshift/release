@@ -9,7 +9,7 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
 ############################################################
 # Set PowerVS and VPC Zone and Region  
-POWERVS_ZONE="${LEASED_RESOURCE}"
+export POWERVS_ZONE="${LEASED_RESOURCE}"
 POWERVS_REGION=$(
         case "$POWERVS_ZONE" in
             ("dal10" | "dal12") echo "dal" ;;
@@ -27,7 +27,7 @@ POWERVS_REGION=$(
             ("osa21") echo "osa" ;;
             (*) echo "$POWERVS_ZONE" ;;
         esac)
-
+export POWERVS_REGION
 VPC_REGION=$(
         case "$POWERVS_ZONE" in
             ("dal10" | "dal12" | "us-south") echo "us-south" ;;
@@ -43,15 +43,14 @@ VPC_REGION=$(
             ("osa21") echo "jp-osa" ;;
             (*) echo "$POWERVS_ZONE" ;;
         esac)
-VPC_ZONE="${VPC_REGION}-1"
+export VPC_REGION
+export VPC_ZONE="${VPC_REGION}-1"
+
+echo "Variables for Workflow are being stored in SHARED_DIR."
 echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
 echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
 echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
 echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
-export POWERVS_REGION
-export POWERVS_ZONE
-export VPC_REGION
-export VPC_ZONE
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/:"${PATH}"
@@ -125,6 +124,7 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # Download automation code
@@ -195,10 +195,11 @@ function cleanup_prior() {
         echo "Done Deleting the ${CRN}"
     done
     echo "Delete network ocp-net on powerVS region"
-    ic pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ic pi subnet delete {} --force || true
+    # Dev: functions don't work inline with xargs
+    HOME=${IBMCLOUD_HOME_FOLDER} ic pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} --force || true
 
     # VPC Instances
-    # VPC LBs
+    # VPC LBs 
     # TODO: FIXME - need to be selective so as not to blow out other workflows being run
     echo "Cleaning up the VPC Load Balancers"
     ic target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
@@ -270,18 +271,22 @@ function configure_terraform() {
     echo "IC: PowerVS instance ID: ${POWERVS_SERVICE_INSTANCE_ID}"
     export POWERVS_SERVICE_INSTANCE_ID
 
+    echo "Release Image used is:"
+    echo "$(openshift-install version | grep 'release image' | awk '{print $3}')"
+
 cat << EOF >${IBMCLOUD_HOME_FOLDER}/ocp-install-dir/var-multi-arch-upi.tfvars
 ibmcloud_api_key    = "${IBMCLOUD_API_KEY}"
 ibmcloud_zone       = "${POWERVS_ZONE}"
 ibmcloud_region     = "${POWERVS_REGION}"
 service_instance_id = "${POWERVS_SERVICE_INSTANCE_ID}"
 rhel_image_name     = "CentOS-Stream-9"
+rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
 system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
-cluster_id_prefix   = "ma-p2"
+cluster_id_prefix   = "p2"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
@@ -289,6 +294,7 @@ worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
 release_image_override    = "$(openshift-install version | grep 'release image' | awk '{print $3}')"
+
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
 ibm_cloud_vpc_name        = "${VPC_NAME}"
