@@ -47,6 +47,12 @@ else
     exit 1
 fi
 
+export AWS_ACCESS_ID AWS_BUCKET_NAME AWS_SECRET_KEY
+
+AWS_ACCESS_ID="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-access-id )"
+AWS_BUCKET_NAME="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-bucket-name )"
+AWS_SECRET_KEY="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-secret-key )"
+
 cd "$(mktemp -d)"
 git clone --branch main https://github.com/openshift-pipelines/performance.git .
 

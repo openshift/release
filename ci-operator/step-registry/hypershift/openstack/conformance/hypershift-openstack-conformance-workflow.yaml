@@ -1,0 +1,42 @@
+workflow:
+  as: hypershift-openstack-conformance
+  documentation: |-
+    Sets up all the mgmt/infra cluster prerequisites necessary for hypershift openstack guest clusters.
+    Then runs openshift e2e tests.
+    This workflow can be use for regular conformance tests or CSI, you'll need to set
+    TEST_SUITE and also TEST_CSI_DRIVER_MANIFEST if testing CSI.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      AWS_PROFILE: ""
+      BASE_DOMAIN: "origin-ci-int-aws.dev.rhcloud.com"
+      CONFIG_TYPE: "minimal"
+      SKIP_MONITOR_TEST: "true"
+      TEST_CSI_DRIVER_MANIFEST: ""
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: openstack-conf-resourcenames
+    - ref: openstack-conf-clouds
+    - ref: openstack-conf-proxy
+    - ref: openstack-conf-externalnetworkid
+    - ref: openstack-conf-exportcindercredentials
+    - ref: hypershift-openstack-create-hostedcluster
+    - ref: openstack-provision-dnsrecords
+    - ref: hypershift-openstack-create-wait
+    - ref: storage-obj-save
+    - ref: storage-conf-csi-openstack-cinder
+    - ref: storage-conf-csi-openstack-manila
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: storage-obj-check
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - ref: hypershift-openstack-destroy
+    - ref: openstack-deprovision-dnsrecords
+    - chain: hypershift-destroy-nested-management-cluster

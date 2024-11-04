@@ -84,7 +84,10 @@ else
     rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/el9/os"
     ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/el9/os"
 
-    if sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}"; then
+    # `dnf repoquery` returns 1 when the repository is not available,
+    # but returns 0 when the repo is up and package is not present.
+    released=$(sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}" || true)
+    if [[ -n "${released}" ]]; then
         sudo subscription-manager repos --enable "${rhocp}"
     elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-rc,${rc}"; then
         enable_mirror_repo "${rc}"

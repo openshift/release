@@ -13,6 +13,16 @@ export PATH=/usr/libexec/origin:$PATH
 
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
+# In order for openshift-tests to pull external binary images from the
+# payload, we need access enabled to the images on the build farm. In
+# order to do that, we need to unset the KUBECONFIG so we talk to the
+# build farm, not the cluster under test.
+echo "Granting access for image pulling from the build farm..."
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -428,6 +438,16 @@ fi
 echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
+
+# reportedly even the above is not enough for etcd which can still require time to stabilize and rotate certs.
+# wait longer if the new command is available, but it won't be present in past releases.
+echo "$(date) - waiting for oc adm wait-for-stable-cluster..."
+if oc adm wait-for-stable-cluster --minimum-stable-period 2m &>/dev/null; then
+	echo "$(date) - oc adm reports cluster is stable."
+else
+	echo "$(date) - oc adm wait-for-stable-cluster is not available in this release"
+fi
+
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 count=1

@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-openshift-enterprise-base-4.16.multi
+  ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: loki
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.promtail.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: promtail
+promotion:
+  to:
+  - name: v3.2.0
+    namespace: logging
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  steps:
+    test:
+    - as: unit
+      commands: GOFLAGS="" make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: upstream-v3.2.0
+  org: openshift
+  repo: loki

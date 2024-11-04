@@ -770,11 +770,11 @@ cat << EOF > "${SHARED_DIR}/proxy-conf.sh"
 echo "Setup proxy to ${BASTION_IP}:2005"
 export HTTP_PROXY=http://${BASTION_IP}:2005/
 export HTTPS_PROXY=http://${BASTION_IP}:2005/
-export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export NO_PROXY="static.redhat.com,redhat.io,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
 export http_proxy=http://${BASTION_IP}:2005/
 export https_proxy=http://${BASTION_IP}:2005/
-export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export no_proxy="static.redhat.com,redhat.io,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 echo "Finished prepare_next_steps"
 source "${SHARED_DIR}/proxy-conf.sh"

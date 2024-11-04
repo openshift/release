@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/code-quality-checks
     decorate: true
     labels:
@@ -59,7 +59,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/hypershift-pr-check
     decorate: true
     labels:
@@ -77,7 +77,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/osde2e-common
         - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-hypershift-byovpc
+        - --secret-dir=/secrets/osde2e-hypershift-credentials
         - --target=hypershift-pr-check
         command:
         - ci-operator
@@ -100,8 +100,8 @@ presubmits:
         - mountPath: /secrets/osde2e-credentials
           name: osde2e-credentials
           readOnly: true
-        - mountPath: /secrets/osde2e-hypershift-byovpc
-          name: osde2e-hypershift-byovpc
+        - mountPath: /secrets/osde2e-hypershift-credentials
+          name: osde2e-hypershift-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -120,9 +120,9 @@ presubmits:
       - name: osde2e-credentials
         secret:
           secretName: osde2e-credentials
-      - name: osde2e-hypershift-byovpc
+      - name: osde2e-hypershift-credentials
         secret:
-          secretName: osde2e-hypershift-byovpc
+          secretName: osde2e-hypershift-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -130,79 +130,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )hypershift-pr-check,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build09
-    context: ci/prow/rosa-pr-check
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-osde2e-main-rosa-pr-check
-    optional: true
-    rerun_command: /test rosa-pr-check
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/osde2e-common
-        - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-dev
-        - --target=rosa-pr-check
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /secrets/osde2e-common
-          name: osde2e-common
-          readOnly: true
-        - mountPath: /secrets/osde2e-credentials
-          name: osde2e-credentials
-          readOnly: true
-        - mountPath: /secrets/osde2e-dev
-          name: osde2e-dev
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: osde2e-common
-        secret:
-          secretName: osde2e-common
-      - name: osde2e-credentials
-        secret:
-          secretName: osde2e-credentials
-      - name: osde2e-dev
-        secret:
-          secretName: osde2e-dev
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-pr-check,?($|\s.*)

@@ -3,10 +3,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
-  ocp_4.15_cli:
-    name: "4.15"
+  ocp_4.17_cli-artifacts:
+    name: "4.17"
     namespace: ocp
-    tag: cli
+    tag: cli-artifacts
   ocp_ubi-minimal_8:
     name: ubi-minimal
     namespace: ocp
@@ -35,8 +35,8 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.22-openshift-4.17
-  origin_4.15_operator-registry:
-    name: "4.15"
+  origin_4.17_operator-registry:
+    name: "4.17"
     namespace: origin
     tag: operator-registry
 build_root:
@@ -52,17 +52,17 @@ images:
       as:
       - $GO_BUILDER
   to: serverless-knative-operator
-- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
-  to: serverless-bundle
-- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
+- dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
   inputs:
     ocp_ubi-minimal_9:
       as:
       - registry.access.redhat.com/ubi9/ubi-minimal
-    origin_4.15_operator-registry:
+    origin_4.17_operator-registry:
       as:
-      - registry.ci.openshift.org/origin/4.15:operator-registry
+      - registry.ci.openshift.org/origin/4.17:operator-registry
   to: serverless-index
+- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
@@ -75,9 +75,9 @@ images:
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
-    ocp_4.15_cli:
+    ocp_4.17_cli-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.15:cli
+      - registry.ci.openshift.org/ocp/4.17:cli-artifacts
     openshift_eventing-istio-src_knative-v1.15:
       as:
       - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.15
@@ -142,10 +142,10 @@ tests:
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
       - env: SERVERLESS_INDEX
         name: serverless-index
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
       - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
         name: serverless-openshift-knative-operator
       - env: SERVERLESS_SOURCE_IMAGE
@@ -166,10 +166,10 @@ tests:
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
       - env: SERVERLESS_INDEX
         name: serverless-index
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
       - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
         name: serverless-openshift-knative-operator
       - env: SERVERLESS_SOURCE_IMAGE

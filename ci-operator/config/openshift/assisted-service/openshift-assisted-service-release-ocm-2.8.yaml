@@ -15,6 +15,10 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
   cluster-api-provider-agent:
     name: ocm-2.8
     namespace: edge-infrastructure
@@ -24,9 +28,9 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.13"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   postgresql-12-c8s:
     name: postgresql
     namespace: ci
@@ -201,7 +205,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -236,8 +240,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
-  cron: 00 09 * * 2
+    version: "4.15"
+  cron: 00 06 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -271,7 +275,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -307,8 +311,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
-  cron: 00 08 * * 2
+    version: "4.15"
+  cron: 00 07 * * 2
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -370,6 +374,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters-periodic
   cron: 00 09 * * 2
   steps:
@@ -434,8 +439,7 @@ tests:
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
-- always_run: false
-  as: e2e-ai-operator-ztp-sno-day2-workers
+- as: e2e-ai-operator-ztp-sno-day2-workers
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -462,8 +466,44 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+- as: e2e-ai-operator-ztp-node-labels-periodic
+  cron: 00 12 * * 2
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        NUMBER_OF_DAY2_HOSTS=1
+        MANIFEST_FILES='{"mcp.yaml":"machine_config_pool.yaml", "mc.yaml":"machine_config.yaml"}'
+        NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
+        MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
+        TEST_TO_RUN='node-labels'
+      NUM_EXTRA_WORKERS: "6"
+    workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
+- as: e2e-ai-operator-ztp-node-labels
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        NUMBER_OF_DAY2_HOSTS=1
+        MANIFEST_FILES='{"mcp.yaml":"machine_config_pool.yaml", "mc.yaml":"machine_config.yaml"}'
+        NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
+        MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
+        TEST_TO_RUN='node-labels'
+      NUM_EXTRA_WORKERS: "6"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -478,7 +518,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 00 12 * * 2
+  cron: 00 13 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -532,7 +572,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 13 * * 2
+  cron: 00 14 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -578,6 +618,23 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-hypershift
+- as: e2e-ai-operator-ztp-remove-node-periodic
+  cron: 00 15 * * 2
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        REMOVE_SPOKE_NODE=true
+      DEVSCRIPTS_CONFIG: |
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
+      NUM_EXTRA_WORKERS: "5"
+    workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-ocm-2.8
   org: openshift

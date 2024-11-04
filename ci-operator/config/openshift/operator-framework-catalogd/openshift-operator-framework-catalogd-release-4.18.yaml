@@ -56,12 +56,8 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: vet
-  commands: make vet
-  container:
-    from: src
 - as: verify
-  commands: make verify
+  commands: make -C openshift verify
   container:
     from: src
 - as: verify-deps
@@ -70,10 +66,6 @@ tests:
     make -f openshift/Makefile verify-deps
     # Verify openshift dir
     cd openshift && make verify-deps
-  container:
-    from: src
-- as: verify-manifests
-  commands: make -f openshift/Makefile verify-manifests
   container:
     from: src
 - as: verify-commits
@@ -88,7 +80,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: upstream-e2e
-      commands: make test-e2e
+      commands: make -C openshift test-e2e
       dependencies:
       - env: TEST_CATALOG_IMAGE
         name: test-catalog
