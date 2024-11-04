@@ -28,13 +28,13 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
-  intermediate1:
+  intermediate416:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
       version: "4.16"
-  intermediate2:
+  intermediate417:
     candidate:
       architecture: arm64
       product: ocp
@@ -51,6 +51,12 @@ releases:
       channel: fast
       version: "4.15"
   target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  target-arm64:
     candidate:
       architecture: arm64
       product: ocp
@@ -73,7 +79,21 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - ref: cucushift-upgrade-setedge-3hops
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE416},${RELEASE_IMAGE_ARM64_INTERMEDIATE417},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE417
+        name: release:intermediate417
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetal-upi-ovn-ipv4-f28
@@ -89,7 +109,21 @@ tests:
       masters: "3"
       workers: "2"
     test:
-    - ref: cucushift-upgrade-setedge-3hops
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE416},${RELEASE_IMAGE_ARM64_INTERMEDIATE417},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE417
+        name: release:intermediate417
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
     workflow: baremetal-lab-upi
 zz_generated_metadata:
