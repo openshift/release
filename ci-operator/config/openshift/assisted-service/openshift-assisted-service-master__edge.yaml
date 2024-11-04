@@ -63,8 +63,12 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: tests
-  upi-installer:
+  tests-4.17:
     name: "4.17"
+    namespace: ocp
+    tag: tests
+  upi-installer:
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -146,18 +150,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
-  latest-418:
-    candidate:
-      product: ocp
-      stream: nightly
       version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -444,8 +443,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=4
@@ -458,8 +457,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=5
@@ -983,6 +982,18 @@ tests:
         OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
 - always_run: false
+  as: e2e-metal-assisted-4-17
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.17
+    workflow: assisted-baremetal
+- always_run: false
   as: e2e-metal-assisted-cnv-4-16
   steps:
     cluster_profile: packet-assisted
@@ -1005,7 +1016,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -1067,7 +1078,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -1366,17 +1377,6 @@ tests:
         PLATFORM=external
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-5-control-planes-4-17
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=5
-        NUM_WORKERS=0
-        OPENSHIFT_VERSION=4.17
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- always_run: false
   as: e2e-metal-assisted-5-control-planes-4-18
   steps:
     cluster_profile: packet-assisted
@@ -1385,17 +1385,6 @@ tests:
         NUM_MASTERS=5
         NUM_WORKERS=0
         OPENSHIFT_VERSION=4.18
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-control-planes-4-17
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=4
-        NUM_WORKERS=1
-        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - always_run: false
