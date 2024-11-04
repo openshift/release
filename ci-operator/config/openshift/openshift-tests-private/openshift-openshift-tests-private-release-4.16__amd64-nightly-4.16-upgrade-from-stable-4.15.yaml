@@ -15,6 +15,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,6 +35,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -78,8 +86,6 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
@@ -92,8 +98,6 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
@@ -106,8 +110,6 @@ tests:
       ENABLE_OTA_TEST: OCP-24663
       EXTRACT_MANIFEST_INCLUDED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
@@ -129,8 +131,6 @@ tests:
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CCO_MANUAL_MODE: oidc
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
@@ -144,8 +144,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRACT_MANIFEST_INCLUDED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
@@ -158,8 +156,6 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
@@ -238,6 +234,29 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift-full
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-rosa-hcp-upgrade-cp-stage-f7
+  cron: 21 12 1,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      AVAILABLE_UPGRADE: "yes"
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HCP_NODE_UPGRADE_ENABLED: "false"
+      HOSTED_CP: "true"
+      NODE_UPGRADE_TIMEOUT: "14400"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "3"
+      UPGRADED_TO_VERSION: "4.16"
+      ZONES_COUNT: "3"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    workflow: rosa-aws-sts-hcp
 - as: aws-ipi-shared-vpc-phz-f14
   cron: 59 6 14,28 * *
   steps:
@@ -317,8 +336,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_OTA_TEST: OCP-24663
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
@@ -527,8 +544,6 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
@@ -538,8 +553,6 @@ tests:
     cluster_profile: ibmcloud-qe-2
     env:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
@@ -661,8 +674,6 @@ tests:
     cluster_profile: vsphere-dis-2
     env:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
@@ -737,8 +748,6 @@ tests:
     env:
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice

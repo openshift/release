@@ -484,9 +484,12 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
-
-  GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  if [ -n "${PERSISTENT_TG}" ]
+  then
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
+  else
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  fi
   if [ -z "${GATEWAY_ID}" ]
   then
     echo "Error: GATEWAY_ID is empty"
