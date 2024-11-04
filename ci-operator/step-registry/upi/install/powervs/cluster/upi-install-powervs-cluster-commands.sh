@@ -125,7 +125,6 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-    retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # Download automation code
@@ -195,6 +194,8 @@ function cleanup_prior() {
         sleep 60
         echo "Done Deleting the ${CRN}"
     done
+    echo "Delete network ocp-net on powerVS region"
+    ic pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ic pi subnet delete {} --force || true
 
     # VPC Instances
     # VPC LBs
@@ -327,7 +328,7 @@ function build_upi_cluster() {
                     then
                     OUTPUT="yes"
                     fi
-                done || true
+                done
 
     if [ ! -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate ]
     then
