@@ -10,11 +10,20 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
-# Check if this is the specific PR to run e2e tests
-TARGET_PR_NUMBER="1869" # Set the specific PR number that should run the e2e tests
+# Define branch and PR conditions
+TARGET_BRANCH="main"
+ALLOWED_PR_ON_MAIN="1869"
+RELEASE_BRANCH="release-1.3"
 
-if [ "$GIT_PR_NUMBER" != "$TARGET_PR_NUMBER" ]; then
-    echo "This PR is not targeted to run end-to-end tests. Exiting script."
+# Extract the base branch name
+BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+
+# Check conditions for running e2e tests
+if [ "$BRANCH_NAME" == "$TARGET_BRANCH" ] && [ "$GIT_PR_NUMBER" != "$ALLOWED_PR_ON_MAIN" ]; then
+    echo "Only PR $ALLOWED_PR_ON_MAIN is allowed to run e2e tests on main branch. Exiting script."
+    exit 0
+elif [ "$BRANCH_NAME" != "$RELEASE_BRANCH" ] && [ "$BRANCH_NAME" != "$TARGET_BRANCH" ]; then
+    echo "e2e tests are only allowed on main and release-1.3 branches. Exiting script."
     exit 0
 fi
 
