@@ -3,6 +3,14 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.15_base-rhel9:
     name: 4.15-priv
     namespace: ocp-private
@@ -11,19 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.15_base-rhel9:
@@ -35,9 +34,7 @@ images:
   to: hypershift
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
-    name: 4.15-priv
+  - name: 4.15-priv
     namespace: ocp-private
 releases:
   initial:
@@ -81,7 +78,7 @@ tests:
     cluster_profile: hypershift
     env:
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
+    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -115,6 +112,13 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

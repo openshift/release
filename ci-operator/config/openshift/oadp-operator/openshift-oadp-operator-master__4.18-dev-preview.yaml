@@ -1,0 +1,93 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.22.2
+images:
+- dockerfile_path: Dockerfile
+  to: oadp-operator
+- dockerfile_path: build/ci-Dockerfile
+  to: test-oadp-operator
+operator:
+  bundles:
+  - dockerfile_path: build/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/konveyor/oadp-operator:latest
+    with: oadp-operator
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-dev-preview
+        upper: 4.19.0-0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  optional: true
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
+      FEATURE_SET: CustomNoUpgrade
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: e2e-test-aws-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
+      FEATURE_SET: CustomNoUpgrade
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: oadp-operator
+  variant: 4.18-dev-preview

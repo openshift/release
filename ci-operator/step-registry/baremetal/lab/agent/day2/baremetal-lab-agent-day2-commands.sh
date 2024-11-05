@@ -87,10 +87,15 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
-oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
+
+echo "Extract the latest oc client..."
+oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+   --command=oc --to=/tmp --insecure=true
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+  oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
 fi
 
 DAY2_INSTALL_DIR="${DAY2_INSTALL_DIR:-/tmp/installer_day2}"
@@ -99,16 +104,16 @@ cp "${SHARED_DIR}/nodes-config.yaml" "${DAY2_INSTALL_DIR}/"
 cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 echo "Create node.iso for day2 worker nodes..."
-/cli/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+/tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
-gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
+arch=${ADDITIONAL_WORKER_ARCHITECTURE}
 case "${BOOT_MODE}" in
 "iso")
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
@@ -137,11 +142,11 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}.img"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
-   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
+   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"
@@ -164,7 +169,7 @@ touch /tmp/output.txt
 
 echo "Monitoring day2 workers and pending CSRs..."
 
-/cli/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
+/tmp/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
   tee /tmp/output.txt | while IFS= read -r line; do
   echo "$line"
   if [[ "$line" = *"with signerName kubernetes.io/kube-apiserver-client-kubelet and username system:serviceaccount:openshift-machine-config-operator:node-bootstrapper is Pending and awaiting approval"* ]] || [[ "$line" = *"with signerName kubernetes.io/kubelet-serving and username "*" is Pending and awaiting approval"* ]]; then
@@ -184,4 +189,4 @@ fi
 
 # Add operators status checking until monitoring enhanced to do this
 echo "Check all cluster operators get stable and ready"
-oc adm wait-for-stable-cluster --minimum-stable-period=3m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

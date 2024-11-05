@@ -90,6 +90,14 @@ run-on-first-master "
   oc get nodes
 "
 
+# Pod restart workarounds
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
+  # Restart Multus before proceeding
+  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+"
+
 # Wait for operators to stabilize
 run-on-first-master "
   export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig

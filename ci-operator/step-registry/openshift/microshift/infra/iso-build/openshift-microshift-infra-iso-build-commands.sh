@@ -21,7 +21,7 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
-if [[ "${JOB_NAME}" =~ .*metal-cache.* ]] ; then
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
 else
     ./test/bin/ci_phase_iso_build.sh

@@ -16,9 +16,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -51,11 +55,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -276,7 +275,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f28-longduration-part2-3
   cron: 31 17 3 * *
@@ -289,9 +288,24 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      TEST_SCENARIOS: MCO|Cluster_Infrastructure
+      TEST_SCENARIOS: Cluster_Infrastructure
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-longduration-mco-all
+  cron: 4 14 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: MCO
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-ovn-ipsec-to-multiarch-f28
   cron: 29 4 1 * *
@@ -373,7 +387,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: azure-ipi-disc-f28-longduration-cloud
   cron: 15 13 8 * *
@@ -389,7 +403,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected
 - as: azure-ipi-disc-oidc-f28-destructive
   cron: 3 8 30 * *
@@ -694,7 +708,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: gcp-ipi-to-multiarch-f28
   cron: 35 6 3 * *

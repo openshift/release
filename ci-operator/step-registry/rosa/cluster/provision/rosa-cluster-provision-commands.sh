@@ -198,7 +198,13 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-TAGS="prowci:${CLUSTER_NAME}"
+# add USER_TAGS to help with cloud cos
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
+TAG_Pull_Number=${PULL_NUMBER:-}
+TAG_Job_Type=$JOB_TYPE
+TAG_CI="prow"
+TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
@@ -263,12 +269,8 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  if [[ "$HOSTED_CP" == "true" ]] && [[ "$OCM_LOGIN_ENV" == "production" ]]; then
-     echo "The feature WORKER_DISK_SIZE is not ready for HCP on Prod"
-  else
-      COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-      record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
-  fi
+    COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+    record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
 fi
 
 AUDIT_LOG_SWITCH=""

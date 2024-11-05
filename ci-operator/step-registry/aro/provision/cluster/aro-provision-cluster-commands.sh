@@ -9,7 +9,7 @@ RESOURCEGROUP=${RESOURCEGROUP:=$(cat "${SHARED_DIR}/resourcegroup")}
 VNET=${VNET:=$(cat "$SHARED_DIR/vnet")}
 LOCATION=${LOCATION:=${LEASED_RESOURCE}}
 PULL_SECRET_FILE=${PULL_SECRET_FILE:="${CLUSTER_PROFILE_DIR}/pull-secret"}
-DISK_ENCRYPTION_SET_ENABLE=${DISK_ENCRYPTION_SET_ENABLE:=no}
+#DISK_ENCRYPTION_SET_ENABLE=${DISK_ENCRYPTION_SET_ENABLE:=no}
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
@@ -22,6 +22,7 @@ ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:=""}
 ARO_API_SERVER_VISIBILITY=${ARO_API_SERVER_VISIBILITY:=""}
 ARO_OUTBOUND_TYPE=${ARO_OUTBOUND_TYPE:=""}
 ARO_FIPS=${ARO_FIPS:="false"}
+ARO_BYO_NSG=${ARO_BYO_NSG:="false"}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -52,9 +53,9 @@ if [ -f "$PULL_SECRET_FILE"  ]; then
 fi
 
 # if azure_des file exists assume we want to use des for our aro cluster
-if [ -f "${SHARED_DIR}/azure_des" ]; then
-    des=$(cat ${SHARED_DIR}/azure_des)
-    des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCEGROUP} --query "[id]" -o tsv)
+if [ -f "${SHARED_DIR}/azure_des_id" ]; then
+    des_id=$(cat ${SHARED_DIR}/azure_des_id)
+    #des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCEGROUP} --query "[id]" -o tsv)
     CREATE_CMD="${CREATE_CMD} --disk-encryption-set ${des_id} --master-encryption-at-host --worker-encryption-at-host "
 fi
 
@@ -101,6 +102,11 @@ if [[ ${ARO_FIPS} == "true" ]]; then
   CREATE_CMD="${CREATE_CMD} --fips ${ARO_FIPS}"
 fi
 
+# BYO NSG support
+if [[ ${ARO_BYO_NSG} == "true" ]]; then
+  CREATE_CMD="${CREATE_CMD} --enable-preconfigured-nsg"
+fi
+
 echo "Running ARO create command:"
 echo "${CREATE_CMD}"
 eval "${CREATE_CMD}" > ${SHARED_DIR}/clusterinfo
@@ -123,9 +129,9 @@ fi
 
 echo $KUBECRED > ${SHARED_DIR}/clustercreds
 
-oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS"
+oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS" --insecure-skip-tls-verify=true
 
 echo "Generating kubeconfig in ${SHARED_DIR}/kubeconfig"
 
-oc config view --raw > ${SHARED_DIR}/kubeconfig
+oc config view --raw > ${SHARED_DIR}/kubeconfig --insecure-skip-tls-verify=true
 

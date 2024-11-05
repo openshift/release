@@ -193,7 +193,7 @@ if [ $_hypershiftReady -eq 0 ]; then
 fi
 echo "hypershift is running! Waiting for the pods to become ready"
 
-oc wait --timeout=5m --for=condition=Ready -n hypershift pod -l name=operator
+oc wait deployment operator -n hypershift --for condition=Available=True --timeout=5m
 
 echo "Configuring the hosting service cluster"
 oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
@@ -248,4 +248,4 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.5)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.4)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi

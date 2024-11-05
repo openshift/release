@@ -16,9 +16,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.18"
     namespace: ocp
@@ -51,11 +55,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -83,7 +82,7 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-disc-priv-sts-basecap-none-f28-destructive
+- as: aws-ipi-disc-priv-sts-oc-mirror-basecap-none-f28-destructive
   cron: 2 6 25 * *
   steps:
     cluster_profile: aws-qe
@@ -98,6 +97,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
@@ -278,7 +278,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-part2-3
   cron: 55 1 1,10,22 * *
@@ -291,9 +291,9 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      TEST_SCENARIOS: MCO|Cluster_Infrastructure
+      TEST_SCENARIOS: Cluster_Infrastructure
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-longduration-reliability-test-f14
   cron: 2 13 10,26 * *
@@ -377,7 +377,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
-- as: azure-ipi-disc-oidc-f28-destructive
+- as: azure-ipi-disc-oidc-oc-mirror-f28-destructive
   cron: 56 11 7 * *
   steps:
     cluster_profile: azure-qe
@@ -388,6 +388,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -539,6 +540,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
@@ -557,6 +559,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
@@ -567,6 +570,27 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-compact-agent-ipv4-static-fips-day2-f14
+  cluster: build05
+  cron: 13 17 2,18 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "2"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-day2
 - as: baremetal-upi-ovn-ipv4-f14
   cluster: build05
   cron: 33 14 3,17 * *
@@ -624,7 +648,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-f28-destructive
+- as: gcp-ipi-disc-priv-oidc-oc-mirror-f28-destructive
   cron: 13 16 17 * *
   steps:
     cluster_profile: gcp-qe
@@ -634,6 +658,7 @@ tests:
       COMPUTE_NODE_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:

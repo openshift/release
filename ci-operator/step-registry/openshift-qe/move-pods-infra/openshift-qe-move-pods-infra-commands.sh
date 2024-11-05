@@ -2,7 +2,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x 
 function set_storage_class() {
 
     storage_class_found=false
@@ -236,7 +236,6 @@ metadata:
 data:
   config.yaml: |+
     alertmanagerMain:
-      baseImage: openshift/prometheus-alertmanager
       nodeSelector: 
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -247,7 +246,6 @@ data:
         value: reserved
         effect: NoExecute
     prometheusK8s:
-      baseImage: openshift/prometheus
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -258,9 +256,6 @@ data:
         value: reserved
         effect: NoExecute
     prometheusOperator:
-      baseImage: quay.io/coreos/prometheus-operator
-      prometheusConfigReloaderBaseImage: quay.io/coreos/prometheus-config-reloader
-      configReloaderBaseImage: quay.io/coreos/configmap-reload
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -270,14 +265,9 @@ data:
       - key: node-role.kubernetes.io/infra
         value: reserved
         effect: NoExecute
-    nodeExporter:
-      baseImage: openshift/prometheus-node-exporter
-    kubeRbacProxy:
-      baseImage: quay.io/coreos/kube-rbac-proxy
-    grafana:
-      baseImage: grafana/grafana
-    auth:
-      baseImage: openshift/oauth-proxy
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
@@ -289,7 +279,6 @@ data:
         value: reserved
         effect: NoExecute
     kubeStateMetrics:
-      baseImage: quay.io/coreos/kube-state-metrics
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -343,7 +332,6 @@ metadata:
 data:
   config.yaml: |+
     alertmanagerMain:
-      baseImage: openshift/prometheus-alertmanager
       nodeSelector: 
         node-role.kubernetes.io/infra: ""
       volumeClaimTemplate:
@@ -361,7 +349,6 @@ data:
         effect: NoExecute
     prometheusK8s:
       retention: ${OPENSHIFT_PROMETHEUS_RETENTION_PERIOD}
-      baseImage: openshift/prometheus
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       volumeClaimTemplate:
@@ -378,9 +365,6 @@ data:
         value: reserved
         effect: NoExecute
     prometheusOperator:
-      baseImage: quay.io/coreos/prometheus-operator
-      prometheusConfigReloaderBaseImage: quay.io/coreos/prometheus-config-reloader
-      configReloaderBaseImage: quay.io/coreos/configmap-reload
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -390,14 +374,9 @@ data:
       - key: node-role.kubernetes.io/infra
         value: reserved
         effect: NoExecute
-    nodeExporter:
-      baseImage: openshift/prometheus-node-exporter
-    kubeRbacProxy:
-      baseImage: quay.io/coreos/kube-rbac-proxy
-    grafana:
-      baseImage: grafana/grafana
-    auth:
-      baseImage: openshift/oauth-proxy
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
@@ -409,7 +388,6 @@ data:
         value: reserved
         effect: NoExecute
     kubeStateMetrics:
-      baseImage: quay.io/coreos/kube-state-metrics
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -520,7 +498,7 @@ retry_times=1
 while [[ $(oc get pods --no-headers -n openshift-monitoring | grep -Pv "(Completed|Running)" | wc -l) != "0" ]];
 do
     echo -n "." && sleep 5; 
-    if [[ $retry_times -le $max_retries ]];then
+    if [[ $retry_times -ge $max_retries ]];then
        echo "Some pods fail to startup in limit times, please check ..."
        exit 1
     fi

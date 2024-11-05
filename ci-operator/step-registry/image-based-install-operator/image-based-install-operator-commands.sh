@@ -107,8 +107,8 @@ sleep 60
 oc wait -n ibi-cluster --for=jsonpath='{.status.conditions[?(@.type=="Completed")].reason}'=ClusterInstallationSucceeded imageclusterinstalls.extensions.hive.openshift.io/ibi-cluster --timeout=60m
 
 echo "### Check connectivity to ibi cluster"
-mkdir /tmp/ibi-cluster
-oc extract secret/ibi-cluster-admin-kubeconfig -n ibi-cluster --to /tmp/ibi-cluster/
-oc --kubeconfig /tmp/ibi-cluster/kubeconfig get clusterversion,clusteroperators
+mkdir /root/ibi-cluster
+oc extract secret/ibi-cluster-admin-kubeconfig -n ibi-cluster --to /root/ibi-cluster/
+oc --kubeconfig /root/ibi-cluster/kubeconfig get clusterversion,clusteroperators
 
 EOF

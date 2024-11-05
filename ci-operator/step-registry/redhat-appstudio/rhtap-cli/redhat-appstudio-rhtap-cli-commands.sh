@@ -51,7 +51,7 @@ configure_rhtap(){
   make build
 
   # Path to your values.yaml.tpl file
-  tpl_file="charts/values.yaml.tpl"
+  tpl_file="installer/charts/values.yaml.tpl"
 
   # Turn ci to true
   sed -i 's/ci: false/ci: true/' $tpl_file
@@ -69,7 +69,7 @@ $(echo "${GITHUB__APP__PRIVATE_KEY}" | sed 's/^/      /')
 EOF
 
   # Edit config.yaml
-  config_file="config.yaml"
+  config_file="installer/config.yaml"
   sed -i '/redHatAdvancedClusterSecurity:/,/namespace: rhtap-acs/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
   sed -i '/redHatQuay:/,/namespace: rhtap-quay/ s/^\(\s*enabled:.*\)$/#\1/' $config_file
   sed -i 's|/release/|/main/|' $config_file
@@ -79,7 +79,7 @@ EOF
 configure_rhtap_for_prerelease_versions(){
   # Prepare for pre-release install capabilities
   # Define the file path
-  subscription_values_file="charts/rhtap-subscriptions/values.yaml"
+  subscription_values_file="installer/charts/rhtap-subscriptions/values.yaml"
 
   # Function to update the values
   update_values() {
@@ -115,7 +115,7 @@ install_rhtap(){
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" acs --endpoint="${ACS__CENTRAL_ENDPOINT}" --token="${ACS__API_TOKEN}"
   ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" gitlab --token "${GITLAB__TOKEN}"
   
-  ./bin/rhtap-cli deploy --config ./config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
+  ./bin/rhtap-cli deploy --config ./installer/config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
 
 
   WEBHOOK_URL="https://$(oc get routes -n openshift-pipelines pipelines-as-code-controller -ojsonpath='{.spec.host}')"

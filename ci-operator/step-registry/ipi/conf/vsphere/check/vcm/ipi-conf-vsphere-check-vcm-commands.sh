@@ -368,7 +368,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
   PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
 
-  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then    
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
     log "storing primary lease as LEASE_single"
     cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
@@ -417,7 +417,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
     platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
-  fi  
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
@@ -450,6 +450,12 @@ jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
 source /tmp/envvars
+
+
+if [[ -z "${GOVC_URL}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF

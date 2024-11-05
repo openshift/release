@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile.hpu.ubi
+  to: vllm-build-main-gaudi-1.18.0
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  vllm-build-main-gaudi-1.18.0:
+    limits:
+      cpu: "16"
+      memory: 24Gi
+    requests:
+      cpu: "16"
+      memory: 24Gi
+tests:
+- as: gaudi-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-gaudi-1.18.0
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: gaudi-1.18.0-pr
+    workflow: opendatahub-io-ci-image-mirror
+- as: gaudi-fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-gaudi-1.18.0
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: gaudi-1.18.0-fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: gaudi-1.18.0
+  org: opendatahub-io
+  repo: vllm

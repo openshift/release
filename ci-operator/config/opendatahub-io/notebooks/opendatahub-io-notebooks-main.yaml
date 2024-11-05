@@ -4,53 +4,6 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.14
 images:
-- context_dir: base/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  to: base-ubi8-python-3.8
-- context_dir: jupyter/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: jupyter-minimal-ubi8-python-3.8
-- context_dir: jupyter/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-minimal-ubi8-python-3.8
-  to: jupyter-datascience-ubi8-python-3.8
-- context_dir: cuda/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: cuda-ubi8-python-3.8
-- context_dir: jupyter/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-ubi8-python-3.8
-  to: cuda-jupyter-minimal-ubi8-python-3.8
-- context_dir: jupyter/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-jupyter-minimal-ubi8-python-3.8
-  to: cuda-jupyter-datascience-ubi8-python-3.8
-- context_dir: habana/1.10.0/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.10.0-ubi8-python-3.8
-- context_dir: habana/1.13.0/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.13.0-ubi8-python-3.8
-- context_dir: runtimes/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-minimal-ubi8-python-3.8
-- context_dir: runtimes/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-datascience-ubi8-python-3.8
-- context_dir: runtimes/pytorch/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-pytorch-ubi8-python-3.8
-- context_dir: runtimes/tensorflow/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-ubi8-python-3.8
-  to: runtime-cuda-tensorflow-ubi8-python-3.8
 - context_dir: base/ubi9-python-3.9
   dockerfile_path: Dockerfile
   to: base-ubi9-python-3.9
@@ -169,13 +122,6 @@ images:
   dockerfile_path: Dockerfile
   from: rocm-jupyter-datascience-ubi9-python-3.9
   to: rocm-jupyter-pytorch-ubi9-python-3.9
-- context_dir: base/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  to: base-anaconda-python-3.8
-- context_dir: jupyter/datascience/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-anaconda-python-3.8
-  to: jupyter-datascience-anaconda-python-3.8
 - context_dir: runtimes/rocm-pytorch/ubi9-python-3.9
   dockerfile_path: Dockerfile
   from: rocm-ubi9-python-3.9
@@ -326,229 +272,6 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: notebook-base-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: base-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: base-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-base-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: base-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: base-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-datascience-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-datascience-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(cuda\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (cuda\/ubi8-python-3.8\/*)|(base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-ds-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-ds-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (cuda\/ubi8-python-3.8\/*)|(base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.10.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-10-0-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.10.0\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.10.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.13.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.13.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-13-0-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.13.0\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.13.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.13.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-minimal-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(runtimes\/minimal\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-minimal-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-datascience-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-datascience-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(runtimes\/datascience\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-pytorch-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-pytorch-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-pytorch-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-pytorch-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-cuda-tensorflow-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-tf-ubi9-python-3-9-pr-image-mirror
   run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/tensorflow\/ubi9-python-3.9\/*)
   steps:
@@ -556,6 +279,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-tf-ubi9-python-3-9-image-mirror
@@ -565,6 +289,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-pyt-ubi9-python-3-9-pr-image-mirror
@@ -574,6 +299,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-pyt-ubi9-python-3-9-image-mirror
@@ -583,6 +309,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-ml-ubi9-python-3-9-pr-image-mirror
@@ -592,6 +319,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-ml-ubi9-python-3-9-image-mirror
@@ -601,16 +329,8 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.9
-    workflow: opendatahub-io-ci-image-mirror
-- as: runtime-cuda-tensorflow-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(cuda\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-cuda-tensorflow-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-base-ubi9-python-3-9-image-mirror
   postsubmit: true
@@ -729,6 +449,7 @@ tests:
       SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-minimal-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-cuda-jupyter-ds-ubi9-python-3-9-image-mirror
@@ -858,6 +579,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-minimal-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-minimal-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-minimal-ubi9-python-3-9-pr-image-mirror
@@ -867,6 +589,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-minimal-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-minimal-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-datascience-ubi9-python-3-9-image-mirror
@@ -876,6 +599,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-datascience-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-datascience-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-datascience-ubi9-python-3-9-pr-image-mirror
@@ -885,6 +609,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-datascience-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-datascience-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-pytorch-ubi9-python-3-9-image-mirror
@@ -894,6 +619,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-pytorch-ubi9-python-3-9-pr-image-mirror
@@ -903,6 +629,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
@@ -912,6 +639,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi9-python-3-9-pr-image-mirror
@@ -921,6 +649,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-base-c9s-python-3-9-image-mirror
@@ -1110,6 +839,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-pytorch-ubi9-python-3-9-pr-image-mirror
@@ -1119,6 +849,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
@@ -1128,6 +859,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-tensorflow-ubi9-python-3-9-pr-image-mirror
@@ -1137,17 +869,8 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
-      RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
-    workflow: opendatahub-io-ci-image-mirror
-- as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
-  run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-anaconda-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
+      RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-tf-ubi9-python-3-11-pr-image-mirror
   run_if_changed: (base\/ubi9-python-3.11\/*)|(intel\/base\/gpu\/ubi9-python-3.11\/*)|(intel\/runtimes\/tensorflow\/ubi9-python-3.11\/*)
@@ -1156,6 +879,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-tf-ubi9-python-3-11-image-mirror
@@ -1165,6 +889,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-pyt-ubi9-python-3-11-pr-image-mirror
@@ -1174,6 +899,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-pyt-ubi9-python-3-11-image-mirror
@@ -1183,6 +909,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-ml-ubi9-python-3-11-pr-image-mirror
@@ -1192,6 +919,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-intel-ml-ubi9-python-3-11-image-mirror
@@ -1201,6 +929,7 @@ tests:
       SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-base-ubi9-python-3-11-image-mirror
@@ -1320,6 +1049,7 @@ tests:
       SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-minimal-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-cuda-jupyter-ds-ubi9-python-3-11-image-mirror
@@ -1449,6 +1179,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-minimal-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-minimal-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-minimal-ubi9-python-3-11-pr-image-mirror
@@ -1458,6 +1189,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-minimal-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-minimal-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-datascience-ubi9-python-3-11-image-mirror
@@ -1467,6 +1199,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-datascience-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-datascience-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-datascience-ubi9-python-3-11-pr-image-mirror
@@ -1476,6 +1209,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-datascience-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-datascience-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-pytorch-ubi9-python-3-11-image-mirror
@@ -1485,6 +1219,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-pytorch-ubi9-python-3-11-pr-image-mirror
@@ -1494,6 +1229,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
@@ -1503,6 +1239,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi9-python-3-11-pr-image-mirror
@@ -1512,6 +1249,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-base-c9s-python-3-11-image-mirror
@@ -1701,6 +1439,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-pytorch-ubi9-python-3-11-pr-image-mirror
@@ -1710,6 +1449,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
@@ -1719,6 +1459,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-rocm-tensorflow-ubi9-python-3-11-pr-image-mirror
@@ -1728,105 +1469,9 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.11
     env:
       IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
-- as: notebooks-ubi8-e2e-tests
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/pytorch\/ubi8-python-3.8\/*)|(jupyter\/tensorflow\/ubi8-python-3.8\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: jupyter-minimal-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-minimal-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
-        make deploy8-jupyter-minimal-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-minimal-ubi8-python-3.8
-        make undeploy8-jupyter-minimal-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_MINIMAL_IMAGE
-        name: jupyter-minimal-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: jupyter-datascience-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-datascience-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
-        make deploy8-jupyter-datascience-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-datascience-ubi8-python-3.8
-        make undeploy8-jupyter-datascience-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_DATA_SCIENCE_IMAGE
-        name: jupyter-datascience-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: cuda-jupyter-minimal-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project cuda-jupyter-minimal-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
-        make deploy8-cuda-jupyter-minimal-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-cuda-jupyter-minimal-ubi8-python-3.8
-        make undeploy8-cuda-jupyter-minimal-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_MINIMAL_IMAGE
-        name: cuda-jupyter-minimal-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: cuda-jupyter-datascience-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project cuda-jupyter-datascience-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
-        make deploy8-cuda-jupyter-datascience-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-cuda-jupyter-datascience-ubi8-python-3.8
-        make undeploy8-cuda-jupyter-datascience-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_DATA_SCIENCE_IMAGE
-        name: cuda-jupyter-datascience-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: anaconda-ubi8-e2e-tests
-  run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: jupyter-datascience-anaconda-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-datascience-anaconda-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_ANACONDA_IMAGE}"
-        make deploy8-jupyter-datascience-anaconda-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-datascience-anaconda-python-3.8
-        make undeploy8-jupyter-datascience-anaconda-python-3.8
-      dependencies:
-      - env: JUPYTER_ANACONDA_IMAGE
-        name: jupyter-datascience-anaconda-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
 - as: notebooks-ubi9-e2e-tests
   run_if_changed: (base\/ubi9-python-3.(9|11)\/*)|(jupyter\/minimal\/ubi9-python-3.(9|11)\/*)|(jupyter\/datascience\/ubi9-python-3.(9|11)\/*)|(jupyter\/pytorch\/ubi9-python-3.(9|11)\/*)|(jupyter\/tensorflow\/ubi9-python-3.(9|11)\/*)|(jupyter\/trustyai\/ubi9-python-3.(9|11)\/*)
   steps:
@@ -2151,63 +1796,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-- as: runtimes-ubi8-e2e-tests
-  run_if_changed: (runtimes\/datascience\/ubi8-python-3.8\/*)|(runtimes\/pytorch\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: runtime-datascience-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-datascience-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_DATASCIENCE_IMAGE}"
-        make deploy8-runtimes-datascience-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-datascience-ubi8-python-3.8
-        make undeploy8-runtimes-datascience-ubi8-python-3.8
-      dependencies:
-      - env: RUNTIME_DATASCIENCE_IMAGE
-        name: runtime-datascience-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: runtime-pytorch-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-pytorch-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_PYTORCH_IMAGE}"
-        make deploy8-runtimes-pytorch-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-pytorch-ubi8-python-3.8
-        make undeploy8-runtimes-pytorch-ubi8-python-3.8
-      dependencies:
-      - env: RUNTIME_PYTORCH_IMAGE
-        name: runtime-pytorch-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: runtime-cuda-tensorflow-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-cuda-tensorflow-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_TENSORFLOW_IMAGE}"
-        make deploy8-runtimes-tensorflow-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-tensorflow-ubi8-python-3.8
-        make undeploy8-runtimes-tensorflow-ubi8-python-3.8
-      dependencies:
-      - env: RUNTIME_TENSORFLOW_IMAGE
-        name: runtime-cuda-tensorflow-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
 - as: runtimes-ubi9-e2e-tests
   run_if_changed: (base\/ubi9-python-3.(9|11)\/*)|(runtimes\/datascience\/ubi9-python-3.(9|11)\/*)|(runtimes\/pytorch\/ubi9-python-3.(9|11)\/*)|(runtimes\/tensorflow\/ubi9-python-3.(9|11)\/*)
   steps:
@@ -2310,46 +1898,6 @@ tests:
       dependencies:
       - env: RUNTIME_TENSORFLOW_IMAGE
         name: runtime-cuda-tensorflow-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: habana-notebooks-e2e-tests
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: habana-jupyter-1.10.0-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project habana-jupyter-1-10-0-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_10_0_IMAGE}"
-        make deploy8-habana-1.10.0-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-habana-1.10.0-ubi8-python-3.8
-        make undeploy8-habana-1.10.0-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_HABANA_1_10_0_IMAGE
-        name: habana-jupyter-1.10.0-ubi8-python-3.8
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: habana-jupyter-1.13.0-ubi8-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project habana-jupyter-1-13-0-ubi8-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_13_0_IMAGE}"
-        make deploy8-habana-1.13.0-ubi8-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-habana-1.13.0-ubi8-python-3.8
-        make undeploy8-habana-1.13.0-ubi8-python-3.8
-      dependencies:
-      - env: JUPYTER_HABANA_1_13_0_IMAGE
-        name: habana-jupyter-1.13.0-ubi8-python-3.8
       from: src
       resources:
         requests:

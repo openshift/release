@@ -38,28 +38,45 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
+function collect_sosreport {
+  ADDRESS=$1
+  echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
+  ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
+  echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
+  ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
+  ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
+  echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
+  scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
+}
+
+function collect_sosreports {
+  NODES=$(oc get nodes -o=jsonpath='{.items[*].metadata.name}')
+  for NODE in $NODES; do
+    ADDRESS=$(oc get nodes -o=jsonpath='{.status.addresses[0].address}' ${NODE})
+    collect_sosreport $ADDRESS
+  done
+}
+
 function collect_sosreport_from_unprovisioned_machines {
   set +e
   echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
 
   MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -o=jsonpath='{.items[*].metadata.name}')
+
+  echo "$(date -u --rfc-3339=seconds) - found machines ${MACHINES}"
+
   for MACHINE in ${MACHINES}; do
     echo "$(date -u --rfc-3339=seconds) - checking if machine $MACHINE lacks a nodeRef"
     NODEREF=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.nodeRef}')
+      
     if [ -z "$NODEREF" ]; then
-      echo "$(date -u --rfc-3339=seconds) - no nodeRef found, attempting to collect sos report"
+      echo "$(date -u --rfc-3339=seconds) - attempting to collect sos report"
       ADDRESS=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.addresses[0].address}')
       if [ -z "$ADDRESS" ]; then
         echo "$(date -u --rfc-3339=seconds) - could not derive address from machine. unable to collect sos report"
         continue
       fi
-      echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
-      echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
-      ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
-      echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
-      scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
+      collect_sosreport $ADDRESS
     fi
   done
   set -e
@@ -574,4 +591,10 @@ EOF
 }
 
 collect_diagnostic_data
-collect_sosreport_from_unprovisioned_machines
+
+if [ -n "${FORCE_SOS_REPORT:-}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - FORCE_SOS_REPORT enabled. will collect sos reports for each node"
+  collect_sosreports
+else
+  collect_sosreport_from_unprovisioned_machines
+fi
