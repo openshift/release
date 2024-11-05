@@ -200,7 +200,7 @@ log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 # add USER_TAGS to help with cloud cos
 TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
-TAG_Pull_Number=$PULL_NUMBER
+TAG_Pull_Number=${PULL_NUMBER:-}
 TAG_Job_Type=$JOB_TYPE
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
