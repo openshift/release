@@ -76,7 +76,7 @@ function check_vpc() {
         "${IBMCLOUD_CLI}" is subnets
         return 1
     else
-        echo "created $expSubnetNum subnets successfully."
+        echo "created extra $expSubnetNum subnets successfully."
     fi
 }
 
