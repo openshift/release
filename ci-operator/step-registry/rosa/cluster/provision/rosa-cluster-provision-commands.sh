@@ -198,9 +198,13 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-# add USER_TAGS to help with cloud cos
+# add USER_TAGS to help with cloud cost
 TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
-TAG_Pull_Number=${PULL_NUMBER:-}
+if [[ -z "$TAG_Author" ]]; then
+  TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
+fi
+TAG_Author=${TAG_Author:-"periodic"}
+TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
 TAG_Job_Type=$JOB_TYPE
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
@@ -209,6 +213,7 @@ if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
 
+# Record the configurations
 cat > ${cluster_config_file} << EOF
 {
   "name": "${CLUSTER_NAME}",
