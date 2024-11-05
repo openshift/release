@@ -17,6 +17,13 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+
+REGION="${LEASED_RESOURCE}"
+INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
+CONFIG=${SHARED_DIR}/install-config.yaml
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+
 function is_empty()
 {
     local v="$1"
@@ -36,15 +43,13 @@ function has_shared_tags() {
 }
 
 
-REGION="${LEASED_RESOURCE}"
-INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
-CONFIG=${SHARED_DIR}/install-config.yaml
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-
 ret=0
 output=$(mktemp)
 
-# the correct iam profile was used
+echo "-------------------------------------------------------------"
+echo "Profiles used by cluster"
+echo "-------------------------------------------------------------"
+
 control_plane_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-master*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $2}')
 compute_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-worker*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $2}')
 
@@ -54,33 +59,29 @@ compute_profile_output=$(mktemp)
 aws --region $REGION iam get-instance-profile --instance-profile-name ${control_plane_profile} --output text >$control_plane_profile_output
 aws --region $REGION iam get-instance-profile --instance-profile-name ${compute_profile} --output text >$compute_profile_output
 
-
-echo "-------------------------------------------------------------"
-echo "Profiles used by cluster"
-echo "-------------------------------------------------------------"
 echo "Control plane: profile: ${control_plane_profile}"
 cat ${control_plane_profile_output}
 echo "Compute: profile: ${compute_profile}"
 cat ${compute_profile_output}
 
 
+echo "-------------------------------------------------------------"
+echo "Profiles configured in install-config.yaml"
+echo "-------------------------------------------------------------"
 
 ic_platform_profile=$(yq-go r "${CONFIG}" 'platform.aws.defaultMachinePlatform.iamProfile')
 ic_control_plane_profile=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.iamProfile')
 ic_compute_profile=$(yq-go r "${CONFIG}" 'compute[0].platform.aws.iamProfile')
 
-echo "-------------------------------------------------------------"
-echo "Profiles configured in install-config.yaml"
-echo "-------------------------------------------------------------"
 echo "Install config: platform: ${ic_platform_profile}, control plane: ${ic_control_plane_profile}, compute: ${ic_compute_profile}"
-
-expected_control_plane_profile=""
-expected_compute_profile=""
 
 
 echo "-------------------------------------------------------------"
 echo "Expected profiles"
 echo "-------------------------------------------------------------"
+
+expected_control_plane_profile=""
+expected_compute_profile=""
 
 if ! is_empty "$ic_platform_profile"; then
   echo "platform.aws.defaultMachinePlatform.iamProfile was found: ${ic_platform_profile}"
