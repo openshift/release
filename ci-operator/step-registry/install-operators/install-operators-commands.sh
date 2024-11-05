@@ -153,7 +153,7 @@ EOF
     CSV=
     for i in $(seq "${RETRIES}"); do
         if [[ -z "${CSV}" ]]; then
-            CSV=$(oc get subscription -n "${operator_install_namespace}" "${operator_name}" -o jsonpath='{.status.installedCSV}')
+            CSV=$(oc get subscription -n "${operator_install_namespace}" "${operator_name}-subscription" -o jsonpath='{.status.installedCSV}')
         fi
 
         if [[ -z "${CSV}" ]]; then
