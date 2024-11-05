@@ -10,6 +10,23 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
+# Define branch and PR conditions
+TARGET_BRANCH="main"
+ALLOWED_PR_ON_MAIN="1869"
+RELEASE_BRANCH="release-1.3"
+
+# Extract the base branch name
+BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+
+# Check conditions for running e2e tests
+if [ "$BRANCH_NAME" == "$TARGET_BRANCH" ] && [ "$GIT_PR_NUMBER" != "$ALLOWED_PR_ON_MAIN" ]; then
+    echo "Only PR $ALLOWED_PR_ON_MAIN is allowed to run e2e tests on main branch. Exiting script."
+    exit 0
+elif [ "$BRANCH_NAME" != "$RELEASE_BRANCH" ] && [ "$BRANCH_NAME" != "$TARGET_BRANCH" ]; then
+    echo "e2e tests are only allowed on main and release-1.3 branches. Exiting script."
+    exit 0
+fi
+
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
@@ -18,7 +35,7 @@ git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
+    # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
     git merge origin/main --no-edit
@@ -33,7 +50,7 @@ fi
 PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
-# Directories to check if changes are exclusively within the specified directories
+# Check if changes are exclusively within the specified directories
 DIRECTORIES_TO_CHECK=".ibm|e2e-tests"
 ONLY_IN_DIRS=true
 
