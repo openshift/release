@@ -136,8 +136,8 @@ EOF
     apiVersion: operators.coreos.com/v1alpha1
     kind: Subscription
     metadata:
-        name: "${operator_name}"
-        namespace: "${operator_install_namespace}-subscription"
+        name: "${operator_name}-subscription"
+        namespace: "${operator_install_namespace}"
     spec:
         channel: "${operator_channel}"
         installPlanApproval: Automatic
