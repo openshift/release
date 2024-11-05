@@ -70,7 +70,7 @@ function fetch_last_nigthly_tag() {
   echo "acs_tag_suffix=${acs_tag_suffix}"
 
   # Quay API info: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
-  ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-${acs_tag_suffix}" | jq '.tags[1].name' --raw-output)
+  ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
   if [[ "${ACS_VERSION_TAG}" == "" || "${ACS_VERSION_TAG}" == "null" ]]; then
     echo "Error: Unable to fetch the last nightly tag"
     exit 1
@@ -126,6 +126,8 @@ EOF
   retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output central-services --image-defaults opensource --output-dir /tmp/helm-templates/central-services
   retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output secured-cluster-services --image-defaults opensource --output-dir /tmp/helm-templates/secured-cluster-services
 
+  # "cp" - is just a wrapper around "tar". In order for "cp" command to work container requires "tar" command to be available
+  # Source: https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cp/
   retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/central-services "${SCRATCH}/central-services"
   retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/secured-cluster-services "${SCRATCH}/secured-cluster-services"
 
@@ -176,3 +178,6 @@ wait_deploy sensor
 wait_deploy admission-control
 
 retry oc get pods --namespace stackrox
+
+# Validate that secured cluster is connected and everything is ready.
+# TODO: Add step to validate central->sensor connection
