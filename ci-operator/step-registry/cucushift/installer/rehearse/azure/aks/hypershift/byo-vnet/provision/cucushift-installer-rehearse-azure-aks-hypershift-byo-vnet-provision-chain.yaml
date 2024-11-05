@@ -1,0 +1,60 @@
+chain:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-provision
+  steps:
+  - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: azure-provision-vnet-hypershift
+  - ref: azure-provision-resourcegroup
+  - ref: cucushift-hypershift-extended-nodepool-image-azure-get-marketplace-image
+  - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
+  - chain: cucushift-hypershift-extended-install-private
+  - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+  - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
+  - chain: hypershift-azure-create
+  - ref: cucushift-hypershift-extended-nodepool-image-azure-health-check
+  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+  env:
+  - name: AKS_ZONES
+    default: "1 2 3"
+  - name: ENABLE_ICSP
+    default: "true"
+  - name: EXTRA_ARGS
+    default: "--fips"
+  - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+    default: "Managed"
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: "centralus"
+  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_ARCH
+    default: "x64"
+  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
+    default: "aro4"
+  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+    default: "azureopenshift"
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_CUSTOM_NSG
+    default: "true"
+  - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+    default: "true"
+  - name: HYPERSHIFT_CUSTOM_SUBNET
+    default: "true"
+  - name: HYPERSHIFT_CUSTOM_VNET
+    default: "true"
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "false"
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: "qe1.azure.devcluster.openshift.com"
+  - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+    default: "HighlyAvailable"
+  - name: HYPERSHIFT_MANAGED_SERVICE
+    default: "ARO-HCP"
+  - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  documentation: |-
+    This chain provisions an aks management cluster and a public hosted cluster using BYO vnet, subnet and nsg.
+    The aks management cluster is created in the managed resource group. 
+    The hosted cluster is created in customer resource group 1. 
+    The BYO vnet, subnet are created in customer resource group 2.
+    The BYO nsg is created in customer resource group 3. 
+    See https://hypershift-docs.netlify.app/how-to/azure/create-azure-cluster_on_aks/ for details. 

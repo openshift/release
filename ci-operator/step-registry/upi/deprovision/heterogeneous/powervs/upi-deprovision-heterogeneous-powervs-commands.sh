@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Generates a workspace name like rdr-mac-4-14-au-syd-n1
+# Generates a workspace name like rdr-multi-arch-4-14-au-syd-n1
 # this keeps the workspace unique per version
 OCP_VERSION=$(cat "${SHARED_DIR}/OCP_VERSION")
 REGION="${LEASED_RESOURCE}"
@@ -11,7 +11,7 @@ then
 else
   CUCUSHIFT=""
 fi
-WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
+WORKSPACE_NAME=rdr-multi-arch-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
 
 # Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {

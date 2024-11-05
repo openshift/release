@@ -48,7 +48,9 @@ resources:
 test_binary_build_commands: job --help
 tests:
 - as: oar-check
-  commands: oar --help
+  commands: |
+    oar --help
+    oarctl --help
   container:
     from: oar
   optional: true
@@ -60,6 +62,16 @@ tests:
 - as: qe-release-gate-test
   cron: 15 * * * *
   steps:
+    env:
+      OCP_RELEASES: 4.12 4.13 4.14 4.16
+    test:
+    - ref: release-qe-tests
+- as: qe-release-gate-test-arm64
+  cron: 0 */2 * * *
+  steps:
+    env:
+      OCP_ARCH: arm64
+      OCP_RELEASES: "4.16"
     test:
     - ref: release-qe-tests
 zz_generated_metadata:

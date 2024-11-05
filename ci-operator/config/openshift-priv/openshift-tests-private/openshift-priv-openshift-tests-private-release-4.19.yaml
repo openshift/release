@@ -1,0 +1,311 @@
+base_images:
+  ci_rosa-aws-cli_latest:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  ci_tests-private-base_4.18:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.18"
+  ci_tests-private-baseui_4.18:
+    name: tests-private-baseui
+    namespace: ci
+    tag: "4.18"
+  ci_tests-private-builder_4.18:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.18"
+  cli:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cli
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
+  upi-installer:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: upi-installer
+binary_build_commands: make go-mod-tidy;make all
+build_root:
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.22-openshift-4.18
+canonical_go_repository: github.com/openshift/openshift-tests-private
+images:
+- dockerfile_path: images/Dockerfile.golang
+  from: ci_tests-private-base_4.18
+  inputs:
+    ci_rosa-aws-cli_latest:
+      as:
+      - registry.ci.openshift.org/ci/rosa-aws-cli:latest
+    ci_tests-private-builder_4.18:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-builder:4.18
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
+  to: tests-private
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.18
+    RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_*.rpm && \
+        mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    ci_tests-private-baseui_4.18:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.18
+    src:
+      as:
+      - src
+  to: tests-private-ui
+- dockerfile_literal: |
+    FROM bin AS builder
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.18
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
+    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    bin:
+      as:
+      - bin
+    ci_tests-private-base_4.18:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-base:4.18
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
+  to: tests-private-newpr
+- dockerfile_literal: |
+    FROM bin
+    RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
+        PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
+        yum update -y && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && yum clean all && rm -rf /var/cache/yum/* && \
+        chmod g+w /etc/passwd
+    RUN pip3 install --upgrade setuptools pip && pip3 install dotmap minio pyyaml==5.4.1 requests python-openstackclient
+    RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip -q awscliv2.zip && ./aws/install -b /bin && rm -rf ./aws awscliv2.zip
+  from: bin
+  optional: true
+  to: tests-private-pr
+promotion:
+  to:
+  - excluded_images:
+    - tests-private
+    - tests-private-ui
+    - tests-private-pr
+    - tests-private-newpr
+    name: 4.19-priv
+    namespace: ocp-private
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  e2e-aws:
+    requests:
+      cpu: "4"
+      memory: 4Gi
+test_binary_build_commands: make test
+tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
+- as: bindata-check
+  commands: |
+    make update
+    ret=0 && git diff --quiet test/extended/testdata/bindata.go || ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make update\" on your terminal and then update PR"
+        echo "---"
+        git diff test/extended/testdata/bindata.go || true
+        echo "---"
+        exit 1
+    fi
+  container:
+    from: src
+- as: code-check
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
+    which golangci-lint
+    make check-code
+  container:
+    from: src
+- as: e2e-aws
+  optional: true
+  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: enable-qe-catalogsource
+    - as: pr-test
+      cli: latest
+      commands: |
+        oc version
+        export HOME="/tmp/home"
+        mkdir -p "${HOME}"
+
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${HOME} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+        mkdir -p ${HOME}/gcloudconfig && export CLOUDSDK_CONFIG=${HOME}/gcloudconfig && export PATH=$PATH:${HOME}/google-cloud-sdk/bin
+
+        export MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
+        curl -s -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o glx.tar.gz && tar -C ${HOME} -xvf glx.tar.gz govc && rm -f glx.tar.gz
+
+        CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/candidate
+        curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp-dev-preview/ -o pre.html
+        ecver=$(grep -E "<a href=\"candidate-4\.18" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V"
+        if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp-dev-preview/${ecver}; fi
+        rcgaver=$(grep -E "<a href=\"4\.18" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"
+        if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi
+        curl -s -k -L ${CLIENTURL}/opm-linux-rhel9.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && mv ${HOME}/opm-rhel9 ${HOME}/opm && rm -fr opm.tar.gz
+        curl -s -k -L ${CLIENTURL}/oc-mirror.rhel9.tar.gz -o om.tar.gz && tar -C ${HOME} -xzvf om.tar.gz && chmod +x ${HOME}/oc-mirror && rm -f om.tar.gz
+
+        SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release
+        curl -s -k -L ${MIRROR2URL}/x86_64/clients/operator-sdk/ -o sdk.html
+        optsdkver=$(grep -E "<a href=\"4\.18" sdk.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo ${optsdkver}
+        if [ "V${optsdkver}V" != "VV"  ]; then SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/${optsdkver}; fi
+        curl -s -k -L ${SDKURL}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
+        tar -C ${HOME} -xzvf opt-sdk.tar.gz && mv ${HOME}/x86_64/operator-sdk ${HOME} && rm -fr opt-sdk.tar.gz ${HOME}/x86_64
+
+        oc image extract quay.io/hypershift/hypershift-operator:latest --file=/usr/bin/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
+        oc image extract quay.io/openshifttest/openshift4-tools:v2 --file=/tmp/OpenShift4-tools.tar && tar -C "${HOME}" -xf OpenShift4-tools.tar && rm -fr OpenShift4-tools.tar
+
+        export PATH=$PATH:$HOME:${HOME}/OpenShift4-tools
+        opm version
+        oc-mirror --help
+
+        if ! which kubectl; then
+          ln -s "$(which oc)" ${HOME}/kubectl
+        fi
+
+        python3 ./hack/pr.py
+      from: tests-private-newpr
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+    workflow: ipi-aws
+- as: e2e-console
+  optional: true
+  run_if_changed: frontend/tests/.*.cy.ts
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - ref: enable-qe-catalogsource
+    - as: console-test
+      cli: latest
+      commands: python3 ./frontend/hack/console_pr.py
+      from: tests-private-ui
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: ipi-gcp
+- as: debug-disasterrecovery-aws-ipi
+  optional: true
+  run_if_changed: test/extended/disaster_recovery/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&;DEBUGPHASE&
+      TEST_SCENARIOS: DR_Testing
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: debug-disasterrecovery-baremetal-upi
+  optional: true
+  run_if_changed: test/extended/disaster_recovery/
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&;DEBUGPHASE&
+      TEST_SCENARIOS: DR_Testing
+      TEST_TIMEOUT: "50"
+      architecture: arm64
+    test:
+    - ref: openshift-extended-test
+    workflow: baremetal-lab-upi
+- as: debug-winc-aws-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: debug-winc-gcp-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: debug-winc-azure-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: openshift-tests-private

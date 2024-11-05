@@ -20,25 +20,44 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-# Temporary test to see if this helps the consistent high CPU alerts and random test failures
-master_type_suffix="-custom-6-16384"
-# TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
-# custom sizes are not supported by arm64 VMs
-if [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type_suffix="-standard-4"
+control_plane_arch="${CONTROL_ARCH:-${OCP_ARCH}}"
+case "${SIZE_VARIANT}" in
+  "xlarge")
+    master_type_suffix="standard-32"
+  ;;
+  "large")
+    master_type_suffix="standard-16"
+  ;;
+  "compact")
+    master_type_suffix="standard-8"
+  ;;
+  *)
+    if [[ "${control_plane_arch}" == "arm64" ]]; then
+      master_type_suffix="standard-4"
+    else
+      # Temporary test to see if this helps the consistent high CPU alerts and random test failures
+      master_type_suffix="custom-6-16384"
+      # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+      # custom sizes are not supported by arm64 VMs
+    fi
+  ;;
+esac
+
+if [[ "${control_plane_arch}" == "amd64" ]]; then
+  master_type="e2-${master_type_suffix}"
+elif [[ "${control_plane_arch}" == "arm64" ]]; then
+  master_type="t2a-${master_type_suffix}"
 fi
-if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type_suffix="-standard-32"
-elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type_suffix="-standard-16"
-elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type_suffix="-standard-8"
+
+compute_arch="${COMPUTE_ARCH:-${OCP_ARCH}}"
+if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
+  if [[ "${compute_arch}" == "arm64" ]]; then
+    COMPUTE_NODE_TYPE="t2a-standard-4"
+  else
+    COMPUTE_NODE_TYPE="e2-standard-4"
+  fi
 fi
-if [ "${OCP_ARCH}" = "amd64" ]; then
-  master_type="e2${master_type_suffix}"
-elif [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type="t2a${master_type_suffix}"
-fi
+
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -47,7 +66,7 @@ platform:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
 controlPlane:
-  architecture: ${OCP_ARCH}
+  architecture: ${control_plane_arch}
   name: master
   platform:
     gcp:
@@ -57,7 +76,7 @@ controlPlane:
         diskSizeGB: 200
   replicas: ${masters}
 compute:
-- architecture: ${OCP_ARCH}
+- architecture: ${compute_arch}
   name: worker
   replicas: ${workers}
   platform:
@@ -82,33 +101,33 @@ if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
   yq-go m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
 fi
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-rm /tmp/pull-secret
+# cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+# oc registry login --to /tmp/pull-secret
+# ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+# rm /tmp/pull-secret
 
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
-  cat > "${PATCH}" << EOF
-imageContentSources:
-- mirrors:
-  - ${SERVICE}
-  source: quay.io
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
+# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+#   SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
+#   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# imageContentSources:
+# - mirrors:
+#   - ${SERVICE}
+#   source: quay.io
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_gcp=$(jq --arg auth ${mirror_auth} --arg repo "${SERVICE}" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
+#   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+#   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+#   pull_secret_gcp=$(jq --arg auth ${mirror_auth} --arg repo "${SERVICE}" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
-  PATCH="/tmp/install-config-pull-secret-gcp.yaml.patch"
-  cat > "${PATCH}" << EOF
-pullSecret: >
-  $(echo "${pull_secret_gcp}" | jq -c .)
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-  rm "${PATCH}"
-fi
+#   PATCH="/tmp/install-config-pull-secret-gcp.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# pullSecret: >
+#   $(echo "${pull_secret_gcp}" | jq -c .)
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   rm "${PATCH}"
+# fi

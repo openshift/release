@@ -1,0 +1,103 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift.rhel7
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: azure-disk-csi-driver
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    unset KUBERNETES_SERVICE_HOST
+    GOFLAGS="-mod=readonly" make unit-test
+  container:
+    from: src
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: azure-disk-csi-driver
+    workflow: openshift-ci-security
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+  timeout: 5h30m0s
+- as: e2e-azure-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]
+    workflow: openshift-e2e-azure-csi-extended
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: azure-disk-csi-driver

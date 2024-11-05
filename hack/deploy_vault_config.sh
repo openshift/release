@@ -296,11 +296,8 @@ EOF
 # that alias back to the identity id which is the thing we need to set up a group is non-trivial.
 echo "Finding ids for dptp members"
 dptp_member_aliases='[
-  "skuznets",
   "hongkliu",
-  "apavel",
   "nmoraiti",
-  "pmuller",
   "sgoeddel",
   "jupierce",
   "bechen",
@@ -308,7 +305,8 @@ dptp_member_aliases='[
   "dgemoli",
   "psalajov",
   "dmistry",
-  "prucek"
+  "prucek",
+  "hvidosil"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \

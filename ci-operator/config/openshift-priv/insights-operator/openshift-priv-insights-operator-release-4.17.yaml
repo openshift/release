@@ -6,7 +6,7 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
+    tag: "4.17"
   ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
@@ -29,8 +29,7 @@ images:
   to: insights-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -84,7 +83,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not UI and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks_4.17
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -121,9 +120,11 @@ tests:
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
   steps:
@@ -137,7 +138,7 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
+        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.17
       credentials:
       - mount_path: /secrets
         name: insights-qa

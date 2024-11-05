@@ -1,0 +1,175 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-image-registry-operator
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: cluster-image-registry-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: JUNIT_REPORT=1 make test-unit
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ovn-image-registry
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-image-registry
+- as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-ovn
+  optional: true
+  run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
+  steps:
+    cluster_profile: gcp-3
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-operator
+  optional: true
+  run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-azure-ovn
+  optional: true
+  run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-operator
+  optional: true
+  run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-vsphere
+  optional: true
+  run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator
+  run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: e2e-test
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-vsphere
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-openstack
+  optional: true
+  run_if_changed: (^(.*swift.*|vendor/github\.com/gophercloud/.*)\.go$|.*openstack.*)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-hypershift-conformance
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cluster-image-registry-operator

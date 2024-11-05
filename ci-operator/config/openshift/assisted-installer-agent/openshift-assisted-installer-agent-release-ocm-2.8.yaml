@@ -23,64 +23,22 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  coreos-centos-stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  from: coreos-centos-stream8
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-agent
+- dockerfile_path: Dockerfile.assisted_installer_agent-build
+  to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
     COPY . .
   from: src
   to: assisted-installer-agent-src
-- dockerfile_literal: |
-    FROM test-bin AS builder
-    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    COPY --from=builder /usr/bin/golangci-lint /usr/bin/golangci-lint
-    COPY --from=builder /go/src/github.com/openshift/assisted-installer-agent /go/src/github.com/openshift/assisted-installer-agent
-    WORKDIR /go/src/github.com/openshift/assisted-installer-agent
-    ENV GO111MODULE=on
-    ENV GOFLAGS=""
-    RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
-      go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
-      go install github.com/golang/mock/mockgen@v1.6.0 && \
-      go install github.com/vektra/mockery/v2@v2.9.6 && \
-      go install gotest.tools/gotestsum@v1.6.3 && \
-      go install github.com/axw/gocov/gocov@latest && \
-      go install github.com/AlekSi/gocov-xml@latest
-    RUN go mod vendor
-    RUN mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
-    RUN dnf install -y gcc nmstate-devel nmstate-libs && dnf clean all
-  inputs:
-    ocp_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    test-bin:
-      as:
-      - test-bin
-  to: assisted-test-bin
 promotion:
   to:
   - name: ocm-2.8
@@ -90,7 +48,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -120,29 +78,37 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    export "GOROOT=$(go env GOROOT)"
     make lint
   container:
-    from: assisted-test-bin
+    clone: true
+    from: assisted-installer-agent-build
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: assisted-test-bin
+    clone: true
+    from: assisted-installer-agent-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: assisted-test-bin
+    clone: true
+    from: assisted-installer-agent-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -153,7 +119,7 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: subsystem-test-periodic
-  cron: 00 00 */1 * 0
+  cron: 00 14 * * 2
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent

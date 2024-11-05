@@ -41,8 +41,9 @@ base_images:
     tag: upi-installer
 releases:
   initial:
-    release:
-      channel: candidate
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.16"
   latest:
     candidate:
@@ -79,18 +80,6 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
   timeout: 5h0m0s
-- as: e2e-aws-sdn-upgrade
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-upgrade-ovn-single-node
   interval: 168h
   steps:
@@ -102,6 +91,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node
+- as: e2e-metal-ovn-single-node-rt-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node-realtime
 - as: e2e-vsphere-upgrade
   interval: 168h
   steps:

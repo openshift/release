@@ -10,6 +10,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+  AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -36,11 +39,20 @@ if [ -f "${remove_resources_by_cli}" ]; then
     sh -x "${remove_resources_by_cli}"
 fi
 
-rg_files="${SHARED_DIR}/resourcegroup ${SHARED_DIR}/resourcegroup_cluster ${SHARED_DIR}/RESOURCE_GROUP_NAME"
-for rg_file in ${rg_files}; do
+rg_files=(
+    "${SHARED_DIR}/RESOURCE_GROUP_NAME"
+    "${SHARED_DIR}/resourcegroup"
+    "${SHARED_DIR}/resourcegroup_cluster"
+    "${SHARED_DIR}/resourcegroup_vnet"
+    "${SHARED_DIR}/resourcegroup_nsg"
+    "${SHARED_DIR}/resourcegroup_aks"
+    "${SHARED_DIR}/resourcegroup_sa"
+)
+for rg_file in "${rg_files[@]}"; do
     if [ -f "${rg_file}" ]; then
         existing_rg=$(cat "${rg_file}")
         if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
+            echo "Removing resource group ${existing_rg} from ${rg_file}"
             az group delete -y -n "${existing_rg}"
         fi
     fi

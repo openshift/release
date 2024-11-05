@@ -1,0 +1,168 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/operator-framework-olm
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: operator-registry
+- dockerfile_path: operator-framework-tools.Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: operator-framework-tools
+- dockerfile_path: base.Dockerfile
+  from: src
+  to: ci-image
+promotion:
+  to:
+  - excluded_images:
+    - ci-image
+    name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: ci-image
+- as: e2e-gcp-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: unit-olm
+  commands: |
+    # Note(tflannag): Hacks for https://github.com/kubernetes-sigs/controller-runtime/commit/58c17f696263fc4a35ef5de198f99aa1717e7b87
+    # as we run into permission denied errors when attempting to create the ${HOME}/.cache directory in the unit test.
+    echo "Overriding the \$XDG_CACHE_HOME directory"
+    export XDG_CACHE_HOME=/tmp/.cache
+
+    make unit/olm
+  container:
+    from: ci-image
+- as: unit-registry
+  commands: make unit/registry
+  container:
+    from: ci-image
+- as: unit-api
+  commands: make unit/api
+  container:
+    from: ci-image
+- as: unit-psm
+  commands: make unit/psm
+  container:
+    from: ci-image
+- as: e2e-gcp-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
+        export JUNIT_DIRECTORY=${ARTIFACT_DIR}
+        # Skip the flake tests, which are ran in a separate job
+        export SKIP='\[FLAKE\]'
+        # Skip an upstream test that requires OLM to be built with an e2e-only go build tag
+        export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
+        make e2e/olm
+      from: ci-image
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-olm-flaky
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm TEST='\[FLAKE\]'
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-console-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: operator-framework-olm

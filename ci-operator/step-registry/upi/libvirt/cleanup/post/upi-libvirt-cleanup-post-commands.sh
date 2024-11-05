@@ -22,7 +22,6 @@ fi
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
-POOL_NAME="multiarch-ci-pool"
 
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
@@ -39,7 +38,7 @@ do
 done
 
 # Remove stale volumes
-echo "Removing stale volumes..."
+echo "Removing stale ci pool volumes..."
 if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
@@ -47,20 +46,31 @@ if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   done
 fi
 
+# Remove stale httpd volumes
+echo "Removing stale httpd volumes..."
+if [[ ! -z "$(${VIRSH} pool-list | grep ${HTTPD_POOL_NAME})" ]]; then
+  for VOLUME in $(${VIRSH} vol-list --pool ${HTTPD_POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
+  do
+    ${VIRSH} vol-delete --pool ${HTTPD_POOL_NAME} ${VOLUME}
+  done
+fi
+
 # Old behavior; Uncomment the following line to always remove the source volume regardless of its naming format.
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
-echo "Removing the now obsolete source volume..."
-${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)"
+echo "Removing obsolete source volume..."
+SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)
+if [[ ! -z "${SOURCE_VOLUME}" ]]; then
+  ${VIRSH} vol-delete --pool ${POOL_NAME} "${SOURCE_VOLUME}"
+fi
 
-# Old behavior; Uncomment the following lines if for some reason a pool is created with the lease in the name
-# echo "Removing stale pools..."
-# for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
-# do
-#   ${VIRSH} pool-destroy "${POOL}"
-#   ${VIRSH} pool-delete "${POOL}"
-#   ${VIRSH} pool-undefine "${POOL}"
-# done
+echo "Removing obsolete pools..."
+for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+do
+  ${VIRSH} pool-destroy "${POOL}"
+  ${VIRSH} pool-delete "${POOL}"
+  ${VIRSH} pool-undefine "${POOL}"
+done
 
 # Remove conflicting networks
 echo "Removing stale networks..."

@@ -9,9 +9,16 @@ firewatch jira-config-gen --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" --serv
 
 report_command="firewatch report"
 
-# If the user has specified to fail with test failures, then add the --fail-with-test-failures flag
+if [ "${FIREWATCH_PRIVATE_DECK,,}" = "true" ]; then
+    report_command+=" --gcs-bucket qe-private-deck --gcs-creds-file /tmp/secrets/private-deck/creds.json"
+fi
+
 if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
     report_command+=" --fail-with-test-failures"
+fi
+
+if [ "${FIREWATCH_FAIL_WITH_POD_FAILURES,,}" = "true" ]; then
+    report_command+=" --fail-with-pod-failures"
 fi
 
 # If the user has specified verbose test failure reporting
@@ -24,5 +31,12 @@ fi
 if [ -n "${FIREWATCH_CONFIG_FILE_PATH}" ]; then
     report_command+=" --firewatch-config-path=${FIREWATCH_CONFIG_FILE_PATH}"
 fi
+
+# If the additional labels file exists, add it to the report command
+if [ -f "${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
+    report_command+=" --additional-labels-file=${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
+fi
+
+echo $report_command
 
 eval "$report_command"

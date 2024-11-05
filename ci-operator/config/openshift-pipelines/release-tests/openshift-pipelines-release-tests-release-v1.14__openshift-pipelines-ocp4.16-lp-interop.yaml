@@ -14,10 +14,12 @@ images:
   to: openshift-pipelines-runner
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
 resources:
   '*':
     limits:
@@ -27,7 +29,7 @@ resources:
       memory: 200Mi
 tests:
 - as: openshift-pipelines-interop-aws
-  cron: 0 6 11 2 *
+  cron: 0 6 10 7 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -36,18 +38,12 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
               {"step": "openshift-cluster-bot-rbac", "failure_type": "all", "classification": "Other", "jira_additional_labels": ["!default"]},
               {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "SRVKP", "jira_component": ["QA"], "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","pipelines-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
@@ -57,6 +53,28 @@ tests:
     - ref: openshift-pipelines-install
     - ref: openshift-pipelines-tests
     workflow: firewatch-ipi-aws
+- as: openshift-pipelines-interop-ibmcloud
+  cron: 0 6 10 7 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "openshift-cluster-bot-rbac", "failure_type": "all", "classification": "Other", "jira_additional_labels": ["!default"]},
+              {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "SRVKP", "jira_component": ["QA"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","pipelines-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+    test:
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-tests
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: release-v1.14
   org: openshift-pipelines

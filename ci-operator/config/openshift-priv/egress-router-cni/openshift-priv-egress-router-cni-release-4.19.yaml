@@ -1,0 +1,75 @@
+base_images:
+  ocp_4.16_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+binary_build_commands: hack/build-go.sh
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/egress-router-cni
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: egress-router-cni
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: hack/test-go.sh
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: egress-router-cni

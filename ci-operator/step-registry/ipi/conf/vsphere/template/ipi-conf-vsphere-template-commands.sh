@@ -9,6 +9,9 @@ declare vsphere_datacenter
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/template.yaml.patch"
 

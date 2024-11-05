@@ -1,0 +1,61 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: loaded-upgrade415-24nodes
+  cron: 0 14 3,17 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      AVAILABLE_UPGRADE: "yes"
+      CHANNEL_GROUP: candidate
+      CHURN: "false"
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC: "false"
+      HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
+      ITERATION_MULTIPLIER_ENV: "6"
+      LONG_CLUSTER_NAME_ENABLED: "true"
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "24"
+      UPGRADED_TO_VERSION: "4.16"
+      USER_COUNT: "30"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-cluster-density-v2
+    - ref: rosa-cluster-upgrade-cluster
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.15-candidate-x86-loaded-upgrade-from-4.14

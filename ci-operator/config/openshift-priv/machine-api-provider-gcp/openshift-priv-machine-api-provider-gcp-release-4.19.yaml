@@ -1,0 +1,97 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/machine-api-provider-gcp
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: gcp-machine-controllers
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: goimports
+  commands: make goimports
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: e2e-gcp-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "5400"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: machine-api-provider-gcp
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: machine-api-provider-gcp

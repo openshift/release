@@ -604,7 +604,7 @@ function check_signed() {
     response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
@@ -662,16 +662,18 @@ function admin_ack() {
 # Upgrade the cluster to target release
 function upgrade() {
     set_channel $TARGET_VERSION
-    local retry=3 unrecommened_conditional_updates
+    local retry=5 unrecommended_conditional_updates
     while (( retry > 0 )); do
-        unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
-        if [[ -z "${unrecommened_conditional_updates}" ]]; then
+        unrecommended_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        echo "Not recommended conditions: "
+        echo "${unrecommended_conditional_updates}"
+        if [[ -z "${unrecommended_conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
             echo "No conditionalUpdates update available! Retry..."
         else
             #shellcheck disable=SC2076
-            if [[ " $unrecommened_conditional_updates " =~ " $TARGET_VERSION " ]]; then
+            if [[ " $unrecommended_conditional_updates " =~ " $TARGET_VERSION " ]]; then
                 echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
                 oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'
                 exit 1
@@ -684,28 +686,26 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
-# Log abnormal cluster status
-function dump_status_if_unexpected() {
-    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
-        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
-            # if upgrading, and not progressing well, dump status to log
-            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
-            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
-                echo "${out}"
-            fi
-        fi
-}
-
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
-    echo "Starting the upgrade checking on $(date "+%F %T")"
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
+    echo -e "Upgrade checking start at $(date "+%F %T")\n"
+    start_time=$(date "+%s")
+    # print once to log (including full messages)
+    oc adm upgrade || true
+    # log oc adm upgrade (excluding garbage messages)
+    stat_cmd="oc adm upgrade | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    # if available (version 4.16+) log "upgrade status" instead
+    if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    fi
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        wait_upgrade=$(( wait_upgrade - 5 ))
-        if ! ( run_command "oc get clusterversion" ); then
-            continue
+        sleep ${interval}m
+        wait_upgrade=$(( wait_upgrade - interval ))
+        # if output is different from previous (ignoring irrelevant time/percentage difference), write to log
+        if stat="$(eval "${stat_cmd}")" && [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+            echo -e "=== Upgrade Status $(date "+%T") ===\n${stat}\n\n\n\n"
+            oldstat=${stat}
         fi
         if ! out="$(oc get clusterversion --no-headers || false)"; then
             echo "Error occurred when getting clusterversion"
@@ -714,7 +714,9 @@ function check_upgrade_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
+            end_time=$(date "+%s")
+            echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
@@ -722,10 +724,12 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
-        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
+        end_time=$(date "+%s")
+        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        return 1
     fi
 }
 
@@ -870,24 +874,42 @@ function filter_tests() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    local failures=0 errors=0 skipped=0 tests=0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
 cucushift-chainupgrade-toimage:
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
-    if [ $((failures)) != 0 ] ; then
+
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
-        for (( i=0; i<failures; i++ )) ; do
+        for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi
@@ -965,6 +987,8 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export TARGET_MINOR_VERSION=""
+
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
 release_string="$(< "${SHARED_DIR}/upgrade-edge")"
 # shellcheck disable=SC2207
@@ -987,7 +1011,6 @@ for target in "${TARGET_RELEASES[@]}"; do
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
     export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -1035,6 +1058,10 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
-        run_upgrade_e2e "${index}"
+	echo "Start e2e test..."
+	test_log_dir="${ARTIFACT_DIR}/test-logs"
+        mkdir -p ${test_log_dir}
+        run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt" || true
+	echo "End e2e test..."
     fi
 done

@@ -5,7 +5,7 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 
 #Vault Secrets
-export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG CYPRESS_SNYK_TOKEN
+export HAC_KC_SSO_URL KC_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG CYPRESS_SNYK_TOKEN
 HAC_KC_SSO_URL=$(cat /usr/local/ci-secrets/devsandbox/sso_hostname)
 HAC_KC_USERNAME=$(cat /usr/local/ci-secrets/devsandbox/username)
 HAC_KC_PASSWORD=$(cat /usr/local/ci-secrets/devsandbox/new-password)
@@ -17,6 +17,11 @@ CYPRESS_QUAY_TOKEN=$(cat /usr/local/ci-secrets/github/quay-token)
 CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
 CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
 CYPRESS_SNYK_TOKEN=$(cat /usr/local/ci-secrets/github/snyk_token)
+
+#Vault Secrets for RH Trusted Profile Analyzer (testing SBOM)
+export CYPRESS_ATLAS_PASSWORD CYPRESS_ATLAS_USERNAME
+CYPRESS_ATLAS_USERNAME=$(cat /usr/local/ci-secrets/github/atlas_stage_acc)
+CYPRESS_ATLAS_PASSWORD=$(cat /usr/local/ci-secrets/github/atlas_stage_pass)
 
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
@@ -71,6 +76,18 @@ bonfire deploy hac \
         --namespace ${NAMESPACE} \
         --timeout 1200
 
+# Hacks for clowder and keycloak integration
+oc get clowdenvironment $ENV_NAME -o json | jq '.spec.disabled=true' | oc apply -f -
+KC_URL=$(echo $HAC_KC_SSO_URL | sed -s 's/\/auth\///')
+oc get deployment $ENV_NAME-mbop -o json | \
+  jq --arg url $KC_URL --arg user $HAC_KC_USERNAME --arg pass $HAC_KC_PASSWORD \
+    '(.spec.template.spec.containers[].env=[
+     {"name": "KEYCLOAK_SERVER", "value": $url},
+     {"name": "KEYCLOAK_USERNAME", "value": $user},
+     {"name": "KEYCLOAK_PASSWORD", "value": $pass},
+     {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc replace -f -
+oc rollout status deployment $ENV_NAME-mbop
+
 # Call the keycloak API and add a user
 B64_USER=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.username'| tr -d '"')
 B64_PASS=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.password' | tr -d '"')
@@ -84,7 +101,7 @@ python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $ENCODED_CY
 
 export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN CYPRESS_SSO_URL
 CYPRESS_PERIODIC_RUN=true
-CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/preview/application-pipeline
+CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/application-pipeline
 CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}
 CYPRESS_SSO_URL=${HAC_KC_SSO_URL}

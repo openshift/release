@@ -1,13 +1,13 @@
 base_rpm_images:
   os:
     name: centos
-    namespace: origin
-    tag: stream8
+    namespace: openshift
+    tag: stream9
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/openshift/openshift-ansible
 images:
 - dockerfile_path: images/installer/Dockerfile
@@ -15,15 +15,16 @@ images:
   to: ansible
 promotion:
   to:
-  - name: 4.18-priv
+  - disabled: true
+    name: 4.18-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       cat <<REPOFILE > /opt/ose.repo
-      [rhel-8-server-ose]
-      name = rhel-8-server-ose
-      baseurl = http://base-4-12-rhel8.ocp.svc/rhel-8-server-ose
+      [rhel-9-server-ose]
+      name = rhel-9-server-ose
+      baseurl = http://base-4-16-rhel9.ocp.svc/rhel-9-server-ose
       enabled = 1
       gpgcheck = 0
       priority = 1
@@ -71,13 +72,14 @@ resources:
     requests:
       cpu: "1"
       memory: 1.5Gi
-rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
+rpm_build_commands: dnf install epel-release epel-next-release -y; dnf install tito
+  python3 -y; tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
   tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
   -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
   createrepo _output/local/releases/rpms
 test_binary_build_commands: |
   set -eo pipefail
-  yum install -y gcc libffi-devel openssl-devel python3-devel
+  yum install -y gcc libffi-devel openssl-devel python3-pip
   pip3 install tox virtualenv==16.7.9
   chmod uga+w /etc/passwd
 tests:
@@ -85,14 +87,20 @@ tests:
   commands: |
     set -o pipefail
     echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-    tox
+    HOME=/tmp tox
   container:
     from: test-bin
 - as: e2e-aws-workers-rhel8
   steps:
     cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.6"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-workers-rhel9
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "9.4"
     workflow: openshift-e2e-aws-workers-rhel
 zz_generated_metadata:
   branch: release-4.18

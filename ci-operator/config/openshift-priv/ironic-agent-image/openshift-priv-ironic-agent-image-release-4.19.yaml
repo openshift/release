@@ -1,0 +1,90 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-9-base-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ironic-agent-image
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: ironic-agent-base
+  to: ironic-agent
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-4-18-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-18-rhel-9-server-ironic.repo
+    from: ocp_builder_rhel-9-base-openshift-4.18
+    to: ironic-agent-base
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-bm
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-virtualmedia
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: check-requirements
+  commands: |-
+    #!/bin/bash
+    set -euxo pipefail
+    # this could also come from the "CLONEREFS_OPTIONS" env variable
+    export CHECK_RELEASE="master"
+    make check-reqs
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: ironic-agent-image

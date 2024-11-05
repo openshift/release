@@ -1,0 +1,107 @@
+base_rpm_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/openshift/openshift-ansible
+images:
+- dockerfile_path: images/installer/Dockerfile
+  from: base
+  to: ansible
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<REPOFILE > /opt/ose.repo
+      [rhel-9-server-ose]
+      name = rhel-9-server-ose
+      baseurl = http://base-4-16-rhel9.ocp.svc/rhel-9-server-ose
+      enabled = 1
+      gpgcheck = 0
+      priority = 1
+      skip_if_unavailable = false
+      exclude=openshift-ansible*
+      REPOFILE
+      INSTALL_PKGS="which tar wget hostname util-linux socat tree findutils lsof bind-utils"
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM os
+      COPY ose.repo /etc/yum.repos.d/ose.repo
+      RUN mkdir -p /var/lib/origin && \
+          yum install --setopt=tsflags=nodocs --setopt=install_weak_deps=False -y ${INSTALL_PKGS} && \
+          rpm -V ${INSTALL_PKGS} && \
+          yum clean all && rm -rf /var/cache/yum/*
+      DOCKERFILE
+    from: os
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: os
+    inputs:
+      src: {}
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /opt/Dockerfile
+        - destination_dir: .
+          source_path: /opt/ose.repo
+    to: base
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: "1"
+      memory: 1.5Gi
+rpm_build_commands: dnf install epel-release epel-next-release -y; dnf install tito
+  python3 -y; tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
+  tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
+  -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
+  createrepo _output/local/releases/rpms
+test_binary_build_commands: |
+  set -eo pipefail
+  yum install -y gcc libffi-devel openssl-devel python3-pip
+  pip3 install tox virtualenv==16.7.9
+  chmod uga+w /etc/passwd
+tests:
+- as: unit
+  commands: |
+    set -o pipefail
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    HOME=/tmp tox
+  container:
+    from: test-bin
+- as: e2e-aws-workers-rhel8
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "8.6"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-workers-rhel9
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "9.4"
+    workflow: openshift-e2e-aws-workers-rhel
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: openshift-ansible

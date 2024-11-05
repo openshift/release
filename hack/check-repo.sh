@@ -30,7 +30,8 @@ mkdir "${APPDATA}/plugins"
 oc --context app.ci --namespace ci extract configmap/plugins --to "${APPDATA}/plugins" > /dev/null
 
 CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
-$CONTAINER_ENGINE pull registry.ci.openshift.org/ci/check-gh-automation:latest
+CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64}
+$CONTAINER_ENGINE pull registry.ci.openshift.org/ci/check-gh-automation:latest $CONTAINER_ENGINE_OPTS
 $CONTAINER_ENGINE run \
     --rm \
     --platform linux/amd64 \

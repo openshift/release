@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-gcp-csi-custom-worker
+  steps:
+    cluster_profile: gcp
+    post:
+    - ref: storage-obj-check
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-osdisk-disktype-compute
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: storage-conf-csi-gcp-pd
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_TYPE: c3-standard-4
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-gcp-pd.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E GCP `csi` workflow executes the `openshift/csi` end-to-end test suite on GCP PD CSI driver that was installed during cluster setup with custom worker.

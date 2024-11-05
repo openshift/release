@@ -55,12 +55,12 @@ function save_logs() {
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'save_logs' EXIT TERM
 
-REMOTE_DIR="/tmp"
-REMOTE_INSTALL_DIR="/tmp/installer/"
-REMOTE_ENV_FILE="/tmp/remote_env_file"
 BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+REMOTE_DIR="/home/${BASTION_SSH_USER}"
+REMOTE_INSTALL_DIR="${REMOTE_DIR}/installer/"
+REMOTE_ENV_FILE="${REMOTE_DIR}/remote_env_file"
 
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then

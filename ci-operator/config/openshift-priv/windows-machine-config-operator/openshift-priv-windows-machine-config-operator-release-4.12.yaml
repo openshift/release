@@ -94,6 +94,8 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
@@ -111,49 +113,10 @@ tests:
   as: vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- always_run: false
-  as: aws-e2e-upgrade
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    test:
-    - as: install
-      cli: latest
-      commands: |
-        oc create namespace openshift-windows-machine-config-operator
-        oc label --overwrite=true ns openshift-windows-machine-config-operator openshift.io/cluster-monitoring=true \
-        pod-security.kubernetes.io/enforce=privileged
-        operator-sdk run bundle --timeout=10m -n openshift-windows-machine-config-operator "$OO_BUNDLE"
-        oc wait --timeout=5m --for condition=Available -n openshift-windows-machine-config-operator deployment windows-machine-config-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: wmco-bundle
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
-    - as: e2e-aws-upgrade
-      cli: latest
-      commands: |-
-        #!/bin/bash
-        set -euo pipefail
-        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
-        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
-        export WINDOWS_SERVER_VERSION="2019"
-        export OPERATOR_IMAGE="PLACEHOLDER"
-        make run-ci-e2e-upgrade-test
-      from: windows-machine-config-operator-test
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
-    workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -255,11 +218,12 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: platform-none-vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
@@ -267,7 +231,7 @@ tests:
   as: wicd-unit-vsphere
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     post:
     - chain: upi-vsphere-windows-post
     pre:
@@ -275,7 +239,7 @@ tests:
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
     - ref: ipi-conf-vsphere-check-vcm
-    - ref: upi-conf-vsphere
+    - ref: upi-conf-vsphere-vcm
     - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
     test:

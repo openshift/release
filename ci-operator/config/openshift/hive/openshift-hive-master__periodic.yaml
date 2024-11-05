@@ -1,37 +1,24 @@
 base_images:
-  base:
-    name: "4.14"
+  ocp_4.18_base-rhel9:
+    name: "4.18"
     namespace: ocp
-    tag: base
-  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.16
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
-binary_build_commands: make build
+    tag: base-rhel9
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
-  project_image:
-    dockerfile_path: build/build-image/Dockerfile
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+  from: ocp_4.18_base-rhel9
   to: hive
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.18"
 resources:
   '*':
     requests:

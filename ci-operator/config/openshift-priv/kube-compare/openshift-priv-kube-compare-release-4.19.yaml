@@ -1,0 +1,99 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.0
+  ocp_4.18_cli:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: GOFLAGS="-mod=readonly" make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/openshift/kube-compare
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:cli
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: kube-compare-artifacts
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/markdownlint-install.sh
+tests:
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: unit
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: bin
+- as: unit-report-creator
+  commands: GOFLAGS="-mod=readonly" make test-report-creator
+  container:
+    from: bin
+  run_if_changed: ^addon-tools/report-creator/*$
+- as: golint
+  commands: |
+    make golangci-lint
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kube-compare
+    workflow: openshift-ci-security
+- as: modtidy
+  commands: go mod tidy && git diff --exit-code
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: kube-compare

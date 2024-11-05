@@ -3,6 +3,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.54.2
+  lightspeed-console-plugin:
+    name: lightspeed-console-plugin
+    namespace: ols
+    tag: latest
   lightspeed-service-api:
     name: lightspeed-service-api
     namespace: ols
@@ -33,6 +37,30 @@ operator:
     with: pipeline:lightspeed-operator
   - pullspec: quay.io/openshift-lightspeed/lightspeed-service-api:latest
     with: pipeline:lightspeed-service-api
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-operator.*
+    with: pipeline:lightspeed-operator
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-service.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/ols/lightspeed-console.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.stage.redhat.io/openshift-lightspeed-tech-preview/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.redhat.io/openshift-lightspeed-tech-preview/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-service-api-rhel9.*
+    with: pipeline:lightspeed-service-api
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-console-plugin-rhel9.*
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: registry.redhat.io/openshift-lightspeed-beta/lightspeed-rhel9-operator.*
+    with: pipeline:lightspeed-operator
 promotion:
   to:
   - namespace: ols
@@ -68,14 +96,21 @@ tests:
   container:
     clone: true
     from: golangci-lint
-- as: bundle-e2e
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: bundle-e2e-4-15
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: ols
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
-    test:
+    pre:
     - ref: ipi-install-rbac
+    test:
     - as: e2e-install
       cli: latest
       commands: |
@@ -107,9 +142,102 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: hypershift-hostedcluster-workflow
+    workflow: generic-claim
+- as: bundle-e2e-4-16
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: ols
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-bundle-test
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: bundle-e2e-4-17
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: ols
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-bundle-test
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 - as: security
-  optional: true
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk

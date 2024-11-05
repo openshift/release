@@ -70,6 +70,45 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-reboot-nodes-arm-f28
+  cron: 24 0 27 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_REBOOT_CHECK: "true"
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-usertags-arm-f14
+  cron: 3 20 5,19 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags
+- as: aws-upi-reboot-nodes-f28
+  cron: 5 13 3 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: aws-ipi-shared-phz-f14
   cron: 14 0 5,19 * *
   steps:
@@ -88,6 +127,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-ipi-additional-ca-always-arm-f14
+  cron: 56 13 14,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
 - as: azure-ipi-custom-nsg-f28
   cron: 20 20 23 * *
   steps:
@@ -162,7 +216,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -175,7 +229,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:413.92.2023101700
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.15.2024072409
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -216,8 +270,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -317,25 +371,72 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
-- as: nutanix-ipi-zones-single-osimage-customized-f28
+- as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
+  cron: 1 4 24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: ibmcloud-ipi-private-sshkey-f28
+  cron: 21 8 11 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
+- as: nutanix-ipi-zones-single-osimage-customized-reboot-nodes-f28
   cluster: build01
-  cron: 22 22 26 * *
+  cron: 21 19 3 * *
   steps:
     cluster_profile: nutanix-qe-zone
     env:
       CLUSTER_OS_IMAGE: https://rhcos.mirror.openshift.com/art/storage/prod/streams/4.16-9.4/builds/416.94.202405171948-0/x86_64/rhcos-416.94.202405171948-0-nutanix.x86_64.qcow2
+      COMPUTE_REPLICAS: "2"
+      ENABLE_REBOOT_CHECK: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       SINGLE_ZONE: "true"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+- as: nutanix-ipi-zones-invaid-fields-f28
+  cluster: build01
+  cron: 17 23 22 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-invalid-fields
 - as: vsphere-ipi-customized-resource-f28
   cron: 12 15 6 * *
   steps:
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+- as: vsphere-ipi-disktype-eagerzeroedthick-f28
+  cron: 7 21 26 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: eagerZeroedThick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
+- as: vsphere-ipi-disktype-thick-f28
+  cron: 35 22 6 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      DISK_TYPE: thick
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disktype
+- as: vsphere-ipi-invaid-fields-f28
+  cron: 4 15 19 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    workflow: cucushift-installer-rehearse-vsphere-ipi-invalid-fields
 zz_generated_metadata:
   branch: master
   org: openshift

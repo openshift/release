@@ -35,11 +35,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     prerelease:
@@ -61,8 +56,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-c2s-ipi-disc-priv-fips-f14
-  cron: 42 2 8,24 * *
+- as: aws-c2s-ipi-disc-priv-fips-f28
+  cron: 9 3 23 * *
   steps:
     cluster_profile: aws-c2s-qe
     env:
@@ -73,7 +68,7 @@ tests:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sts-ep-fips-f28
-  cron: 21 17 4 * *
+  cron: 36 2 6 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -84,29 +79,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-ovn-fips-f28
-  cron: 44 17 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: aws-ipi-proxy-sts-f28
-  cron: 13 9 22 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      ENABLE_OTA_TEST: OCP-24358
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-disc-fullyprivate-f28
-  cron: 24 10 24 * *
+  cron: 6 2 3 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -115,72 +89,30 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-fips-f28
-  cron: 6 15 1 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_OTA_TEST: OCP-56083
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-fullyprivate-proxy-f28
-  cron: 4 13 4 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_OTA_TEST: OCP-24358
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: gcp-ipi-disc-priv-oidc-f14
-  cron: 47 15 11,27 * *
+- as: gcp-ipi-disc-priv-oidc-fips-f28
+  cron: 55 9 1 * *
   steps:
     cluster_profile: gcp-qe
     env:
       ENABLE_OTA_TEST: OCP-30832
       EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-f14
-  cron: 2 7 3,17 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      ENABLE_OTA_TEST: OCP-24358
-    test:
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: ibmcloud-ipi-proxy-private-fips-rt-f14
-  cron: 55 18 7,21 * *
+- as: ibmcloud-ipi-proxy-private-rt-f14
+  cron: 29 11 10,26 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      FIPS_ENABLED: "true"
+      ENABLE_OTA_TEST: OCP-56083
       RT_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: nutanix-ipi-disc-rt-f14
+- as: nutanix-ipi-proxy-fips-f28
   cluster: build01
-  cron: 52 3 12,28 * *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      ENABLE_OTA_TEST: OCP-30832
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      RT_ENABLED: "true"
-    test:
-    - ref: nutanix-upgrade-pre-config
-    - chain: openshift-upgrade-qe-sanity-disconnected
-    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-proxy-fips-f14
-  cluster: build01
-  cron: 29 0 7,23 * *
+  cron: 23 5 6 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -191,8 +123,8 @@ tests:
     - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-disc-f14
-  cron: 21 4 14,28 * *
+- as: vsphere-ipi-disc-f28
+  cron: 5 11 10 * *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -203,8 +135,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
-- as: vsphere-ipi-proxy-fips-f14
-  cron: 5 6 5,19 * *
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 22 14 7 * *
   steps:
     cluster_profile: vsphere-dis-2
     env:

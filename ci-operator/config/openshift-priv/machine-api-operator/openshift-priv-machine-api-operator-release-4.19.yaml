@@ -1,0 +1,240 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/machine-api-operator
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: machine-api-operator
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: verify-crds-sync
+  commands: IS_CONTAINER=TRUE make verify-crds-sync
+  container:
+    from: src
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-azure-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-azure-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-gcp-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-metal-ipi
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-upgrade
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-virtualmedia
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-vsphere-ovn-serial
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-serial
+- as: e2e-nutanix
+  cluster: build01
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: e2e-vsphere-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-upgrade-vsphere
+- as: e2e-vsphere-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- as: e2e-openstack
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  steps:
+    cluster_profile: openstack-vexxhost
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: machine-api-operator

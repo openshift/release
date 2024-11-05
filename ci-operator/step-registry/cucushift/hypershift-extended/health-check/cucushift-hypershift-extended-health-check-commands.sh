@@ -75,7 +75,8 @@ function check_pod_status {
             echo "Pod $pod in namespace $namespace has status $status, which is not valid."
             return 1
         fi
-    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix")
+    # ignore osd pods in for rosa hcp since it takes a very long time to recover for some reason.
+    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix" | grep -v "osd-delete-backplane")
     echo "All pods are in the expected state."
     return 0
 }
@@ -142,3 +143,4 @@ print_clusterversion
 check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
+oc get pod -A > "${ARTIFACT_DIR}/guest-pods"

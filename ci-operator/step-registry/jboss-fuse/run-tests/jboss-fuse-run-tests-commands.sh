@@ -180,12 +180,16 @@ function check_tests() {
            oc wait --for=delete deployment/$todelete -n jboss-fuse-interop --timeout=120s
            sleep 120
          else
+           echo "Store $currentPod logs"
+           oc logs --tail=5000 "$currentPod" -n jboss-fuse-interop > "${ARTIFACT_DIR}"/run-"$currentPod".log
            trymap[$currentTest]=$(expr ${trymap[$currentTest]} + 1)
            currentRetriesNumber=${trymap[$currentTest]}
            echo "$currentPod was unsuccessful at first attempt, rerun #$currentRetriesNumber"
            restartPodAfterFailure $currentPod ${trymap[$currentTest]}
          fi
        elif [[ "$podlog" == *"BUILD FAILURE"* ]]; then
+         echo "Store $currentPod logs"
+         oc logs --tail=5000 "$currentPod" -n jboss-fuse-interop > "${ARTIFACT_DIR}"/run-"$currentPod".log
          trymap[$currentTest]=$(expr ${trymap[$currentTest]} + 1)
          currentRetriesNumber=${trymap[$currentTest]}
          echo "$currentPod was in build failure at first attempt, rerun #$currentRetriesNumber"

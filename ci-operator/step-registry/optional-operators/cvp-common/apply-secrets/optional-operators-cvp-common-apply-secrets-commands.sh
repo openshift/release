@@ -11,15 +11,15 @@ PYXIS_URL="${PYXIS_URL:-""}"
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
 OO_PACKAGE="${OO_PACKAGE:-"cpaas-test-operator-bundle"}"
 
-echo "Creating a new NAMESPACE"
+echo "[$(date --utc +%FT%T.%3NZ)] Creating a new NAMESPACE"
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
-    echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '!create': creating new namespace"
     NS_NAMESTANZA="generateName: oo-"
 elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
     NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
 else
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
 fi
 
 if [[ -n "${NS_NAMESTANZA:-}" ]]; then
@@ -36,9 +36,9 @@ fi
 
 # Check if PYXIS_URL exists, skip the whole step if not.
 if [[ -z "$PYXIS_URL" ]]; then
-    echo "PYXIS_URL is not defined!"
+    echo "[$(date --utc +%FT%T.%3NZ)] PYXIS_URL is not defined!"
 else
-    echo "PYXIS_URL is defined, proceeding with cvp-common-apply-secrets from PYXIS"
+    echo "[$(date --utc +%FT%T.%3NZ)] PYXIS_URL is defined, proceeding with cvp-common-apply-secrets from PYXIS"
     # Creating file that contains namespace name
     echo "$OO_INSTALL_NAMESPACE" > "${SHARED_DIR}"/operator-install-namespace.txt
     GPG_KEY=${GPG_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-gpg.key} # Secret file which will be mounted by DPTP
@@ -46,15 +46,15 @@ else
     PKCS12_CERT=${PKCS12_CERT:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.cert} # Secret file which will be mounted by DPTP
     PKCS12_KEY=${PKCS12_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.key} # Secret file which will be mounted by DPTP
 
-    echo "Fetching the kube_objects from Pyxis for ISV pid ${PYXIS_URL}"
+    echo "[$(date --utc +%FT%T.%3NZ)] Fetching the kube_objects from Pyxis for ISV pid ${PYXIS_URL}"
     touch /tmp/get_kubeObjects.txt
     curl --key "${PKCS12_KEY}" --cert "${PKCS12_CERT}" "${PYXIS_URL}" | jq -r ".container.kube_objects" > /tmp/get_kubeObjects.txt
 
-    echo "Decrypting the kube_objects fetched from Pyxis"
+    echo "[$(date --utc +%FT%T.%3NZ)] Decrypting the kube_objects fetched from Pyxis"
     gpg --batch --yes --quiet --pinentry-mode loopback --import --passphrase-file "${GPG_PASS}" "${GPG_KEY}"
     gpg --batch --yes --quiet --pinentry-mode loopback --decrypt --passphrase-file "${GPG_PASS}" /tmp/get_kubeObjects.txt > /tmp/kube_objects.yaml
 
-    echo "Applying the kube_objects on the testing OCP cluster"
+    echo "[$(date --utc +%FT%T.%3NZ)] Applying the kube_objects on the testing OCP cluster"
     oc apply -f /tmp/kube_objects.yaml -n "$OO_INSTALL_NAMESPACE"
 
     # Remove the kube objects file just in case
@@ -69,10 +69,10 @@ CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH:=/var/run/}"
 # the following command lists all the kubeobjects mounted on CUSTOM_KUBEOBJECTS_PATH 
 # with prefix "custom-" and also package name within the name of the file.
 
-echo "The following variables are being used:"
-echo "custom kubeobjects path: ${CUSTOM_KUBEOBJECTS_PATH}"
-echo "keyword_custom_kubeobjects: ${KEYWORD_CUSTOM_KUBEOBJECTS}"
-echo "The OO_package : ${OO_PACKAGE}"
+echo "[$(date --utc +%FT%T.%3NZ)] The following variables are being used:"
+echo "[$(date --utc +%FT%T.%3NZ)] custom kubeobjects path: ${CUSTOM_KUBEOBJECTS_PATH}"
+echo "[$(date --utc +%FT%T.%3NZ)] keyword_custom_kubeobjects: ${KEYWORD_CUSTOM_KUBEOBJECTS}"
+echo "[$(date --utc +%FT%T.%3NZ)] The OO_package : ${OO_PACKAGE}"
 
 CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"
 
@@ -81,9 +81,9 @@ CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}
 
 if [ ! -d "${CUSTOM_KUBEOBJECTS_PATH}" ]
 then
-    echo "Directory ${CUSTOM_KUBEOBJECTS_PATH} DOES NOT exists."
-    echo "Please check the vault"
-    echo "The following step gracefully exits now"
+    echo "[$(date --utc +%FT%T.%3NZ)] Directory ${CUSTOM_KUBEOBJECTS_PATH} DOES NOT exists."
+    echo "[$(date --utc +%FT%T.%3NZ)] Please check the vault"
+    echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution Successfully !"
     exit 0 
 fi
 
@@ -94,17 +94,17 @@ LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}"* -type f -name kube_obje
 if [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
     for i in "${LIST_OF_KUBEOBJECTS[@]}"
     do
-	echo "The following custom kubeobject has been found ! $i"
-	echo "Check if the namespace is mentioned inside the kubeobjects"
+	echo "[$(date --utc +%FT%T.%3NZ)] The following custom kubeobject has been found ! $i"
+	echo "[$(date --utc +%FT%T.%3NZ)]  Check if the namespace is mentioned inside the kubeobjects"
         if oc apply -f "$i" --dry-run=client | grep  "^namespace/"
         then
-            echo "Namespace found in kubeobjects. Applying directly"
+            echo "[$(date --utc +%FT%T.%3NZ)] Namespace found in kubeobjects. Applying directly"
 	    oc apply -f "$i"
         else
-            echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
+            echo "[$(date --utc +%FT%T.%3NZ)] Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
             oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
         fi	
     done
 else
-    echo "Could not find any kubeobjects please check the vault"
+    echo "[$(date --utc +%FT%T.%3NZ)] Could not find any kubeobjects please check the vault"
 fi

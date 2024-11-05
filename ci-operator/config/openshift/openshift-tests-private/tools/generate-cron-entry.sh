@@ -21,7 +21,7 @@ fi
 TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
 
-if [[ "${TEST_NAME}" =~ (-disabled|-disasterrecovery|powervs-) ]] && [[ "$@" != *\ --force* ]]; then
+if [[ "${TEST_NAME}" =~ (-disabled|-disasterrecovery|powervs-|ppc64le) ]] && [[ "$@" != *\ --force* ]]; then
     echo "The test config ${TEST_NAME} should not get changes in the cron entry as
       the schedule rotation scheme is different than the other tests.
       Use --force to skip this check."
@@ -52,10 +52,12 @@ let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
 
-# For f360 jobs, hard code the cron to:
-# 	Feb 16
-if [[ "${TEST_NAME}" =~ -f360 ]] ; then
-	DAY_OF_MONTH=16
+# For f999 jobs, hard code the cron to:
+# 	Feb 29, 8:08
+if [[ "${TEST_NAME}" =~ -f999 ]] ; then
+	MINUTE=8
+	HOUR=8
+	DAY_OF_MONTH=29
 	MONTH=2
 fi
 
@@ -99,6 +101,9 @@ case "$FN" in
 		done
 		MONTH_FINAL=$(echo $MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
 		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH_FINAL *"
+		;;
+	999)
+		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH *"
 		;;
 	*)
 		echo "to be implemented"

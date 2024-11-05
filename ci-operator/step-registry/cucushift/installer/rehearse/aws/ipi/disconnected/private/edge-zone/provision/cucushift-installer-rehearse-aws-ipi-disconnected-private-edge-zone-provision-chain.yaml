@@ -1,0 +1,67 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone-provision
+  steps:
+  - ref: openshift-cluster-bot-rbac
+  - ref: aws-provision-vpc-disconnected
+  - chain: aws-provision-edge-zone-subnet
+  - chain: aws-provision-bastionhost
+  - ref: aws-provision-security-group
+  - chain: mirror-images-by-oc-adm
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-aws
+  - ref: ipi-conf-aws-custom-security-groups
+  - ref: ipi-conf-aws-edge-zone
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: aws-provision-cco-manual-users-static
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - ref: ipi-conf-aws-usage-info
+  - ref: ipi-install-install-aws
+  - ref: health-check-node-count
+  - ref: ipi-install-times-collection
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - ref: storage-conf-storageclass-set-default-storageclass
+  - ref: cucushift-installer-check-aws-edge-zone
+  - chain: cucushift-installer-check
+  env:
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: "Instance type for control plane nodes"
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: "Instance type for compute nodes"
+  - name: ENABLE_AWS_EDGE_ZONE
+    default: "yes"
+  - name: EDGE_ZONE_TYPES
+    default: "local-zone"
+  - name: EDGE_NODE_WORKER_NUMBER
+    default: "1"
+  - name: EDGE_NODE_INSTANCE_TYPE
+    default: ""
+  - name: EDGE_NODE_WORKER_SCHEDULABLE
+    default: "no"
+  - name: EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP
+    default: "no"
+  - name: EDGE_NODE_INSTANCE_TYPE
+    default: ""
+  - name: EXPECTED_COMPUTE_NODE_COUNT
+    default: "4"
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Enable manually create apps dns record."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "gp2-csi"
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
+    Additional worker nodes will be created in Local Zone with taints:NoSchedule
+

@@ -15,6 +15,10 @@ function cleanup() {
     kill ${CHILDREN} && wait
   fi
 
+  if [ -f "${STORE_PATH}/e2e-events.json" ]; then
+    cp "${STORE_PATH}/e2e-events.json" "${ARTIFACT_DIR}/e2e-events-observer.json"
+  fi
+
   tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
   rm -rf $STORE_PATH
 
@@ -61,6 +65,6 @@ then
 fi
 
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
-DISABLED_MONITOR_TESTS="apiserver-availability,apiserver-new-disruption-invariant,disruption-summary-serializer,external-service-availability,incluster-disruption-serializer,image-registry-availability,ingress-availability,pod-network-avalibility,service-type-load-balancer-availability"
+DISABLED_MONITOR_TESTS="apiserver-new-disruption-invariant,disruption-summary-serializer,incluster-disruption-serializer,pod-network-avalibility"
 openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
 wait

@@ -1,0 +1,88 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.18_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/coredns/coredns
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: coredns
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  bin:
+    requests:
+      memory: 4Gi
+  unit:
+    requests:
+      memory: 4Gi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-serial
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-serial
+- as: e2e-metal-ipi-ovn
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e-ovn-dualstack
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: coredns

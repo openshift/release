@@ -24,6 +24,8 @@ declare vsphere_cluster
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
@@ -79,6 +81,7 @@ declare vsphere_datastore
 declare vsphere_url
 declare vsphere_cluster
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -110,8 +113,8 @@ set -o errexit
 
 Z_VERSION=1000
 
-if [ ! -z ${VERSION} ]; then
-  Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
+if [ ! -z "${VERSION}" ]; then
+  Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
   echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
 else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
@@ -167,7 +170,6 @@ fi
 if [ "${Z_VERSION}" -lt 13 ]; then
   cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
   datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
-
   cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES

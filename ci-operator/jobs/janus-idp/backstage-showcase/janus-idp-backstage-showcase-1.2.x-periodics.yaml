@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build10
   cron: 0 5 * * *
   decorate: true
   decoration_config:
@@ -13,6 +13,19 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-janus-idp-backstage-showcase-1.2.x-e2e-tests-nightly
+  reporter_config:
+    slack:
+      channel: '#rhdh-e2e-test-alerts'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+        :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*. Open
+        Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-1.2.x-e2e-tests-nightly/{{.Status.BuildID}}/artifacts/e2e-tests-nightly/janus-idp-backstage-showcase-1.2.x-nightly/artifacts/showcase-ci-nightly/index.html|nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-1.2.x-e2e-tests-nightly/{{.Status.BuildID}}/artifacts/e2e-tests-nightly/janus-idp-backstage-showcase-1.2.x-nightly/artifacts/showcase-rbac-nightly/index.html|rbac-nightly>
+        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/periodic-ci-janus-idp-backstage-showcase-1.2.x-e2e-tests-nightly/{{.Status.BuildID}}/artifacts/e2e-tests-nightly/janus-idp-backstage-showcase-1.2.x-nightly/artifacts/|Open
+        artifacts> | <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:

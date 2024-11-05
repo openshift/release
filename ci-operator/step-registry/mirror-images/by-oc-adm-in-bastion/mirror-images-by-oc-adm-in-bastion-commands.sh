@@ -5,6 +5,13 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
@@ -79,11 +86,9 @@ scp ${ssh_options} "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remo
 
 mirror_crd_type='icsp'
 regex_keyword_1="imageContentSources"
-regex_keyword_2="ImageContentSourcePolicy"
 if [[ "${ENABLE_IDMS}" == "yes" ]]; then
     mirror_crd_type='idms'
     regex_keyword_1="imageDigestSources"
-    regex_keyword_2="ImageDigestMirrorSet"
 fi
 
 # set the release mirror args
@@ -120,8 +125,11 @@ cmd="oc adm release -a '${remote_pull_secret}' mirror ${args[*]}"
 ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
 "${cmd}" | tee "${mirror_output}"
 
-grep -A 6 "${regex_keyword_1}" ${mirror_output} > "${install_config_mirror_patch}"
-grep -B 1 -A 10 "kind: ${regex_keyword_2}" ${mirror_output} > "${cluster_mirror_conf_file}"
+line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+install_end_line_num=$(expr ${line_num} - 3) &&
+upgrade_start_line_num=$(expr ${line_num} + 2) &&
+sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
+sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
 
 run_command "cat '${install_config_mirror_patch}'"
 rm -f "${new_pull_secret}"

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -69,7 +69,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aro-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -133,7 +133,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/eks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -193,11 +193,74 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )eks-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/gke-nongroovy-compatibility-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-gke-nongroovy-compatibility-tests
+    optional: true
+    rerun_command: /test gke-nongroovy-compatibility-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=gke-nongroovy-compatibility-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gke-nongroovy-compatibility-tests,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -206,7 +269,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-gke-nongroovy-e2e-tests
-    optional: true
     rerun_command: /test gke-nongroovy-e2e-tests
     spec:
       containers:
@@ -260,7 +322,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -325,7 +387,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-perf-scale-tests
     decorate: true
     decoration_config:
@@ -389,7 +451,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -454,7 +516,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-race-condition-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -518,7 +580,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-scale-tests
     decorate: true
     decoration_config:
@@ -581,7 +643,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-scanner-v4-tests
     decorate: true
     decoration_config:
@@ -645,7 +707,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -709,7 +771,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -774,7 +836,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-upgrade-tests
     decorate: true
     decoration_config:
@@ -837,7 +899,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-version-compatibility-tests
     decorate: true
     decoration_config:
@@ -901,71 +963,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ibmcloudz-4-13-qa-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ibmcloudz-4-13-qa-e2e-tests
-    optional: true
-    rerun_command: /test ibmcloudz-4-13-qa-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ibmcloudz-4-13-qa-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ibmcloudz-4-13-qa-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ibmcloudz-4-14-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1029,7 +1027,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ibmcloudz-4-15-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1093,7 +1091,71 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
+    context: ci/prow/ibmcloudz-4-16-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 6h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-ibmcloudz-4-16-qa-e2e-tests
+    optional: true
+    rerun_command: /test ibmcloudz-4-16-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ibmcloudz-4-16-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ibmcloudz-4-16-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/ocp-4-12-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -1153,7 +1215,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1213,7 +1275,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -1272,7 +1334,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -1332,7 +1394,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1392,7 +1454,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-scanner-v4-tests
     decorate: true
     decoration_config:
@@ -1452,7 +1514,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -1511,7 +1573,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-12-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -1571,19 +1633,19 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-compliance-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-compliance-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-compliance-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-compliance-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-compliance-e2e-tests
+    rerun_command: /test ocp-4-17-compliance-e2e-tests
     run_if_changed: ^(compliance|central\/compliance.*)
     spec:
       containers:
@@ -1592,7 +1654,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=compliance-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1625,25 +1687,84 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-compliance-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-compliance-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-ebpf-qa-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-crun-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-ebpf-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-crun-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-ebpf-qa-e2e-tests
+    rerun_command: /test ocp-4-17-crun-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=crun-qa-e2e-tests
+        - --variant=ocp-4-17
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp-4-17-crun-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/ocp-4-17-ebpf-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/variant: ocp-4-17
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-ebpf-qa-e2e-tests
+    optional: true
+    rerun_command: /test ocp-4-17-ebpf-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1651,7 +1772,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ebpf-qa-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1684,25 +1805,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-ebpf-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-ebpf-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-fips-qa-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-fips-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-fips-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-fips-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-fips-qa-e2e-tests
+    rerun_command: /test ocp-4-17-fips-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1710,7 +1831,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=fips-qa-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1743,25 +1864,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-fips-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-fips-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-nongroovy-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-nongroovy-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-nongroovy-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-nongroovy-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-nongroovy-e2e-tests
+    rerun_command: /test ocp-4-17-nongroovy-e2e-tests
     spec:
       containers:
       - args:
@@ -1769,7 +1890,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=nongroovy-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1802,25 +1923,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-nongroovy-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-nongroovy-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-operator-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-operator-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-operator-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-operator-e2e-tests
+    rerun_command: /test ocp-4-17-operator-e2e-tests
     run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
@@ -1829,7 +1950,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=operator-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1862,25 +1983,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-operator-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-qa-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-qa-e2e-tests
+    rerun_command: /test ocp-4-17-qa-e2e-tests
     run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
@@ -1889,7 +2010,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=qa-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1922,25 +2043,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-scanner-v4-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-scanner-v4-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-scanner-v4-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-scanner-v4-tests
     optional: true
-    rerun_command: /test ocp-4-15-scanner-v4-tests
+    rerun_command: /test ocp-4-17-scanner-v4-tests
     run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
     spec:
       containers:
@@ -1949,7 +2070,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=scanner-v4-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1982,25 +2103,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-scanner-v4-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-scanner-v4-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-sensor-integration-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-sensor-integration-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-sensor-integration-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-sensor-integration-tests
     optional: true
-    rerun_command: /test ocp-4-15-sensor-integration-tests
+    rerun_command: /test ocp-4-17-sensor-integration-tests
     spec:
       containers:
       - args:
@@ -2008,7 +2129,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=sensor-integration-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2041,25 +2162,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-sensor-integration-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-sensor-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-15-ui-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-17-ui-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-15
+      ci-operator.openshift.io/variant: ocp-4-17
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-15-ui-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-17-ui-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-15-ui-e2e-tests
+    rerun_command: /test ocp-4-17-ui-e2e-tests
     run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)/
     spec:
       containers:
@@ -2068,7 +2189,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ui-e2e-tests
-        - --variant=ocp-4-15
+        - --variant=ocp-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2101,13 +2222,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-15-ui-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-17-ui-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -2166,7 +2287,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2225,7 +2346,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-fips-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2284,7 +2405,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -2343,7 +2464,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -2402,7 +2523,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2461,7 +2582,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-scanner-v4-tests
     decorate: true
     decoration_config:
@@ -2520,7 +2641,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -2579,7 +2700,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-dev-preview-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -2638,7 +2759,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -2697,7 +2818,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2756,7 +2877,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-fips-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2815,7 +2936,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -2874,7 +2995,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -2933,7 +3054,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2992,7 +3113,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-scanner-v4-tests
     decorate: true
     decoration_config:
@@ -3051,7 +3172,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -3110,7 +3231,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-next-candidate-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -3169,7 +3290,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -3228,7 +3349,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -3287,7 +3408,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -3346,7 +3467,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -3405,7 +3526,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-perf-scale-tests
     decorate: true
     decoration_config:
@@ -3464,7 +3585,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -3523,7 +3644,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-scanner-v4-tests
     decorate: true
     decoration_config:
@@ -3582,7 +3703,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -3641,7 +3762,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-stable-scanner-v4-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -3700,7 +3821,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/osd-aws-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -3764,7 +3885,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/osd-gcp-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -3828,263 +3949,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/powervs-4-12-qa-corebpf-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-4-12-qa-corebpf-e2e-tests
-    optional: true
-    rerun_command: /test powervs-4-12-qa-corebpf-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-4-12-qa-corebpf-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-4-12-qa-corebpf-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/powervs-4-12-qa-ebpf-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-4-12-qa-ebpf-e2e-tests
-    optional: true
-    rerun_command: /test powervs-4-12-qa-ebpf-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-4-12-qa-ebpf-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-4-12-qa-ebpf-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/powervs-4-13-qa-corebpf-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-4-13-qa-corebpf-e2e-tests
-    optional: true
-    rerun_command: /test powervs-4-13-qa-corebpf-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-4-13-qa-corebpf-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-4-13-qa-corebpf-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/powervs-4-13-qa-ebpf-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-4-13-qa-ebpf-e2e-tests
-    optional: true
-    rerun_command: /test powervs-4-13-qa-ebpf-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-4-13-qa-ebpf-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-4-13-qa-ebpf-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/powervs-4-14-qa-corebpf-e2e-tests
     decorate: true
     decoration_config:
@@ -4148,8 +4013,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/powervs-4-14-qa-ebpf-e2e-tests
+    cluster: build01
+    context: ci/prow/powervs-4-15-qa-corebpf-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -4157,9 +4022,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-4-14-qa-ebpf-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-powervs-4-15-qa-corebpf-e2e-tests
     optional: true
-    rerun_command: /test powervs-4-14-qa-ebpf-e2e-tests
+    rerun_command: /test powervs-4-15-qa-corebpf-e2e-tests
     spec:
       containers:
       - args:
@@ -4167,7 +4032,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-4-14-qa-ebpf-e2e-tests
+        - --target=powervs-4-15-qa-corebpf-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -4206,13 +4071,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-4-14-qa-ebpf-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )powervs-4-15-qa-corebpf-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/powervs-4-16-qa-corebpf-e2e-tests
     decorate: true
     decoration_config:
@@ -4276,8 +4141,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/powervs-qa-corebpf-e2e-tests
+    cluster: build01
+    context: ci/prow/powervs-4-17-qa-corebpf-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -4285,9 +4150,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-qa-corebpf-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-powervs-4-17-qa-corebpf-e2e-tests
     optional: true
-    rerun_command: /test powervs-qa-corebpf-e2e-tests
+    rerun_command: /test powervs-4-17-qa-corebpf-e2e-tests
     spec:
       containers:
       - args:
@@ -4295,7 +4160,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-qa-corebpf-e2e-tests
+        - --target=powervs-4-17-qa-corebpf-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -4334,77 +4199,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-qa-corebpf-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )powervs-4-17-qa-corebpf-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/powervs-qa-ebpf-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-powervs-qa-ebpf-e2e-tests
-    optional: true
-    rerun_command: /test powervs-qa-ebpf-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=powervs-qa-ebpf-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )powervs-qa-ebpf-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/rosa-hcp-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -4468,7 +4269,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/rosa-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -4532,7 +4333,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:
@@ -4595,7 +4396,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ui-component-tests
     decorate: true
     decoration_config:

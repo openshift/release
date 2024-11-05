@@ -27,24 +27,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
@@ -131,7 +119,7 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: subsystem-test-periodic
-  cron: 00 00 */1 * 0,3
+  cron: 00 13 * * 2
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
 build_root:
   from_repository: true
 images:
@@ -21,8 +25,7 @@ images:
   to: cluster-control-plane-machine-set-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   arm64-latest:
@@ -270,6 +273,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: regression-clusterinfra-aws-ipi-cpms-allcases
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h45m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

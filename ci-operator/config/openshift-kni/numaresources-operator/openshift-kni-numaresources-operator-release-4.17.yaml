@@ -1,0 +1,168 @@
+base_images:
+  os-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
+  build-topics
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile.must-gather
+  from: os-min9
+  to: numaresources-must-gather
+- dockerfile_path: Dockerfile.openshift
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/manager
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+  to: numaresources-operator
+- dockerfile_path: Dockerfile.openshift.rte
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+  to: resource-topology-exporter
+- dockerfile_path: Dockerfile.openshift.tests
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+  to: numaresources-operator-tests
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.17.999-snapshot
+    with: numaresources-operator
+promotion:
+  to:
+  - name: numaresources-operator-4.17
+    namespace: ocp-kni
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 250Mi
+tests:
+- as: ci-unit
+  commands: make test-unit
+  container:
+    from: src
+- as: ci-install-e2e
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.17
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-release-4.17
+        ci-job-type ci-install-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: ci-e2e
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.17
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-release-4.17
+        ci-job-type ci-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: ci-must-gather-e2e
+  cron: 42 0 * * *
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.17
+        ci-job-fullname openshift-kni-ci-must-gather-e2e-numaresources-operator-release-4.17
+        ci-job-type ci-must-gather-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: must-gather-e2e-test
+      cli: latest
+      commands: make test-must-gather-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: numaresources-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-kni
+  repo: numaresources-operator

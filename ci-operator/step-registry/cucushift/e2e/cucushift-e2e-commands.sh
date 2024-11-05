@@ -39,7 +39,7 @@ function set_cluster_access() {
     fi
 }
 function preparation_for_test() {
-    if ! which kubectl > /dev/null ; then
+    if ! which kubectl &> /dev/null ; then
         mkdir --parents /tmp/bin
         export PATH=$PATH:/tmp/bin
         ln --symbolic "$(which oc)" /tmp/bin/kubectl
@@ -165,7 +165,7 @@ function filter_test_by_capability() {
     local enabledcaps xversion yversion
     enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    local v411 v412 v413 v414 v415 v416 v417
+    local v411 v412 v413 v414 v415 v416 v417 v418
     v411="baremetal marketplace openshift-samples"
     v412="${v411} Console Insights Storage CSISnapshot"
     v413="${v412} NodeTuning"
@@ -173,6 +173,7 @@ function filter_test_by_capability() {
     v415="${v414} OperatorLifecycleManager CloudCredential"
     v416="${v415} CloudControllerManager Ingress"
     v417="${v416}"
+    v418="${v417}"
     # [console]=console
     # the first `console` is the capability name
     # the second `console` is the tag name in verification-tests
@@ -197,6 +198,9 @@ function filter_test_by_capability() {
     local versioncaps
     versioncaps="$v416"
     case "$xversion.$yversion" in
+        4.18)
+            versioncaps="$v418"
+            ;;
         4.17)
             versioncaps="$v417"
             ;;
@@ -339,25 +343,42 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
-    failures=0 errors=0 skipped=0 tests=0
-    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+        echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+        exit 0
+    else
+        echo "Artifact dir '${ARTIFACT_DIR}' exist"
+        ls -lR "${ARTIFACT_DIR}"
+        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+        if [[ "$files" -eq 0 ]] ; then
+            echo "There are no JUnit files"
+            exit 0
+        fi
+    fi
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
 cucushift-e2e:
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
-    if [ $((failures)) != 0 ] ; then
+
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
-        for (( i=0; i<failures; i++ )) ; do
+        for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi

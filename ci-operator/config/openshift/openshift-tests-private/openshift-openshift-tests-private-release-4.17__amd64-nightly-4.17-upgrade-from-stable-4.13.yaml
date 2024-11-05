@@ -1,0 +1,187 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  custom:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  intermediate414:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  intermediate415:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  intermediate416:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.13"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: baremetalds-ipi-ovn-ipv6-fips-f28
+  cron: 54 23 13 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: gcp-upi-private-xpn-sdn-f28
+  cron: 41 14 28 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-sdn
+- as: vsphere-ipi-ovn-dualstack-f28
+  cron: 3 20 10 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
+- as: nutanix-ipi-proxy-fips-f28
+  cluster: build01
+  cron: 25 2 23 * *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: nutanix-upgrade-pre-config
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.17-upgrade-from-stable-4.13

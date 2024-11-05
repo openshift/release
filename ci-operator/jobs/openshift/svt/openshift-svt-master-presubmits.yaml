@@ -1,22 +1,20 @@
 presubmits:
   openshift/svt:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-aws-4.15-nightly-x86-images
+    cluster: build09
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: reliability-v2-aws-4.15-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-aws-4.15-nightly-x86-images
-    rerun_command: /test reliability-v2-aws-4.15-nightly-x86-images
+    name: pull-ci-openshift-svt-master-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -24,7 +22,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=reliability-v2-aws-4.15-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,26 +54,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )reliability-v2-aws-4.15-nightly-x86-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-aws-4.15-nightly-x86-reliability-v2-1h
+    context: ci/prow/regression-aws-4.17-nightly-x86-regression-scale-affinity-rules
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-aws-4.15-nightly-x86
+      ci-operator.openshift.io/variant: regression-aws-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-aws-4.15-nightly-x86-reliability-v2-1h
-    rerun_command: /test reliability-v2-aws-4.15-nightly-x86-reliability-v2-1h
+    name: pull-ci-openshift-svt-master-regression-aws-4.17-nightly-x86-regression-scale-affinity-rules
+    rerun_command: /test regression-aws-4.17-nightly-x86-regression-scale-affinity-rules
     spec:
       containers:
       - args:
@@ -85,9 +82,162 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-1h-cluster-profile
+        - --target=regression-scale-affinity-rules
+        - --variant=regression-aws-4.17-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(regression-aws-4.17-nightly-x86-regression-scale-affinity-rules|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/regression-aws-4.17-nightly-x86-regression-scale-loaded-projects
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: regression-aws-4.17-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-svt-master-regression-aws-4.17-nightly-x86-regression-scale-loaded-projects
+    rerun_command: /test regression-aws-4.17-nightly-x86-regression-scale-loaded-projects
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=regression-scale-loaded-projects
+        - --variant=regression-aws-4.17-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(regression-aws-4.17-nightly-x86-regression-scale-loaded-projects|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/reliability-v2-aws-4.17-nightly-x86-reliability-v2-1h
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: reliability-v2-aws-4.17-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-svt-master-reliability-v2-aws-4.17-nightly-x86-reliability-v2-1h
+    rerun_command: /test reliability-v2-aws-4.17-nightly-x86-reliability-v2-1h
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=reliability-v2-1h
-        - --variant=reliability-v2-aws-4.15-nightly-x86
+        - --variant=reliability-v2-aws-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -103,8 +253,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-1h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -128,9 +276,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -140,26 +285,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-aws-4.15-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-aws-4.17-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-aws-4.15-nightly-x86-reliability-v2-20h
+    context: ci/prow/reliability-v2-aws-4.17-nightly-x86-reliability-v2-20h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-aws-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-aws-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-aws-4.15-nightly-x86-reliability-v2-20h
-    rerun_command: /test reliability-v2-aws-4.15-nightly-x86-reliability-v2-20h
+    name: pull-ci-openshift-svt-master-reliability-v2-aws-4.17-nightly-x86-reliability-v2-20h
+    rerun_command: /test reliability-v2-aws-4.17-nightly-x86-reliability-v2-20h
     spec:
       containers:
       - args:
@@ -168,9 +313,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-20h-cluster-profile
         - --target=reliability-v2-20h
-        - --variant=reliability-v2-aws-4.15-nightly-x86
+        - --variant=reliability-v2-aws-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -186,8 +330,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-20h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -211,9 +353,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -223,84 +362,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-aws-4.15-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-azure-4.15-nightly-x86-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: reliability-v2-azure-4.15-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-azure-4.15-nightly-x86-images
-    rerun_command: /test reliability-v2-azure-4.15-nightly-x86-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=reliability-v2-azure-4.15-nightly-x86
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )reliability-v2-azure-4.15-nightly-x86-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-aws-4.17-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-azure-4.15-nightly-x86-reliability-v2-10h
+    cluster: build09
+    context: ci/prow/reliability-v2-azure-4.17-nightly-x86-reliability-v2-10h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-      ci-operator.openshift.io/variant: reliability-v2-azure-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-azure-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-azure-4.15-nightly-x86-reliability-v2-10h
-    rerun_command: /test reliability-v2-azure-4.15-nightly-x86-reliability-v2-10h
+    name: pull-ci-openshift-svt-master-reliability-v2-azure-4.17-nightly-x86-reliability-v2-10h
+    rerun_command: /test reliability-v2-azure-4.17-nightly-x86-reliability-v2-10h
     spec:
       containers:
       - args:
@@ -309,9 +390,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-10h-cluster-profile
         - --target=reliability-v2-10h
-        - --variant=reliability-v2-azure-4.15-nightly-x86
+        - --variant=reliability-v2-azure-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -327,8 +407,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-10h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -352,9 +430,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -364,26 +439,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-azure-4.15-nightly-x86-reliability-v2-10h|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-azure-4.17-nightly-x86-reliability-v2-10h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-azure-4.15-nightly-x86-reliability-v2-1h
+    cluster: build09
+    context: ci/prow/reliability-v2-azure-4.17-nightly-x86-reliability-v2-1h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-      ci-operator.openshift.io/variant: reliability-v2-azure-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-azure-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-azure-4.15-nightly-x86-reliability-v2-1h
-    rerun_command: /test reliability-v2-azure-4.15-nightly-x86-reliability-v2-1h
+    name: pull-ci-openshift-svt-master-reliability-v2-azure-4.17-nightly-x86-reliability-v2-1h
+    rerun_command: /test reliability-v2-azure-4.17-nightly-x86-reliability-v2-1h
     spec:
       containers:
       - args:
@@ -392,9 +467,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-1h-cluster-profile
         - --target=reliability-v2-1h
-        - --variant=reliability-v2-azure-4.15-nightly-x86
+        - --variant=reliability-v2-azure-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -410,8 +484,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-1h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -435,9 +507,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -447,84 +516,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-azure-4.15-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-rosa-4.15-nightly-x86-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: reliability-v2-rosa-4.15-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa-4.15-nightly-x86-images
-    rerun_command: /test reliability-v2-rosa-4.15-nightly-x86-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=reliability-v2-rosa-4.15-nightly-x86
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )reliability-v2-rosa-4.15-nightly-x86-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-azure-4.17-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-rosa-4.15-nightly-x86-reliability-v2-1h
+    context: ci/prow/reliability-v2-rosa-4.17-nightly-x86-reliability-v2-1h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-rosa-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-rosa-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa-4.15-nightly-x86-reliability-v2-1h
-    rerun_command: /test reliability-v2-rosa-4.15-nightly-x86-reliability-v2-1h
+    name: pull-ci-openshift-svt-master-reliability-v2-rosa-4.17-nightly-x86-reliability-v2-1h
+    rerun_command: /test reliability-v2-rosa-4.17-nightly-x86-reliability-v2-1h
     spec:
       containers:
       - args:
@@ -533,9 +544,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-1h-cluster-profile
         - --target=reliability-v2-1h
-        - --variant=reliability-v2-rosa-4.15-nightly-x86
+        - --variant=reliability-v2-rosa-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -551,8 +561,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-1h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -576,9 +584,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -588,26 +593,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-rosa-4.15-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-rosa-4.17-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-rosa-4.15-nightly-x86-reliability-v2-20h
+    context: ci/prow/reliability-v2-rosa-4.17-nightly-x86-reliability-v2-20h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-rosa-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-rosa-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa-4.15-nightly-x86-reliability-v2-20h
-    rerun_command: /test reliability-v2-rosa-4.15-nightly-x86-reliability-v2-20h
+    name: pull-ci-openshift-svt-master-reliability-v2-rosa-4.17-nightly-x86-reliability-v2-20h
+    rerun_command: /test reliability-v2-rosa-4.17-nightly-x86-reliability-v2-20h
     spec:
       containers:
       - args:
@@ -616,9 +621,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-20h-cluster-profile
         - --target=reliability-v2-20h
-        - --variant=reliability-v2-rosa-4.15-nightly-x86
+        - --variant=reliability-v2-rosa-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -634,8 +638,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-20h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -659,9 +661,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -671,84 +670,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-rosa-4.15-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/reliability-v2-rosa_hcp-4.15-nightly-x86-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: reliability-v2-rosa_hcp-4.15-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa_hcp-4.15-nightly-x86-images
-    rerun_command: /test reliability-v2-rosa_hcp-4.15-nightly-x86-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=reliability-v2-rosa_hcp-4.15-nightly-x86
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )reliability-v2-rosa_hcp-4.15-nightly-x86-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-rosa-4.17-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-1h
+    context: ci/prow/reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-1h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-rosa_hcp-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-rosa_hcp-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-1h
-    rerun_command: /test reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-1h
+    name: pull-ci-openshift-svt-master-reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-1h
+    rerun_command: /test reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-1h
     spec:
       containers:
       - args:
@@ -757,9 +698,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-1h-cluster-profile
         - --target=reliability-v2-1h
-        - --variant=reliability-v2-rosa_hcp-4.15-nightly-x86
+        - --variant=reliability-v2-rosa_hcp-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -775,8 +715,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-1h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -800,9 +738,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -812,26 +747,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-1h|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-20h
+    context: ci/prow/reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-20h
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
-      ci-operator.openshift.io/variant: reliability-v2-rosa_hcp-4.15-nightly-x86
+      ci-operator.openshift.io/variant: reliability-v2-rosa_hcp-4.17-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-20h
-    rerun_command: /test reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-20h
+    name: pull-ci-openshift-svt-master-reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-20h
+    rerun_command: /test reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-20h
     spec:
       containers:
       - args:
@@ -840,9 +775,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/reliability-v2-20h-cluster-profile
         - --target=reliability-v2-20h
-        - --variant=reliability-v2-rosa_hcp-4.15-nightly-x86
+        - --variant=reliability-v2-rosa_hcp-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -858,8 +792,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/reliability-v2-20h-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -883,9 +815,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-perfscale-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -895,4 +824,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(reliability-v2-rosa_hcp-4.15-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(reliability-v2-rosa_hcp-4.17-nightly-x86-reliability-v2-20h|remaining-required),?($|\s.*)

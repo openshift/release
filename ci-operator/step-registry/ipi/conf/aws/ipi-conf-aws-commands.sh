@@ -63,10 +63,6 @@ function eval_instance_capacity() {
   set -o errexit
 }
 
-
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
-
 CONTROL_PLANE_INSTANCE_SIZE="xlarge"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="8xlarge"
@@ -91,7 +87,9 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
-  architecture="arm64"
+  CONTROL_ARCH="arm64"
+  COMPUTE_ARCH="arm64"
+
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     COMPUTE_NODE_TYPE="m6g.xlarge"
   fi
@@ -100,7 +98,7 @@ elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; t
     CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 else
-  # AMD 64
+  # AMD 64 or Multiarch Compute
 
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
@@ -113,20 +111,34 @@ else
   # Do not change auto-types unless it is coordinated with the cloud
   # financial operations team. Savings plans may be in place to
   # decrease the cost of certain instance families.
-  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-    else
-      CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+  if [[ "${CONTROL_ARCH}" == "amd64" ]]; then
+    if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+      else
+        CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+      fi
     fi
+  elif [[ "${CONTROL_ARCH}" == "arm64" ]]; then
+    CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
+  else
+    echo "${CONTROL_ARCH} is not a valid control plane architecture..."
+    exit 1
   fi
 
-  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-    else
-      COMPUTE_NODE_TYPE="m6i.xlarge"
+  if [[ "${COMPUTE_ARCH}" == "amd64" ]]; then
+    if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+      if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+        COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+      else
+        COMPUTE_NODE_TYPE="m6i.xlarge"
+      fi
     fi
+  elif [[ "${COMPUTE_ARCH}" == "arm64" ]]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
+  else
+    echo "${COMPUTE_ARCH} is not a valid compute plane architecture..."
+    exit 1
   fi
 
 fi
@@ -207,15 +219,16 @@ platform:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
+      clusterName: ${NAMESPACE}-${UNIQUE_HASH}
 controlPlane:
-  architecture: ${architecture}
+  architecture: ${CONTROL_ARCH}
   name: master
   replicas: ${master_replicas}
   platform:
     aws:
       type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
-- architecture: ${architecture}
+- architecture: ${COMPUTE_ARCH}
   name: worker
   replicas: ${worker_replicas}
   platform:
@@ -231,6 +244,16 @@ do
   yq-go write -i "${CONFIG}" "platform.aws.userTags.${TAG}" "${VALUE}"
 done
 
+if [[ "${PROPAGATE_USER_TAGS:-}" == "yes" ]]; then
+  patch_propagate_user_tags="${SHARED_DIR}/install-config-propagate_user_tags.yaml.patch"
+  cat > "${patch_propagate_user_tags}" << EOF
+platform:
+  aws:
+    propagateUserTags: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_propagate_user_tags}"
+fi
+
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
@@ -239,34 +262,29 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 rm /tmp/pull-secret
 
 # excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  MIRROR_REGION="us-east-1"
-  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
-    MIRROR_REGION="${REGION}"
-  fi
+# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+#   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# imageContentSources:
+# - mirrors:
+#   - quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com
+#   source: quay.io
+# EOF
 
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
-  cat > "${PATCH}" << EOF
-imageContentSources:
-- mirrors:
-  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
-  source: quay.io
-EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+#   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+#   pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
-  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
-
-  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
-  cat > "${PATCH}" << EOF
-pullSecret: >
-  $(echo "${pull_secret_aws}" | jq -c .)
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-  rm "${PATCH}"
-fi
+#   PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# pullSecret: >
+#   $(echo "${pull_secret_aws}" | jq -c .)
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   rm "${PATCH}"
+# fi
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
@@ -339,7 +357,7 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:
-- architecture: ${architecture}
+- architecture: ${COMPUTE_ARCH}
   name: edge
   platform:
     aws:

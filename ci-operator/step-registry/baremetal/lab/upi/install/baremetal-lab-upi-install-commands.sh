@@ -291,6 +291,7 @@ cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"

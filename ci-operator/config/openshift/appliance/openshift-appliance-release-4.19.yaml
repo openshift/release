@@ -1,0 +1,72 @@
+base_images:
+  coreos-centos-stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.openshift-appliance-build
+images:
+- dockerfile_path: Dockerfile.openshift-appliance
+  from: coreos-centos-stream9
+  to: agent-preinstall-image-builder
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: test-bin
+- as: unit-test
+  commands: |
+    make unit-test
+  container:
+    from: test-bin
+  run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+- as: e2e-compact-ipv4-static
+  cluster: build05
+  run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: packet-assisted
+    workflow: agent-e2e-appliance-ipv4
+  timeout: 6h0m0s
+- as: e2e-sno-dualstack-dhcp
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: packet-assisted
+    dependencies:
+      APPLIANCE_IMAGE: agent-preinstall-image-builder
+    workflow: agent-e2e-appliance-dualstack
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: appliance

@@ -14,7 +14,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.ocp
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -33,8 +33,9 @@ operator:
     with: pipeline:linuxptp-daemon
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: ptp-4.17
+    namespace: origin
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -58,6 +59,12 @@ tests:
     from: src
 - as: govet
   commands: make vet
+  container:
+    from: src
+- as: bundle-check
+  commands: |
+    unset VERSION
+    make bundle-check
   container:
     from: src
 - as: e2e-aws-ovn

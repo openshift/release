@@ -1,0 +1,106 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+binary_build_commands: make binaries
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes/cloud-provider-vsphere
+images:
+- dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: vsphere-cloud-controller-manager
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit-ci
+  container:
+    from: src
+- as: verify-git-history
+  commands: make verify-history
+  container:
+    from: src
+  optional: true
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-vsphere-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-upgrade-vsphere
+- as: regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+  timeout: 7h0m0s
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+  optional: true
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: cluster-provider-vsphere
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: cloud-provider-vsphere

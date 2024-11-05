@@ -10,6 +10,8 @@ declare vsphere_portgroup
 declare vsphere_bastion_portgroup
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
 

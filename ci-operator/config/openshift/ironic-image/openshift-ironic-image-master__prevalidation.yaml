@@ -3,40 +3,41 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-9-base-openshift-4.17:
+  ocp_builder_rhel-9-base-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.17
+    tag: rhel-9-base-openshift-4.18
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
   from: prevalidation-base
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.17:
+    ocp_builder_rhel-9-base-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
   to: ironic
 promotion:
   to:
   - disabled: true
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-4-17-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.d/base-4-17-rhel-9-ironic-prevalidation.repo
-    from: ocp_builder_rhel-9-base-openshift-4.17
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-4-18-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.d/base-4-18-rhel-9-ironic-prevalidation.repo
+    from: ocp_builder_rhel-9-base-openshift-4.18
     to: prevalidation-base
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':

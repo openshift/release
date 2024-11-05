@@ -1,4 +1,12 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -20,8 +28,7 @@ images:
   to: cluster-storage-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -48,9 +55,15 @@ tests:
   container:
     from: src
 - as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - always_run: false
   as: e2e-aws-ovn
   optional: true
@@ -84,7 +97,7 @@ tests:
   as: e2e-ovn-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -92,7 +105,7 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-csi
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -163,6 +176,21 @@ tests:
     env:
       PROJECT_NAME: cluster-storage-operator
     workflow: openshift-ci-security
+- as: e2e-aws-selinux-alpha
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_GATES: '[''SELinuxMount=true'']'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_ARGS: --run=sig-storage.*SELinux
+      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
+      TEST_SUITE: all
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-csi
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

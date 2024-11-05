@@ -59,7 +59,7 @@ spec:
         - |
           set -xe
           yum install jq git wget podman-docker -y
-          yum groupinstall "Development Tools" -y
+          yum group install "development-tools" -y
           wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
           rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
           export PATH=$PATH:/usr/local/go/bin
@@ -215,9 +215,13 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-pattern="4.[0-9]+"
-if [[ "$T5CI_VERSION" =~ $pattern ]]; then
-  source $HOME/golang-1.20
+# Set go version
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
+    source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
@@ -236,7 +240,7 @@ git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRA
 
 cd ptp-operator-under-test
 
-# force downloading fresh images 
+# force downloading fresh images
 grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
 
 # deploy ptp-operator
@@ -246,7 +250,19 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
+    export EVENT_API_VERSION="1.0"
+    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+else
+    export EVENT_API_VERSION="2.0"
+    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+fi
+
+if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
+    export ENABLE_V1_REGRESSION="true"
+else
+    export ENABLE_V1_REGRESSION="false"
+fi
 
 # wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp

@@ -1,0 +1,91 @@
+base_images:
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/prometheus-alertmanager
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: prometheus-alertmanager
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: vendor
+  commands: go mod vendor && make unused && git diff --exit-code
+  container:
+    from: src
+- as: test
+  commands: |
+    nodejs_version=v20.12.2
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+
+    export npm_config_cache="/tmp/.npm"
+    make build && make test
+  container:
+    from: src
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-agnostic-cmo
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: stable:cluster-monitoring-operator-src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: prometheus-alertmanager

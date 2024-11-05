@@ -1,68 +1,141 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_4.18_etcd:
+    name: "4.18"
+    namespace: ocp
+    tag: etcd
+  ocp_4.18_hyperkube:
+    name: "4.18"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.18_installer-etcd-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.18_installer-terraform-providers:
+    name: "4.18"
+    namespace: ocp
+    tag: installer-terraform-providers
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
-  origin_scos-4.17_base-stream9:
-    name: scos-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
+  origin_scos-4.18_base-stream9:
+    name: scos-4.18
     namespace: origin
     tag: base-stream9
-  origin_scos-4.17_etcd:
-    name: scos-4.17
+  origin_scos-4.18_cli:
+    name: scos-4.18
+    namespace: origin
+    tag: cli
+  origin_scos-4.18_etcd:
+    name: scos-4.18
     namespace: origin
     tag: etcd
-  origin_scos-4.17_hyperkube:
-    name: scos-4.17
+  origin_scos-4.18_hyperkube:
+    name: scos-4.18
     namespace: origin
     tag: hyperkube
-  origin_scos-4.17_installer-etcd-artifacts:
-    name: scos-4.17
+  origin_scos-4.18_installer-etcd-artifacts:
+    name: scos-4.18
     namespace: origin
     tag: installer-etcd-artifacts
-  origin_scos-4.17_installer-kube-apiserver-artifacts:
-    name: scos-4.17
+  origin_scos-4.18_installer-kube-apiserver-artifacts:
+    name: scos-4.18
     namespace: origin
     tag: installer-kube-apiserver-artifacts
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: images/baremetal/Dockerfile.ci
-  from: origin_scos-4.17_base-stream9
+  dockerfile_path: images/infrastructure-providers/Dockerfile
+  from: origin_scos-4.18_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - linuxarmbuilder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: installer-terraform-providers
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: origin_scos-4.18_base-stream9
+  inputs:
+    installer-terraform-providers:
+      as:
+      - providers
+      - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    origin_scos-4.17_etcd:
+    origin_scos-4.18_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:cli
+    origin_scos-4.18_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
+    origin_scos-4.18_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/baremetal/Dockerfile.ci
+  from: origin_scos-4.18_base-stream9
+  inputs:
+    ocp_4.18_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:etcd
+    ocp_4.18_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:hyperkube
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_etcd:
       as:
       - etcd
-      - registry.ci.openshift.org/ocp/4.17:etcd
-    origin_scos-4.17_hyperkube:
+    origin_scos-4.18_hyperkube:
       as:
       - kas
-      - registry.ci.openshift.org/ocp/4.17:hyperkube
   to: baremetal-installer
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
-  from: origin_scos-4.17_base-stream9
+  from: origin_scos-4.18_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    origin_scos-4.17_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_installer-etcd-artifacts:
       as:
       - etcd-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    origin_scos-4.17_installer-kube-apiserver-artifacts:
+    origin_scos-4.18_installer-kube-apiserver-artifacts:
       as:
       - kas-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
@@ -71,21 +144,31 @@ images:
   - name: TAGS
     value: scos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: origin_scos-4.17_base-stream9
+  from: origin_scos-4.18_base-stream9
   inputs:
     installer-terraform-providers:
       as:
       - providers
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_4.18_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    origin_scos-4.17_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_installer-etcd-artifacts:
       as:
       - etcd-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    origin_scos-4.17_installer-kube-apiserver-artifacts:
+    origin_scos-4.18_installer-kube-apiserver-artifacts:
       as:
       - kas-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
@@ -93,58 +176,50 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: images/infrastructure-providers/Dockerfile
-  from: origin_scos-4.17_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - linuxarmbuilder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: installer-terraform-providers
-- build_args:
-  - name: TAGS
-    value: scos
   dockerfile_path: images/installer/Dockerfile.ci
-  from: origin_scos-4.17_base-stream9
+  from: origin_scos-4.18_base-stream9
   inputs:
     installer-terraform-providers:
       as:
       - providers
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_4.18_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_4.18_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    origin_scos-4.17_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_installer-etcd-artifacts:
       as:
       - etcd-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    origin_scos-4.17_installer-kube-apiserver-artifacts:
+    origin_scos-4.18_installer-kube-apiserver-artifacts:
       as:
       - kas-artifacts
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
   to: installer
 promotion:
   to:
-  - name: scos-4.17
+  - name: scos-4.18
     namespace: origin
 releases:
   latest:
     integration:
-      name: scos-4.17
+      name: scos-4.18
       namespace: origin
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: e2e-aws-ovn
-  optional: true
-  run_if_changed: (scos|fcos|okd)
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift

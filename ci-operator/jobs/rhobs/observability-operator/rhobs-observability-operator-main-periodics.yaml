@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 8 * * 4
   decorate: true
   decoration_config:
@@ -81,7 +81,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 6 1 11 *
   decorate: true
   decoration_config:
@@ -162,7 +162,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 8 * * 3
   decorate: true
   decoration_config:
@@ -172,8 +172,6 @@ periodics:
     org: rhobs
     repo: observability-operator
   labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
     ci-operator.openshift.io/variant: ocp-4.13-coo
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -194,11 +192,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/qeindex-cluster-profile
       - --target=qeindex
       - --variant=ocp-4.13-coo
       command:
@@ -210,16 +207,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/qeindex-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -232,18 +227,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: hive-hive-credentials
       secret:
-        secretName: cluster-secrets-gcp-qe
+        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -254,7 +243,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 6 1 10 *
   decorate: true
   decoration_config:
@@ -264,8 +253,6 @@ periodics:
     org: rhobs
     repo: observability-operator
   labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
     ci-operator.openshift.io/variant: ocp-4.13-coo
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -286,11 +273,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/stage-cluster-profile
       - --target=stage
       - --variant=ocp-4.13-coo
       command:
@@ -302,16 +288,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/stage-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -324,18 +308,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: hive-hive-credentials
       secret:
-        secretName: cluster-secrets-gcp-qe
+        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -346,8 +324,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 0 8 * * 2
+  cluster: build01
+  cron: 0 8 * * 4
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -356,8 +334,6 @@ periodics:
     org: rhobs
     repo: observability-operator
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
     ci-operator.openshift.io/variant: ocp-4.14-coo
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
@@ -378,11 +354,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/qeindex-cluster-profile
       - --target=qeindex
       - --variant=ocp-4.14-coo
       command:
@@ -394,16 +369,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/qeindex-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -416,18 +389,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: hive-hive-credentials
       secret:
-        secretName: cluster-secrets-azure-qe
+        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -438,8 +405,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 0 6 1 9 *
+  cluster: build01
+  cron: 0 6 1 11 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -448,8 +415,6 @@ periodics:
     org: rhobs
     repo: observability-operator
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
     ci-operator.openshift.io/variant: ocp-4.14-coo
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
@@ -470,11 +435,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/stage-cluster-profile
       - --target=stage
       - --variant=ocp-4.14-coo
       command:
@@ -486,16 +450,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/stage-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -508,18 +470,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: hive-hive-credentials
       secret:
-        secretName: cluster-secrets-azure-qe
+        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -530,7 +486,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 8 * * 1
   decorate: true
   decoration_config:
@@ -611,7 +567,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 6 1 8 *
   decorate: true
   decoration_config:
@@ -692,7 +648,265 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build09
+  cron: 0 8 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rhobs
+    repo: observability-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: ocp-4.16-coo
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rhobs-observability-operator-main-ocp-4.16-coo-arm-qeindex
+  reporter_config:
+    slack:
+      channel: '#observability-operator-cicd'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=arm-qeindex
+      - --variant=ocp-4.16-coo
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 0 6 1 8 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rhobs
+    repo: observability-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: ocp-4.16-coo
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rhobs-observability-operator-main-ocp-4.16-coo-arm-stage
+  reporter_config:
+    slack:
+      channel: '#observability-operator-cicd'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=arm-stage
+      - --variant=ocp-4.16-coo
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 8 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rhobs
+    repo: observability-operator
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+    ci-operator.openshift.io/variant: ocp-4.17-coo
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rhobs-observability-operator-main-ocp-4.17-coo-qeindex
+  reporter_config:
+    slack:
+      channel: '#observability-operator-cicd'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=qeindex
+      - --variant=ocp-4.17-coo
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   cron: 13 23 * * *
   decorate: true
   decoration_config:
@@ -728,7 +942,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/416-compat-cluster-profile
       - --target=416-compat
       - --variant=ocp
       command:
@@ -746,8 +959,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/416-compat-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -771,9 +982,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -784,7 +992,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 6 1 7 *
   decorate: true
   decoration_config:
@@ -865,7 +1073,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 13 23 * * *
   decorate: true
   decoration_config:

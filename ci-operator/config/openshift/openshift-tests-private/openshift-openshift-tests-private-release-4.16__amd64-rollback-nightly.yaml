@@ -16,9 +16,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.16"
     namespace: ocp
@@ -51,17 +55,12 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     release:
       architecture: amd64
       channel: candidate
-      version: 4.16.0-rc.0
+      version: 4.16.0
   target:
     candidate:
       architecture: amd64
@@ -80,8 +79,6 @@ tests:
   cron: 29 16 6,14,21,28 * *
   steps:
     cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
@@ -97,7 +94,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
 - as: aws-ipi-ovn-hypershift-inplace-f7
   cron: 44 3 1,8,15,23 * *
@@ -114,8 +111,6 @@ tests:
   cron: 16 4 5,12,20,28 * *
   steps:
     cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
@@ -131,15 +126,13 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-azure-upi
 - as: baremetal-ipi-ovn-ipv4-f7
   cluster: build05
   cron: 41 4 3,10,17,24 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
@@ -160,14 +153,12 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: baremetal-lab-ipi
 - as: gcp-ipi-ovn-ipsec-f7
   cron: 14 3 4,12,19,26 * *
   steps:
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
@@ -181,14 +172,12 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: ibmcloud-ipi-f7
   cron: 36 11 7,15,22,29 * *
   steps:
     cluster_profile: ibmcloud-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
@@ -202,15 +191,15 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
-- as: nutanix-ipi-boot-categories-project-f7
+- as: nutanix-ipi-boot-categories-project-rt-f28
   cluster: build01
-  cron: 23 11 2,9,16,24 * *
+  cron: 6 20 16 * *
   steps:
     cluster_profile: nutanix-qe
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      RT_ENABLED: "true"
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
@@ -225,14 +214,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     - ref: nutanix-upgrade-pre-config
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
 - as: vsphere-upi-f7
   cron: 13 17 7,14,21,29 * *
   steps:
-    cluster_profile: vsphere-2
-    dependencies:
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    cluster_profile: vsphere-elastic
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
@@ -246,7 +233,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
+    - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-vsphere-upi
 zz_generated_metadata:
   branch: release-4.16

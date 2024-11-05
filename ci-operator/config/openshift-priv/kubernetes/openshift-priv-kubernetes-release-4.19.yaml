@@ -1,0 +1,479 @@
+base_images:
+  base:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base
+  base-machine:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  cli:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cli
+  cloud-provider-aws-rpms:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cloud-provider-aws-rpms
+  cloud-provider-azure-rpms:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cloud-provider-azure-rpms
+  cloud-provider-gcp-rpms:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: cloud-provider-gcp-rpms
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  oc-rpms:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: oc-rpms
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.18_tools:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: tools
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  rhel-coreos-base:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: rhel-coreos
+  tools:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: tools
+binary_build_commands: openshift-hack/build-go.sh
+build_root:
+  from_repository: true
+canonical_go_repository: k8s.io/kubernetes
+images:
+- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: hyperkube
+- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+  inputs:
+    ocp_4.18_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:tools
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: kubernetes-tests
+- dockerfile_literal: |
+    # We want to test the PR using the code from it. Now, this repo ships RPMs
+    # which are normally part of RHCOS. We need to make sure that RHCOS itself
+    # is updated with the freshly built RPMs from the PR run. To do this, we do a
+    # multi-stage build: the first stage downloads the RPMs that were just built
+    # (the `base-machine-with-rpms` contains the RPMs), and the second stage
+    # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
+    # bootable container).
+    # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    FROM quay.io/centos/centos:stream9 as build
+    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+    # in a container https://github.com/coreos/rpm-ostree/issues/4034
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+    # See also https://issues.redhat.com/browse/ART-4352
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    COPY --from=build /*.rpm /
+    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - quay.io/centos/centos:stream9
+    rhel-coreos-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+  to: rhel-coreos
+- context_dir: build/pause
+  dockerfile_path: Dockerfile.Rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: pod
+- dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: installer-kube-apiserver-artifacts
+promotion:
+  to:
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - rhel-coreos
+    name: 4.19-priv
+    namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-aws-rpms /go/src/k8s.io/cloud-provider-aws/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-azure-rpms /go/src/github.com/kubernetes-sigs/cloud-provider-azure/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-gcp-rpms /go/src/k8s.io/cloud-provider-gcp/_output/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
+    from: bin
+    to: bin-cross
+- project_directory_image_build_step:
+    from: base
+    inputs:
+      bin-cross:
+        as:
+        - bin
+        paths:
+        - destination_dir: .
+          source_path: /go/src/k8s.io/kubernetes/_output/local/releases/Dockerfile
+      cloud-provider-aws-rpms:
+        as:
+        - cloud-provider-aws-rpms
+      cloud-provider-azure-rpms:
+        as:
+        - cloud-provider-azure-rpms
+      cloud-provider-gcp-rpms:
+        as:
+        - cloud-provider-gcp-rpms
+      oc-rpms:
+        as:
+        - oc-rpms
+      rpms:
+        as:
+        - rpms
+      src: {}
+    optional: true
+    to: artifacts
+- output_image_tag_step:
+    from: artifacts
+    optional: true
+    to:
+      name: stable
+      namespace: ""
+      tag: artifacts
+- rpm_image_injection_step:
+    from: base
+    to: base-with-rpms
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  artifacts:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  bin-cross:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+  cmd:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  hyperkube:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  hypershift:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  integration:
+    requests:
+      cpu: "6"
+      memory: 14Gi
+  k8s-e2e-conformance-aws:
+    requests:
+      cpu: "1"
+      memory: 300Mi
+  rpms:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  unit:
+    requests:
+      cpu: "6"
+      memory: 8Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+rpm_build_commands: openshift-hack/build-rpms.sh
+tests:
+- as: unit
+  commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/test-go.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 8Gi
+- as: integration
+  commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/test-integration.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 6Gi
+- as: verify
+  commands: |
+    KUBE_VERIFY_GIT_BRANCH="${PULL_BASE_REF:-master}" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+- as: k8s-e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-kubernetes-e2e-gcp
+- as: k8s-e2e-gcp-five-control-plane-replicas
+  optional: true
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+    workflow: openshift-kubernetes-e2e-gcp
+- as: k8s-e2e-gcp-serial
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-kubernetes-e2e-gcp-serial
+- as: k8s-e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-kubernetes-e2e-aws
+- as: k8s-e2e-aws-ovn-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-kubernetes-e2e-aws-serial
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-agnostic-ovn-cmd
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_SUITE: openshift/test-cmd
+    workflow: openshift-e2e-azure
+- as: e2e-aws-disruptive
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+- as: e2e-gcp-ovn-upgrade
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-upgrade-gcp
+- as: e2e-aws-ovn-upgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-azure-ovn-upgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-aws-ovn-downgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+  timeout: 5h0m0s
+- as: e2e-aws-csi
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+- as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-vsphere
+- as: k8s-e2e-conformance-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: configmap-scale
+  steps:
+    cluster_profile: aws
+    workflow: openshift-perfscale-e2e-configmap-scale
+- as: e2e-aws-ovn-fips
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- as: e2e-aws-single-node
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-openstack
+  optional: true
+  run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-csi-cinder
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-csi-manila
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-aws-ovn-cgroupsv2
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-aws-ovn-crun
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun
+- as: e2e-aws-ovn-runc
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-runc
+- as: e2e-aws-crun-wasm
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun-wasm
+- always_run: false
+  as: perfscale-control-plane-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-priv
+  repo: kubernetes

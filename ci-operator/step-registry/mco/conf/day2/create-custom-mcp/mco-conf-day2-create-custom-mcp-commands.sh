@@ -4,12 +4,6 @@ set -e
 set -u
 set -o pipefail
 
-if  [ "$MCO_CONF_DAY2_CUSTOM_MCP_NAME" == "" ]; then
-  echo "This installation does not need to create any custom MachineConfigPool"
-  exit 0
-fi
-
-
 function set_proxy () {
     if [ -s "${SHARED_DIR}/proxy-conf.sh" ]; then
         echo "Setting the proxy ${SHARED_DIR}/proxy-conf.sh"
@@ -20,72 +14,109 @@ function set_proxy () {
     fi
 }
 
-function validate_params() {
-  # shellcheck disable=SC2086
-  NUM_WORKERS=$(oc get nodes -l $MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL -oname | wc -l)
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
 
-  if [ "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" != "" ] && (( MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES > NUM_WORKERS  )) ; then
-    echo "ERROR: We are trying to add $MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES to our custom pool, but there are only $NUM_WORKERS nodes available with label $MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL"
-    exit 255
-  fi
-
-  if [ "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" != "" ] && (( MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES < 0  )) ; then
-    echo "ERROR: Refuse to create a custom MCP with a negative number of nodes."
-    exit 255
-  fi
+function remove_item_from_array() {
+    local del="$1"
+    shift
+    local arr=("$@")
+    arr=("${arr[@]/$del}")
+    echo "${arr[@]}"
 }
 
 function create_custom_mcp() {
-  local MCP_NAME=$1
-  local MCP_NUM_NODES=$2
-  local MCP_LABEL=$3
+  local mcp_name="$1"
+  local mcp_node_num="$2"
+  local mcp_node_label="$3"
+  local node="" expected_mcp_node_num="${mcp_node_num}"
+  local -a matched_nodes_array=()
+  local -a target_nodes_array=()
 
-  echo "Creating custom MachineConfigPool with name $MCP_NAME from label $MCP_LABEL"
+  echo "Creating custom MachineConfigPool with name ${mcp_name} with ${mcp_node_num} nodes labeld with ${mcp_node_label}"
+
+  read -a matched_nodes_array <<< "$(oc get nodes -l ${mcp_node_label} -ojsonpath="{.items[:].metadata.name}")"
+  echo "Matched nodes with ${mcp_node_label} label: ${matched_nodes_array[*]}"
+  echo "Available free nodes in the cluser: ${ALL_NODES_LIST[*]}"
+
+  if [[ ${#matched_nodes_array[@]} == 0 ]]; then
+    echo "No matched nodes!"
+    return 255
+  fi
+
+  for node in "${matched_nodes_array[@]}"; do
+    #shellcheck disable=SC2076
+    if [[ " ${ALL_NODES_LIST[*]} " =~ " ${node} " ]]; then
+      target_nodes_array+=("${node}")
+      read -a ALL_NODES_LIST <<< "$(remove_item_from_array "${node}" "${ALL_NODES_LIST[@]}")"
+      mcp_node_num=$((mcp_node_num - 1))
+    fi
+    if (( $mcp_node_num == 0 )); then
+        break
+    fi
+  done
+
+  if [[ "${expected_mcp_node_num}" != "${#target_nodes_array[@]}" ]]; then
+    echo "Found ${#target_nodes_array[@]} matched available free nodes (${target_nodes_array[*]}), but expecting ${expected_mcp_node_num} nodes"
+    return 255
+  fi
 
   oc create -f - << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfigPool
 metadata:
-  name: $MCP_NAME
+  name: $mcp_name
 spec:
   machineConfigSelector:
     matchExpressions:
-      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,$MCP_NAME]}
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,$mcp_name]}
   nodeSelector:
     matchLabels:
-      node-role.kubernetes.io/$MCP_NAME: ""
+      node-role.kubernetes.io/$mcp_name: ""
 EOF
 
-  if [ "$MCP_NUM_NODES" == "0" ]; then
-    echo "It has been requested to add 0 nodes to the pool. No node will be added to the custom MachineConfigPool."
-    return
-  fi
-  [ -z "$MCP_NUM_NODES" ] \
-    && echo "MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES variable is empty. All nodes matching the '$MCP_LABEL' label will be added to the custom pool" \
-    || echo "Labeling $MCP_NUM_NODES worker nodes in order to add them to the new custom MCP"
-  # shellcheck disable=SC2046
-  oc label node $(oc get nodes -l "$MCP_LABEL" -ojsonpath="{.items[:$MCP_NUM_NODES].metadata.name}") node-role.kubernetes.io/"$MCO_CONF_DAY2_CUSTOM_MCP_NAME"=
+  run_command "oc label node ${target_nodes_array[*]} node-role.kubernetes.io/$mcp_name="
+
+  echo "Waiting for $mcp_name MachineConfigPool to start updating..."
+  oc wait mcp "$mcp_name" --for='condition=UPDATING=True' --timeout=300s &>/dev/null
 }
 
 function wait_for_config_to_be_applied() {
-  local MCP_NAME=$1
-  local MCP_NUM_NODES=$2
-  local MCP_TIMEOUT=$3
+  local mcp_name="$1"
+  local mcp_timeout="$2"
 
-  if [ "$MCP_NUM_NODES" != "0" ]; then
-    echo "Waiting for $MCP_NAME MachineConfigPool to start updating..."
-    oc wait mcp "$MCP_NAME" --for='condition=UPDATING=True' --timeout=300s &>/dev/null
-  fi
-
-  echo "Waiting for $MCP_NAME MachineConfigPool to finish updating..."
-  oc wait mcp "$MCP_NAME" --for='condition=UPDATED=True' --timeout="$MCP_TIMEOUT" 2>/dev/null
-
+  echo "Waiting for $mcp_name MachineConfigPool to finish updating..."
+  oc wait mcp "$mcp_name" --for='condition=UPDATED=True' --timeout="$mcp_timeout" 2>/dev/null
 }
 
-
+if  [[ -z "$MCO_CONF_DAY2_CUSTOM_MCP" ]]; then
+  echo "This installation does not need to create any custom MachineConfigPool"
+  exit 0
+fi
 set_proxy
-validate_params
-create_custom_mcp "$MCO_CONF_DAY2_CUSTOM_MCP_NAME" "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" "$MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL"
-wait_for_config_to_be_applied "$MCO_CONF_DAY2_CUSTOM_MCP_NAME" "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" "$MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT"
-
+read -a ALL_NODES_LIST <<< "$(oc get nodes -ojsonpath="{.items[:].metadata.name}")"
+custom_mcp_num=$(echo "${MCO_CONF_DAY2_CUSTOM_MCP}" | jq -r ". | length")
+last_mcp_index=$((custom_mcp_num - 1))
+for index in $(seq 0 ${last_mcp_index}); do
+    custom_mcp_name=$(echo "${MCO_CONF_DAY2_CUSTOM_MCP}" | jq -r ".[$index].mcp_name")
+    if [[ -z "$custom_mcp_name" ]]; then
+        echo "No mcp_name input"
+        exit 255
+    fi
+    custom_mcp_node_num=$(echo "${MCO_CONF_DAY2_CUSTOM_MCP}" | jq -r ".[$index].mcp_node_num")
+    if [[ -z "$custom_mcp_node_num" ]]; then
+        echo "No mcp_node_num input, set it to '1' by default"
+        custom_mcp_node_num="1"
+    fi
+    custom_mcp_node_label=$(echo "${MCO_CONF_DAY2_CUSTOM_MCP}" | jq -r ".[$index].mcp_node_label")
+    if [[ -z "$custom_mcp_node_label" ]]; then
+        echo "No mcp_node_num input, set it to 'node-role.kubernetes.io/worker' by default"
+        custom_mcp_node_label="node-role.kubernetes.io/worker="
+    fi
+    create_custom_mcp "$custom_mcp_name" "$custom_mcp_node_num" "$custom_mcp_node_label"
+    wait_for_config_to_be_applied "$custom_mcp_name" "$MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT"
+done
 oc get mcp

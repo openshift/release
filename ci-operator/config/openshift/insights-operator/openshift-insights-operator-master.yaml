@@ -7,38 +7,38 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_4.17_base-rhel9:
-    name: "4.17"
+  ocp_4.18_base-rhel9:
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: insights-operator
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -130,9 +130,11 @@ tests:
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
   cron: 0 0 * * *
@@ -172,9 +174,11 @@ tests:
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-slow-tests
   cron: 0 0 * * 6
@@ -214,9 +218,11 @@ tests:
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-test-time-periodic
   cron: 0 0 * * *
@@ -255,9 +261,11 @@ tests:
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
   steps:
@@ -312,6 +320,13 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: fips-image-scan-operator
+  cron: 0 2 * * 2
+  steps:
+    dependencies:
+      SCAN_IMAGE: insights-operator
+    test:
+    - ref: fips-check-image-scan
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
   cluster: build05

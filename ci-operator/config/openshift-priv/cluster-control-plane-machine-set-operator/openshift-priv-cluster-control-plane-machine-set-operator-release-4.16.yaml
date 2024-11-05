@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
@@ -240,6 +244,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: regression-clusterinfra-aws-ipi-cpms-allcases
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h45m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

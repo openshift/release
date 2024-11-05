@@ -3,6 +3,14 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.15_base-rhel9:
     name: 4.15-priv
     namespace: ocp-private
@@ -11,20 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
-binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.15_base-rhel9:
@@ -36,9 +34,7 @@ images:
   to: hypershift
 promotion:
   to:
-  - additional_images:
-      hypershift-tests: test-bin
-    name: 4.15-priv
+  - name: 4.15-priv
     namespace: ocp-private
 releases:
   initial:
@@ -64,7 +60,7 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
-test_binary_build_commands: make build e2e
+test_binary_build_commands: make e2e
 tests:
 - as: verify
   commands: make verify
@@ -82,15 +78,26 @@ tests:
     cluster_profile: hypershift
     env:
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
-- as: e2e-kubevirt-aws-ovn
+    workflow: hypershift-aws-e2e-external
+- as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+      SKIP_E2E_LOCAL: "true"
+    workflow: hypershift-kubevirt-e2e-aws
+- as: e2e-kubevirt-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
@@ -105,28 +112,13 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
-- as: e2e-ibmcloud-iks
-  optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
-      BOM_VERSION: 4.15.0_openshift
-      MANAGED_CLUSTER_TYPE: iks
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks-release.kubeconfig
-      TEST_TYPE: release
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
-    workflow: hypershift-ibmcloud-e2e-release
-- as: e2e-ibmcloud-roks
-  optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    env:
-      BOM_VERSION: 4.15.0_openshift
-      MANAGED_CLUSTER_TYPE: openshift
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks-release.kubeconfig
-      TEST_TYPE: release
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
-    workflow: hypershift-ibmcloud-e2e-release
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

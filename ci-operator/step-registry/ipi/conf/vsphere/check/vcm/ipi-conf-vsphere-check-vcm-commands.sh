@@ -9,6 +9,10 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   exit 0
 fi
 
+function log() {
+  echo "$(date -u --rfc-3339=seconds) - " + "$1"
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -19,10 +23,27 @@ export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
 # only used in zonal and vsphere environments with
 # multiple datacenters
-declare vsphere_cluster
 declare vsphere_url
 declare VCENTER_AUTH_PATH
 
+
+
+declare MULTI_TENANT_CAPABLE_WORKFLOWS
+# shellcheck source=/dev/null
+source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
+
+DEFAULT_NETWORK_TYPE="single-tenant"
+for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
+  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
+    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="multi-tenant"
+    break
+  fi
+done
+
+NETWORK_TYPE=${NETWORK_TYPE:-${DEFAULT_NETWORK_TYPE}}
+
+log "job will run with network type ${NETWORK_TYPE}"
 
 function networkToSubnetsJson() {
   local NETWORK_CACHE_PATH=$1
@@ -46,9 +67,7 @@ function networkToSubnetsJson() {
 }
 
 
-function log() {
-  echo "$(date -u --rfc-3339=seconds) - " + "$1"
-}
+
 
 log "add jq plugin for converting json to yaml"
 # this snippet enables jq to convert json to yaml
@@ -119,40 +138,36 @@ function getDVSInfo() {
     UUID_FORMATTED=$(govc object.collect -json "$(jq -r .Type <<< "${parentDVS}")":"$(jq -r .Value <<< "${parentDVS}")" | jq -r '.[] | select(.Name=="uuid") | .Val')
 
     # determine the cluster where this dvs instance resides
-    HOST0=$(jq --compact-output -r .elements[${DVS_idx}].Object.Host[0] /tmp/dvs.json)
-    if [[ $(jq --compact-output -r .elements[${DVS_idx}].Object.Host[0].Type /tmp/dvs.json) != "HostSystem" ]]; then
-      log "${HOST0} is not a known type"
-      continue
-    fi
-    HOST=$(govc object.collect -json HostSystem:"$(jq --compact-output -r .Value <<< "${HOST0}")")
+    HOSTS=$(jq -r '.elements['${DVS_idx}'].Object.Host | .[].Value' /tmp/dvs.json)
+    for HOST in ${HOSTS}; do
+      _HOST=$(govc object.collect -json HostSystem:"${HOST}")
 
-    if [[ $(jq -r .elements[${DVS_idx}].Object.Host[0].Type /tmp/dvs.json) != "HostSystem" ]]; then
-      log "unable to get host. ${HOST0} is not a known type"
-      continue
-    fi
+      getTypeInHeirarchy "ClusterComputeResource" "${_HOST}"
+      # shellcheck disable=SC2181
+      if [ "$?" -ne 0 ];then
+        log "could not determine the compute cluster resource for ${NETWORK}"
+        exit 1
+      fi
+      local CLUSTER=${LEVEL_NAME}
 
-    getTypeInHeirarchy "ClusterComputeResource" "${HOST}"
-    # shellcheck disable=SC2181
-    if [ "$?" -ne 0 ];then
-      log "could not determine the compute cluster resource for ${NETWORK}"
-      exit 1
-    fi
-    local CLUSTER=${LEVEL_NAME}
+      getTypeInHeirarchy "Datacenter" "${_HOST}"
+      # shellcheck disable=SC2181
+      if [ "$?" -ne 0 ];then
+        log "could not determine the datacenter resource for ${NETWORK}"
+        exit 1
+      fi
 
-    getTypeInHeirarchy "Datacenter" "${HOST}"
-    # shellcheck disable=SC2181
-    if [ "$?" -ne 0 ];then
-      log "could not determine the datacenter resource for ${NETWORK}"
-      exit 1
-    fi
-
-    log "found in cluster ${LEVEL_NAME} with UUID ${UUID_FORMATTED}"
-    dvsJSON=$(jq -r '.["'"${NETWORK}"'"] = {"datacenter":"'"${LEVEL_NAME}"'","cluster":{"'"${CLUSTER}"'": "'"${UUID_FORMATTED}"'"}}' <<< "${dvsJSON}")
+      log "found in cluster ${CLUSTER} with UUID ${UUID_FORMATTED}"
+      dvsJSON2=$(jq -r '.["'"${NETWORK}"'"] += {"datacenter":"'"${LEVEL_NAME}"'","cluster":{"'"${CLUSTER}"'": "'"${UUID_FORMATTED}"'"}}' <<< "${dvsJSON}")
+      dvsJSON=$(echo "${dvsJSON} ${dvsJSON2}" | jq -s '.[0] * .[1]')
+    done
     DVS_idx=$((DVS_idx + 1))
    done
 
   echo "$dvsJSON" > "${DVS_PATH}"
 }
+
+SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 
 if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
    IPI=0
@@ -160,6 +175,11 @@ if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
 else
    IPI=1
    log "determined this is an IPI job"
+fi
+
+if [[ -n "${MULTI_NIC_IPI}" ]]; then
+  echo "multi-nic is enabled, an additional NIC will be attached to nodes"
+  VSPHERE_EXTRA_LEASED_RESOURCE=1
 fi
 
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
@@ -177,18 +197,19 @@ metadata:
   namespace: \"vsphere-infra-helpers\"
   annotations: {}
   labels:
+    vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
     VSPHERE_EXTRA_LEASED_RESOURCE: \"${i}\"
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 
   i=$((i + 1))
   done
 fi
-
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
@@ -201,21 +222,21 @@ metadata:
   namespace: \"vsphere-infra-helpers\"
   annotations: {}
   labels:
+    vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
     VSPHERE_BASTION_LEASED_RESOURCE: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 fi
 
-
 POOLS=${POOLS:-}
 IFS=" " read -r -a pools <<< "${POOLS}"
 
-SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 OPENSHIFT_REQUIRED_CORES=${OPENSHIFT_REQUIRED_CORES:-24}
 OPENSHIFT_REQUIRED_MEMORY=${OPENSHIFT_REQUIRED_MEMORY:-96}
 
@@ -226,6 +247,9 @@ else
   OPENSHIFT_REQUIRED_CORES=$((OPENSHIFT_REQUIRED_CORES / ${#pools[@]}))
   OPENSHIFT_REQUIRED_MEMORY=$((OPENSHIFT_REQUIRED_MEMORY / ${#pools[@]}))
 fi
+
+
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 # create a lease for each pool
 for POOL in "${pools[@]}"; do
@@ -244,22 +268,44 @@ metadata:
   namespace: \"vsphere-infra-helpers\"
   annotations: {}
   labels:
+    cluster-id: \"${cluster_name}\"
+    vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
 spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
+  network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
 
 log "waiting for lease to be fulfilled..."
+
+n=0
+until [ "$n" -ge 5 ]
+do
+  if oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o json | jq -e '.items[].status?'; then
+    break
+  fi
+
+  n=$((n+1))
+  sleep 15
+done
+
+if [ "$n" -ge 5 ]; then
+  log "status was never available for lease, exit 1"
+  oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o yaml
+  exit 1
+fi
+
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
+vsphere_extra_portgroup=""
 LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
@@ -296,20 +342,18 @@ EOF
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
+  vsphere_extra_portgroup="${portgroup_name}"
 
   else
     vcenter_portgroups[$VCENTER]=${portgroup_name}
+    log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-  log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
 done
 
 # debug, confirm correct subnets.json
 cat "${SHARED_DIR}/subnets.json"
-
-# retrieving resource pools
-RESOURCE_POOLS=$(oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 
 declare -A pool_usernames
 declare -A pool_passwords
@@ -319,22 +363,14 @@ platformSpec='{"vcenters": [],"failureDomains": []}'
 
 log "building local variables and failure domains"
 
-for RESOURCE_POOL in ${RESOURCE_POOLS}; do
-  log "checking to see if ${RESOURCE_POOL} is in use"
-  # check to see if this pool is in use by a lease
-  FOUND=0
-  for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
-    _VCENTER=$(jq -r .status.name < "${_leaseJSON}")
-    log "checking if ${_VCENTER} == ${RESOURCE_POOL}"
-    if [ "${_VCENTER,,}" = "${RESOURCE_POOL,,}" ]; then
-      FOUND=1
-      break
-    fi
-  done
+# Iterate through each lease and generate the failure domain and vcenters information
+for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
+  RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
 
-  if [ ${FOUND} -eq 0 ]; then
-    log "resource pool ${RESOURCE_POOL} isn't in use. excluding from failure domains"
-    continue
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
+    log "storing primary lease as LEASE_single"
+    cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
 
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
@@ -366,37 +402,48 @@ for RESOURCE_POOL in ${RESOURCE_POOLS}; do
   else
     resource_pool=${cluster}/Resources/ipi-ci-clusters
   fi
-  platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+
+  # prevent duplicate failure domains if in the event we have a network-only lease in addition to the primary lease
+  add_failure_domain=0
+  failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
+  if [[ $failure_domain_count == 0 ]]; then
+    add_failure_domain=1
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$name" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+    add_failure_domain=1
+  fi
+
+  if [[ $add_failure_domain == 1 ]] ; then
+    if [ -n "${MULTI_NIC_IPI}" ]; then
+      network="${network}\",\"${vsphere_extra_portgroup}"
+    fi
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+  fi
+
+  # Add / Update vCenter list
+  if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
+    # Check and make sure the datacenter doesn't already exist in the vcenter definition
+    if ! echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" --arg DC "$datacenter" '.vcenters[] | select(.server == $VCENTER) | any(.datacenters[]; . == $DC)' ; then
+      log "Adding additional datacenter to vcenter ${VCENTER}"
+      platformSpec=$(echo "${platformSpec}" | jq -r --arg VCENTER "$VCENTER" --arg DC "$datacenter" '(.vcenters[] | select(.server == $VCENTER)) |= (.datacenters[.datacenters | length] |= .+ $DC)')
+    fi
+  else
+    log "Adding vcenter ${VCENTER} to config"
+    platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ["'"${datacenter}"'"]}]')
+  fi
 
   cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
 done
 
-log "building vcenters for platform spec"
-
-# append vCenters to platform spec
-for VCENTER in "${!pool_usernames[@]}"; do
-  log "building ${VCENTER} in platform spec"
-  declare -A _datacenters
-  for _poolJSON in "${SHARED_DIR}"/POOL*; do
-    log "processing $_poolJSON";
-    _VCENTER=$(jq -r .spec.server < "${_poolJSON}")
-    _DATACENTER=$(jq -r .spec.topology.datacenter < "${_poolJSON}")
-    if [ "${_VCENTER}" = "${VCENTER}" ]; then
-      _datacenters[${_DATACENTER}]=${_DATACENTER}
-    fi
-  done
-  printf -v joined '"%s",' "${_datacenters[@]}"
-  log "found datacenters ${joined%,}"
-
-  platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ['"${joined%,}"']}]')
-done
+# For legacy spec, the below will merge the following json to the existing json.
+if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
+  platformSpec='{"vcenter": "'"${server}"'", "username": "'"${vsphere_user}"'", "password": "'"${vsphere_password}"'", "defaultDatastore": "'"$(basename "${datastore}")"'" ,"network": "'"$(basename "${network}")"'" , "cluster": "'"$(basename "${cluster}")"'", "datacenter": "'"$(basename "${datacenter}")"'"}'
+fi
 
 # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-cp /tmp/lease.json "${SHARED_DIR}"/LEASE_single.json
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
@@ -404,10 +451,10 @@ jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 # shellcheck source=/dev/null
 source /tmp/envvars
 
-if [ $IPI -eq 0 ]; then
-  resource_pool=${vsphere_cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
-else
-  resource_pool=${vsphere_cluster}/Resources/ipi-ci-clusters
+
+if [[ -z "${GOVC_URL}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
 fi
 
 log "Creating govc.sh file..."
