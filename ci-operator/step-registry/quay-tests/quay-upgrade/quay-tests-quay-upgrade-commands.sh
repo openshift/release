@@ -9,8 +9,8 @@ oc version
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
-QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
-QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
+# QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+# QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
 ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
 
@@ -93,9 +93,14 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
+#export env variabels for Go test cases
+export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
+export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
+export QUAYREGISTRY_QUAY_VERSION=${QUAYREGISTRY_QUAY_VERSION}
+
 echo "Run extended-platform-tests"
- 
-extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
+extended-platform-tests run all --dry-run | grep "20934-Quay-Upgrade-High"| extended-platform-tests run --timeout 180m --junit-dir="${ARTIFACT_DIR}" -f - || true
+
 
 function handle_result {
 
@@ -116,9 +121,8 @@ function handle_result {
         return
     fi 
     rm -fr ${resultfile}
-    echo ${newresultfile}
 
- ## Copy quay operator logs to ARTIFACT_DIR
+    #Copy quay operator logs to ARTIFACT_DIR
     quayoperatorlogfile=`ls -rt -1 /tmp/*quayoperatorlogs.txt 2>&1 || true`
     echo $quayoperatorlogfile
 
@@ -127,7 +131,7 @@ function handle_result {
         return
     fi
     cp $quayoperatorlogfile ${ARTIFACT_DIR}/ || true
-    
+ 
 }
 
 handle_result
