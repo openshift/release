@@ -145,7 +145,7 @@ function download_terraform_binary() {
         && gunzip "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform
     echo "Terraform installed. expect to see version"
-    terraform version
+    terraform version -no-color
 }
 
 # facilitates scp copy from inside the contianer
@@ -315,8 +315,8 @@ function build_upi_cluster() {
     OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
     cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init && \
-        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -auto-approve \
+        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init -no-color && \
+        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -auto-approve -no-color \
             -var-file "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-multi-arch-upi.tfvars \
             -state "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-powervs/terraform.tfstate \
             | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
@@ -354,6 +354,12 @@ function build_upi_cluster() {
     BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
     BASTION_PRIVATE_IP=$(<"${SHARED_DIR}/BASTION_PRIVATE_IP")
     echo "BASTION_PRIVATE_IP:- $BASTION_PRIVATE_IP"
+
+    if [ -z "${BASTION_PUBLIC_IP}" ]
+    then
+        echo "Unexpected it's blank"
+        exit 77
+    fi
 
     echo "Retrieving the SSH key"
     scp -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
