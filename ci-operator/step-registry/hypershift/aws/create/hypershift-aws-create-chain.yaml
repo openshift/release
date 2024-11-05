@@ -4,6 +4,10 @@ chain:
   - as: create-hostedcluster
     cli: latest
     env:
+    - name: FEATURE_SET
+      default: ""
+      documentation: |
+        This field sets the cluster feature set. This is used to enable custom features such as tech preview features
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
@@ -93,15 +97,30 @@ chain:
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
+      if [[ $FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+        COMMAND+=(--feature-set=TechPreviewNoUpgrade)
+      fi
+
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
       fi
-     
+      
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
       
+      # add cluster-info tags if exists
+      hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
+      if [[ -f "${hosted_cluster_info_file}" ]] ; then
+        while read -r TAG VALUE
+        do
+          printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"
+          COMMAND+=(--additional-tags="${TAG}=${VALUE}")
+        done < "${hosted_cluster_info_file}"
+        cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
+      fi
+
       "${COMMAND[@]}"
 
       set +e

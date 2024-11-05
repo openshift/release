@@ -52,10 +52,12 @@ let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
 
-# For f360 jobs, hard code the cron to:
-# 	Feb 16
-if [[ "${TEST_NAME}" =~ -f360 ]] ; then
-	DAY_OF_MONTH=16
+# For f999 jobs, hard code the cron to:
+# 	Feb 29, 8:08
+if [[ "${TEST_NAME}" =~ -f999 ]] ; then
+	MINUTE=8
+	HOUR=8
+	DAY_OF_MONTH=29
 	MONTH=2
 fi
 
@@ -99,6 +101,9 @@ case "$FN" in
 		done
 		MONTH_FINAL=$(echo $MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
 		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH_FINAL *"
+		;;
+	999)
+		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH *"
 		;;
 	*)
 		echo "to be implemented"
