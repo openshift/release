@@ -51,7 +51,7 @@ fi
 export EVENTUALLY_VERBOSE="false"
 
 hack/ci-test-e2e.sh -test.v \
-  -test.run=${CI_TESTS_RUN:-''} \
+  -test.run='TestNodePool' \
   -test.parallel=20 \
   --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
   --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \

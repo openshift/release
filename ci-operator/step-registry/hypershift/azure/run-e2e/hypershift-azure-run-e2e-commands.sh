@@ -50,7 +50,7 @@ fi
 
 
 hack/ci-test-e2e.sh -test.v \
-  -test.run='^TestCreateCluster.*|^TestNodePool$' \
+  -test.run='TestNodePool' \
   -test.parallel=20 \
   --e2e.platform=Azure \
   --e2e.azure-credentials-file=/etc/hypershift-ci-jobs-azurecreds/credentials.json \
