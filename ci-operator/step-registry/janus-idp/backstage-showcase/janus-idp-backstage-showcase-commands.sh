@@ -10,6 +10,14 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
+# Check if this is the specific PR to run e2e tests
+TARGET_PR_NUMBER="1869" # Set the specific PR number that should run the e2e tests
+
+if [ "$GIT_PR_NUMBER" != "$TARGET_PR_NUMBER" ]; then
+    echo "This PR is not targeted to run end-to-end tests. Exiting script."
+    exit 0
+fi
+
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
@@ -18,7 +26,7 @@ git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
+    # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
     git merge origin/main --no-edit
@@ -33,7 +41,7 @@ fi
 PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
-# Directories to check if changes are exclusively within the specified directories
+# Check if changes are exclusively within the specified directories
 DIRECTORIES_TO_CHECK=".ibm|e2e-tests"
 ONLY_IN_DIRS=true
 
