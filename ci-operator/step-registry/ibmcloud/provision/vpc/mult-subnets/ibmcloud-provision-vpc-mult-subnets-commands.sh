@@ -48,18 +48,18 @@ function create_subnets() {
     local zones pgwName id
 
     zones=("${region}-1" "${region}-2" "${region}-3")
-    id=1
+    id=0
     while [[ $id -lt $subnetCount ]]; do
         for zone in "${zones[@]}"; do
-            createSubnet "${preName}-control-plane" "${vpcName}" "${zone}" "${id}"
-            [[ $id -eq $subnetCount ]] && return
+            createSubnet "${preName}-control-plane" "${vpcName}" "${zone}" "${id}"            
             ((id++))
+            [[ $id -eq $subnetCount ]] && return
         done
 
         for zone in "${zones[@]}"; do
             createSubnet "${preName}-compute" "${vpcName}" "${zone}" "${id}"
-            [[ $id -eq $subnetCount ]] && return
             ((id++))
+            [[ $id -eq $subnetCount ]] && return     
         done
     done
 }
