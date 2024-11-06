@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   stolostron_builder_go1.21-linux:
     name: builder
     namespace: stolostron
@@ -7,28 +11,19 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.21-linux
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.prow
+  from: base
   inputs:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-  to: observatorium
+  to: kube-state-metrics
 promotion:
   to:
   - name: "2.13"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.8"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.8"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -38,16 +33,23 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint --always-make
-  container:
-    from: src
 - as: test
   commands: |
-    make test --always-make
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow test-unit
   container:
-    from: test-bin
+    from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kube-state-metrics
+    env:
+      IMAGE_REPO: kube-state-metrics
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -67,21 +69,32 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: observatorium
-    env:
-      IMAGE_REPO: observatorium
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kube-state-metrics
     env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: kube-state-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="kube-state-metrics"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
-  repo: observatorium
+  repo: kube-state-metrics
