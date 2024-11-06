@@ -5,6 +5,7 @@ set -o nounset
 # Variables
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
+VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/:"${PATH}"
