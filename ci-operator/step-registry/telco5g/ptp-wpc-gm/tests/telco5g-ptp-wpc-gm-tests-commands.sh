@@ -208,7 +208,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="master"
+export TEST_BRANCH="additional_tests_2"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"
@@ -258,7 +258,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
 
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/nishant-parekh/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -351,12 +351,11 @@ export VSE_TEST_BRANCH="main"
 cd -
 echo "running vse-sync-tests from branch ${VSE_TEST_BRANCH}"
 
-#
-git clone https://github.com/redhat-partner-solutions/vse-sync-test -b "${VSE_TEST_BRANCH}" vse-tests
+mkdir vse-tests
 cd vse-tests
+git clone https://github.com/redhat-partner-solutions/vse-sync-test -b "${VSE_TEST_BRANCH}"
 git clone https://github.com/redhat-partner-solutions/vse-sync-collection-tools.git -b "${VSE_TEST_BRANCH}"
 git clone https://github.com/redhat-partner-solutions/vse-sync-test-report.git -b "${VSE_TEST_BRANCH}"
-#
 
 mkdir data
 ./vse-sync-test/cmd/e2e.sh -d 2000s -n cnfdf32.telco5gran.eng.rdu2.redhat.com  $KUBECONFIG || temp_status_vst=$?
