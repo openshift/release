@@ -1,8 +1,8 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.31.0
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
@@ -47,17 +47,17 @@ tests:
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws
-    dependencies:
-      OO_BUNDLE: external-dns-operator-bundle
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: external-dns-operator
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n external-dns-operator rollout status deployment external-dns-operator
-      from: src
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -68,21 +68,21 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: ipi-aws
 - as: e2e-gcp-operator
   steps:
     cluster_profile: gcp
-    dependencies:
-      OO_BUNDLE: external-dns-operator-bundle
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: external-dns-operator
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n external-dns-operator rollout status deployment external-dns-operator
-      from: src
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -93,21 +93,21 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: ipi-gcp
 - as: e2e-azure-operator
   steps:
     cluster_profile: azure4
-    dependencies:
-      OO_BUNDLE: external-dns-operator-bundle
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: external-dns-operator
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n external-dns-operator rollout status deployment external-dns-operator
-      from: src
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -118,21 +118,21 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-azure
+    workflow: ipi-azure
 - as: e2e-azure-infoblox-operator
   steps:
     cluster_profile: azure4
-    dependencies:
-      OO_BUNDLE: external-dns-operator-bundle
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: external-dns-operator
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n external-dns-operator rollout status deployment external-dns-operator
-      from: src
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -150,22 +150,23 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-azure
+    workflow: ipi-azure
 - as: e2e-aws-shared-vpc-phz-operator
   steps:
     cluster_profile: aws
-    dependencies:
-      OO_BUNDLE: external-dns-operator-bundle
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: external-dns-operator
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n external-dns-operator rollout status deployment external-dns-operator
-      from: src
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -176,7 +177,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws-shared-vpc-phz
+    workflow: ipi-aws-shared-vpc-phz
 zz_generated_metadata:
   branch: main
   org: openshift

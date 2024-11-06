@@ -75,10 +75,10 @@ function getZoneAddressprefix() {
 }
 
 function getOneMoreCidr() {
-    local cidr="$1"
+    local cidr="$1" increament="${2:-1}"
 
     IFS='.' read -r -a cidr_num_array <<< "${cidr}"
-    cidr_num_array[2]=$((${cidr_num_array[2]} + 1))    
+    cidr_num_array[2]=$((${cidr_num_array[2]} + ${increament}))    
     IFS=. ; echo "${cidr_num_array[*]}"
 }
 
@@ -99,8 +99,8 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" resource_group="$3" region="$4"
-    local zones zone_cidr zone_cidr_main subnetName
+    local preName="$1" vpcName="$2" resource_group="$3" num_subnets_pair_per_zone="${4:-1}"
+    local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
     # create vpc
     "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name ${resource_group}
@@ -108,22 +108,28 @@ function create_vpc() {
     waitAvailable "vpc" ${vpcName}
     
     # create subnets
-    zones=("${region}-1" "${region}-2" "${region}-3")
-
-    for zone in "${zones[@]}"; do
+    for zone in "${ZONES[@]}"; do
         zone_cidr=$(getZoneAddressprefix "${vpcName}" "${zone}")
         zone_cidr_main="${zone_cidr%/*}"
-        subnetName="${preName}-control-plane-${zone}"
-        "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${zone_cidr_main}/24"
-        waitAvailable "subnet" ${subnetName}
-    done
+        subnets_pair_idx=0
+        subnets_idx=0
+        while (( $subnets_pair_idx < $num_subnets_pair_per_zone )); do
+            echo "#${subnets_pair_idx}: Creating controlplane subnet in $zone zone"
+            subnet_cidr_main=$(getOneMoreCidr "${zone_cidr_main}" ${subnets_idx})
+            subnetName="${preName}-control-plane-${zone}-${subnets_pair_idx}"
+            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${subnet_cidr_main}/24"
+            waitAvailable "subnet" ${subnetName}
+            (( subnets_idx += 1 ))
 
-    for zone in "${zones[@]}"; do
-        zone_cidr=$(getZoneAddressprefix "${vpcName}" "${zone}")
-        zone_cidr_main=$(getOneMoreCidr "${zone_cidr%/*}")
-        subnetName="${preName}-compute-${zone}"
-        "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${zone_cidr_main}/24"
-        waitAvailable "subnet" ${subnetName}
+            echo "#${subnets_pair_idx}: Creating compute subnet in $zone zone"
+            subnet_cidr_main=$(getOneMoreCidr "${zone_cidr_main}" ${subnets_idx})
+            subnetName="${preName}-compute-${zone}-${subnets_pair_idx}"
+            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${subnet_cidr_main}/24"
+            waitAvailable "subnet" ${subnetName}
+            (( subnets_idx += 1 ))
+
+            (( subnets_pair_idx += 1 ))
+        done
     done
 }
 
@@ -179,22 +185,24 @@ fi
 "${IBMCLOUD_CLI}" target -g ${resource_group}
 
 ## Create the VPC
-echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
+declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+
+echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
-create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${region}" 
+create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}"
 
 vpcAddressPre=$(getAddressPre ${vpc_info_file})
 
+
 if [[ "${RESTRICTED_NETWORK}" = "yes" ]]; then
     echo "[WARN] Skip creating public gateway to create disconnected network"
 else
-    zones=("${region}-1" "${region}-2" "${region}-3")
-    for zone in "${zones[@]}"; do
+    for zone in "${ZONES[@]}"; do
         echo "Creating public gateway in ${zone}..."
         public_gateway_name="${CLUSTER_NAME}-gateway-${zone}"
         create_zone_public_gateway "${public_gateway_name}" "${vpc_name}" "$zone"
@@ -205,8 +213,34 @@ else
     done
 fi
 workdir="$(mktemp -d)"
-cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("control-plane")) | .name]' | yq-go r -P - >${workdir}/controlPlaneSubnets.yaml
-cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("compute")) | .name]' | yq-go r -P - >${workdir}/computerSubnets.yaml
+if [[ "${APPLY_ALL_SUBNETS}" == "no" ]]; then
+    for zone in "${ZONES[@]}"; do
+      case "$PICKUP_SUBNETS_IN_ORDER" in
+      "descending")
+        cp_idx="-1"
+        compute_idx="-1"
+      ;;
+      "ascending")
+        cp_idx="0"
+        compute_idx="0"
+      ;;
+      "random")
+        cp_subnets_len=$(cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" '[.subnets | .[] | select(.zone.name==$z) | select(.name|test("control-plane"))] | length')
+        cp_idx=$(( RANDOM % cp_subnets_len))
+        compute_subnets_len=$(cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" '[.subnets | .[] | select(.zone.name==$z) | select(.name|test("compute"))] | length')
+        compute_idx=$(( RANDOM % compute_subnets_len))
+      ;;
+      *)
+        echo "unsupported value for PICKUP_SUBNETS_IN_ORDER"
+        exit 2
+      esac
+      cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" --argjson idx "$cp_idx" '[[.subnets | sort_by(.created_at) | .[] | select(.zone.name==$z) | select(.name|test("control-plane")) | .name][$idx]]' | yq-go r -P - >>${workdir}/controlPlaneSubnets.yaml
+      cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" --argjson idx "$compute_idx" '[[.subnets | sort_by(.created_at) | .[] | select(.zone.name==$z) | select(.name|test("compute")) | .name][$idx]]' | yq-go r -P - >>${workdir}/computerSubnets.yaml
+    done
+else
+    cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("control-plane")) | .name]' | yq-go r -P - >${workdir}/controlPlaneSubnets.yaml
+    cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("compute")) | .name]' | yq-go r -P - >${workdir}/computerSubnets.yaml
+fi
 
 if [[ "${isOldVersion}" == "true" ]]; then
     rg_name_line="resourceGroupName: ${resource_group}"
