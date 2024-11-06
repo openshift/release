@@ -1,14 +1,23 @@
 base_images:
-  base:
-    name: "4.19"
-    namespace: ocp
-    tag: base
+  openshift_release_golang-1.22:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
 build_root:
   from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    openshift_release_golang-1.22:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.22
+  to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
+    excluded_images:
+    - cluster-api-actuator-pkg-test
     name: "4.19"
     namespace: ocp
 releases:
