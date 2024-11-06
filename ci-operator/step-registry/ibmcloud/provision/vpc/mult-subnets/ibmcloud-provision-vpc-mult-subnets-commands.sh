@@ -13,7 +13,7 @@ function ibmcloud_login {
     export IBMCLOUD_HOME=/output   
     region="${LEASED_RESOURCE}"
     export region
-    "${IBMCLOUD_CLI}" config --check-version=false
+    "${IBMCLOUD_CLI}" config --check-version=true
     echo "Try to login..." 
     "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
