@@ -29,13 +29,33 @@ START_TIME=$(date "+%s")
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
-mkdir -p /tmp/cnv-ci
-tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+# TODO: restore the below snippet after all the PRs in cnv-ci are merged
+# curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+# mkdir -p /tmp/cnv-ci
+# tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+cd /tmp || exit 1 # Remove me
+git clone https://github.com/aleskandro/cnv-ci.git # Remove me
 cd /tmp/cnv-ci || exit 1
 
 # Overwrite the default configuration file used for testing
 export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
+
+if oc get nodes -o jsonpath='{.items[*].status.nodeInfo.architecture}' | grep -q arm64; then
+  # If the cluster is running any arm64 nodes, we can't use ODF's chef, which is set as the default storage class for testing
+  # in https://github.com/openshift-cnv/cnv-ci/blob/master/manifests/testing/kubevirt-tier1-ocs.json
+  # We replace it here to allow further works to support ODF on clusters with arm64 nodes without needing multiple
+  # Pull Requests in different repositories.
+  cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
+{
+    "storageClassRhel":        "gp3-csi",
+    "storageClassWindows":     "gp3-csi",
+    "storageRWOBlock":         "gp3-csi",
+    "storageRWOFileSystem":    "gp3-csi",
+    "storageSnapshot":         "gp3-csi"
+}
+EOF
+fi
+
 make deploy_test || exit_code=$?
 
 FINISH_TIME=$(date "+%s")
