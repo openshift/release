@@ -35,10 +35,6 @@ base_images:
     name: "4.17"
     namespace: origin
     tag: operator-registry
-  upi-installer:
-    name: "4.16"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -119,7 +115,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -128,13 +124,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-vsphere-continuous
-  cron: 35 17 * * 0
+- as: e2e-sno-continuous
+  cron: 24 10 * * 0
   steps:
-    cluster_profile: vsphere-elastic
+    cluster_profile: gcp
     test:
     - as: operator-e2e
-      commands: FORCE_KONFLUX_INDEX=true HA=false make test-e2e-with-kafka
+      commands: FORCE_KONFLUX_INDEX=true HA=false make test-e2e-with-kafka-no-tracing
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -159,9 +155,10 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-gcp-single-node
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 416-vsphere
+  variant: 417-single-node
