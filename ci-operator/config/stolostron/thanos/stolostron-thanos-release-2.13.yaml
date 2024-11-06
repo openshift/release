@@ -1,20 +1,29 @@
 base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
   stolostron_builder_go1.21-linux:
     name: builder
     namespace: stolostron
     tag: go1.21-linux
+  stolostron_builder_go1.22-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.22-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.22-linux
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.prow
+  from: base
   inputs:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-  to: observatorium-operator
+  to: thanos
 promotion:
   to:
   - name: "2.13"
@@ -38,12 +47,21 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow test-local
+  container:
+    from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: observatorium-operator
+      SOURCE_IMAGE_REF: thanos
     env:
-      IMAGE_REPO: observatorium-operator
+      IMAGE_REPO: thanos
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: e2e-kind
@@ -58,44 +76,39 @@ tests:
     - ref: ocm-e2e-kind-create
     test:
     - as: test
-      commands: |
-        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
-        ./tests/e2e.sh test-kind-prow
-      dependencies:
-      - env: OPERATOR_IMAGE_NAME
-        name: observatorium-operator
+      commands: "export SELF=\"make\"\n./test-kind-prow.sh \n"
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: thanos
     env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: thanos
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="thanos"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
-  repo: observatorium-operator
+  repo: thanos
