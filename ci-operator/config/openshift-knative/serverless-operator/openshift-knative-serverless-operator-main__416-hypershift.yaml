@@ -56,6 +56,12 @@ images:
       as:
       - $GO_BUILDER
   to: serverless-knative-operator
+- dockerfile_path: must-gather/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $RUNTIME
+  to: serverless-must-gather
 - dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
   inputs:
     ocp_ubi-minimal_9:
@@ -137,10 +143,12 @@ tests:
       HYPERSHIFT_NODE_COUNT: "6"
     test:
     - as: operator-e2e
-      commands: make USER_MANAGEMENT_ALLOWED=false test-e2e-with-kafka
+      commands: FORCE_KONFLUX_INDEX=true USER_MANAGEMENT_ALLOWED=false make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
+      - env: SERVERLESS_MUST_GATHER
+        name: serverless-must-gather
       - env: SERVERLESS_INDEX
         name: serverless-index
       - env: SERVERLESS_BUNDLE
@@ -161,10 +169,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade
+      commands: FORCE_KONFLUX_INDEX=true make test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
+      - env: SERVERLESS_MUST_GATHER
+        name: serverless-must-gather
       - env: SERVERLESS_INDEX
         name: serverless-index
       - env: SERVERLESS_BUNDLE
@@ -185,10 +195,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
+      commands: FORCE_KONFLUX_INDEX=true make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
+      - env: SERVERLESS_MUST_GATHER
+        name: serverless-must-gather
       - env: SERVERLESS_INDEX
         name: serverless-index
       - env: SERVERLESS_BUNDLE

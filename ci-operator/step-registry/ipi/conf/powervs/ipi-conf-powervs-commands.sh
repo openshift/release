@@ -114,6 +114,7 @@ PLATFORM_ARGS_COMPUTE=( )
 PLATFORM_ARGS_WORKER=( )
 POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
+PERSISTENT_VPC=""
 case "${LEASED_RESOURCE}" in
    "dal10")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10")
@@ -150,6 +151,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
       PERSISTENT_TG="tg-lon06-powervs-7-0"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-0"
    ;;
    "lon06-powervs-7-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-1")
@@ -157,6 +159,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
       PERSISTENT_TG="tg-lon06-powervs-7-1"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-1"
    ;;
    "lon06-powervs-7-quota-slice-2")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-2")
@@ -164,6 +167,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
       PERSISTENT_TG="tg-lon06-powervs-7-2"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-2"
    ;;
    "lon06-powervs-7-quota-slice-3")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-3")
@@ -171,6 +175,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
       PERSISTENT_TG="tg-lon06-powervs-7-3"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-3"
    ;;
    "mad02-powervs-5-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-0")
@@ -236,6 +241,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=wdc
       VPCREGION=us-east
       PERSISTENT_TG="tg-wdc06-powervs-4-0"
+      PERSISTENT_VPC="vpc-wdc06-powervs-4-0"
    ;;
    *)
       # Default Region & Zone
@@ -250,6 +256,7 @@ echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
 echo "VPCREGION=${VPCREGION}"
 echo "PERSISTENT_TG=${PERSISTENT_TG}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
 
 echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
 echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
@@ -330,6 +337,12 @@ TGNAME: ${PERSISTENT_TG}
 EOF
 fi
 
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${SHARED_DIR}/powervs-conf.yaml" << EOF
+VPCNAME: ${PERSISTENT_VPC}
+EOF
+fi
+
 export POWERVS_SHARED_CREDENTIALS_FILE
 
 if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 <= 14) { exit 0 } else { exit 1 } }'; then
@@ -385,6 +398,12 @@ cat >> "${CONFIG}" << EOF
 EOF
 fi
 
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${CONFIG}" << EOF
+    vpcName: ${PERSISTENT_VPC}
+EOF
+fi
+
 cat >> "${CONFIG}" << EOF
 publish: External
 pullSecret: >
@@ -420,3 +439,5 @@ fi
 
 echo "tgName in ${CONFIG}:"
 grep tgName "${CONFIG}" || true
+echo "vpcName in ${CONFIG}:"
+grep vpcName "${CONFIG}" || true

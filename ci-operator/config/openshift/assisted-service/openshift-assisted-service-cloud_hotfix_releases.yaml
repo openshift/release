@@ -24,7 +24,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   tests:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tests
   tests-4.12:
@@ -45,6 +45,10 @@ base_images:
     tag: tests
   tests-4.16:
     name: "4.16"
+    namespace: ocp
+    tag: tests
+  tests-4.17:
+    name: "4.17"
     namespace: ocp
     tag: tests
 build_root:
@@ -71,7 +75,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -141,7 +145,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-metal-assisted-single-node
+- always_run: true
+  as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet-assisted
     env:
@@ -149,7 +154,8 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         NUM_MASTERS=1
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2
+- always_run: true
+  as: e2e-metal-assisted-day2
   steps:
     cluster_profile: packet-assisted
     env:
@@ -157,16 +163,7 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv4v6
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        IPv6=yes
-        IPv4=yes
-    workflow: assisted-baremetal
-- always_run: false
+- always_run: true
   as: e2e-metal-assisted-4-12
   steps:
     cluster_profile: packet-assisted
@@ -177,9 +174,8 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
-- always_run: false
+- always_run: true
   as: e2e-metal-assisted-4-13
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -189,9 +185,8 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
-- always_run: false
+- always_run: true
   as: e2e-metal-assisted-4-14
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -201,9 +196,8 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.14
     workflow: assisted-baremetal
-- always_run: false
+- always_run: true
   as: e2e-metal-assisted-4-15
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -213,9 +207,8 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.15
     workflow: assisted-baremetal
-- always_run: false
+- always_run: true
   as: e2e-metal-assisted-4-16
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -225,7 +218,20 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
-- as: e2e-metal-assisted
+- always_run: true
+  as: e2e-metal-assisted-4-17
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.17
+    workflow: assisted-baremetal
+- always_run: true
+  as: e2e-metal-assisted
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -233,7 +239,8 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-static-ip-suite
+- always_run: true
+  as: e2e-metal-assisted-static-ip-suite
   steps:
     cluster_profile: packet-assisted
     env:
@@ -241,12 +248,13 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         STATIC_IPS=true
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4-17
+- always_run: true
+  as: e2e-metal-assisted-cnv-4-17
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -259,7 +267,18 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-lvm
+- always_run: true
+  as: e2e-metal-assisted-ipv4v6
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        IPv6=yes
+        IPv4=yes
+    workflow: assisted-baremetal
+- always_run: true
+  as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -273,12 +292,13 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-17
+- always_run: true
+  as: e2e-metal-assisted-odf-4-17
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
