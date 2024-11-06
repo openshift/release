@@ -23,7 +23,7 @@ if [ "$BRANCH_NAME" == "$TARGET_BRANCH" ] && [ "$GIT_PR_NUMBER" != "$ALLOWED_PR_
     echo "Only PR $ALLOWED_PR_ON_MAIN is allowed to run e2e tests on main branch at the moment. Exiting script with failure code 1."
     exit 1
 elif [ "$BRANCH_NAME" != "$RELEASE_BRANCH" ] && [ "$BRANCH_NAME" != "$TARGET_BRANCH" ]; then
-    echo "e2e tests are only allowed on main and release-1.3 branches at the moment. Exiting script."
+    echo "e2e tests are only allowed on main and release-1.3 branches at the moment. Exiting script with failure code 1."
     exit 1
 fi
 
