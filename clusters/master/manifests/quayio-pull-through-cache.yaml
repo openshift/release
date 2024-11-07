@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-master
+  namespace: clusters
+spec:
+  destination:
+    name: in-cluster
+    namespace: clusters
+  source:
+    path: clusters/master/manifests
+    repoURL: 'https://github.com/openshift/release'
+    targetRevision: master
+  sources: []
+  project: cluster-master
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+      - PruneLast=true
