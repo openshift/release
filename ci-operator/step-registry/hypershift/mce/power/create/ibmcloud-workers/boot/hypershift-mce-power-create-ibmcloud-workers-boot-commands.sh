@@ -245,7 +245,7 @@ add_x86_workers() {
 }
 
 main() {
-	#sleep 2h
+	sleep 2h
 	add_power_workers &
 	pid1=$!
 	if [ ${IS_HETEROGENEOUS} == "yes" ]; then
