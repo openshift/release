@@ -1,12 +1,12 @@
 #!/bin/bash
 set -xeuo pipefail
 
-if [ -z "${SHARED_DIR-}" ] ; then
-    echo "The SHARED_DIR environment variable is not defined"
-    exit 1
+if [ -z "${SHARED_DIR-}" ]; then
+  echo "The SHARED_DIR environment variable is not defined"
+  exit 1
 fi
 
-cat > "${SHARED_DIR}/ci-functions.sh" <<'EOF_SHARED_DIR'
+cat >"${SHARED_DIR}/ci-functions.sh" <<'EOF_SHARED_DIR'
 #
 # Note that CI-specific functions have 'ci_' name prefix.
 # The rest should be generic functionality.
@@ -179,10 +179,13 @@ function ci_clone_src() {
         CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [(select(.refs) | .refs), try(.extra_refs[])]}')
         export CLONEREFS_OPTIONS
     fi
+    export CLONEREFS_OPTIONS=$(echo $CLONEREFS_OPTIONS | jq '.refs[1].org = "pmtk" | .refs[1].base_ref = "rf-containers"')
 
     # Following procedure is taken from original clonerefs image used to construct `src` image.
     umask 0002
     /tmp/clonerefs
+
+    mv /go/src/github.com/pmtk/microshift /go/src/github.com/openshift/microshift
     find /go/src -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod g+xw
 }
 
