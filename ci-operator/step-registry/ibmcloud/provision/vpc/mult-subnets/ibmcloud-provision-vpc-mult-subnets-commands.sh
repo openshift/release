@@ -97,9 +97,9 @@ fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name=$(cat "${SHARED_DIR}/ibmcloud_vpc_name")
-
+set -x
 create_subnets "${CLUSTER_NAME}" "${vpc_name}" "${region}" ${extra_subnets_count}
-
+set +x
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}" ${extra_subnets_count}
 
