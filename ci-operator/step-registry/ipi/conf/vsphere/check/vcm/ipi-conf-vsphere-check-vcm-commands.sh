@@ -263,8 +263,9 @@ for POOL in "${pools[@]}"; do
   if [[ -n "${VSPHERE_MULTI_NETWORKS}" ]]; then
     # seems only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, other pending create lease
     # if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1" ]]; then
       networks_number=2
-    # fi
+    fi
   fi
   # shellcheck disable=SC1078
   echo "apiVersion: vspherecapacitymanager.splat.io/v1
