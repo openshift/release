@@ -140,6 +140,7 @@ function install_central_with_helm() {
     --version "${ACS_VERSION_TAG}" \
     --set imagePullSecrets.allowNone=true \
     --set central.persistence.none=true \
+    --set central.db.resources.requests.cpu=2 \
     --set central.adminPassword.value="${ROX_PASSWORD}"
 }
 
