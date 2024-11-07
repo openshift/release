@@ -3,7 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export STORAGECLASS_LOCATION=${SHARED_DIR}/smb-winserver-sc.yaml
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # For disconnected or otherwise unreachable environments, we want to
