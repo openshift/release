@@ -262,9 +262,9 @@ for POOL in "${pools[@]}"; do
   networks_number=1
   if [[ -n "${VSPHERE_MULTI_NETWORKS}" ]]; then
     # seems only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, other pending create lease
-    if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    # if [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
       networks_number=2
-    fi
+    # fi
   fi
 
   # shellcheck disable=SC1078
@@ -288,7 +288,7 @@ spec:
 done
 
 log "waiting for lease to be fulfilled..."
-
+sleep 3600
 n=0
 until [ "$n" -ge 5 ]
 do
