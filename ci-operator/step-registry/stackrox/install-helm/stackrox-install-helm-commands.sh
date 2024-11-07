@@ -66,11 +66,21 @@ function wait_deploy() {
 function fetch_last_nigthly_tag() {
   # Support Linux and MacOS (requires brew coreutils)
   local acs_tag_suffix=""
-  acs_tag_suffix="$(date -d "-1 day" +"%Y%m%d" || gdate -d "-1 day" +"%Y%m%d")"
-  echo "acs_tag_suffix=${acs_tag_suffix}"
 
-  # Quay API info: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
-  ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
+  # To avoid siutations where nightly is not created for the previous day (i.e. weekend),
+  # we need to look more into the past.
+  for days_in_past in {1..14};
+  do
+    acs_tag_suffix="$(date -d "-${days_in_past} day" +"%Y%m%d" || gdate -d "-${days_in_past} day" +"%Y%m%d")"
+    echo "acs_tag_suffix=${acs_tag_suffix}"
+
+    # Quay API info: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
+    ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
+    if [[ "${ACS_VERSION_TAG}" != "" && "${ACS_VERSION_TAG}" != "null" ]]; then
+      break
+    fi
+  done
+
   if [[ "${ACS_VERSION_TAG}" == "" || "${ACS_VERSION_TAG}" == "null" ]]; then
     echo "Error: Unable to fetch the last nightly tag"
     exit 1
