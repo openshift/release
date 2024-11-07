@@ -10,23 +10,6 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
-# Define branch and PR conditions
-TARGET_BRANCH="main"
-ALLOWED_PR_ON_MAIN="1869"
-RELEASE_BRANCH="release-1.3"
-
-# Extract the base branch name
-BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
-
-# Check conditions for running e2e tests
-if [ "$BRANCH_NAME" == "$TARGET_BRANCH" ] && [ "$GIT_PR_NUMBER" != "$ALLOWED_PR_ON_MAIN" ]; then
-    echo "Only PR $ALLOWED_PR_ON_MAIN is allowed to run e2e tests on main branch. Exiting script."
-    exit 0
-elif [ "$BRANCH_NAME" != "$RELEASE_BRANCH" ] && [ "$BRANCH_NAME" != "$TARGET_BRANCH" ]; then
-    echo "e2e tests are only allowed on main and release-1.3 branches. Exiting script."
-    exit 0
-fi
-
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
