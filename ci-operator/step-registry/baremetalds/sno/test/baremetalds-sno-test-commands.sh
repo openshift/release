@@ -62,17 +62,6 @@ ${TIMEOUT_COMMAND} ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_I
 
         echo "\${stderr}"
 
-        # TODO: remove this part once we fully handle the problem described at
-        # https://issues.redhat.com/browse/MGMT-15555.
-        # After 'openshift-tests' finishes validating the tests, it checks
-        # the extra monitoring tests, so the following line only excludes those
-        # kind of failures (rather than excluding all runs where the monitoring
-        # tests have failed).
-        if [[ "\${stderr}" == *"failed due to a MonitorTest failure" ]]; then
-            echo "Overriding exit code because of MonitorTest failure"
-            exit 0
-        fi
-
         if [[ \${exit_code} -ne 0 ]]; then
             exit \${exit_code}
         fi

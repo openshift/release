@@ -14,7 +14,7 @@ cat /etc/os-release
 if [ ${BAREMETAL} == "true" ]; then
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
@@ -44,13 +44,13 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 if [ ${BAREMETAL} == "true" ]; then
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/bm/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "export ALL_SCENARIOS=false;export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com";cd /tmp/e2e-benchmarking/workloads/network-perf-v2; sed -i s/--retry-all-errors//g run.sh;VIRT=true WORKLOAD=full-run.yaml ./run.sh"
 
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   # kill the ssh tunnel so the job completes
   pkill ssh
-else 
+else
   git clone $REPO_URL $TAG_OPTION --depth 1
   pushd e2e-benchmarking/workloads/network-perf-v2
   # Clean up resources from possible previous tests.

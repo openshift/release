@@ -142,9 +142,12 @@ function waitForReady() {
           echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
         else
           current_time=$(date +"%s")
+          echo $current_time > ${SHARED_DIR}/workers_scale_end_epoch.txt
           record_cluster "timers" "nodes_ready" $(( "${current_time}" - "${start_time}" ))
           echo "All nodes are ready to run workloads after $(( ${current_time} - ${start_time} )) seconds"
           FINAL_NODE_STATE="Pass"
+          record_cluster "timers" "global_end" "$(date +'%s')"
+
           break
         fi
       else
@@ -166,20 +169,19 @@ function waitForReady() {
 # Determine count of desired compute node count
 function getDesiredComputeCount {
   desired_compute_count=0
+  entries=(".autoscaling.min_replicas" ".autoscaling.min_replica" ".replicas" )
   for MP_NAME in $(rosa list machinepool -c "$CLUSTER_ID" -o json | jq -r '.[].id'); do
-    mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
-    if [[ "$mp_compute_count" = "null" ]]; then
-      echo "Machinepool $MP_NAME --auto-scaling enabled, retrieving min_replica count desired"
-      if [[ $HOSTED_CP = "true" ]];then
-        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica')
-      else
-        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas')
+    mp_detail=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json)
+    for entry in "${entries[@]}"; do
+      mp_compute_count=$(echo "$mp_detail"| jq -r ${entry})
+      if [[ ! "$mp_compute_count" = "null" ]];then
+        break
       fi
-    fi
+    done
     echo "Machinepool $MP_NAME desired compute node count is $mp_compute_count"
     desired_compute_count=$(expr $desired_compute_count + $mp_compute_count)
   done
- 
+
   export desired_compute_count
   echo "Total desired node count: $desired_compute_count"
 }
@@ -195,6 +197,8 @@ function fixNodeScaling {
     else
       rosa edit machinepool -c "$CLUSTER_ID" worker --enable-autoscaling=false --replicas "$REPLICAS"
     fi
+    workers_scale_event_epoch=$(date +"%s")
+    echo $workers_scale_event_epoch > ${SHARED_DIR}/workers_scale_event_epoch.txt
   fi
 }
 

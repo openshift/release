@@ -3,25 +3,37 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 echo "************ baremetalds assisted operator publish command ************"
-
-# Check for postsubmit job type
-if [[ ! ("$JOB_TYPE" = "postsubmit" ) ]]; then
-    echo "ERROR Cannot update the manifest from a $JOB_TYPE job"
-    exit 1
-fi
 
 # Skip if no changes
 echo "## Detect if there are changes in the olm related manifests."
 echo "## Exit if no changes."
 set +o errexit
-if git diff HEAD~1 --exit-code "deploy/olm-catalog" >/dev/null 2>&1; then
-    echo "   no changes detected"
-    exit 0
+
+if [[ "$JOB_TYPE" = "presubmit" ]]; then
+    echo "This is a test job"
+    test="true"
+elif [[ "$JOB_TYPE" != "postsubmit" ]]; then
+    echo "This job can run only as presubmit for testing or postsubmit for actual execution"
 fi
+
+if [ "$test" != "true" ]; then
+    if git diff HEAD~1 --exit-code "deploy/olm-catalog" >/dev/null 2>&1; then
+        echo "   no changes detected"
+        exit 0
+    fi
+
+    echo "changes detected in deploy/olm-catalog"
+fi
+
 set -o errexit
-echo "   changes detected in deploy/olm-catalog"
+
+function get_image_sha() {
+    local image_url=$1
+    curl -G "${image_url}" | jq -e -r '.tags[] | select((has("expiration") | not)) | .manifest_digest'
+}
 
 # Setup GitHub credentials
 GITHUB_TOKEN_FILE="$SECRETS_PATH/$GITHUB_SECRET/$GITHUB_SECRET_FILE"
@@ -150,30 +162,44 @@ pushd "${CO_DIR}"
 git checkout -B "${OPERATOR_VERSION}"
 CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/manifests/${CSV}"
 
-echo "   updating images to use digest"
+echo
+echo "## updating images to use digest"
+
 # Grab all of the images from the relatedImages and get their digest sha
-for full_image in $(yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
-    image=${full_image%:*}
-    image_name=${image#*/}
+num_entries=$(yq eval '.spec.relatedImages | length' "${CO_CSV}")
+for i in $(seq 0 $((num_entries - 1))); do
+    full_image=$(yq eval ".spec.relatedImages[$i].image" "${CO_CSV}")
+    image_name=$(yq eval ".spec.relatedImages[$i].name" "${CO_CSV}")
 
-    # Mirror image
-    mirror_image_name="${REGISTRY_ORG}/${image_name#*/}"
-    full_mirror_image="${REGISTRY_HOST}/${mirror_image_name}:${OPERATOR_VERSION}"
-    echo "   mirroring image ${full_image} -> ${full_mirror_image}"
-    oc image mirror "${full_image}" "${full_mirror_image}" || {
-        echo "ERROR Unable to mirror image"
-        exit 1
-    }
+    image_without_tag=${full_image%:*}
+    image_registry=${image_without_tag%%/*}   
+    image_org_and_name=${image_without_tag#*/}
+    image_tag=${full_image##*:}
 
-    digest=$(curl -G "https://${REGISTRY_HOST}/api/v1/repository/${mirror_image_name}/tag/?specificTag=${OPERATOR_VERSION}" | \
-        jq -e -r '
-            .tags[]
-            | select((has("expiration") | not))
-            | .manifest_digest')
+    # Skip postgresql image as we should take the latest always
+    if [[ "${image_name}" == "postgresql" ]]; then
+        echo "skipping mirroring of ${full_image} (postgresql)"
+        
+        digest=$(get_image_sha "https://${image_registry}/api/v1/repository/${image_org_and_name}/tag/?specificTag=${image_tag}")
+        new_image_ref="${image_registry}/${image_org_and_name}@${digest}"
+    else
+        # Mirror image
+        mirror_image_name="${REGISTRY_ORG}/${image_org_and_name#*/}"
+        full_mirror_image="${REGISTRY_HOST}/${mirror_image_name}:${OPERATOR_VERSION}"
+
+        echo "mirroring image ${full_image} -> ${full_mirror_image}"
+        oc image mirror "${full_image}" "${full_mirror_image}" || {
+            echo "ERROR Unable to mirror image"
+            exit 1
+        }
+
+        digest=$(get_image_sha "https://${REGISTRY_HOST}/api/v1/repository/${mirror_image_name}/tag/?specificTag=${OPERATOR_VERSION}")
+        new_image_ref="${REGISTRY_HOST}/${mirror_image_name}@${digest}"
+    fi
 
     # Fail if digest empty
     [[ -z ${digest} ]] && false
-    sed -i "s,${full_image},${REGISTRY_HOST}/${mirror_image_name}@${digest},g" "${CO_CSV}"
+    sed -i "s,${full_image},${new_image_ref},g" "${CO_CSV}"
 done
 
 echo "   update createdAt time"
@@ -189,15 +215,21 @@ v="assisted-service-operator.v${PREV_OPERATOR_VERSION}" \
     '.spec.replaces |= strenv(v)' "${CO_CSV}"
 
 echo
-echo "## Submit PR to community operators"
 echo "   commit changes"
 git add --all
 git commit -s -m "operator assisted-service-operator (${OPERATOR_VERSION})"
-git push --set-upstream --force origin HEAD
 
-echo "   submit PR"
-curl "https://api.github.com/repos/${CO_REPO}/pulls" --user "${GITHUB_USER}:${GITHUB_TOKEN}" -X POST \
-    --data '{"title": "'"$(git log -1 --format=%s)"'", "base": "main", "body": "An automated PR to update assisted-service-operator to v'"${OPERATOR_VERSION}"'", "head": "'"${GITHUB_USER}:${OPERATOR_VERSION}"'"}'
+if [[ "$test" = "true" ]]; then
+    echo "This is a test-job, printing the changes that would have outputed"
+    git --no-pager show
+else
+    echo
+    echo "## Submit PR to community operators"
+    git push --set-upstream --force origin HEAD
+    curl "https://api.github.com/repos/${CO_REPO}/pulls" --user "${GITHUB_USER}:${GITHUB_TOKEN}" -X POST \
+        --data '{"title": "'"$(git log -1 --format=%s)"'", "base": "main", "body": "An automated PR to update assisted-service-operator to v'"${OPERATOR_VERSION}"'", "head": "'"${GITHUB_USER}:${OPERATOR_VERSION}"'"}'
+fi
+
 popd
 
 echo "## Done ##"

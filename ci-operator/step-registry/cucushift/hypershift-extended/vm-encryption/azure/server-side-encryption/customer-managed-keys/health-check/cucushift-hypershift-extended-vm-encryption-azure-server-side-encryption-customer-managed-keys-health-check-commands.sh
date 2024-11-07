@@ -12,7 +12,7 @@ function check_node_sse_with_cmk() {
         return 1
     fi
 
-    des_id="$(oc get np -n clusters "$np_name" -o jsonpath='{.spec.platform.azure.diskEncryptionSetID}')"
+    des_id="$(oc get np -n clusters "$np_name" -o jsonpath='{.spec.platform.azure.osDisk.encryptionSetID}')"
     if [[ -z "$des_id" ]]; then
         echo "Error: got empty diskEncryptionSetID from NP $np_name" >&2
         return 1

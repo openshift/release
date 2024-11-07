@@ -54,85 +54,61 @@ function run-on-first-master-silent-long {
   timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
 
-
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
-cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
-  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
-  for field in ${fields[@]}; do
-    echo "Approving ${field} CSRs at $(date)"
-    (( required_csrs=${#control_nodes[@]} + ${#compute_nodes[@]} ))
-    approved_csrs=0
-    attempts=0
-    max_attempts=40
-    while (( required_csrs >= approved_csrs )); do
-      echo -n '.'
-      mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
-      if [[ ${#csrs[@]} -gt 0 ]]; then
-        echo ""
-        oc adm certificate approve ${csrs} && attempts=0 && (( approved_csrs=approved_csrs+${#csrs[@]} ))
-      else
-        (( attempts++ ))
-      fi
-      if (( attempts > max_attempts )); then
-        break
-      fi
-      sleep 10s
-    done
-    echo ""
-  done
-  echo "Finished CSR approval at $(date)"
-EOZ
-chmod a+x /tmp/approve-csrs-with-timeout.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
-run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
+run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  echo "Waiting for API server to come up"
-  until oc get nodes; do sleep 10; done
-  mapfile -d ' ' -t nodes < <( oc get nodes -o name )
-  RAN_CSR_APPROVAL=""
-  for nodename in ${nodes[@]}; do
-    echo "Waiting for ${nodename} to send heartbeat"
-    while true; do
-      STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-      NODE_HEARTBEAT_TIME=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
-      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then sleep 5; fi
-      TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
-      if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
-        break
+  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
+
+  echo "Approving CSRs at $(date)"
+  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
+  for field in ${fields[@]}; do
+    (( required_csrs=${#nodes[@]} ))
+    approved_csrs=0
+    until (( approved_csrs >= required_csrs )); do
+      mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      if [[ ${#csrs[@]} -gt 0 ]]; then
+        oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      if [[ -z ${RAN_CSR_APPROVAL} ]]; then
-        bash /usr/local/bin/approve-csrs-with-timeout.sh
-        RAN_CSR_APPROVAL=1
-      else
-        echo -n "."
-        sleep 10
-      fi
-    done
-    echo "${nodename} is sending heartbeats"
+      sleep 10
+    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
-  echo "All nodes are ready"
-  oc get nodes
+  echo "All CSRs approved at $(date)"
+
+  for nodename in ${nodes[@]}; do
+    STATUS="False"
+    TIME_DIFF="301"
+    until [[ ${TIME_DIFF} -le 300 ]] && [[ ${STATUS} == True ]]; do
+      STATUS=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      NODE_HEARTBEAT_TIME=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
+      if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then
+        continue
+      fi
+      TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
+      sleep 1
+    done 3> >(/usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null)
+  done
+  echo "All nodes are ready at $(date)"
 EOZ
 chmod a+x /tmp/ensure-nodes-are-ready.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-silent-long "bash -x /usr/local/bin/ensure-nodes-are-ready.sh"
-  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig && ls -la /tmp/lb-ext.kubeconfig"
+  run-on-first-master-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
 
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
-  until oc get nodes; do sleep 10; done
+  until oc --request-timeout=5s get nodes; do sleep 10; done
 EOZ
 chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
@@ -142,9 +118,23 @@ function wait-for-valid-lb-ext-kubeconfig {
   run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
 
-function pod-restart-workarounds {
-  export KUBECONFIG=/tmp/lb-ext.kubeconfig
-  ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+  echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  oc --request-timeout=5s wait --for=condition=Progressing clusteroperator/kube-apiserver --timeout=300s 
+EOZ
+chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
+run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh && chmod a+x /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+
+function wait-for-kubeapiserver-to-start-progressing {
+  run-on-first-master "bash /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+}
+
+cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
@@ -158,6 +148,13 @@ function pod-restart-workarounds {
     oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
     oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
   fi
+EOZ
+chmod a+x /tmp/pod-restart-workarounds.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
+run-on-first-master "mv /tmp/pod-restart-workarounds.sh /usr/local/bin/pod-restart-workarounds.sh && chmod a+x /usr/local/bin/pod-restart-workarounds.sh"
+
+function pod-restart-workarounds {
+  run-on-first-master-silent "bash /usr/local/bin/pod-restart-workarounds.sh"
 }
 
 function prepull-tools-image-for-gather-step {
@@ -169,11 +166,12 @@ function prepull-tools-image-for-gather-step {
 
 function wait-for-operators-to-stabilize {
   export KUBECONFIG=/tmp/lb-ext.kubeconfig
+  oc --request-timeout=5s get nodes
   # Wait for operators to stabilize
   if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
-      oc get nodes
-      oc get co | grep -v "True\s\+False\s\+False"
+    ! oc --request-timeout=5s adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
+      oc --request-timeout=5s get nodes
+      oc --request-timeout=5s get co | grep -v "True\s\+False\s\+False"
       exit 1
   fi
 }
@@ -194,6 +192,8 @@ if [ -d "$KUBECONFIG" ]; then
     export KUBECONFIG=${kubeconfig}
   done
 fi
+
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 
 # Use emptyDir for image-registry
 oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'

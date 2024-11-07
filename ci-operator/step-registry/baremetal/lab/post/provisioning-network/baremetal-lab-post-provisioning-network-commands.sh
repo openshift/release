@@ -2,12 +2,25 @@
 
 set -o nounset
 
+[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 if [ ! -f "${SHARED_DIR}/provisioning_network" ]; then
   echo "No need to rollback the provisioning network. Skipping..."
   exit 0
 fi
 
-[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 # Use the last octet of the first master node as the VLAN ID to keep it unique in the managed network
@@ -99,13 +112,6 @@ interfaces:
   type: vlan
   state: absent
 "
-
-SSHOPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 echo "[INFO] Rolling back the provisioning network configuration via the NMState specs"
 timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \

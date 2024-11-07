@@ -40,18 +40,19 @@ if [ -f "${remove_resources_by_cli}" ]; then
 fi
 
 rg_files=(
+    "${SHARED_DIR}/RESOURCE_GROUP_NAME"
     "${SHARED_DIR}/resourcegroup"
     "${SHARED_DIR}/resourcegroup_cluster"
     "${SHARED_DIR}/resourcegroup_vnet"
     "${SHARED_DIR}/resourcegroup_nsg"
     "${SHARED_DIR}/resourcegroup_aks"
     "${SHARED_DIR}/resourcegroup_sa"
-    "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 )
 for rg_file in "${rg_files[@]}"; do
     if [ -f "${rg_file}" ]; then
         existing_rg=$(cat "${rg_file}")
         if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
+            echo "Removing resource group ${existing_rg} from ${rg_file}"
             az group delete -y -n "${existing_rg}"
         fi
     fi

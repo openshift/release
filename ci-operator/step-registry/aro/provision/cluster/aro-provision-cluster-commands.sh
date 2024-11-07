@@ -22,6 +22,7 @@ ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:=""}
 ARO_API_SERVER_VISIBILITY=${ARO_API_SERVER_VISIBILITY:=""}
 ARO_OUTBOUND_TYPE=${ARO_OUTBOUND_TYPE:=""}
 ARO_FIPS=${ARO_FIPS:="false"}
+ARO_BYO_NSG=${ARO_BYO_NSG:="false"}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -101,6 +102,11 @@ if [[ ${ARO_FIPS} == "true" ]]; then
   CREATE_CMD="${CREATE_CMD} --fips ${ARO_FIPS}"
 fi
 
+# BYO NSG support
+if [[ ${ARO_BYO_NSG} == "true" ]]; then
+  CREATE_CMD="${CREATE_CMD} --enable-preconfigured-nsg"
+fi
+
 echo "Running ARO create command:"
 echo "${CREATE_CMD}"
 eval "${CREATE_CMD}" > ${SHARED_DIR}/clusterinfo
@@ -123,9 +129,9 @@ fi
 
 echo $KUBECRED > ${SHARED_DIR}/clustercreds
 
-oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS"
+oc login "$KUBEAPI" --username="$KUBEUSER" --password="$KUBEPASS" --insecure-skip-tls-verify=true
 
 echo "Generating kubeconfig in ${SHARED_DIR}/kubeconfig"
 
-oc config view --raw > ${SHARED_DIR}/kubeconfig
+oc config view --raw > ${SHARED_DIR}/kubeconfig --insecure-skip-tls-verify=true
 

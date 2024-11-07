@@ -275,8 +275,30 @@ case $CLUSTER_TYPE in
   echo "The image version for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers has been created... "
   echo "Patching the MachineSet..."
   resource_id="/resourceGroups/${rg_name}/providers/Microsoft.Compute/galleries/${gallery_name}/images/${image_name}/versions/latest"
-  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.vmSize = \"${ADDITIONAL_WORKER_VM_TYPE}\"
-       | .spec.template.spec.providerSpec.value.image.resourceID = \"${resource_id}\"" <<< "$MACHINE_SET")
+  echo "Duplicate all the machine sets and distribute the number of ADDITIONAL_WORKERS on Azure for some perfscale test"
+  MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+    .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
+    | .metadata.name += "-additional"
+    | .spec.template.spec.providerSpec.value.vmSize = "${ADDITIONAL_WORKER_VM_TYPE}"
+    | .spec.template.spec.providerSpec.value.image.resourceID = "${resource_id}"
+    | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
+    | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
+    )
+EOF
+)")
+  machineset_nums=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 '.items | length')
+  base_replicas=$(( ADDITIONAL_WORKERS / machineset_nums ))
+  remainder=$(( ADDITIONAL_WORKERS % machineset_nums ))
+  for i in $(seq 0 $(( machineset_nums - 1 ))); do
+      if [ $i -lt $remainder ]; then
+        replicas=$(( base_replicas + 1 ))
+      else
+        replicas=$base_replicas
+      fi
+      MACHINE_SET=$(yq-v4 ".items[$i].spec.replicas = ${replicas}" <<< "$MACHINE_SET")
+  done
 ;;
 *gcp*)
   echo "Extracting gcp boot image..."

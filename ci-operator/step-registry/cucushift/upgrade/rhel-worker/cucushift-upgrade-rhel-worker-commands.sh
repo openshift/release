@@ -117,6 +117,54 @@ EOF
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
+function rhel_pre_upgrade(){
+    cat > /tmp/pre_cordon.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_cordon"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/pre_uncordon.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_uncordon"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/pre_upgrade.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_upgrade"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/post_upgrade.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/post_upgrade"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    echo "Adding upgrade hooks to the inventory"
+    cat > /tmp/upgrade_hooks <<-'EOF'
+openshift_node_pre_cordon_hook=/tmp/pre_cordon.yaml
+openshift_node_pre_uncordon_hook=/tmp/pre_uncordon.yaml
+openshift_node_pre_upgrade_hook=/tmp/pre_upgrade.yaml
+openshift_node_post_upgrade_hook=/tmp/post_upgrade.yaml
+EOF
+
+    sed -i '/\[all\:vars\]/r /tmp/upgrade_hooks' "${SHARED_DIR}/ansible-hosts"
+}
+
 # Upgrade RHEL node
 function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
@@ -140,6 +188,16 @@ function rhel_upgrade(){
     else
         echo "RHEL worker has incorrect K8s version" && exit 1
     fi
+
+    echo "Check the upgrade hook flags created"
+    for hookname in pre_cordon pre_uncordon pre_upgrade post_upgrade; do
+        if [[ -f /tmp/${hookname} ]]; then
+            echo "The hook ${hookname}.yaml was executed."
+        else
+            echo "The hook ${hookname}.yaml was NOT executed." && exit 1
+        fi
+    done
+        
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
@@ -242,6 +300,7 @@ echo -e "The source release version is gotten from clusterversion resource, that
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     run_command "oc get node -owide"
     rhel_repo
+    rhel_pre_upgrade
     rhel_upgrade
     check_mcp
     check_history

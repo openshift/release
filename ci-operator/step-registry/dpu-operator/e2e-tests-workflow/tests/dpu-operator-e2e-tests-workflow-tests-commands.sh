@@ -58,7 +58,7 @@ wait_for_job_to_finish_running() {
 		if [[ "$result" != "null" ]]; then
 			# Job has completed
 			echo "Job Result: $result"
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
+			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "$1/consoleText")
 			echo "$curl_info"
 			if [ "$result" == "SUCCESS" ]; then
 				exit 0

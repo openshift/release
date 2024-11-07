@@ -4,53 +4,6 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
 images:
-- context_dir: base/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  to: base-ubi8-python-3.8
-- context_dir: jupyter/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: jupyter-minimal-ubi8-python-3.8
-- context_dir: jupyter/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-minimal-ubi8-python-3.8
-  to: jupyter-datascience-ubi8-python-3.8
-- context_dir: cuda/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: cuda-ubi8-python-3.8
-- context_dir: jupyter/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-ubi8-python-3.8
-  to: cuda-jupyter-minimal-ubi8-python-3.8
-- context_dir: jupyter/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-jupyter-minimal-ubi8-python-3.8
-  to: cuda-jupyter-datascience-ubi8-python-3.8
-- context_dir: habana/1.10.0/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.10.0-ubi8-python-3.8
-- context_dir: habana/1.13.0/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.13.0-ubi8-python-3.8
-- context_dir: runtimes/minimal/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-minimal-ubi8-python-3.8
-- context_dir: runtimes/datascience/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-datascience-ubi8-python-3.8
-- context_dir: runtimes/pytorch/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-ubi8-python-3.8
-  to: runtime-pytorch-ubi8-python-3.8
-- context_dir: runtimes/tensorflow/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-ubi8-python-3.8
-  to: runtime-cuda-tensorflow-ubi8-python-3.8
 - context_dir: base/ubi9-python-3.9
   dockerfile_path: Dockerfile
   to: base-ubi9-python-3.9
@@ -122,13 +75,6 @@ images:
   dockerfile_path: Dockerfile
   from: rocm-jupyter-datascience-ubi9-python-3.9
   to: rocm-jupyter-pytorch-ubi9-python-3.9
-- context_dir: base/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  to: base-anaconda-python-3.8
-- context_dir: jupyter/datascience/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-anaconda-python-3.8
-  to: jupyter-datascience-anaconda-python-3.8
 - context_dir: base/rhel9-python-3.9
   dockerfile_path: Dockerfile
   to: base-rhel9-python-3.9
@@ -157,96 +103,6 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: odh-minimal-notebook-container
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: v1
-    workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-jupyter-datascience-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: odh-generic-data-science-notebook
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: v1
-    workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: cuda-notebooks
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.10.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: odh-habana-notebooks
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.13.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: odh-habana-notebooks
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.13.0-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: runtime-minimal-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-minimal-ubi8-python-3.8
-    env:
-      IMAGE_REPO: runtime-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: runtime-minimal-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: runtime-datascience-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-datascience-ubi8-python-3.8
-    env:
-      IMAGE_REPO: runtime-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: runtime-datascience-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: runtime-pytorch-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: runtime-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: runtime-pytorch-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: runtime-cuda-tensorflow-ubi8-python-3.8
-    env:
-      IMAGE_REPO: runtime-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: runtime-cuda-tensorflow-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
 - as: notebook-jupyter-minimal-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
@@ -377,16 +233,6 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: rocm-jupyter-pytorch-ubi9-python-3.9
     workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-jupyter-datascience-anaconda-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-anaconda-python-3.8
-    env:
-      IMAGE_REPO: odh-anaconda-notebook
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
 - as: notebook-codeserver-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
@@ -424,6 +270,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
     env:
       IMAGE_REPO: runtime-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9
     workflow: red-hat-data-services-ci-image-mirror
 - as: runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
@@ -433,6 +280,7 @@ tests:
       SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
     env:
       IMAGE_REPO: runtime-images
+      IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9
     workflow: red-hat-data-services-ci-image-mirror
 zz_generated_metadata:

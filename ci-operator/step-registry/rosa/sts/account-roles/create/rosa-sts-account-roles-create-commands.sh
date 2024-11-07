@@ -47,9 +47,14 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
-# Support to create the account-roles with the higher version 
+# Support to create the account-roles with the higher version
 VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
+  # Get the X.Y from the release payload pullspec if we're using the one from CI
+  if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
+    OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
+  fi
+
   if [[ -z "$OPENSHIFT_VERSION" ]]; then
     versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
     if [[ "$HOSTED_CP" == "true" ]]; then

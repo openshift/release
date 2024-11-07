@@ -1,0 +1,147 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.17
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
+      as:
+      - golang:1.22
+  to: multiarch-tuning-operator
+- additional_architectures:
+  - arm64
+  dockerfile_path: bundle.Dockerfile
+  to: multiarch-tuning-op-bundle
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+    FROM src
+    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+  from: src
+  to: operator-sdk-mto
+operator:
+  bundles:
+  - as: multiarch-tuning-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:v1.0
+    with: pipeline:multiarch-tuning-operator
+promotion:
+  to:
+  - namespace: origin
+    tag: v1.0
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  sast:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 300m
+      memory: 400Mi
+tests:
+- as: fmt
+  cluster: build10
+  commands: NO_DOCKER=1 make fmt && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: vet
+  cluster: build10
+  commands: NO_DOCKER=1 make vet && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: vendor
+  cluster: build10
+  commands: NO_DOCKER=1 make vendor && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: goimports
+  cluster: build10
+  commands: NO_DOCKER=1 make goimports && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: lint
+  cluster: build10
+  commands: NO_DOCKER=1 make lint && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: sast
+  cluster: build10
+  commands: NO_DOCKER=1 make gosec && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: manifests
+  cluster: build10
+  commands: NO_DOCKER=1 make manifests && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: generate
+  cluster: build10
+  commands: NO_DOCKER=1 make generate && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: unit
+  cluster: build10
+  commands: NO_DOCKER=1 make unit
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+- as: security
+  cluster: build10
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
+  steps:
+    env:
+      PROJECT_NAME: multiarch-tuning-operator
+    workflow: openshift-ci-security
+- as: bundle
+  cluster: build10
+  commands: unset VERSION; NO_DOCKER=1 make bundle-verify
+  container:
+    from: operator-sdk-mto
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+zz_generated_metadata:
+  branch: v1.0
+  org: openshift
+  repo: multiarch-tuning-operator

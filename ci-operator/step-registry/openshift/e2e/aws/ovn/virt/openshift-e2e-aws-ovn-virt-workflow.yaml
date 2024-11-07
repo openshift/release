@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-aws-ovn-virt
+  steps:
+    env:
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK: "true"
+      TEST_ARGS: --run \[sig-network\]\[OCPFeatureGate:PersistentIPsForVirtualization\]\[Feature:Layer2LiveMigration\]
+      TEST_SUITE: openshift/network/virtualization
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf
+      - chain: ipi-install
+      - ref: kubevirt-install
+    test:
+      - ref: openshift-e2e-test
+    post:
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+  documentation: |-
+    The Openshift E2E OVN virt workflow executes the VIRT end-to-end test suite in AWS with the OVNKubernetes network plugin with dualstack configured.

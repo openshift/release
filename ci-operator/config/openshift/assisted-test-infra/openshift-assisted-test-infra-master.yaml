@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -24,7 +24,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   tests:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tests
   tests-4.12:
@@ -47,8 +47,12 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: tests
-  upi-installer:
+  tests-4.17:
     name: "4.17"
+    namespace: ocp
+    tag: tests
+  upi-installer:
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -63,20 +67,20 @@ images:
   to: assisted-test-infra-internal
 promotion:
   to:
-  - name: ocm-2.12
+  - name: ocm-2.13
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -175,7 +179,7 @@ tests:
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
-  cron: 30 02 * * 1,4
+  cron: 30 09 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -186,7 +190,7 @@ tests:
       TEST_TYPE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-13-periodic
-  cron: 30 03 * * 0-5
+  cron: 30 03 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -197,7 +201,7 @@ tests:
       TEST_TYPE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-14-periodic
-  cron: 30 04 * * 0-5
+  cron: 30 04 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -209,7 +213,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-15-periodic
-  cron: 30 05 * * 0-5
+  cron: 30 05 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -231,7 +235,7 @@ tests:
         OPENSHIFT_VERSION=4.15
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-16-periodic
-  cron: 00 03 */1 * 0-5
+  cron: 00 03 * * 1,4
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -253,16 +257,16 @@ tests:
         OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-cnv-4-16
+  as: e2e-metal-assisted-cnv-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=18700
         MASTER_CPU=9
@@ -271,16 +275,16 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4-16-periodic
+- as: e2e-metal-assisted-cnv-4-17-periodic
   cron: 15 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=18700
         MASTER_CPU=9
@@ -289,6 +293,25 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
       TEST_TYPE: extensive
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-mtv-4-17
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mtv
+        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=19724
+        MASTER_CPU=10
+        WORKER_MEMORY=10240
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=6
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-lvm
@@ -319,16 +342,16 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-odf-4-16
+  as: e2e-metal-assisted-odf-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
@@ -365,16 +388,16 @@ tests:
         METALLB_API_IP=10.0.0.1
         METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-16-periodic
-  cron: 30 02 */1 * 0-5
+- as: e2e-metal-assisted-odf-4-17-periodic
+  cron: 30 02 * * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
       TEST_TYPE: extensive
@@ -664,7 +687,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-periodic
-  cron: 30 19 * * 0-5
+  cron: 30 0 * * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -673,7 +696,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-4-14-periodic
-  cron: 30 20 * * 0
+  cron: 30 07 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -687,7 +710,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-4-14-periodic
-  cron: 30 21 * * 0
+  cron: 30 08 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -828,13 +851,15 @@ tests:
         IPXE_BOOT=true
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-ctlplane-scaleup
+  as: e2e-metal-ctlplane-scaleup-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_VERSION=4.18
         NUM_DAY2_MASTERS=2
         WORKERS_COUNT=2
         TEST_FUNC=test_ctlplane_scaleup
@@ -988,7 +1013,7 @@ tests:
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-4-16-periodic
   cluster: build01
-  interval: 24h
+  cron: 30 06 * * 1,4
   steps:
     cluster_profile: nutanix
     dependencies:
@@ -1016,6 +1041,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        CPU_ARCHITECTURE=multi
     workflow: assisted-equinix
 - as: e2e-metal-assisted-day2-arm-workers-periodic
   cron: 30 01 * * 1,4
@@ -1030,6 +1056,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        CPU_ARCHITECTURE=multi
     workflow: assisted-equinix
 - always_run: false
   as: e2e-oci-assisted

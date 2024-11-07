@@ -31,11 +31,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   intermediate:
     candidate:
@@ -60,64 +55,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ibmcloud-ipi-ovn-ipsec-f14
-  cron: 1 16 12,28 * *
+- as: ibmcloud-ipi-ovn-ipsec-f28
+  cron: 11 21 12 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
-  cron: 5 4 17 * *
+  cron: 5 11 4 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
       FIPS_ENABLED: "true"
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
-- as: vsphere-upi-encrypt-f14
-  cron: 14 16 6,22 * *
+- as: vsphere-upi-encrypt-f28
+  cron: 38 7 4 * *
   steps:
     cluster_profile: vsphere-connected-2
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-vsphere-upi-encrypt
 zz_generated_metadata:

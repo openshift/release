@@ -236,7 +236,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-
+  if [[ "${CLUSTER_TYPE}" == "vsphere" ]] && [[ -f ${SHARED_DIR}/template.yaml.patch ]]; then
+      grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/.openshift_install.log"
+  fi
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -679,7 +681,9 @@ aws|aws-arm64|aws-usgov)
     fi
     ;;
 vsphere*)
-  cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
 apiVersion: samples.operator.openshift.io/v1
 kind: Config
 metadata:
@@ -690,6 +694,7 @@ spec:
   skippedImagestreams:
   - openliberty
 EOF
+    fi
     ;;
 esac
 
@@ -748,6 +753,10 @@ case $JOB_NAME in
     ;;
   *aws)
     # Do not retry because aws resources can collide when re-using installer assets
+    max=1
+    ;;
+  *azure)
+    # Do not retry because azure resources always collide when re-using installer assets
     max=1
     ;;
   *)

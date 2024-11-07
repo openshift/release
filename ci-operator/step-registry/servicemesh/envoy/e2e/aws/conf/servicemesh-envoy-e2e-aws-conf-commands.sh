@@ -232,39 +232,34 @@ yq-go m -x -i "${CONFIG}" "${PATCH}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
 # excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  MIRROR_REGION="us-east-1"
-  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
-    MIRROR_REGION="${REGION}"
-  fi
+# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+#   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# imageContentSources:
+# - mirrors:
+#   - quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com
+#   source: quay.io
+# EOF
 
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
-  cat > "${PATCH}" << EOF
-imageContentSources:
-- mirrors:
-  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
-  source: quay.io
-EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+#   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+#   pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
-  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
-
-  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
-  cat > "${PATCH}" << EOF
-pullSecret: >
-  $(echo "${pull_secret_aws}" | jq -c .)
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-  rm "${PATCH}"
-fi
+#   PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# pullSecret: >
+#   $(echo "${pull_secret_aws}" | jq -c .)
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   rm "${PATCH}"
+# fi
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=

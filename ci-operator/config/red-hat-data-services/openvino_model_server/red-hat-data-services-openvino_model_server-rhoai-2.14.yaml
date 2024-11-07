@@ -44,17 +44,23 @@ images:
   - name: JOBS
     value: "16"
   dockerfile_path: Dockerfile.redhat
-  to: model-server-release-cuda-intel-gpu-2.14-release
+  to: model-server-release-cuda-intel-gpu-2.14
 promotion:
   to:
-  - name: model-server-release-cuda-intel-gpu-2.14-release
-    namespace: red-hat-data-services
+  - namespace: red-hat-data-services
+    tag: rhoai-2.14-final
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 200Mi
-  model-server-release-cuda-intel-gpu-2.14-release:
+  model-server-release-cuda-intel-gpu-2.14:
     limits:
       cpu: "12"
       memory: 24Gi
@@ -62,24 +68,15 @@ resources:
       cpu: "6"
       memory: 12Gi
 tests:
-- as: pr-image-mirror
-  run_if_changed: ^(Dockerfile.redhat)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu-2.14-release
-    env:
-      IMAGE_REPO: openvino_model_server
-    workflow: opendatahub-io-ci-image-mirror-serving-runtime
-- as: fast-image-mirror
+- as: stable-image-mirror
   postsubmit: true
-  run_if_changed: ^(Dockerfile.redhat)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu-2.14-release
+      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu-2.14
     env:
       IMAGE_REPO: openvino_model_server
       RELEASE_VERSION: rhoai-2.14
-    workflow: opendatahub-io-ci-image-mirror-serving-runtime
+    workflow: red-hat-data-services-ci-image-mirror
 zz_generated_metadata:
   branch: rhoai-2.14
   org: red-hat-data-services

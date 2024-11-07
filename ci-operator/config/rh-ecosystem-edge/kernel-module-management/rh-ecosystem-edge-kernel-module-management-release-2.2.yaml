@@ -1,0 +1,270 @@
+base_images:
+  go-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
+  operator-sdk:
+    name: "4.16"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+images:
+- build_args:
+  - name: TARGET
+    value: manager
+  dockerfile_path: Dockerfile
+  to: kernel-module-management-operator
+- build_args:
+  - name: TARGET
+    value: manager-hub
+  dockerfile_path: Dockerfile
+  to: kernel-module-management-operator-hub
+- dockerfile_path: Dockerfile.signimage
+  inputs:
+    ubi9-minimal-entitled:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.4
+  to: kernel-module-management-signimage
+- dockerfile_path: Dockerfile.must-gather
+  to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.webhook
+  to: kernel-module-management-webhook-server
+- dockerfile_path: Dockerfile.worker
+  to: kernel-module-management-worker
+- dockerfile_literal: |
+    FROM ubi9-minimal:9.4
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-16-rhel94.ocp.svc > /etc/yum.repos.d/base-4-16-rhel94.repo
+  to: ubi9-minimal-entitled
+- dockerfile_literal: |
+    FROM src
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && \
+      chmod +x /usr/local/bin/yq
+    RUN wget https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1/operator-sdk_linux_amd64 -O /usr/local/bin/operator-sdk && \
+      chmod +x /usr/local/bin/operator-sdk
+  from: src
+  to: e2e-hub-tools
+- dockerfile_literal: |
+    FROM src
+    RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz && \
+      tar -xvzf grpcurl_1.8.9_linux_x86_64.tar.gz -C /tmp/ && \
+      chmod +x /tmp/grpcurl && \
+      mv /tmp/grpcurl /usr/local/bin/ && \
+      rm grpcurl_1.8.9_linux_x86_64.tar.gz
+  from: src
+  to: src-grpcurl
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  - as: hub-operator-bundle
+    dockerfile_path: bundle-hub.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-operator:latest
+    with: pipeline:kernel-module-management-operator
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-operator-hub:latest
+    with: pipeline:kernel-module-management-operator-hub
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
+    with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-webhook-server:latest
+    with: pipeline:kernel-module-management-webhook-server
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
+    with: pipeline:kernel-module-management-worker
+promotion:
+  to:
+  - excluded_images:
+    - e2e-hub-tools
+    - ubi9-minimal-entitled
+    - src-grpcurl
+    namespace: edge-infrastructure
+    tag: release-2.2
+    tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  steps:
+    test:
+    - as: run-and-upload-codecov
+      commands: |
+        ci/prow/unit-tests
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
+      credentials:
+      - mount_path: /var/run/secrets
+        name: codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          memory: 1Gi
+- as: unit-tests-postsubmit
+  postsubmit: true
+  steps:
+    test:
+    - as: run-and-upload-codecov
+      commands: |
+        ci/prow/unit-tests
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
+      credentials:
+      - mount_path: /var/run/secrets
+        name: codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          memory: 1Gi
+- as: build
+  commands: ci/prow/build
+  container:
+    clone: true
+    from: go-builder
+- as: lint
+  commands: ci/prow/lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: check-commits-count
+  commands: ci/prow/check-commits-count
+  container:
+    clone: true
+    from: go-builder
+- as: check-api-changes
+  steps:
+    test:
+    - as: check-api-changes
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        unset VERSION
+        ci/prow/check-api-changes
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        oc project default
+        SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-hub
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-hub-spoke-incluster-build
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
+      - env: IMG
+        name: kernel-module-management-operator
+      - env: HUB_IMG
+        name: kernel-module-management-operator-hub
+      - env: WEBHOOK_IMG
+        name: kernel-module-management-webhook-server
+      from: e2e-hub-tools
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  optional: true
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: ./ci/prow/operator-upgrade
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: src-grpcurl
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kmm
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-2.2
+  org: rh-ecosystem-edge
+  repo: kernel-module-management

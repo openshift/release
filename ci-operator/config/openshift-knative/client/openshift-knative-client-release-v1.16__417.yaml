@@ -1,0 +1,114 @@
+base_images:
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/client
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal:latest
+  to: knative-client-client
+- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  to: knative-client-test-grpc-ping
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  to: knative-client-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  to: knative-client-test-servingcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  to: knative-client-test-sidecarcontainer
+promotion:
+  to:
+  - additional_images:
+      client-src: src
+    name: knative-v1.16
+    namespace: openshift
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: test-e2e-aws-417
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.17"
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: src
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
+      dependencies:
+      - env: KNATIVE_CLIENT_CLIENT
+        name: knative-client-client
+      - env: KNATIVE_CLIENT_TEST_GRPC_PING
+        name: knative-client-test-grpc-ping
+      - env: KNATIVE_CLIENT_TEST_HELLOWORLD
+        name: knative-client-test-helloworld
+      - env: KNATIVE_CLIENT_TEST_SERVINGCONTAINER
+        name: knative-client-test-servingcontainer
+      - env: KNATIVE_CLIENT_TEST_SIDECARCONTAINER
+        name: knative-client-test-sidecarcontainer
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-v1.16
+  org: openshift-knative
+  repo: client
+  variant: "417"

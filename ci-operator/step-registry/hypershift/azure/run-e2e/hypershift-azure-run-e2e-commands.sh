@@ -37,6 +37,18 @@ if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
     export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
 fi
 
+N1_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N1} != "${OCP_IMAGE_LATEST}" ]]; then
+  N1_NP_VERSION_TEST_ARGS="--e2e.n1-minor-release-image=${OCP_IMAGE_N1}"
+fi
+
+N2_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
+  N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
+fi
+
+
+
 hack/ci-test-e2e.sh -test.v \
   -test.run='^TestCreateCluster.*|^TestNodePool$' \
   -test.parallel=20 \
@@ -47,6 +59,8 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-location=${HYPERSHIFT_AZURE_LOCATION} \
     ${EXTERNAL_DNS_ARGS:-} \
     ${AKS_ANNOTATIONS:-} \
+    ${N1_NP_VERSION_TEST_ARGS:-} \
+    ${N2_NP_VERSION_TEST_ARGS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!

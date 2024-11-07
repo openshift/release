@@ -1,0 +1,52 @@
+base_images:
+  base:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+canonical_go_repository: github.com/openshift/multi-operator-manager
+promotion:
+  to:
+  - disabled: true
+    name: 4.18-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.18-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.18-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: test-operator-integration
+  commands: make test-operator-integration
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift-priv
+  repo: multi-operator-manager

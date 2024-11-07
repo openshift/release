@@ -55,8 +55,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 36 21 11,25 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 28 0 14 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -71,23 +71,12 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-arm-mixarch-f14
-  cron: 59 0 12,26 * *
+- as: azure-ipi-arm-mixarch-f28
+  cron: 17 21 19 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -101,18 +90,7 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi

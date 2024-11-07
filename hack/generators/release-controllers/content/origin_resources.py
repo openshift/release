@@ -163,7 +163,7 @@ def _add_origin_resources(gendoc):
                                         "value": "release"
                                     }
                                 ],
-                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
+                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                                 "volumeMounts": [
                                     {
                                         "name": "release",
@@ -189,7 +189,7 @@ def _add_origin_resources(gendoc):
                                         "value": "release"
                                     }
                                 ],
-                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
+                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                                 "volumeMounts": [
                                     {
                                         "name": "release",

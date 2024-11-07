@@ -6,3 +6,16 @@ onboard:
   hosted: false
   unmanaged: false
   useTokenFileInKubeconfig: true
+  ciSchedulingWebhook:
+    patches:
+    - matches:
+      - kind: MachineAutoscaler
+        name: '^.+\-us-east-2b$'
+      - kind: MachineAutoscaler
+        name: '^.+\-us-east-2a$'
+      inline: {"spec":{"minReplicas": 0}}
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '^.+\-amd64-us-east-2a$'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/iops", "value": 0}]

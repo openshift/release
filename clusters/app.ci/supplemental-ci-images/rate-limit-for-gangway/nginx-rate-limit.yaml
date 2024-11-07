@@ -1,0 +1,60 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: nging-rate-limit
+  namespace: ci
+spec:
+  tags:
+  - name: "latest"
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: nging-rate-limit
+  namespace: ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: nging-rate-limit:latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_nginx-unprivileged_stable
+      RUN echo 'pid /tmp/nginx.pid; \n\
+        events { \n\
+            worker_connections 1024; \n\
+        } \n\
+        http { \n\
+            limit_req_zone $binary_remote_addr zone=mylimit:10m rate=6r/m; \n\
+            server { \n\
+                listen 31999; \n\
+                server_name localhost; \n\
+                location / { \n\
+                    limit_req zone=mylimit burst=5 nodelay; \n\
+                    limit_req_status 429; \n\
+                    proxy_pass http://127.0.0.1:32001; \n\
+                    proxy_set_header Host $host; \n\
+                    proxy_set_header X-Real-IP $remote_addr; \n\
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \n\
+                    proxy_set_header X-Forwarded-Proto $scheme; \n\
+                    proxy_http_version 1.1; \n\
+                    proxy_set_header Upgrade $http_upgrade; \n\
+                    proxy_set_header Connection "upgrade"; \n\
+                } \n\
+                  location = /429 { \n\
+                    return 429 "Rate limit exceeded. Please wait before retrying."; \n\
+                } \n\
+            } \n\
+        }' > /etc/nginx/nginx.conf
+      EXPOSE 31999
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: nginx-unprivileged:stable
+        namespace: ci
+      imageOptimizationPolicy: SkipLayers
+    type: Docker

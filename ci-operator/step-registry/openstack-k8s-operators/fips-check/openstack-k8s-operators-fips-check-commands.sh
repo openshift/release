@@ -49,7 +49,7 @@ OPERATOR_IMG=${IMAGE_TAG_BASE}:${BUILD_TAG}
 
 # Run operator scan
 REPORT_FILE="/tmp/fips-check-operator-scan.log"
-oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -T -- chroot /host /usr/bin/bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot quay.io/mschuppe/check-payload:latest scan operator --spec ${OPERATOR_IMG} &> ${REPORT_FILE}" || true
+oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -T -- chroot /host /usr/bin/bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan operator --spec ${OPERATOR_IMG} &> ${REPORT_FILE}" || true
 REPORT_OUT=$(oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -- chroot /host bash -c "cat ${REPORT_FILE}" || true)
 REPORT_RES=$(echo "${REPORT_OUT}" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
 # Save content in artifact dir

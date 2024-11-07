@@ -8,7 +8,7 @@ cat /etc/os-release
 if [ ${BAREMETAL} == "true" ]; then
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
@@ -39,7 +39,7 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-heavy
 
 # A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50" ./run.sh
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
 
 # The measurable run
 export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
