@@ -1,8 +1,20 @@
 base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   ocp_4.17_cli-artifacts:
     name: "4.17"
     namespace: ocp
     tag: cli-artifacts
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
   openshift_eventing-istio-src_knative-v1.15:
     name: eventing-istio-src
     namespace: openshift
@@ -19,17 +31,52 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.15
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+  origin_4.17_operator-registry:
+    name: "4.17"
+    namespace: origin
+    tag: operator-registry
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
 - dockerfile_path: knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-knative-operator
+- dockerfile_path: must-gather/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $RUNTIME
+  to: serverless-must-gather
+- dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal
+    origin_4.17_operator-registry:
+      as:
+      - registry.ci.openshift.org/origin/4.17:operator-registry
+  to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
-- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
-  to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -51,19 +98,32 @@ images:
       - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: serverless-metadata-webhook
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.15"
+    release:
+      channel: fast
+      version: "4.17"
 resources:
   '*':
     limits:
-      memory: 8Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -71,4 +131,4 @@ zz_generated_metadata:
   branch: release-1.33
   org: openshift-knative
   repo: serverless-operator
-  variant: ocp4.15-lp-interop
+  variant: 417-osd
