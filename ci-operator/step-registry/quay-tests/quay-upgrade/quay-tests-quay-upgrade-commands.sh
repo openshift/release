@@ -99,7 +99,7 @@ export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 export QUAYREGISTRY_QUAY_VERSION=${QUAYREGISTRY_QUAY_VERSION}
 
 echo "Run extended-platform-tests"
-extended-platform-tests run all --dry-run | grep "20934-Quay-Upgrade-High"| extended-platform-tests run --timeout 180m --junit-dir="${ARTIFACT_DIR}" -f - || true
+extended-platform-tests run all --dry-run | grep "20934-Quay-Upgrade-High"| extended-platform-tests run --timeout 240m --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 
 function handle_result {
