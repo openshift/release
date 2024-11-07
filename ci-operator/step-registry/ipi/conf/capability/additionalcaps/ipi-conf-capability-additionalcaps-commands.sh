@@ -63,9 +63,10 @@ v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
-# shellcheck disable=SC2034
 v417=" ${v416}"
-latest_version="v417"
+# shellcheck disable=SC2034
+v418=" ${v417}"
+latest_version="v418"
 
 # define capability dependency
 declare -A dependency_caps

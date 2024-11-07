@@ -93,7 +93,8 @@ v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
 v417=" ${v416}"
-latest_defined="v417"
+v418=" ${v417}"
+latest_defined="v418"
 always_default="${!latest_defined}"
 # always enabled capabilities
 #declare -A always_enabled_caps
@@ -139,6 +140,9 @@ case ${baselinecaps_from_config} in
   ;;
 "v4.17")
   enabled_capability_set="${v417}"
+  ;;
+"v4.18")
+  enabled_capability_set="${v418}"
   ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"
