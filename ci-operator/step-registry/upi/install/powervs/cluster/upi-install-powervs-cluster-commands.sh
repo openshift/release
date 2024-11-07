@@ -203,26 +203,25 @@ function cleanup_prior() {
 
     # VPC Instances
     # VPC LBs 
-    # TODO: FIXME - need to be selective so as not to blow out other workflows being run
+    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+
     echo "Cleaning up the VPC Load Balancers"
     ic target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for SUB in $(ic is subnets --output json | jq -r '.[].id')
+    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
-        VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-        if [ -n "${VALID_SUB}" ]
-        then
-            # Searches the VSIs and LBs to delete them
-            for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
-            do
-                ic is instance-delete "${VSI}" --force || true
-            done
+        echo "Subnet: ${SUB}"
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+        do
+            ic is instance-delete "${VSI}" --force || true
+        done
 
-            for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-            do
-                ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
-            done
-            sleep 60
-        fi
+        for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 60
     done
 
     # VPC Images
