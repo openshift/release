@@ -53,14 +53,14 @@ function create_subnets() {
     while [[ $id -lt $subnetCount ]]; do
         for zone in "${zones[@]}"; do
             createSubnet "${preName}-control-plane" "${vpcName}" "${zone}" "${id}"            
-            ((id++))
-            [[ $id -eq $subnetCount ]] && return
+            id+=1
+            [[ $id -eq $subnetCount ]] && return 0
         done
 
         for zone in "${zones[@]}"; do
             createSubnet "${preName}-compute" "${vpcName}" "${zone}" "${id}"
-            ((id++))
-            [[ $id -eq $subnetCount ]] && return     
+            id+=1
+            [[ $id -eq $subnetCount ]] && return 0
         done
     done
 }
