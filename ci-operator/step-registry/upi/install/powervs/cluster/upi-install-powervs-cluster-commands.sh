@@ -217,6 +217,7 @@ function cleanup_prior() {
             ic is instance-delete "${VSI}" --force || true
         done
 
+        echo "Deleting LB in ${SUB}"
         for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
         do
             ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
@@ -295,7 +296,7 @@ master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
-release_image_override    = "$(openshift-install version | grep 'release image' | awk '{print $3}')"
+release_image_override    = "quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-multi"
 
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
