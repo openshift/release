@@ -29,7 +29,9 @@ function get_source_dir() {
   fi
 }
 
-if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
+if [[ ${JOB_NAME} =~ .*bootc-containers.* ]] ; then
+  SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc-containers/presubmits" "")
+elif [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
   SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
   if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
     SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
