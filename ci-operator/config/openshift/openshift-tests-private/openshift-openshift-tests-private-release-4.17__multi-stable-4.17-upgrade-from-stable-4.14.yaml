@@ -24,12 +24,12 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate415:
+  intermediate1:
     release:
       architecture: multi
       channel: candidate
       version: "4.15"
-  intermediate416:
+  intermediate2:
     release:
       architecture: multi
       channel: candidate
@@ -60,21 +60,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-3hops
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
