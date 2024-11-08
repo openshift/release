@@ -1,20 +1,16 @@
 chain:
-  as: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
+  as: cucushift-installer-rehearse-aws-ipi-cco-manual-security-token-service-minimal-permission-provision
   steps:
-  - ref: aws-provision-vpc-disconnected
-  - chain: aws-provision-bastionhost
   - ref: ipi-conf
   - ref: ipi-conf-telemetry
-  - ref: ipi-conf-aws-custom-vpc
-  - ref: ipi-conf-proxy
   - ref: ipi-conf-aws
   - ref: ipi-install-monitoringpvc
   - ref: ipi-conf-credentials-mode
+  - ref: aws-provision-iam-user-minimal-permission
   - ref: ipi-conf-aws-oidc-creds-provision
   - ref: ipi-conf-manual-creds-remove-unnecessary-creds
   - ref: ipi-conf-aws-usage-info
   - chain: ipi-install
-  - ref: aws-provision-tags-for-byo-vpc
   - ref: enable-qe-catalogsource
   - chain: cucushift-installer-check
   env:
@@ -26,5 +22,12 @@ chain:
     documentation: "Instance type for compute nodes"
   - name: CREDENTIALS_MODE
     default: "Manual"
+  - name: STS_USE_PRIVATE_S3
+    default: "no"
+    documentation: "Enable  --create-private-s3-bucket option in ccoctl or not"
+  - name: ENABLE_MIN_PERMISSION_FOR_STS
+    default: "true"
+    documentation: |-
+      Assign minimal permissions to the IAM user used by ccoctl tool to create STS resources.
   documentation: |-
     Create an IPI cluster on AWS with security token service for QE e2e tests.
