@@ -212,7 +212,7 @@ function cleanup_prior() {
     do
         echo "Subnet: ${SUB}"
         # Searches the VSIs and LBs to delete them
-        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
         do
             ic is instance-delete "${VSI}" --force || true
         done
