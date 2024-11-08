@@ -7,6 +7,15 @@ set -o pipefail
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
+
+if [[ -f "${SHARED_DIR}/ccoctl_minimal_permission" ]]; then
+  echo "Setting AWS credential with minimal permision for ccoctl"
+  export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/ccoctl_minimal_permission
+else
+  export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
+fi
+
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 

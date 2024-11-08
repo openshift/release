@@ -53,6 +53,76 @@ function aws_create_user()
     return 0
 }
 
+function create_user_with_policy_list()
+{
+  
+  local permision_list=$1
+  local aws_profile_location=$2
+  local postfix=${3:-}
+  local policy_file permision_file
+  local policy_name policy_doc policy_outout
+  local user_name policy_arn user_outout cred_outout
+  local key_id key_sec
+
+  # generte policy file
+
+  permision_file="${ARTIFACT_DIR}/permision${postfix}"
+  jq --raw-input . "${permision_list}" | jq -sc > "${permision_file}"
+
+  policy_file="${ARTIFACT_DIR}/policy${postfix}"
+  cat <<EOF > "${policy_file}"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+  cat <<< "$(jq '.Statement[0].Action += input' "${policy_file}" "${permision_file}")" > "${policy_file}"
+
+  echo "Policy file:"
+  jq . $policy_file
+
+  policy_name="${CLUSTER_NAME}-required-policy${postfix}"
+  policy_doc=$(cat "${policy_file}" | jq -c .)
+  policy_outout=$(mktemp)
+
+  echo "Creating policy ${policy_name}"
+  aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
+
+  user_name="${CLUSTER_NAME}-minimal-perm${postfix}"
+  policy_arn=$(jq -r '.Policy.Arn' ${policy_outout})
+  user_outout=$(mktemp)
+  cred_outout=$(mktemp)
+
+  echo "Creating user ${user_name}"
+  aws_create_user $REGION "${user_name}" "${policy_arn}" "${user_outout}" "${cred_outout}"
+
+  key_id=$(jq -r '.AccessKey.AccessKeyId' ${cred_outout})
+  key_sec=$(jq -r '.AccessKey.SecretAccessKey' ${cred_outout})
+
+  if [[ "${key_id}" == "" ]] || [[ "${key_sec}" == "" ]]; then
+    echo "ERROR: No AccessKeyId or SecretAccessKey"
+    return 1
+  fi
+
+  echo "Key id: ${key_id} sec: ${key_sec:0:5}"
+  cat <<EOF > "${aws_profile_location}"
+[default]
+aws_access_key_id     = ${key_id}
+aws_secret_access_key = ${key_sec}
+EOF
+
+  # for destroy 
+  echo ${policy_arn} >> "${SHARED_DIR}/aws_policy_arns"
+  echo ${user_name} >> "${SHARED_DIR}/aws_user_names"
+}
+
+
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
@@ -165,10 +235,8 @@ elasticloadbalancing:RegisterInstancesWithLoadBalancer
 elasticloadbalancing:RegisterTargets
 elasticloadbalancing:SetLoadBalancerPoliciesOfListener
 iam:AddRoleToInstanceProfile
-iam:CreateAccessKey
 iam:CreateInstanceProfile
 iam:CreateRole
-iam:CreateUser
 iam:DeleteAccessKey
 iam:DeleteInstanceProfile
 iam:DeleteRole
@@ -246,6 +314,11 @@ servicequotas:ListAWSDefaultServiceQuotas
 tag:GetResources
 EOF
 
+if [[ ${CREDENTIALS_MODE} != "Manual" ]]; then
+  echo "iam:CreateAccessKey" >> "${PERMISION_LIST}"
+  echo "iam:CreateUser" >> "${PERMISION_LIST}"
+fi
+
 # additional permisions for 4.11+
 if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
   echo "ec2:DeletePlacementGroup" >> "${PERMISION_LIST}"
@@ -272,60 +345,76 @@ if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
   echo "s3:PutBucketPolicy" >> "${PERMISION_LIST}"
 fi
 
-# generte policy file
+create_user_with_policy_list ${PERMISION_LIST} ${SHARED_DIR}/aws_minimal_permission
 
-PERMISION_JSON="${ARTIFACT_DIR}/permision_list.json"
-jq --raw-input . "${PERMISION_LIST}" | jq -sc > "${PERMISION_JSON}"
 
-USER_POLICY_FILE="${ARTIFACT_DIR}/user_policy_file.json"
-cat <<EOF > "${USER_POLICY_FILE}"
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [],
-      "Resource": "*"
-    }
-  ]
-}
+
+# CCOCTL
+
+PERMISION_LIST_CCOCTL="${ARTIFACT_DIR}/permision_list_ccoctl.txt"
+
+cat <<EOF > "${PERMISION_LIST_CCOCTL}"
+cloudfront:ListCloudFrontOriginAccessIdentities
+cloudfront:ListDistributions
+cloudfront:ListTagsForResource
+iam:CreateOpenIDConnectProvider
+iam:CreateRole
+iam:DeleteOpenIDConnectProvider
+iam:DeleteRole
+iam:DeleteRolePolicy
+iam:GetOpenIDConnectProvider
+iam:GetRole
+iam:GetUser
+iam:ListOpenIDConnectProviders
+iam:ListRolePolicies
+iam:ListRoles
+iam:PutRolePolicy
+iam:TagOpenIDConnectProvider
+iam:TagRole
+s3:CreateBucket
+s3:DeleteBucket
+s3:DeleteObject
+s3:GetBucketAcl
+s3:GetBucketTagging
+s3:GetObject
+s3:GetObjectAcl
+s3:GetObjectTagging
+s3:ListBucket
+s3:PutBucketAcl
+s3:PutBucketPolicy
+s3:PutBucketPublicAccessBlock
+s3:PutBucketTagging
+s3:PutObject
+s3:PutObjectAcl
+s3:PutObjectTagging
 EOF
-cat <<< "$(jq '.Statement[0].Action += input' "${USER_POLICY_FILE}" "${PERMISION_JSON}")" > "${USER_POLICY_FILE}"
 
-
-echo "Policy file:"
-jq . $USER_POLICY_FILE
-
-POLICY_NAME="${CLUSTER_NAME}-required-policy"
-POLICY_DOC=$(cat "${USER_POLICY_FILE}" | jq -c .)
-POLICY_OUTOUT=/tmp/aws_policy_output
-
-echo "Creating policy ${POLICY_NAME}"
-aws_create_policy $REGION "${POLICY_NAME}" "${POLICY_DOC}" "${POLICY_OUTOUT}"
-
-USER_NAME="${CLUSTER_NAME}-minimal-perm"
-POLICY_ARN=$(jq -r '.Policy.Arn' ${POLICY_OUTOUT})
-USER_OUTOUT=/tmp/aws_user_output
-CRED_OUTOUT=/tmp/aws_cred_output
-
-echo "Creating user ${USER_NAME}"
-aws_create_user $REGION "${USER_NAME}" "${POLICY_ARN}" "${USER_OUTOUT}" "${CRED_OUTOUT}"
-
-key_id=$(jq -r '.AccessKey.AccessKeyId' ${CRED_OUTOUT})
-key_sec=$(jq -r '.AccessKey.SecretAccessKey' ${CRED_OUTOUT})
-
-if [[ "${key_id}" == "" ]] || [[ "${key_sec}" == "" ]]; then
-  echo "No AccessKeyId or SecretAccessKey, exit now"
-  exit 1
+if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
+  # enable option --create-private-s3-bucket
+  echo "cloudfront:CreateCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:CreateDistribution" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:DeleteCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:DeleteDistribution" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:GetCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:GetCloudFrontOriginAccessIdentityConfig" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:GetDistribution" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:TagResource" >> "${PERMISION_LIST_CCOCTL}"
+  echo "cloudfront:UpdateDistribution" >> "${PERMISION_LIST_CCOCTL}"
 fi
 
-echo "Key id: ${key_id} sec: ${key_sec:0:5}"
-cat <<EOF > "${SHARED_DIR}/aws_minimal_permission"
-[default]
-aws_access_key_id     = ${key_id}
-aws_secret_access_key = ${key_sec}
-EOF
+create_user_with_policy_list ${PERMISION_LIST_CCOCTL} ${SHARED_DIR}/ccoctl_minimal_permission ccoctl
 
-# for destroy 
-echo ${POLICY_ARN} > "${SHARED_DIR}/aws_policy_arns"
-echo ${USER_NAME} > "${SHARED_DIR}/aws_user_names"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
