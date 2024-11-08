@@ -1,0 +1,32 @@
+workflow:
+  as: openshift-e2e-aws-csi-smb-win
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-winc-provision
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-smb
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-conf-csi-optional-smb-winserver
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - ref: storage-destroy-must-gather-before-destroy
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    env:
+      CLUSTERCSIDRIVER: smb.csi.k8s.io
+      ENABLE_CREATE_SAMBA_SERVER: false
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: qe-app-registry
+      SUB_TARGET_NAMESPACES: '!install'
+      WINDOWS_NODE_REPLICAS: "1"
+      TRUECONDITIONS: SambaDriverControllerServiceControllerAvailable SambaDriverNodeServiceControllerAvailable
+      TEST_ARGS: --disable-monitor=pod-network-avalibility
+      TEST_CSI_DRIVER_MANIFEST: manifest-samba.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E Samba Win workflow installs the SMB CSI Driver Operator and executes the `openshift/csi` end-to-end test suite on the CSI driver that was installed during cluster setup,
+    the samba server was configured on one windows node.
