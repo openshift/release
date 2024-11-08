@@ -275,7 +275,10 @@ function configure_terraform() {
     export POWERVS_SERVICE_INSTANCE_ID
 
     echo "Release Image used is:"
-    echo "$(openshift-install version | grep 'release image' | awk '{print $3}')"
+    curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
+    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
+    export TARGET_VERSION="$(< /tmp/target_version)"
+    echo "${TARGET_VERSION}"
 
 cat << EOF >${IBMCLOUD_HOME_FOLDER}/ocp-install-dir/var-multi-arch-upi.tfvars
 ibmcloud_api_key    = "${IBMCLOUD_API_KEY}"
@@ -296,7 +299,7 @@ master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
-release_image_override    = "quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-multi"
+release_image_override    = "${TARGET_VERSION}"
 
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
