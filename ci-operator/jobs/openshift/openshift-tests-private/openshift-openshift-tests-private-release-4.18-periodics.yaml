@@ -16468,7 +16468,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 16 8 4,16,25 * *
+  cron: 55 21 3,12,24 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -16483,7 +16483,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.18-amd64-nightly-aws-ipi-longduration-mco-g1-f9
+  name: periodic-ci-openshift-openshift-tests-private-release-4.18-amd64-nightly-aws-ipi-longduration-mco-p1-f9
   reporter_config:
     slack:
       channel: '#forum-ocp-mco-qe'
@@ -16504,7 +16504,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-ipi-longduration-mco-g1-f9
+      - --target=aws-ipi-longduration-mco-p1-f9
       - --variant=amd64-nightly
       command:
       - ci-operator
@@ -16561,7 +16561,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 10 3 5,14,23 * *
+  cron: 22 22 2,11,23 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -16576,7 +16576,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.18-amd64-nightly-aws-ipi-longduration-mco-g2-f9
+  name: periodic-ci-openshift-openshift-tests-private-release-4.18-amd64-nightly-aws-ipi-longduration-mco-p2-f9
   reporter_config:
     slack:
       channel: '#forum-ocp-mco-qe'
@@ -16597,7 +16597,100 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-ipi-longduration-mco-g2-f9
+      - --target=aws-ipi-longduration-mco-p2-f9
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 53 1 4,16,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.18-amd64-nightly-aws-ipi-longduration-mco-p3-f9
+  reporter_config:
+    slack:
+      channel: '#forum-ocp-mco-qe'
+      job_states_to_report:
+      - error
+      - failure
+      - success
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=aws-ipi-longduration-mco-p3-f9
       - --variant=amd64-nightly
       command:
       - ci-operator
