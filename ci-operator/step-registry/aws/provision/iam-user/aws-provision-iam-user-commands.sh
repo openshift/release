@@ -59,24 +59,32 @@ function create_cred_file()
 	local user_name policy_arn user_outout cred_outout
 	local key_id key_sec
 
-	
+	if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
+		if [ -z "${POLICY_ARN-}" ]; then
+			echo "POLICY_ARN must be set when SKIP_CREATE_POLICY is set"
+			exit 1
+		fi
+		policy_arn=${POLICY_ARN}
+	elif [ ! -f "${policy_file}" ]; then
+		echo "User permission policy file not found. Skipping user creation"
+		exit 0
+	else
+		echo "Policy file:"
+		jq . $policy_file
 
-	echo "Policy file:"
-	jq . $policy_file
+		policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
+		policy_doc=$(cat "${policy_file}" | jq -c .)
+		policy_outout=/tmp/aws_policy_output
 
-	policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
-	policy_doc=$(cat "${policy_file}" | jq -c .)
-	policy_outout=/tmp/aws_policy_output
-
-	echo "Creating policy ${policy_name}"
-	aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
+		echo "Creating policy ${policy_name}"
+		aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
+	fi
 
 	user_name="${CLUSTER_NAME}-minimal-perm-${postfix}"
-	policy_arn=$(jq -r '.Policy.Arn' ${policy_outout})
 	user_outout=/tmp/aws_user_output
 	cred_outout=/tmp/aws_cred_output
 
-	echo "Creating user ${user_name}"
+	echo "Creating user ${USER_NAME}"
 	aws_create_user $REGION "${user_name}" "${policy_arn}" "${user_outout}" "${cred_outout}"
 
 	key_id=$(jq -r '.AccessKey.AccessKeyId' ${cred_outout})
@@ -86,7 +94,6 @@ function create_cred_file()
 		echo "No AccessKeyId or SecretAccessKey, exit now"
 		return 1
 	fi
-
 
 	echo "Key id: ${key_id} sec: ${key_sec:0:5}"
 	cat <<EOF >"${cred_file}"
@@ -102,6 +109,9 @@ EOF
 POLICY_FILE_INSTALLER="${SHARED_DIR}/aws-permissions-policy-creds.json"
 POLICY_FILE_CCOCTL="${SHARED_DIR}/aws-permissions-policy-creds-ccoctl.json"
 
+# Registering the creation time to collect audit logs since it
+USER_CREATED_TIMESTAMP="$(date -u "+%Y-%m-%dT%H:%M:%S+00:00")"
+
 if [ -f "${POLICY_FILE_INSTALLER}" ]; then
 	create_cred_file "${POLICY_FILE_INSTALLER}" "installer" "${SHARED_DIR}/aws_minimal_permission"
 else
@@ -113,3 +123,8 @@ if [ -f "${POLICY_FILE_CCOCTL}" ]; then
 else
 	echo "User permission policy file for ccoctl not found. Skipping user creation"
 fi
+
+# used by IAM event parser
+echo "${USER_CREATED_TIMESTAMP}" > "${SHARED_DIR}"/time_iam_created
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}"/CLUSTER_NAME
+echo "${LEASED_RESOURCE}" > "${SHARED_DIR}"/LEASED_RESOURCE
