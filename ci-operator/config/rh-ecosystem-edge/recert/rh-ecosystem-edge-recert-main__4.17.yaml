@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -10,9 +10,9 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.17"
   upi-installer:
-    name: "4.18"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -21,20 +21,14 @@ build_root:
     namespace: openshift
     tag: golang-1.22
 images:
-- dockerfile_path: Dockerfile.prow
-  to: recert-check
 - dockerfile_path: Dockerfile
   to: recert
-promotion:
-  to:
-  - namespace: edge-infrastructure
-    tag: latest
-    tag_by_commit: true
 releases:
   latest:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -43,23 +37,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
-  as: cargo-check
-  commands: cargo check
-  container:
-    from: recert-check
-- always_run: true
-  as: cargo-test
-  commands: cargo test
-  container:
-    from: recert-check
-- always_run: true
-  as: cargo-clippy
-  commands: cargo clippy
-  container:
-    from: recert-check
-- always_run: true
-  as: e2e-aws-ovn-single-node-recert-serial
+- as: e2e-aws-ovn-single-node-recert-serial
+  cron: '@daily'
   steps:
     cluster_profile: aws-2
     env:
@@ -71,8 +50,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: true
-  as: e2e-aws-ovn-single-node-recert-parallel
+- as: e2e-aws-ovn-single-node-recert-parallel
+  cron: '@daily'
   steps:
     cluster_profile: aws-2
     env:
@@ -82,8 +61,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: false
-  as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+- as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+  cron: '@weekly'
   steps:
     cluster_profile: aws-2
     env:
@@ -106,7 +85,7 @@ tests:
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
 - as: e2e-aws-ipi-sno-fips-recert
-  cron: '@weekly'
+  cron: '@daily'
   steps:
     cluster_profile: aws-qe
     env:
@@ -125,8 +104,8 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
-- always_run: true
-  as: baremetalds-sno-recert-cluster-rename
+- as: baremetalds-sno-recert-cluster-rename
+  cron: 0 */6 * * *
   steps:
     cluster_profile: packet-sno
     env:
@@ -139,3 +118,4 @@ zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
   repo: recert
+  variant: "4.17"
