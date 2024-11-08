@@ -55,7 +55,6 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -314,11 +313,16 @@ EOF
 		create_get_actions_py
 		python3 $GET_ACTIONS_PY ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json > ${PERMISION_LIST}
 
+		# temp workaround for
+		#  https://issues.redhat.com/browse/OCPBUGS-45218
+		#  https://issues.redhat.com/browse/OCPBUGS-46596
+		echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
+
 		rm -rf "${dir}"
 	fi
 
 	create_jsoner_py
-	
+
 	# generate policy file and save it to shared dir so later steps have access to it.
 	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 

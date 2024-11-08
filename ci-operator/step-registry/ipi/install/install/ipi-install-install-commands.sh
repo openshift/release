@@ -579,6 +579,8 @@ aws|aws-arm64|aws-usgov)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+        echo "Waiting 30s to AWS populate recently created credentials"
+        sleep 15
     else
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     fi

@@ -60,8 +60,6 @@ function create_cred_file()
 	local policy_arn user_outout cred_outout
 	local key_id key_sec
 
-	
-
 	echo "Policy file:"
 	jq . $policy_file
 
@@ -86,7 +84,6 @@ function create_cred_file()
 		return 1
 	fi
 
-
 	echo "Key id: ${key_id} sec: ${key_sec:0:5}"
 	cat <<EOF >"${cred_file}"
 [default]
@@ -100,6 +97,9 @@ EOF
 
 POLICY_FILE_INSTALLER="${SHARED_DIR}/aws-permissions-policy-creds.json"
 POLICY_FILE_CCOCTL="${SHARED_DIR}/aws-permissions-policy-creds-ccoctl.json"
+
+# Registering the creation time to collect audit logs since it
+USER_CREATED_TIMESTAMP="$(date -u "+%Y-%m-%dT%H:%M:%S+00:00")"
 
 if [ -f "${POLICY_FILE_INSTALLER}" ]; then
 
@@ -117,3 +117,8 @@ if [ -f "${POLICY_FILE_CCOCTL}" ]; then
 else
 	echo "User permission policy file for ccoctl not found. Skipping user creation"
 fi
+
+# used by IAM event parser
+echo "${USER_CREATED_TIMESTAMP}" > "${SHARED_DIR}"/time_iam_created
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}"/CLUSTER_NAME
+echo "${LEASED_RESOURCE}" > "${SHARED_DIR}"/LEASED_RESOURCE
