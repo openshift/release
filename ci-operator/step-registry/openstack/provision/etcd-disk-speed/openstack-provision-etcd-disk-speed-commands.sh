@@ -14,7 +14,9 @@ function wait_for_etcd_patch_done() {
   info 'INFO: Waiting for patch etcd cluster...'
   if
     ! oc wait --timeout=30m --for=jsonpath='{.spec.controlPlaneHardwareSpeed}'="Slower" etcd cluster 1>/dev/null || \
-    ! oc wait --timeout=30m --for=condition=Progressing=false co etcd 1>/dev/null; then
+    ! oc wait --timeout=30m --all --for=condition=Progressing=false co etcd 1>/dev/null || \
+    ! oc wait --timeout=30m --all --for=condition=Degraded=false co etcd 1>/dev/null || \
+    ! oc wait --timeout=30m --all --for=condition=Available=true co etcd 1>/dev/null; then
       info "ERROR: Etcd patch failed..."
       exit 1
   fi
