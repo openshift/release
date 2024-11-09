@@ -23,6 +23,10 @@ base_images:
     name: "4.18"
     namespace: origin
     tag: operator-sdk
+  test-suite:
+    name: "4.18"
+    namespace: ocp
+    tag: custom-metrics-autoscaler-tests
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kedacore/keda-olm-operator
@@ -134,21 +138,21 @@ tests:
     - as: test-setup
       cli: latest
       commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-setup
-      from: custom-metrics-autoscaler-tests
+      from: test-suite
       resources:
         requests:
           cpu: 100m
     - as: test-run
       cli: latest
       commands: make e2e-test-openshift
-      from: custom-metrics-autoscaler-tests
+      from: test-suite
       resources:
         requests:
           cpu: 100m
     - as: test-clean
       cli: latest
       commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-clean
-      from: custom-metrics-autoscaler-tests
+      from: test-suite
       resources:
         requests:
           cpu: 100m
