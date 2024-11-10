@@ -38,6 +38,14 @@ oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p 
 # Make the masters schedulable so we have more capacity to run VMs
 oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
 
+# In case of nested-mgmt topology where there's only one worker node, we need to label it as a master
+# in order to get some kubevirt components to be scheduled. This is needed since CNV 4.17.0+
+if [[ $(oc get nodes --no-headers | wc -l) -eq 1 ]]
+then
+	NODENAME=$(oc get nodes -o jsonpath='{.items[].metadata.name}')
+	oc label node ${NODENAME} node-role.kubernetes.io/control-plane=
+fi
+
 if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
   then
   # Add pullsecret for cnv nightly channel from quay.io/openshift-cnv
