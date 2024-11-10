@@ -40,7 +40,7 @@ else
   JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
 fi
 echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
-echo "Copying the env to the bastion host"
+echo "Copying the env to the bastion host ${CLUSTER_NAME}"
 scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
