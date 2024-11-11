@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# If this file is present, we want to run the tests against an Hypershift HostedCluster
+# and therefore we want to load the KUBECONFIG from a specific path.
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+	export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+fi
+
 function wait_for_sriov_network_node_state() {
     # Wait up to 5 minutes for SriovNetworkNodeState to be succeeded
     for _ in $(seq 1 10); do
