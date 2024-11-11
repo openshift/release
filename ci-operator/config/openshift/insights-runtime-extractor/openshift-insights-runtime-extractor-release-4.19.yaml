@@ -20,8 +20,6 @@ images:
 
     RUN echo Target architecture: ${TARGETARCH}
 
-    ENV RUST_TOOLCHAIN=1.81.0
-
     COPY . /opt/app-root/src/
     WORKDIR /opt/app-root/src/insights-runtime-extractor
 
@@ -31,11 +29,7 @@ images:
 
     RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
         chmod g+w /opt/app-root/src/insights-runtime-extractor && \
-        dnf install -y gcc make
-
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN}
-    RUN if [ "$TARGETARCH" == "arm64" ]; then rustup target add aarch64-unknown-linux-musl; fi
-    RUN if [ "$TARGETARCH" == "amd64" ]; then rustup target add x86_64-unknown-linux-musl; fi
+        dnf install -y gcc make rust-toolset rustfmt
 
     RUN mkdir -p $HOME/.cargo/git/ && \
         find $HOME/. -type d -exec chmod 777 {} \; && \
@@ -90,6 +84,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  src-rust:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
 tests:
 - as: rust-unit-tests
   commands: cd extractor && make unit-tests
@@ -103,6 +101,23 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-tests
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-tests
+      cli: latest
+      commands: cd exporter && make e2e-test
+      dependencies:
+      - env: INSIGHTS_RUNTIME_EXPORTER
+        name: insights-runtime-exporter
+      - env: INSIGHTS_RUNTIME_EXTRACTOR
+        name: insights-runtime-extractor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

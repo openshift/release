@@ -51,11 +51,6 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     candidate:
@@ -161,7 +156,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sdn-rhcos-rhel8-f28
   cron: 13 9 22 * *
@@ -292,7 +287,7 @@ tests:
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-localzone-byo-subnet-f28
   cron: 36 10 8 * *
@@ -440,6 +435,20 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - ref: fips-check-optional-operator-images-scan
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-longduration-mco-fips-proxy-all-f14
+  cron: 10 21 10,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-vpc-phz-f28
   cron: 24 8 23 * *
@@ -648,7 +657,7 @@ tests:
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "100"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-private-fips-f28-disasterrecovery
   cron: 39 3 24 * *
@@ -788,7 +797,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-mag-ipi-fullyprivate-fips-f28
   cron: 33 21 25 * *
@@ -872,6 +881,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: azure-ipi-fullyprivate-proxy-f28-compliance
+  cron: 7 11 18 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetalds-ipi-ovn-ipv4-fips-f28
   cron: 3 9 2 * *
   steps:
@@ -1179,7 +1206,7 @@ tests:
       TEST_SCENARIOS: Cluster_Operator|OTA|GCP-Filestore-CSI
       TEST_TIMEOUT: "100"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
 - as: gcp-ipi-marketplace-f28
   cron: 44 12 21 * *
@@ -1264,7 +1291,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: gcp-ipi-proxy-etcd-encryption-f28
   cron: 46 13 23 * *
@@ -1625,7 +1652,7 @@ tests:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-agent-compact-fips-f28
   cron: 42 9 21 * *
@@ -1786,7 +1813,7 @@ tests:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f28
   cron: 15 15 26 * *

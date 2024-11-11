@@ -6,15 +6,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/images
+    context: ci/prow/e2e-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: e2e
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-images
-    rerun_command: /test images
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-images
+    rerun_command: /test e2e-images
     spec:
       containers:
       - args:
@@ -22,6 +23,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,25 +56,83 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/e2e-presubmits-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: e2e-presubmits
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-images
+    rerun_command: /test e2e-presubmits-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=e2e-presubmits
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-presubmits-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-classic-full-resources-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-classic-full-resources-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-classic-full-resources-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-classic-full-resources-optional-presubmit
     optional: true
-    rerun_command: /test rosa-classic-full-resources-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-classic-full-resources-optional-presubmit
     spec:
       containers:
       - args:
@@ -81,8 +141,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-classic-full-resources-optional-presubmit-cluster-profile
         - --target=rosa-classic-full-resources-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -98,8 +158,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-classic-full-resources-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -123,9 +181,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -135,25 +190,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-classic-full-resources-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-classic-full-resources-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-day1-supplemental-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-day1-supplemental-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-day1-supplemental-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-day1-supplemental-optional-presubmit
     optional: true
-    rerun_command: /test rosa-day1-supplemental-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-day1-supplemental-optional-presubmit
     spec:
       containers:
       - args:
@@ -162,8 +218,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-day1-supplemental-optional-presubmit-cluster-profile
         - --target=rosa-day1-supplemental-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -179,8 +235,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-day1-supplemental-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -204,9 +258,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -216,24 +267,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-day1-supplemental-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-day1-supplemental-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-advanced-critical-high-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-advanced-critical-high-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-advanced-critical-high-presubmit
-    rerun_command: /test rosa-hcp-advanced-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-advanced-critical-high-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-advanced-critical-high-presubmit
     skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
@@ -243,8 +295,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-advanced-critical-high-presubmit-cluster-profile
         - --target=rosa-hcp-advanced-critical-high-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -260,8 +312,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-advanced-critical-high-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -285,9 +335,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -297,25 +344,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-advanced-critical-high-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-advanced-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-advanced-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-advanced-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-advanced-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-advanced-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-advanced-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-advanced-optional-presubmit
     spec:
       containers:
       - args:
@@ -324,8 +372,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-advanced-optional-presubmit-cluster-profile
         - --target=rosa-hcp-advanced-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -341,8 +389,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-advanced-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -366,9 +412,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -378,25 +421,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-advanced-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-advanced-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-arm-critical-high-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-arm-critical-high-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-arm-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-arm-critical-high-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-arm-critical-high-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-arm-critical-high-presubmit
     spec:
       containers:
       - args:
@@ -405,8 +449,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-arm-critical-high-presubmit-cluster-profile
         - --target=rosa-hcp-arm-critical-high-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -422,8 +466,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-arm-critical-high-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -447,9 +489,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -459,25 +498,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-arm-critical-high-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-arm-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-arm-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-arm-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-arm-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-arm-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-arm-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-arm-optional-presubmit
     spec:
       containers:
       - args:
@@ -486,8 +526,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-arm-optional-presubmit-cluster-profile
         - --target=rosa-hcp-arm-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -503,8 +543,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-arm-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -528,9 +566,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -540,25 +575,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-arm-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-arm-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-encryption-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-encryption-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-encryption-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-encryption-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-encryption-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-encryption-optional-presubmit
     spec:
       containers:
       - args:
@@ -567,8 +603,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-encryption-optional-presubmit-cluster-profile
         - --target=rosa-hcp-encryption-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -584,8 +620,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-encryption-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -609,9 +643,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -621,25 +652,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-encryption-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-encryption-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-full-resources-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-full-resources-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-full-resources-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-full-resources-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-full-resources-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-full-resources-optional-presubmit
     spec:
       containers:
       - args:
@@ -648,8 +680,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-full-resources-optional-presubmit-cluster-profile
         - --target=rosa-hcp-full-resources-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -665,8 +697,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-full-resources-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -690,9 +720,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -702,25 +729,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-full-resources-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-full-resources-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-network-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-network-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-network-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-network-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-network-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-network-optional-presubmit
     spec:
       containers:
       - args:
@@ -729,8 +757,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-network-optional-presubmit-cluster-profile
         - --target=rosa-hcp-network-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -746,8 +774,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-network-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -771,9 +797,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -783,24 +806,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-network-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-network-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-private-critical-high-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-private-critical-high-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-private-critical-high-presubmit
-    rerun_command: /test rosa-hcp-private-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-private-critical-high-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-private-critical-high-presubmit
     skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
@@ -810,8 +834,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-private-critical-high-presubmit-cluster-profile
         - --target=rosa-hcp-private-critical-high-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -827,8 +851,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-private-critical-high-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -852,9 +874,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -864,25 +883,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-private-critical-high-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-private-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-private-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-private-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-private-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-private-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-private-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-private-optional-presubmit
     spec:
       containers:
       - args:
@@ -891,8 +911,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-private-optional-presubmit-cluster-profile
         - --target=rosa-hcp-private-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -908,8 +928,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-private-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -933,9 +951,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -945,25 +960,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-private-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-private-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-upgrade-y-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-upgrade-y-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-upgrade-y-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-upgrade-y-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-upgrade-y-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-upgrade-y-optional-presubmit
     spec:
       containers:
       - args:
@@ -972,8 +988,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-upgrade-y-optional-presubmit-cluster-profile
         - --target=rosa-hcp-upgrade-y-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -989,8 +1005,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-upgrade-y-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1014,9 +1028,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1026,25 +1037,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-upgrade-y-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-upgrade-y-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-hcp-upgrade-z-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-hcp-upgrade-z-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-hcp-upgrade-z-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-hcp-upgrade-z-optional-presubmit
     optional: true
-    rerun_command: /test rosa-hcp-upgrade-z-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-hcp-upgrade-z-optional-presubmit
     spec:
       containers:
       - args:
@@ -1053,8 +1065,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-hcp-upgrade-z-optional-presubmit-cluster-profile
         - --target=rosa-hcp-upgrade-z-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1070,8 +1082,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-hcp-upgrade-z-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1095,9 +1105,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1107,24 +1114,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-hcp-upgrade-z-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-hcp-upgrade-z-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-advanced-critical-high-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-advanced-critical-high-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-critical-high-presubmit
-    rerun_command: /test rosa-sts-advanced-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-advanced-critical-high-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-advanced-critical-high-presubmit
     skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
@@ -1134,8 +1142,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-advanced-critical-high-presubmit-cluster-profile
         - --target=rosa-sts-advanced-critical-high-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1151,8 +1159,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-advanced-critical-high-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1176,9 +1182,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1188,25 +1191,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-advanced-critical-high-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-advanced-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-advanced-day1-negative-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-advanced-day1-negative-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-day1-negative-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-advanced-day1-negative-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-advanced-day1-negative-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-advanced-day1-negative-optional-presubmit
     spec:
       containers:
       - args:
@@ -1215,8 +1219,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-advanced-day1-negative-optional-presubmit-cluster-profile
         - --target=rosa-sts-advanced-day1-negative-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1232,8 +1236,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-advanced-day1-negative-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1257,9 +1259,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1269,25 +1268,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-advanced-day1-negative-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-advanced-day1-negative-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-advanced-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-advanced-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-advanced-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-advanced-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-advanced-optional-presubmit
     spec:
       containers:
       - args:
@@ -1296,8 +1296,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-advanced-optional-presubmit-cluster-profile
         - --target=rosa-sts-advanced-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1313,8 +1313,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-advanced-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1338,9 +1336,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1350,24 +1345,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-advanced-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-advanced-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-private-critical-high-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-private-critical-high-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-critical-high-presubmit
-    rerun_command: /test rosa-sts-private-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-private-critical-high-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-private-critical-high-presubmit
     skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
@@ -1377,8 +1373,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-private-critical-high-presubmit-cluster-profile
         - --target=rosa-sts-private-critical-high-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1394,8 +1390,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-private-critical-high-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1419,9 +1413,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1431,25 +1422,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-private-critical-high-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-private-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-private-day1-negative-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-private-day1-negative-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-day1-negative-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-private-day1-negative-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-private-day1-negative-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-private-day1-negative-optional-presubmit
     spec:
       containers:
       - args:
@@ -1458,8 +1450,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-private-day1-negative-optional-presubmit-cluster-profile
         - --target=rosa-sts-private-day1-negative-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1475,8 +1467,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-private-day1-negative-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1500,9 +1490,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1512,25 +1499,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-private-day1-negative-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-private-day1-negative-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-private-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-private-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-private-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-private-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-private-optional-presubmit
     spec:
       containers:
       - args:
@@ -1539,8 +1527,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-private-optional-presubmit-cluster-profile
         - --target=rosa-sts-private-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1556,8 +1544,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-private-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1581,9 +1567,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1593,25 +1576,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-private-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-private-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-shared-vpc-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-shared-vpc-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-shared-vpc-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-shared-vpc-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-shared-vpc-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-shared-vpc-optional-presubmit
     spec:
       containers:
       - args:
@@ -1620,8 +1604,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-shared-vpc-optional-presubmit-cluster-profile
         - --target=rosa-sts-shared-vpc-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1637,8 +1621,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-shared-vpc-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1662,9 +1644,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1674,25 +1653,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-shared-vpc-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-shared-vpc-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-upgrade-y-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-upgrade-y-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-upgrade-y-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-upgrade-y-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-upgrade-y-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-upgrade-y-optional-presubmit
     spec:
       containers:
       - args:
@@ -1701,8 +1681,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-upgrade-y-optional-presubmit-cluster-profile
         - --target=rosa-sts-upgrade-y-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1718,8 +1698,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-upgrade-y-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1743,9 +1721,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1755,25 +1730,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-upgrade-y-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-upgrade-y-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-upgrade-z-optional-presubmit
+    context: ci/prow/e2e-presubmits-rosa-sts-upgrade-z-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-upgrade-z-optional-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-presubmits-rosa-sts-upgrade-z-optional-presubmit
     optional: true
-    rerun_command: /test rosa-sts-upgrade-z-optional-presubmit
+    rerun_command: /test e2e-presubmits-rosa-sts-upgrade-z-optional-presubmit
     spec:
       containers:
       - args:
@@ -1782,8 +1758,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-upgrade-z-optional-presubmit-cluster-profile
         - --target=rosa-sts-upgrade-z-optional-presubmit
+        - --variant=e2e-presubmits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1799,8 +1775,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-upgrade-z-optional-presubmit-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1824,9 +1798,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-terraform-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1836,7 +1807,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-sts-upgrade-z-optional-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-presubmits-rosa-sts-upgrade-z-optional-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

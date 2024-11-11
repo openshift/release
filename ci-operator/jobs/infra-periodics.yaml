@@ -90,6 +90,36 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
+  cluster: build11
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build11-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build11` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.14:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
   cluster: hosted-mgmt
   cron: 30 7 * * 1-5
   decorate: true
@@ -306,7 +336,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -348,7 +378,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -390,7 +420,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -432,7 +462,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -509,7 +539,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -554,7 +584,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -600,7 +630,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -649,7 +679,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -699,7 +729,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -747,7 +777,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -796,7 +826,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-staging-test-infra/commenter:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/commenter:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -849,7 +879,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-staging-test-infra/label_sync:v20241009-8bb28ed95b
+      image: gcr.io/k8s-staging-test-infra/label_sync:v20241015-f5fd905349
       imagePullPolicy: Always
       name: ""
       resources:
@@ -886,7 +916,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20241108-b21d1cf48
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1216,7 +1246,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1270,7 +1300,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1328,7 +1358,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1397,7 +1427,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1889,7 +1919,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1921,7 +1951,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1953,7 +1983,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241008-24e765300
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20241108-b21d1cf48
       imagePullPolicy: Always
       name: ""
       resources:

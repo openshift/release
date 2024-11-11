@@ -5,18 +5,18 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build09
-    context: ci/prow/415-images
+    cluster: build10
+    context: ci/prow/417-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "417"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-v1.15-415-images
+    name: pull-ci-openshift-knative-client-release-v1.15-417-images
     path_alias: github.com/knative/client
-    rerun_command: /test 415-images
+    rerun_command: /test 417-images
     spec:
       containers:
       - args:
@@ -25,7 +25,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=415
+        - --variant=417
         command:
         - ci-operator
         image: ci-operator:latest
@@ -58,37 +58,34 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )417-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
     cluster: build10
-    context: ci/prow/415-test-e2e-aws-415
+    context: ci/prow/417-test-e2e-aws-417
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "417"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-v1.15-415-test-e2e-aws-415
+    name: pull-ci-openshift-knative-client-release-v1.15-417-test-e2e-aws-417
     path_alias: github.com/knative/client
-    rerun_command: /test 415-test-e2e-aws-415
+    rerun_command: /test 417-test-e2e-aws-417
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-e2e-aws-415-cluster-profile
-        - --target=test-e2e-aws-415
-        - --variant=415
+        - --target=test-e2e-aws-417
+        - --variant=417
         command:
         - ci-operator
         image: ci-operator:latest
@@ -98,16 +95,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-e2e-aws-415-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -120,18 +115,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws-serverless
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -141,25 +130,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-e2e-aws-415,?($|\s.*)
+    trigger: (?m)^/test( | .* )417-test-e2e-aws-417,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build09
-    context: ci/prow/416-images
+    cluster: build10
+    context: ci/prow/418-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "416"
+      ci-operator.openshift.io/variant: "418"
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-v1.15-416-images
+    name: pull-ci-openshift-knative-client-release-v1.15-418-images
     path_alias: github.com/knative/client
-    rerun_command: /test 416-images
+    rerun_command: /test 418-images
     spec:
       containers:
       - args:
@@ -168,7 +157,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=416
+        - --variant=418
         command:
         - ci-operator
         image: ci-operator:latest
@@ -201,27 +190,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )418-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
     cluster: build10
-    context: ci/prow/416-test-e2e-aws-416
+    context: ci/prow/418-test-e2e-aws-418
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
+      ci-operator.openshift.io/variant: "418"
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-v1.15-416-test-e2e-aws-416
+    name: pull-ci-openshift-knative-client-release-v1.15-418-test-e2e-aws-418
     path_alias: github.com/knative/client
-    rerun_command: /test 416-test-e2e-aws-416
+    rerun_command: /test 418-test-e2e-aws-418
     spec:
       containers:
       - args:
@@ -230,9 +219,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-e2e-aws-416-cluster-profile
-        - --target=test-e2e-aws-416
-        - --variant=416
+        - --target=test-e2e-aws-418
+        - --variant=418
         command:
         - ci-operator
         image: ci-operator:latest
@@ -248,8 +236,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-e2e-aws-416-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -273,9 +259,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -285,4 +268,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-e2e-aws-416,?($|\s.*)
+    trigger: (?m)^/test( | .* )418-test-e2e-aws-418,?($|\s.*)
