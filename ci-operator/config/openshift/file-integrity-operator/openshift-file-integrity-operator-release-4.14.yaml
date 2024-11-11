@@ -1,8 +1,24 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   openshift_release_rhel-8-release-golang-1.19-openshift-4.13:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.13
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
 build_root:
   image_stream_tag:
     name: release
@@ -117,6 +133,22 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-aws-upgrade
+- as: gcp-ipi-proxy-etcd-encryption-f28
+  cron: 19 18 7 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
