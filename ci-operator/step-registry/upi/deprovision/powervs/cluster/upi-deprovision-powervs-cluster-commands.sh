@@ -5,6 +5,7 @@ set -o nounset
 # Variables
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
+VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/:"${PATH}"
@@ -121,10 +122,10 @@ function fix_user_permissions() {
 #   COS: bucket, objects
 function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
-    workspace_name=
+    WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+    for CRN in $(ic pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
         echo "Targetting power cloud instance"
         ic pi workspace target "${CRN}"

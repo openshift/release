@@ -194,32 +194,35 @@ function cleanup_prior() {
         sleep 60
         echo "Done Deleting the ${CRN}"
     done
-    echo "Delete network ocp-net on powerVS region"
+
     # Dev: functions don't work inline with xargs
-    HOME=${IBMCLOUD_HOME_FOLDER} ic pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} --force || true
+    echo "Delete network non-'ocp-net' on PowerVS region"
+    export IBMCLOUD_HOME=${IBMCLOUD_HOME_FOLDER}
+    ibmcloud pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} --force || true
+    echo "Done deleting non-'ocp-net' on PowerVS"
 
     # VPC Instances
     # VPC LBs 
-    # TODO: FIXME - need to be selective so as not to blow out other workflows being run
+    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+
     echo "Cleaning up the VPC Load Balancers"
     ic target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for SUB in $(ic is subnets --output json | jq -r '.[].id')
+    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
-        VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-        if [ -n "${VALID_SUB}" ]
-        then
-            # Searches the VSIs and LBs to delete them
-            for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
-            do
-                ic is instance-delete "${VSI}" --force || true
-            done
+        echo "Subnet: ${SUB}"
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+        do
+            ic is instance-delete "${VSI}" --force || true
+        done
 
-            for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-            do
-                ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
-            done
-            sleep 60
-        fi
+        echo "Deleting LB in ${SUB}"
+        for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 60
     done
 
     # VPC Images
@@ -283,7 +286,7 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
-rhcos_import_image_storage_type = "tier1"
+rhcos_import_image_storage_type = "tier5k"
 system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "p2"
@@ -293,7 +296,7 @@ master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
-release_image_override    = "$(openshift-install version | grep 'release image' | awk '{print $3}')"
+release_image_override    = "quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-multi"
 
 use_zone_info_for_names   = true
 use_ibm_cloud_services    = true
