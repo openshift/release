@@ -1,122 +1,63 @@
 base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
   openshift_release_rhel-8-release-golang-1.17-openshift-4.10:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.12"
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
-images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    openshift_release_rhel-8-release-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10
-  to: file-integrity-operator
-operator:
-  bundles:
-  - as: file-integrity-operator-bundle
-    context_dir: .
-    dockerfile_path: bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:0.1.32
-    with: pipeline:file-integrity-operator
-promotion:
-  to:
-  - name: "4.12"
-    namespace: ocp
 releases:
   initial:
     integration:
       name: "4.12"
       namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.12"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.12"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: go-build
-  commands: make
-  container:
-    from: src
-- as: unit
-  commands: make test-unit
-  container:
-    from: src
-- as: verify
-  commands: make verify
-  container:
-    from: src
-- as: e2e-aws
+- as: aws-ipi-proxy-fips-f60
+  cron: 8 3 10 2,4,6,8,10,12 *
   steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: file-integrity-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-bundle-aws
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-file-integrity-operator-bundle
+    cluster_profile: aws-qe
     env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: file-integrity
-      OO_PACKAGE: file-integrity-operator
-      OO_TARGET_NAMESPACES: '!install'
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "25"
     test:
-    - as: test-bundle
-      cli: latest
-      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
-        make e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: file-integrity-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-aws
-- as: e2e-bundle-aws-upgrade
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-file-integrity-operator-bundle
-    env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: file-integrity
-      OO_LATEST_CSV: file-integrity-operator.v0.1.32
-      OO_PACKAGE: file-integrity-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: test-bundle-upgrade
-      cli: latest
-      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
-        make e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: file-integrity-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-aws-upgrade
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
