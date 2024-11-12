@@ -125,8 +125,26 @@ function is_openshift_version_gte() {
     printf '%s\n%s' "$1" "${DS_OPENSHIFT_VERSION}" | sort -C -V
 }
 
+function extract_oc_for_upgrade() {
+  # shellcheck disable=SC2087
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+EXTRACTDIR=\$(mktemp --tmpdir -d "installer-upgrade-XXXXXXXXXX")
+
+EXTRACTNEWOC="oc adm release extract --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+   --command=oc --to "\${EXTRACTDIR}" $1"
+
+\$EXTRACTNEWOC
+
+sudo mv "\${EXTRACTDIR}/oc" /usr/local/bin
+
+echo "Extracted the new oc client on remote host:"
+oc version --client
+EOF
+}
+
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
+    extract_oc_for_upgrade "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
