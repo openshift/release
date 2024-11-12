@@ -38,7 +38,7 @@ fi
 SOURCE_KUBECONFIG="/${SOURCE_CLUSTER_DIR}/auth/kubeconfig"
 
 echo "Logging into source cluster."
-export KUBECONFIG= $SOURCE_KUBECONFIG
+export KUBECONFIG=$SOURCE_KUBECONFIG
 SOURCE_KUBEADMIN_PASSWORD=$(cat $SOURCE_KUBEADMIN_PASSWORD_FILE)
 
 API_URL=$(oc whoami --show-server)
