@@ -203,7 +203,6 @@ function ci_custom_link_report() {
     local -r url_prefix="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
 
     # Disable tracing and glob expansion
-    set +x
     shopt -s nullglob
 
     cat >>"${report_html}" <<EOF
@@ -236,8 +235,15 @@ EOF
 
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         testname=$(basename "${test}")
+        p_extra_style=""
+        # If there's no junit from Robot Framework execution (i.e. it didn't run), or
+        # if junit contains any failures=N, N>0, then make the line red-ish to make it easier to find.
+        if [[ ! -e "${test}/junit.xml" ]] || grep --quiet --extended-regexp 'failures="[1-9][0-9]?"' "${test}/junit.xml"; then
+            p_extra_style="color:#FF6666"
+        fi
+
         cat >>"${report_html}" <<EOF
-<p>${testname}:&nbsp;
+<p style="${p_extra_style}">${testname}:&nbsp;
 <a target="_blank" href="${url_prefix}/${testname}">directory</a>
 EOF
 
