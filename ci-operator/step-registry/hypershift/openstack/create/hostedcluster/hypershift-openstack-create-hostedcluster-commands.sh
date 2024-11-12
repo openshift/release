@@ -31,7 +31,7 @@ CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 echo "$CLUSTER_NAME" > "${SHARED_DIR}/CLUSTER_NAME"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 COMMAND=(
-  /usr/bin/hypershift create cluster openstack
+  /usr/bin/hcp create cluster openstack
   --name "${CLUSTER_NAME}"
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}"
   --openstack-credentials-file "${SHARED_DIR}/clouds.yaml"
