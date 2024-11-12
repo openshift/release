@@ -100,7 +100,6 @@ fi
 
 # Create zVSI compute nodes
 set -e
-zvsi_rip=""
 echo "Triggering the $infra_name-vm zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
 vol_json=$(jq -n -c --arg volume "$infra_name-vm-volume" '{"name": $volume, "volume": {"name": $volume, "capacity": 100, "profile": {"name": "general-purpose"}}}')
 ibmcloud is instance-create $infra_name-vm $infra_name-vpc $IC_REGION-2 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume $vol_json
