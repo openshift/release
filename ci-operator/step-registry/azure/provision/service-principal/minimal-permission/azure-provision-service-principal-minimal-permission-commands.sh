@@ -41,6 +41,33 @@ function run_cmd_with_retries_save_output()
     return 0
 }
 
+function create_role_definition_json() {
+
+    local role_name=$1 permissions=$2 role_definition_file=$3
+
+    role_description="the custom role ${role_name} with minimal permissions for cluster ${CLUSTER_NAME}"
+    assignable_scopes="""
+\"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
+"""
+
+    # create role definition json file
+    jq --null-input \
+       --arg role_name "${role_name}" \
+       --arg description "${role_description}" \
+       --argjson assignable_scopes "[ ${assignable_scopes} ]" \
+       --argjson permission_list "[ ${permissions} ]" '
+{
+  "Name": $role_name,
+  "IsCustom": true,
+  "Description": $description,
+  "assignableScopes": $assignable_scopes,
+  "Actions": $permission_list,
+  "notActions": [],
+  "dataActions": [],
+  "notDataActions": []
+}' > "${role_definition_file}"
+}
+
 function create_custom_role() {
     local role_definition="$1"
     local custom_role_name="$2"
@@ -280,31 +307,10 @@ ${required_permissions}
 """
 fi
 
-role_description="the custom role with minimal permissions for cluster ${CLUSTER_NAME}"
-assignable_scopes="""
-\"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
-"""
-
 if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
     sp_role="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
 else
-    # create role definition json file
-    jq --null-input \
-       --arg role_name "${CUSTOM_ROLE_NAME}" \
-       --arg description "${role_description}" \
-       --argjson assignable_scopes "[ ${assignable_scopes} ]" \
-       --argjson permission_list "[ ${required_permissions} ]" '
-{
-  "Name": $role_name,
-  "IsCustom": true,
-  "Description": $description,
-  "assignableScopes": $assignable_scopes,
-  "Actions": $permission_list,
-  "notActions": [],
-  "dataActions": [],
-  "notDataActions": []
-}' > "${ROLE_DEFINITION}"
-
+    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}"
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
     # for destroy
@@ -313,22 +319,76 @@ else
 fi
 echo "Creating sp with custom role..."
 create_sp_with_custom_role "${SP_NAME}" "${sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
-
 sp_id=$(jq -r .appId "${SP_OUTPUT}")
 sp_password=$(jq -r .password "${SP_OUTPUT}")
 sp_tenant=$(jq -r .tenant "${SP_OUTPUT}")
-
 if [[ "${sp_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
     echo "Unable to get service principal id or password, exit..."
     exit 1
 fi
-
 echo "New service principal id: ${sp_id}"
 cat <<EOF > "${SHARED_DIR}/azure_minimal_permission"
 {"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
 EOF
-
 # for destroy
 echo "${sp_id}" > "${SHARED_DIR}/azure_sp_id"
-
 rm -f ${SP_OUTPUT}
+
+# create SP with minimal permission for CCO to create required Azure resources when using workload identity
+if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
+    sts_required_permissions="""
+\"Microsoft.Resources/subscriptions/resourceGroups/read\",
+\"Microsoft.Resources/subscriptions/resourceGroups/write\",
+\"Microsoft.Resources/subscriptions/resourceGroups/delete\",
+\"Microsoft.Authorization/roleAssignments/read\",
+\"Microsoft.Authorization/roleAssignments/delete\",
+\"Microsoft.Authorization/roleAssignments/write\",
+\"Microsoft.Authorization/roleDefinitions/read\",
+\"Microsoft.Authorization/roleDefinitions/write\",
+\"Microsoft.Authorization/roleDefinitions/delete\",
+\"Microsoft.Storage/storageAccounts/listkeys/action\",
+\"Microsoft.Storage/storageAccounts/delete\",
+\"Microsoft.Storage/storageAccounts/read\",
+\"Microsoft.Storage/storageAccounts/write\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/write\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/delete\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/read\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/delete\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/write\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/delete\",
+\"Microsoft.Storage/register/action\",
+\"Microsoft.ManagedIdentity/register/action\"
+"""
+    sts_role_name="${CLUSTER_NAME}-custom-role-sts"
+    sts_role_definition="${ARTIFACT_DIR}/azure-custom-role-definition-sts-minimal-permissions.json"
+    sts_sp_name="${CLUSTER_NAME}-sp-sts"
+    sts_sp_output=$(mktemp)
+
+    echo "Create SP with minimal permission for CCO"
+    create_role_definition_json "${sts_role_name}" "${sts_required_permissions}" "${sts_role_definition}"
+    create_custom_role "${sts_role_definition}" "${sts_role_name}"
+    # for destroy
+    echo "${sts_role_name}" >> "${SHARED_DIR}/azure_custom_role_name"
+    sts_sp_role="${sts_role_name}"
+
+    create_sp_with_custom_role "${sts_sp_name}" "${sts_sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sts_sp_output}"
+    sts_sp_id=$(jq -r .appId "${sts_sp_output}")
+    sts_sp_password=$(jq -r .password "${sts_sp_output}")
+    sts_sp_tenant=$(jq -r .tenant "${sts_sp_output}")
+
+    if [[ "${sts_sp_id}" == "" ]] || [[ "${sts_sp_password}" == "" ]]; then
+        echo "Unable to get service principal id or password, exit..."
+        exit 1
+    fi
+
+    echo "New service principal id: ${sts_sp_id}"
+    cat <<EOF > "${SHARED_DIR}/azure_minimal_permission_sts"
+{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sts_sp_id}","tenantId":"${sts_sp_tenant}","clientSecret":"${sts_sp_password}"}
+EOF
+    # for destroy
+    echo "${sts_sp_id}" >> "${SHARED_DIR}/azure_sp_id"
+    rm -rf ${sts_sp_output}
+fi

@@ -71,6 +71,36 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
+- as: krkn-hub-tests-compact
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-aws-compact
+  timeout: 6h0m0s
+- as: krkn-hub-node-tests-compact
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: openshift-qe-installer-aws-compact
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
