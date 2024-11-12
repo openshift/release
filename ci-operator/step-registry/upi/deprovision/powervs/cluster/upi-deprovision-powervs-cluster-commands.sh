@@ -4,6 +4,8 @@ set -o nounset
 
 # Variables
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME=${IBMCLOUD_HOME_FOLDER}
+
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 
@@ -55,11 +57,6 @@ function report_build(){
     echo "OCP_VERSION: ${OCP_VERSION}"
 }
 
-# wraps the ibmcloud command redirecting it to the specified folder
-function ic() {
-  HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-}
-
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
     if [ -z "$(command -v ibmcloud)" ]
@@ -68,17 +65,17 @@ function setup_ibmcloud_cli() {
         curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
     fi
 
-    retry "ic config --check-version=false"
-    retry "ic version"
+    retry "ibmcloud config --check-version=false"
+    retry "ibmcloud version"
 
-    # Services/Plugins installed are for PowerVS, Transit Gateway, VPC, CIS
-    retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
+    # Servibmcloudes/Plugins installed are for PowerVS, Transit Gateway, VPC, CIS
+    retry "ibmcloud plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # login to the ibmcloud
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
-    ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
 }
 
 # Download automation code
@@ -125,25 +122,25 @@ function cleanup_prior() {
     WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ic pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
+    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
         echo "Targetting power cloud instance"
-        ic pi workspace target "${CRN}"
+        ibmcloud pi workspace target "${CRN}"
 
         echo "Deleting the PVM Instances"
-        for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].id')
+        for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[].id')
         do
             echo "Deleting PVM Instance ${INSTANCE_ID}"
-            retry "ic pi instance delete ${INSTANCE_ID} --delete-data-volumes"
+            retry "ibmcloud pi instance delete ${INSTANCE_ID} --delete-data-volumes"
             sleep 5
         done
         sleep 60
 
         echo "Deleting the Images"
-        for IMAGE_ID in $(ic pi image ls --json | jq -r '.images[] | select(.name | contains("CentOS-Stream-9")| not).imageID')
+        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | select(.name | contains("CentOS-Stream-9")| not).imageID')
         do
             echo "Deleting Images ${IMAGE_ID}"
-            retry "ic pi image delete ${IMAGE_ID}"
+            retry "ibmcloud pi image delete ${IMAGE_ID}"
             sleep 5
         done
         sleep 60
@@ -155,20 +152,20 @@ function cleanup_prior() {
     # TODO: FIXME - need to be selective so as not to blow out other workflows being run
     echo "Cleaning up the VPC Load Balancers"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for RESOURCE_TGT in $(ic is subnets --output json | jq -r '.[].id')
+    for RESOURCE_TGT in $(ibmcloud is subnets --output json | jq -r '.[].id')
     do
-        VALID_SUB=$(ic is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
+        VALID_SUB=$(ibmcloud is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
         if [ -n "${VALID_SUB}" ]
         then
             # Searches the VSIs and LBs to delete them
-            for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+            for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
             do
-                ic is instance-delete "${VSI}" --force || true
+                ibmcloud is instance-delete "${VSI}" --force || true
             done
 
-            for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+            for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
             do
-                ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+                ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
             done
             sleep 60
         fi
@@ -176,7 +173,7 @@ function cleanup_prior() {
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
-    for RESOURCE_TGT in $(ic is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
+    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
     do
         ibmcloud is image-delete "${}"
     done
