@@ -19,7 +19,8 @@ images:
   to: acm-cli
 promotion:
   to:
-  - name: "2.13"
+  - disabled: true
+    name: "2.13"
     namespace: stolostron
 resources:
   '*':
@@ -27,33 +28,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.13
-    workflow: ocm-ci-fastforward
-- as: latest-image-mirror
+- as: publish
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: acm-cli
     env:
       IMAGE_REPO: acm-cli
-      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: periodic-latest-image-rebuild
-  cron: 0 0 * * 1
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: acm-cli
-    env:
-      IMAGE_REPO: acm-cli
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror-periodic
 zz_generated_metadata:
-  branch: main
+  branch: release-2.13
   org: stolostron
   repo: acm-cli
