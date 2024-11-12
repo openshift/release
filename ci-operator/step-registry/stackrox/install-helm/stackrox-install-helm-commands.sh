@@ -146,12 +146,32 @@ EOF
 }
 
 function install_central_with_helm() {
+  # copied from https://github.com/stackrox/stackrox/blob/7e49062da60fbe153d811e42dbcedf8df10bef5a/scripts/quick-helm-install.sh#L31
+  installflags=('--set' 'central.persistence.none=true')
+  installflags+=('--set' 'imagePullSecrets.allowNone=true')
+  SMALL_INSTALL=true
+  if [[ "$SMALL_INSTALL" == "true" ]]; then
+      installflags+=('--set' 'central.resources.requests.memory=1Gi')
+      installflags+=('--set' 'central.resources.requests.cpu=1')
+      installflags+=('--set' 'central.resources.limits.memory=4Gi')
+      installflags+=('--set' 'central.resources.limits.cpu=1')
+      installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
+      installflags+=('--set' 'central.db.resources.requests.cpu=500m')
+      installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
+      installflags+=('--set' 'central.db.resources.limits.cpu=1')
+      installflags+=('--set' 'scanner.autoscaling.disable=true')
+      installflags+=('--set' 'scanner.replicas=1')
+      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+  fi
+
+  installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
+
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
-    --set imagePullSecrets.allowNone=true \
-    --set central.persistence.none=true \
-    --set central.db.resources.requests.cpu=2 \
-    --set central.adminPassword.value="${ROX_PASSWORD}"
+     "${installflags[@]+"${installflags[@]}"}"
 }
 
 function get_init_bundle() {
