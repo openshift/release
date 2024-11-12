@@ -53,6 +53,26 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 oc adm release extract --registry-config pull-secret --credentials-requests --cloud=aws --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${TESTING_RELEASE_IMAGE}"
+
+# ----------------------------------------
+# SCP test
+# ---------------------------------------- START
+cat <<EOF > /tmp/scp_patch
+    - action:
+        - ec2:RunInstances
+      effect: Deny
+      resource: 'arn:aws:ec2:*:*:network-interface/*'
+      policyCondition:
+        "Null":
+          ec2:AssociatePublicIpAddress: false
+EOF
+
+sed -i '/secretRef/e cat /tmp/scp_patch' /tmp/credrequests/0000_30_machine-api-operator_00_credentials-request.yaml
+
+echo "New policy of machine API"
+cat /tmp/credrequests/0000_30_machine-api-operator_00_credentials-request.yaml
+
+# ---------------------------------------- END
 popd
 
 echo "CR manifest files:"

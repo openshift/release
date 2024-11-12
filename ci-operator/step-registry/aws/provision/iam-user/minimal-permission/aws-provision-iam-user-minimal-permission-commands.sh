@@ -293,6 +293,28 @@ EOF
 cat <<< "$(jq '.Statement[0].Action += input' "${USER_POLICY_FILE}" "${PERMISION_JSON}")" > "${USER_POLICY_FILE}"
 
 
+
+# ----------------------------------------
+# SCP test
+# ---------------------------------------- START
+policy_with_scp=$(mktemp)
+jq '.Statement += [{
+  "Effect": "Deny",
+  "Action": [
+    "ec2:RunInstances"
+  ],
+  "Condition": {
+    "Null": {
+      "ec2:AssociatePublicIpAddress": "false"
+    }
+  },
+  "Resource": "arn:aws:ec2:*:*:network-interface/*"
+}]' ${USER_POLICY_FILE} > $policy_with_scp
+mv $policy_with_scp $USER_POLICY_FILE
+# ---------------------------------------- END
+
+
+
 echo "Policy file:"
 jq . $USER_POLICY_FILE
 
