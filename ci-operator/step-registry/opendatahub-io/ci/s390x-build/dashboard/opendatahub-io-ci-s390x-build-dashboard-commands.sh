@@ -86,12 +86,14 @@ echo "commit hash is ${PULL_BASE_SHA:0:7}"
 echo "Entire commit has is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
 
-ALL_VARS="DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'"
-export ALL_VARS
+# Initialize ALL_VARS as an array of variable assignments
+ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
+ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
+export ALL_VARS_STR
 
 # create ssh session to zvsi and pass the script
-ssh "${ssh_options[@]}" root@$zvsi_fip "$ALL_VARS bash -s" << 'EOF'
-#installing docker in zvsi
+ssh "${ssh_options[@]}" root@$zvsi_fip "$ALL_VARS_STR bash -s" << 'EOF'
+#Installing docker in zvsi
 echo "Installing docker engine in zvsi"
 
 # Add Docker's official GPG key:
