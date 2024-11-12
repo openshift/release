@@ -174,7 +174,7 @@ function cleanup_prior() {
     # TODO: FIXME add filtering by date.... ?
     for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
     do
-        ibmcloud is image-delete "${}"
+        ibmcloud is image-delete "${RESOURCE_TGT}"
     done
 
     echo "Done cleaning up prior runs"
