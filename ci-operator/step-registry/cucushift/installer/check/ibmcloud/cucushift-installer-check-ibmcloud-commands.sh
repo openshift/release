@@ -30,5 +30,4 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 checkProviderType
-sleep 14400
 exit $?
