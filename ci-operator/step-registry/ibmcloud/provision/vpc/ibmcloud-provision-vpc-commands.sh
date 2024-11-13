@@ -139,6 +139,7 @@ function create_vpc() {
 }
 
 function check_vpc() {
+    local vpcName="$1" vpc_info_file="$2"
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
 }
 
