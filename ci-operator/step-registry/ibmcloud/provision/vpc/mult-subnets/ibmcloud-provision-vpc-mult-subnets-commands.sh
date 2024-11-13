@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-MORE_SUBNETS_COUNT=$((EXTRA_SUBNETS_NUMBER))
+extra_subnets_count=$((EXTRA_SUBNETS_NUMBER))
 #15 is the max number of of ALB, so just create more subnets on vpc, do not use them when create cluster. https://cloud.ibm.com/docs/vpc?topic=vpc-load-balancer-faqs#max-number-subnets-alb
 
 # IBM Cloud CLI login
@@ -34,50 +34,53 @@ function waitAvailable() {
     fi   
 }
 
+function createSubnet() {
+    local subnetPreName="$1" vpcName="$2" id="$3"
+    local subnetName
+    subnetName="${subnetPreName}-${id}"
+    "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-address-count 16
+    return waitAvailable "subnet" ${subnetName}
+}
+
 function create_subnets() {
-    local preName="$1" vpc_name="$2" resource_group="$3" region="$4"
-    local zones prefix pgwName zid subnetCount subnetName
- 
-    # create subnets
+    local preName="$1" vpc_name="$2" resource_group="$3" region="$4" subnetCount=$5
+    local zones prefix pgwName zid subnetName
+
     zones=("${region}-1" "${region}-2" "${region}-3")
-    prefix="${region}-"
-    subnetCount=$((MORE_SUBNETS_COUNT / 3))
-    for zone in "${zones[@]}"; do
-        pgwName=$(ibmcloud is subnets | grep control-plane-${zone} | awk '{print $7}')
-    
-        zid=${zone#$prefix}
-        for id in $(seq 1 ${subnetCount}); do
-            subnetName="${preName}-control-plane-${zid}-${id}"
-            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpc_name} --zone ${zone} --ipv4-address-count 8 --resource-group-name ${resource_group} --pgw ${pgwName} || return 1
-            waitAvailable "subnet" ${subnetName}
-            echo "succeed created subnet ${zid}-${id} in ${zone}================================"
+    id=1
+    while [[ $id -lt $subnetCount ]]; do
+        for zone in "${zones[@]}"; do
+            createSubnet "${preName}-control-plane" ${vpcName} ${id}
+            [[ $id -eq $subnetCount ]] && return
+            ((id++))
+        done
+
+        for zone in "${zones[@]}"; do
+            createSubnet "${preName}-compute" ${vpcName} ${id}
+            if [[ $id --eq $subnetCount ]] return
+            ((id++))
         done
     done
-    r_subnetCount=$((MORE_SUBNETS_COUNT % 3))
-    echo "r_subnetCount: $r_subnetCount"
-    if [[ ${r_subnetCount} -gt 0 ]]; then
-        for id in $(seq 1 ${r_subnetCount}); do
-            subnetName="${preName}-control-plane-${id}"
-            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpc_name} --zone ${zone} --ipv4-address-count 8 --resource-group-name ${resource_group} --pgw ${pgwName} || return 1
-            waitAvailable "subnet" ${subnetName}
-            echo "succeed created subnet ${id} in ${zone}================================"
-        done
-    fi
-
-    echo "succeed created subnet..."
-    "${IBMCLOUD_CLI}" is subnets
 }
 
 function check_vpc() {
-    local vpcName="$1" vpc_info_file="$2"
-
+    local vpcName="$1" vpc_info_file="$2" expSubnetNum="$3"
+    local num
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
+    num=$("${IBMCLOUD_CLI}" is subnets  --output JSON | jq '. | length')
+    echo "created ${num} subnets in the vpc."
+    if [[ ${num} -ne ${expSubnetNum} ]]; then
+        echo "fail to created the expected subnets $num_subnets"
+        echo "succeed created subnet..."
+        "${IBMCLOUD_CLI}" is subnets
+        return 1
+    fi
 }
 
 ibmcloud_login
 
-echo "MORE_SUBNETS_COUNT: ${MORE_SUBNETS_COUNT:-}"
-echo "Try to add more subnets: ${MORE_SUBNETS_COUNT:-} ..."
+echo "extra_subnets_count: ${extra_subnets_count:-}"
+echo "Try to add more subnets: ${extra_subnets_count:-} ..."
 
 rg_file="${SHARED_DIR}/ibmcloud_resource_group"
 if [ -f "${rg_file}" ]; then
@@ -91,10 +94,10 @@ fi
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name=$(cat "${SHARED_DIR}/ibmcloud_vpc_name")
 
-create_subnets "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${region}" 
+create_subnets "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${region}" ${extra_subnets_count}
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
-check_vpc "${vpc_name}" "${vpc_info_file}"
+check_vpc "${vpc_name}" "${vpc_info_file}" ${extra_subnets_count}
 
 if [[ "${USED_IN_CLUSTER}" = "yes" ]]; then
     echo "The extra subnets used in the cluster, update customer_vpc_subnets.yaml"
