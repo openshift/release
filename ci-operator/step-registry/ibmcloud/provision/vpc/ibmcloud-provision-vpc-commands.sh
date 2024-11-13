@@ -58,7 +58,8 @@ function ibmcloud_login {
     region="${LEASED_RESOURCE}"
     export region
     "${IBMCLOUD_CLI}" config --check-version=false
-    "${IBMCLOUD_CLI}" plugin update --all -f
+    "${IBMCLOUD_CLI}" version
+    "${IBMCLOUD_CLI}" plugin list
     echo "Try to login..." 
     "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
     "${IBMCLOUD_CLI}" version
