@@ -50,7 +50,13 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:~/jetlag/pull_secret.txt
 
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
+cat > /tmp/clean-resources.sh << 'EOF'
+podman pod stop $(podman pod ps -q) || echo 'No podman pods to stop'
+podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
+podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
+podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
+rm -rf /opt/*
+EOF
 
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
@@ -71,6 +77,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    git branch
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
