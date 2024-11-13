@@ -66,7 +66,7 @@ instance_type=${EC2_INSTANCE_TYPE}
 
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && \
   unzip -q awscliv2.zip
-./aws/install -b /bin
+./aws/install -b "${HOME}/bin"
 rm -rf ./aws awscliv2.zip
 
 function save_stack_events_to_shared()
