@@ -1,0 +1,27 @@
+workflow:
+  as: rosa-aws-sts-conformance
+  steps:
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "release:latest"
+      TEST_SKIPS: >-
+        users can manipulate groups\|
+        well-known endpoint should be reachable\|
+        builds installing subscription content\|
+        The HAProxy router should expose prometheus metrics for a route\|
+        oc adm must-gather runs successfully for audit logs\|
+        OAuth server has the correct token and certificate fallback semantics\|
+        OAuthClientWithRedirectURIs must validate request URIs according to oauth-client definition\|
+        should be present on all masters and work\|
+        when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
+        API LBs follow \/readyz of kube-apiserver and stop sending requests before server shutdowns for external clients
+    pre:
+    - chain: rosa-aws-sts-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: rosa-aws-sts-deprovision
+  documentation: |-
+    This workflow installs a rosa sts cluster and performs openshift-tests conformance testing.

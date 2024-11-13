@@ -60,7 +60,9 @@ v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
-latest_defined="v416"
+v417=" ${v416}"
+v418=" ${v417}"
+latest_defined="v418"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -100,6 +102,12 @@ case ${BASELINE_CAPABILITY_SET} in
   ;;
 "v4.16")
   enabled_operators="${v416}"
+  ;;
+"v4.17")
+  enabled_operators="${v417}"
+  ;;
+"v4.18")
+  enabled_operators="${v418}"
   ;;
 "vCurrent")
   enabled_operators="${vCurrent}"

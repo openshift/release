@@ -330,9 +330,9 @@ tests:
     workflow: openshift-e2e-azure-csi-extended
 - as: e2e-openstack
   optional: true
-  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
-    cluster_profile: openstack-vexxhost
+    cluster_profile: openstack-vh-mecha-central
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
@@ -347,7 +347,7 @@ tests:
         pods on the same node
     workflow: openshift-e2e-openstack-csi-cinder
 - as: e2e-openstack-manila-csi
-  run_if_changed: ^(Dockerfile\.openstack-manila|legacy\/csi-driver-manila-operator\/.*)
+  run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
@@ -375,6 +375,19 @@ tests:
       OO_PACKAGE: smb-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
     workflow: openshift-e2e-azure-csi-smb-extended
+- as: smb-win-operator-e2e
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-aws-csi-smb-win
 - as: verify-deps
   steps:
     test:

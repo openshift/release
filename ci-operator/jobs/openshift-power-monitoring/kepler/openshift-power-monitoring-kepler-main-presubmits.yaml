@@ -12,7 +12,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-power-monitoring-kepler-main-images
     rerun_command: /test images
@@ -68,7 +68,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-power-monitoring-kepler-main-kepler-e2e
     rerun_command: /test kepler-e2e
@@ -303,6 +303,63 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build09
+    context: ci/prow/ocp4.17-periodic-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp4.17-periodic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.17-periodic-images
+    rerun_command: /test ocp4.17-periodic-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=ocp4.17-periodic
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp4.17-periodic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/post-submit-images
     decorate: true
     decoration_config:
@@ -310,7 +367,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: post-submit
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-power-monitoring-kepler-main-post-submit-images
     rerun_command: /test post-submit-images
@@ -367,7 +424,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-power-monitoring-kepler-main-security
     rerun_command: /test security

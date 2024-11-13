@@ -45,7 +45,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         # If source is any, use any available catalog
         if [[ "${operator_source}" == "!any" ]]; then
             # Prioritize the use of the default catalog
-            operator_source=$(oc get packagemanifest ${operator_name} | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
+            operator_source=$(oc get packagemanifest | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
             if [[ -n "${operator_source}" ]]; then
                 operator_source="${DEFAULT_OPERATOR_SOURCE}" ;
             else
@@ -77,13 +77,11 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.defaultChannel}' 2>/dev/null || echo)
         if [[ -z "${operator_channel}" ]]; then
             echo "ERROR: Default channel not found in '${operator_name}' packagemanifest."
-            echo "Checking if the ${operator_name} packagemanifest is available in other catalogs:"
+            echo "Checking if the ${operator_name} packagemanifest is available in other catalogs for debugging purpose:"
             set -x
-            oc get packagemanifest "${operator_name}" --ignore-not-found || {
-                echo "There is not any available packagemanifest for '${operator_name}' operator" ;
-                exit 1 ;
-            }
-            operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}')
+            oc get packagemanifest "${operator_name}" || \
+              echo "There is not any available packagemanifest for '${operator_name}' operator"
+            exit 1
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi

@@ -27,6 +27,17 @@ images:
 - build_args:
   - name: TAGS
     value: scos
+  dockerfile_path: Dockerfile.openstack-manila
+  from: origin_scos-4.18_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: csi-driver-manila-operator
+- build_args:
+  - name: TAGS
+    value: scos
   dockerfile_path: Dockerfile.aws-ebs
   from: origin_scos-4.18_base-stream9
   inputs:
@@ -57,17 +68,6 @@ images:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: openstack-cinder-csi-driver-operator
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile.openstack-manila
-  from: origin_scos-4.18_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: csi-driver-manila-operator
 promotion:
   to:
   - name: scos-4.18
@@ -75,6 +75,7 @@ promotion:
 releases:
   latest:
     integration:
+      include_built_images: true
       name: scos-4.18
       namespace: origin
 resources:
@@ -82,6 +83,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift

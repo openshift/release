@@ -21,8 +21,6 @@ images:
 
     RUN echo Target architecture: ${TARGETARCH}
 
-    ENV RUST_TOOLCHAIN=1.81.0
-
     COPY . /opt/app-root/src/
     WORKDIR /opt/app-root/src/insights-runtime-extractor
 
@@ -32,11 +30,7 @@ images:
 
     RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
         chmod g+w /opt/app-root/src/insights-runtime-extractor && \
-        dnf install -y gcc make
-
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN}
-    RUN if [ "$TARGETARCH" == "arm64" ]; then rustup target add aarch64-unknown-linux-musl; fi
-    RUN if [ "$TARGETARCH" == "amd64" ]; then rustup target add x86_64-unknown-linux-musl; fi
+        dnf install -y gcc make rust-toolset rustfmt
 
     RUN mkdir -p $HOME/.cargo/git/ && \
         find $HOME/. -type d -exec chmod 777 {} \; && \

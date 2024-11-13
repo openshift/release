@@ -1,0 +1,57 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+  origin_scos-4.18_base-stream9:
+    name: scos-4.18
+    namespace: origin
+    tag: base-stream9
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: ./Containerfile-extractor
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_base-stream9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+  to: insights-runtime-extractor
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: ./Containerfile-exporter
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    origin_scos-4.18_base-stream9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+  to: insights-runtime-exporter
+promotion:
+  to:
+  - name: scos-4.18
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-4.18
+      namespace: origin
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: insights-runtime-extractor
+  variant: okd-scos

@@ -251,15 +251,36 @@ EOF
     oauth_file_dst=/tmp/cucushift-oauth-dst.yaml
     # Don't quote the $TARGET_RESOURCE variable because it may include spaces
     oc get $TARGET_RESOURCE -o json > "${oauth_file_src}"
-    jq $IDP_FIELD' += [{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["cn"],"preferredUsername":["cn"]},"bindDN":"","bindPassword":{"name":""},"insecure":true,"url":"ldap://ldap.ldap.svc:389/ou=people,ou=rfc2307,dc=example,dc=com?cn"},"mappingMethod":"claim","name":"ldapidp","type":"LDAP"}]' "${oauth_file_src}" > "${oauth_file_dst}"
+    # Here use an IDP name "#ldap idp (OpenLDAP)#" with special characters including spaces to cover the checkpoint of an upgrade blocker bug OCPBUGS-43587
+    jq $IDP_FIELD' += [{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["cn"],"preferredUsername":["cn"]},"bindDN":"","bindPassword":{"name":""},"insecure":true,"url":"ldap://ldap.ldap.svc:389/ou=people,ou=rfc2307,dc=example,dc=com?cn"},"mappingMethod":"claim","name":"#ldap idp (OpenLDAP)#","type":"LDAP"}]' "${oauth_file_src}" > "${oauth_file_dst}"
+    /bin/mv "${oauth_file_dst}" "${oauth_file_src}"
+
+
+    # The bug OCPBUGS-43587's reproducing steps required more than one password-based IDPs and at least one IDP's name includes spaces. Above ldap idp name includes spaces, thus adding one more IDP. Here choosing htpasswd IDP for it.
+    htpass_file=/tmp/users.htpasswd
+    for i in $(seq 1 10)
+    do
+        username="testuser-${i}"
+        password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
+        if [ -f "${htpass_file}" ]; then
+            htpasswd -B -b ${htpass_file} "${username}" "${password}"
+        else
+            htpasswd -c -B -b ${htpass_file} "${username}" "${password}"
+        fi
+    done
+    # This shell script and its step are mainly for coverage of Auth ldap integration in the CI jobs for real customer scenarios, thus only the ldap users/passwords will be passed down to follow-up CI steps for e2e cases' logins, the htpasswd IDP's users/passwords will not. The htpasswd IDP's users/passwords are created only for the secret creation here
+    oc create secret generic htpasswd-secret --from-file=htpasswd=${htpass_file} -n "$MIDDLE_NAMESPACE"
+    jq $IDP_FIELD' += [{"htpasswd":{"fileData":{"name":"htpasswd-secret"}},"mappingMethod":"claim","name":"idp-2-htpasswd-provider","type":"HTPasswd"}]' "${oauth_file_src}" > "${oauth_file_dst}"
     oc replace -f "${oauth_file_dst}"
 
-    # Wait for oauth-openshift to rollout
+    echo "Waiting for oauth-openshift pods to roll out"
     wait_auth=true
     expected_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.spec.replicas}')
     while $wait_auth; do
         available_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.status.availableReplicas}')
         new_gen=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.metadata.generation}')
+        oc get pods -n "$OAUTH_NAMESPACE" | grep oauth-openshift
+        echo
         if [[ $expected_replicas == "$available_replicas" && $((new_gen)) -gt $((gen)) ]]; then
             wait_auth=false
         else
