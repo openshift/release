@@ -14,6 +14,8 @@ images:
 - dockerfile_path: Dockerfile.openshift-appliance
   from: coreos-centos-stream9
   to: agent-preinstall-image-builder
+- dockerfile_path: Dockerfile.openshift-appliance-build
+  to: openshift-appliance-build
 promotion:
   to:
   - name: "4.18"
@@ -38,14 +40,23 @@ test_binary_build_commands: |
 tests:
 - as: lint
   commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: openshift-appliance-build
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
     make unit-test
   container:
-    from: test-bin
+    clone: true
+    from: openshift-appliance-build
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
 - as: publish
   cron: '@daily'
