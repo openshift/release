@@ -115,7 +115,7 @@ fi
 echo "Copy automation repo to local $SHARED_DIR"
 mkdir $SHARED_DIR/repos
 ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
-    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
+    "tar --exclude='.git' -czf - -C /tmp ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
 
 cd $SHARED_DIR/repos/ansible-automation
 
@@ -219,6 +219,11 @@ if $BASTION_ENV; then
 else
     PLAYBOOK_ARGS=""
     SNO_CLUSTER_API_PORT="6443"
+fi
+
+if [ "$T5CI_VERSION" = "4.18" ]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
 fi
 
 
