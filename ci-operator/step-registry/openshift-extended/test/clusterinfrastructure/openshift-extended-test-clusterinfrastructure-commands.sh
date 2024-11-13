@@ -26,7 +26,6 @@ export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
-export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
 # add for hosted kubeconfig in the hosted cluster env
@@ -237,40 +236,20 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
 fi
 
 # execute the cases
-
 function run {
     cd /go/src/github.com/openshift/cluster-api-actuator-pkg
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
-
-    #timeout=${TEST_TIMEOUT_CLUSTERINFRASTRUCTURE:-"90m"}
-    #suite=${TEST_SUITE:-"operators"}
-    #GINKGO_ARGS="--junit-report=junit_cluster_api_actuator_pkg_e2e.xml --cover --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}/junit/"
-    #GINKGO_ARGS="--junit-report=junit_cluster-api-actuator-testutils.xml --cover --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}/"
-    #GINKGO_ARGS="--junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=${ARTIFACT_DIR}/"
-    echo "Starting e2e test"
     echo "TEST_FILTERS_CLUSTERINFRASTRUCTURE: \"${TEST_FILTERS_CLUSTERINFRASTRUCTURE:-}\""
-    #git clone https://github.com/sunzhaohua2/cluster-api-actuator-pkg.git /tmp/cluster-api-actuator-pkg
-    #cd /tmp/cluster-api-actuator-pkg
-    #git checkout python
-    pwd
-    #if [[ "$TEST_FILTERS_CLUSTERINFRASTRUCTURE" == *"periodic"* ]]; then
-    #   make test-e2e-periodic GINKGO_ARGS="${GINKGO_ARGS}" || ret_value=$?
-    # else
-    #     make test-e2e GINKGO_ARGS="${GINKGO_ARGS}" || ret_value=$?
-    # fi
-
     if [[ -n "$TEST_FILTERS_CLUSTERINFRASTRUCTURE" ]]; then
         hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter="${TEST_FILTERS_CLUSTERINFRASTRUCTURE}" -p || ret_value=$?
     else
-        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!periodic' -p || ret_value=$?
+        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!disruptive' -p || ret_value=$?
     fi
-
     set +x
     set +e
-
     echo "try to handle result"
     handle_result
     echo "done to handle result"
@@ -340,24 +319,10 @@ function handle_result {
         echo "there is no result file generated"
         return
     fi
-    # current_time=`date "+%Y-%m-%d-%H-%M-%S"`
-    # newresultfile="${ARTIFACT_DIR}/junit/junit_cluster_api_actuator_pkg_e2e_${current_time}.xml"
-    # replace_ret=0
-    # python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
-    # if ! [ "W${replace_ret}W" == "W0W" ]; then
-    #     echo "replacing file is not ok"
-    #     rm -fr ${resultfile}
-    #     return
-    # fi
-    # rm -fr ${resultfile}
 
-    # echo ${newresultfile}
     split_ret=0
-    #git clone https://github.com/sunzhaohua2/cluster-api-actuator-pkg.git /tmp/cluster-api-actuator-pkg
-    #cd /tmp/cluster-api-actuator-pkg
-    #git checkout python
-    python3 pipeline/handleresult.py -a split -i ${resultfile} || split_ret=$?
-    #python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${resultfile} || split_ret=$?
+    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp/handleresult.py
+    python3 /tmp/handleresult.py -a split -i ${resultfile} || split_ret=$?
     if ! [ "W${split_ret}W" == "W0W" ]; then
         echo "splitting file is not ok"
         rm -fr ${resultfile}

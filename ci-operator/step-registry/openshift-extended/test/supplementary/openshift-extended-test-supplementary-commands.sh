@@ -7,12 +7,12 @@ set -o pipefail
 function save_oidc_tokens {
     echo "Saving oidc tokens back to SHARED_DIR"
     cp "$token_cache_dir"/* "$SHARED_DIR"/oc-oidc-token
-    ls "$token_cache_dir" > "$SHARED_DIR"/oc-oidc-token-filename
+    ls "$token_cache_dir" >"$SHARED_DIR"/oc-oidc-token-filename
 }
 
 function exit_trap {
     echo "Exit trap triggered"
-    date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
+    date '+%s' >"${SHARED_DIR}/TEST_TIME_TEST_END" || :
     if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
         save_oidc_tokens
     fi
@@ -30,8 +30,7 @@ export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
 # add for hosted kubeconfig in the hosted cluster env
-if test -f "${SHARED_DIR}/nested_kubeconfig"
-then
+if test -f "${SHARED_DIR}/nested_kubeconfig"; then
     export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 fi
 
@@ -56,8 +55,7 @@ fi
 which extended-platform-tests
 
 # setup proxy
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -68,7 +66,7 @@ if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-file
     KUBECACHEDIR="/tmp/output/oc-oidc"
     token_cache_dir="$KUBECACHEDIR/oc"
     mkdir -p "$token_cache_dir"
-    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    cat "$SHARED_DIR/oc-oidc-token" >"$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
     oc whoami
 fi
 
@@ -79,28 +77,24 @@ if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
 fi
 
 # setup bastion
-if test -f "${SHARED_DIR}/bastion_public_address"
-then
+if test -f "${SHARED_DIR}/bastion_public_address"; then
     QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
     export QE_BASTION_PUBLIC_ADDRESS
 fi
-if test -f "${SHARED_DIR}/bastion_private_address"
-then
+if test -f "${SHARED_DIR}/bastion_private_address"; then
     QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
     export QE_BASTION_PRIVATE_ADDRESS
 fi
-if test -f "${SHARED_DIR}/bastion_ssh_user"
-then
+if test -f "${SHARED_DIR}/bastion_ssh_user"; then
     QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
 fi
 
-if test -f "${SHARED_DIR}/bastion_public_address" ||  test -f "${SHARED_DIR}/bastion_private_address" || oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}" &> /dev/null
-then
+if test -f "${SHARED_DIR}/bastion_public_address" || test -f "${SHARED_DIR}/bastion_private_address" || oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}" &>/dev/null; then
     echo "Ensure our UID, which is randomly generated, is in /etc/passwd. This is required to be able to SSH"
-    if ! whoami &> /dev/null; then
+    if ! whoami &>/dev/null; then
         echo "try to add user ${USER_NAME:-default}"
         if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >>/etc/passwd
             echo "added user ${USER_NAME:-default}"
         fi
     fi
@@ -119,13 +113,11 @@ chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
 #set env for rosa which are required by hypershift qe team
-if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
-then
+if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"; then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
-if test -f "${SHARED_DIR}/cluster-id"
-then
+if test -f "${SHARED_DIR}/cluster-id"; then
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
     export CLUSTER_ID
 fi
@@ -153,7 +145,7 @@ aws)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     ;;
-aws-usgov|aws-c2s|aws-sc2s)
+aws-usgov | aws-c2s | aws-sc2s)
     mkdir -p ~/.ssh
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
@@ -167,8 +159,8 @@ alibabacloud)
     export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.alibabacloud.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"alibabacloud\",\"region\":\"${REGION}\",\"multizone\":true,\"multimaster\":true}"
-;;
-azure4|azuremag|azure-arm64)
+    ;;
+azure4 | azuremag | azure-arm64)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
     export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
@@ -183,27 +175,32 @@ vsphere)
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
     error_code=0
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' >"$VSPHERE_CONF_FILE" || error_code=$?
     if [ "W${error_code}W" == "W0W" ]; then
         # The test suite requires a vSphere config file with explicit user and password fields.
         sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
         sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
     fi
-    export TEST_PROVIDER=vsphere;;
+    export TEST_PROVIDER=vsphere
+    ;;
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
-    export TEST_PROVIDER='{"type":"openstack"}';;
+    export TEST_PROVIDER='{"type":"openstack"}'
+    ;;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
-    export IC_API_KEY;;
-ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
-    export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe|nutanix-qe-dis)
-    export TEST_PROVIDER='{"type":"nutanix"}';;
+    IC_API_KEY="$(<"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY
+    ;;
+ovirt) export TEST_PROVIDER='{"type":"ovirt"}' ;;
+equinix-ocp-metal | equinix-ocp-metal-qe | powervs-*)
+    export TEST_PROVIDER='{"type":"skeleton"}'
+    ;;
+nutanix | nutanix-qe | nutanix-qe-dis)
+    export TEST_PROVIDER='{"type":"nutanix"}'
+    ;;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
@@ -231,7 +228,7 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_TEST_START"
 
 # check if the cluster is ready
 oc version --client
@@ -249,7 +246,7 @@ function run {
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT_SUPPLEMENTARY: \"${TEST_TIMEOUT_SUPPLEMENTARY}\""
     if [[ -n "${TEST_SCENARIOS_SUPPLEMENTARY:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENARIOS_SUPPLEMENTARY}"
+        readarray -t scenarios <<<"${TEST_SCENARIOS_SUPPLEMENTARY}"
         for scenario in "${scenarios[@]}"; do
             if [ "W${scenario}W" != "WW" ]; then
                 test_scenarios="${test_scenarios}|${scenario}"
@@ -269,7 +266,7 @@ function run {
 
     test_additional=""
     if [[ -n "${TEST_ADDITIONAL_SUPPLEMENTARY:-}" ]]; then
-        readarray -t additionals <<< "${TEST_ADDITIONAL_SUPPLEMENTARY}"
+        readarray -t additionals <<<"${TEST_ADDITIONAL_SUPPLEMENTARY}"
         for additional in "${additionals[@]}"; do
             test_additional="${test_additional}|${additional}"
         done
@@ -289,16 +286,16 @@ function run {
 
     echo "final scenarios: ${test_scenarios}"
     ret_grep=0
-    extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected || ret_grep=$?
+    extended-platform-tests run all --dry-run |
+        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" >./case_selected || ret_grep=$?
     if [ "W${ret_grep}W" != "W0W" ]; then
         echo "fail to select case. possible no case, and please check it"
         if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
             echo "do not force success exit"
             exit 1
         fi
-            echo "force success exit"
-            exit 0
+        echo "force success exit"
+        exit 0
     fi
 
     hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
@@ -323,7 +320,7 @@ function run {
     echo "------handle module filter done------"
 
     echo "------------------the case selected------------------"
-    selected_case_num=$(cat ./case_selected|wc -l)
+    selected_case_num=$(cat ./case_selected | wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
         echo "No Case Selected"
         if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
@@ -343,12 +340,12 @@ function run {
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
-        -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+            -o "${ARTIFACT_DIR}/extended.log" \
+            --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     else
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
-        --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+            --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
+            --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
     set +x
     set +e
@@ -364,31 +361,31 @@ function run {
 
     # summarize test results
     echo "Summarizing test results..."
-    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+    if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]]; then
         echo "Artifact dir '${ARTIFACT_DIR}' not exist"
         exit 0
     else
         echo "Artifact dir '${ARTIFACT_DIR}' exist"
         ls -lR "${ARTIFACT_DIR}"
         files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
-        if [[ "$files" -eq 0 ]] ; then
+        if [[ "$files" -eq 0 ]]; then
             echo "There are no JUnit files"
             exit 0
         fi
     fi
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
-    while read row ; do
-	for ctype in "${!results[@]}" ; do
-            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
-            if [[ -n $count ]] ; then
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" >/tmp/zzz-tmp.log || exit 0
+    while read row; do
+        for ctype in "${!results[@]}"; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<<$row)"
+            if [[ -n $count ]]; then
                 let results[$ctype]+=count || true
             fi
         done
-    done < /tmp/zzz-tmp.log
+    done </tmp/zzz-tmp.log
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
-    cat > "${TEST_RESULT_FILE}" <<- EOF
+    cat >"${TEST_RESULT_FILE}" <<-EOF
 openshift-extended-test-supplementary:
   total: ${results[tests]}
   failures: ${results[failures]}
@@ -396,11 +393,11 @@ openshift-extended-test-supplementary:
   skipped: ${results[skipped]}
 EOF
 
-    if [ ${results[failures]} != 0 ] ; then
-        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+    if [ ${results[failures]} != 0 ]; then
+        echo '  failingScenarios:' >>"${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
-        for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
-            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        for ((i = 0; i < ${#failingscenarios[@]}; i++)); do
+            echo "    - ${failingscenarios[$i]}" >>"${TEST_RESULT_FILE}"
         done
     fi
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
@@ -421,39 +418,36 @@ function handle_filters {
         return
     fi
     echo "try to handler filters..."
-    IFS=";" read -r -a filters <<< "${filter_tmp}"
+    IFS=";" read -r -a filters <<<"${filter_tmp}"
 
     filters_and=()
     filters_or=()
-    for filter in "${filters[@]}"
-    do
+    for filter in "${filters[@]}"; do
         echo "${filter}"
         valid_filter "${filter}"
         filter_logical="$(echo $filter | grep -Eo '[&]?$')"
 
         if [ "W${filter_logical}W" == "W&W" ]; then
-            filters_and+=( "$filter" )
+            filters_and+=("$filter")
         else
-            filters_or+=( "$filter" )
+            filters_or+=("$filter")
         fi
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
-    do
+    for filter in ${filters_and[*]}; do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
     done
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
-    do
+    for filter in ${filters_or[*]}; do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"
     done
     if [[ -e ./case_selected_or ]]; then
-        sort -u ./case_selected_or > ./case_selected && rm -fr ./case_selected_or
+        sort -u ./case_selected_or >./case_selected && rm -fr ./case_selected_or
     fi
 }
 
@@ -475,10 +469,10 @@ function handle_and_filter {
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" > ./case_selected_and || ret=$?
+        cat ./case_selected | grep -E "${value}" >./case_selected_and || ret=$?
         check_case_selected "${ret}"
     else
-        cat ./case_selected | grep -v -E "${value}" > ./case_selected_and || ret=$?
+        cat ./case_selected | grep -v -E "${value}" >./case_selected_and || ret=$?
         check_case_selected "${ret}"
     fi
     if [[ -e ./case_selected_and ]]; then
@@ -492,10 +486,10 @@ function handle_or_filter {
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" >> ./case_selected_or || ret=$?
+        cat ./case_selected | grep -E "${value}" >>./case_selected_or || ret=$?
         check_case_selected "${ret}"
     else
-        cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or || ret=$?
+        cat ./case_selected | grep -v -E "${value}" >>./case_selected_or || ret=$?
         check_case_selected "${ret}"
     fi
 }
@@ -506,23 +500,25 @@ function handle_module_filter {
     declare -a module_filter_values
     valid_and_get_module_filter "$module_filter"
 
-
     for i in "${!module_filter_keys[@]}"; do
 
         module_key="${module_filter_keys[$i]}"
         filter_value="${module_filter_values[$i]}"
         echo "moudle: $module_key"
         echo "filter: $filter_value"
-        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+        [ -s ./case_selected ] || {
+            echo "No Case already Selected before handle ${module_key}"
+            continue
+        }
 
-        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
-        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        cat ./case_selected | grep -v -E "${module_key}" >./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" >./case_selected_inclusive || true
         rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
 
         handle_filters "${filter_value}"
 
-        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
-        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >>./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected >./case_selected_sort && mv -f ./case_selected_sort ./case_selected
 
     done
 }
@@ -530,9 +526,9 @@ function handle_module_filter {
 function valid_and_get_module_filter {
     local module_filter_tmp="$1"
 
-    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    IFS='#' read -ra pairs <<<"$module_filter_tmp"
     for pair in "${pairs[@]}"; do
-        IFS=':' read -ra kv <<< "$pair"
+        IFS=':' read -ra kv <<<"$pair"
         if [[ ${#kv[@]} -ne 2 ]]; then
             echo "moudle filter format is not correct"
             exit 1
@@ -546,13 +542,13 @@ function valid_and_get_module_filter {
 }
 
 function handle_result {
-    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
+    resultfile=$(ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true)
     echo $resultfile
-    if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory") ; then
+    if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory"); then
         echo "there is no result file generated"
         return
     fi
-    current_time=`date "+%Y-%m-%d-%H-%M-%S"`
+    current_time=$(date "+%Y-%m-%d-%H-%M-%S")
     newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
     replace_ret=0
     python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
@@ -560,11 +556,12 @@ function handle_result {
         echo "replacing file is not ok"
         rm -fr ${resultfile}
         return
-    fi 
+    fi
     rm -fr ${resultfile}
 
     echo ${newresultfile}
     split_ret=0
+    pwd
     python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${newresultfile} || split_ret=$?
     if ! [ "W${split_ret}W" == "W0W" ]; then
         echo "splitting file is not ok"
