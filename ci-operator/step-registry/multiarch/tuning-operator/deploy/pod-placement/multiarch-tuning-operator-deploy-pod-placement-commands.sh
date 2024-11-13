@@ -72,7 +72,7 @@ kind: ClusterPodPlacementConfig
 metadata:
   name: cluster
 spec:
-  logVerbosityLevel: Normal
+  logVerbosityLevel: TraceAll
   namespaceSelector:
     matchExpressions:
       - key: multiarch.openshift.io/exclude-pod-placement
