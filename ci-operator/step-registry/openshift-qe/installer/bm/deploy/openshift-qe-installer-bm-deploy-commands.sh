@@ -80,7 +80,7 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd ${jetlag_repo}
-   source bootstrap.sh
+   source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
@@ -90,6 +90,8 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    set -e
    set -o pipefail
    cd ${jetlag_repo}
-   git branch
-   source bootstrap.sh
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
+   source .ansible/bin/activate
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   deactivate
+   rm -rf .ansible
+   "
