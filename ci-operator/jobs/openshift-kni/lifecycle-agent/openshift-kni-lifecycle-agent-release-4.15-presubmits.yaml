@@ -6,20 +6,20 @@ presubmits:
     - ^release-4\.15$
     - ^release-4\.15-
     cluster: build09
-    context: ci/prow/ci-index
+    context: ci/prow/ci-index-operator-bundle
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-ci-index
-    rerun_command: /test ci-index
+    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-ci-index-operator-bundle
+    rerun_command: /test ci-index-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -52,7 +52,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -363,6 +363,116 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )markdownlint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build09
+    context: ci/prow/nightly-4.15-ci-index-operator-bundle
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: nightly-4.15
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-nightly-4.15-ci-index-operator-bundle
+    rerun_command: /test nightly-4.15-ci-index-operator-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-operator-bundle
+        - --variant=nightly-4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )nightly-4.15-ci-index-operator-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build09
+    context: ci/prow/nightly-4.15-upgrade-from-stable-4.14-ci-index-operator-bundle
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: nightly-4.15-upgrade-from-stable-4.14
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-nightly-4.15-upgrade-from-stable-4.14-ci-index-operator-bundle
+    rerun_command: /test nightly-4.15-upgrade-from-stable-4.14-ci-index-operator-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-operator-bundle
+        - --variant=nightly-4.15-upgrade-from-stable-4.14
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )nightly-4.15-upgrade-from-stable-4.14-ci-index-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
