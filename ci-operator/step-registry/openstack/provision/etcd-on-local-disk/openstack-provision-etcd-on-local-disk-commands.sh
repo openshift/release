@@ -150,6 +150,7 @@ spec:
           Where=/var/lib/etcd
           Type=xfs
           Options=defaults,prjquota
+          TimeoutSec=120s
 
           [Install]
           WantedBy=local-fs.target
@@ -166,9 +167,10 @@ spec:
           Type=oneshot
           RemainAfterExit=yes
           ExecCondition=/usr/bin/test ! -d /var/lib/etcd/member
-          ExecStart=/usr/sbin/setenforce 0
+          ExecStart=/usr/sbin/setsebool -P rsync_full_access 1
           ExecStart=/bin/rsync -ar /sysroot/ostree/deploy/rhcos/var/lib/etcd/ /var/lib/etcd/
-          ExecStart=/usr/sbin/setenforce 1
+          ExecStart=/usr/sbin/semanage fcontext -a -t container_var_lib_t '/var/lib/etcd(/.*)?'
+          ExecStart=/usr/sbin/setsebool -P rsync_full_access 0
           TimeoutSec=0
 
           [Install]
@@ -192,41 +194,6 @@ spec:
           WantedBy=multi-user.target graphical.target
         enabled: true
         name: restorecon-var-lib-etcd.service
-EOF
-
-wait_for_machineconfig_done
-
-info 'INFO: Replacing the 98-var-lib-etcd MachineConfig with a modified version that removes the logic for creating and syncing the device and that prevents the nodes from rebooting...'
-oc replace -f - <<EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: master
-  name: 98-var-lib-etcd
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    systemd:
-      units:
-      - contents: |
-          [Unit]
-          Description=Mount /dev/vdb to /var/lib/etcd
-          Before=local-fs.target
-          Requires=systemd-mkfs@dev-vdb.service
-          After=systemd-mkfs@dev-vdb.service var.mount
-
-          [Mount]
-          What=/dev/vdb
-          Where=/var/lib/etcd
-          Type=xfs
-          Options=defaults,prjquota
-
-          [Install]
-          WantedBy=local-fs.target
-        enabled: true
-        name: var-lib-etcd.mount
 EOF
 
 wait_for_machineconfig_done
