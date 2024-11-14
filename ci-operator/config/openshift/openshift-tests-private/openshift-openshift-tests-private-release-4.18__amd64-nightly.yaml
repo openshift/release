@@ -34,7 +34,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -59,11 +59,6 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     candidate:
@@ -338,36 +333,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-longduration-mco-g1-f9
-  cron: 16 8 4,16,25 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-longduration-mco-g2-f9
-  cron: 10 3 5,14,23 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical|Medium|Low
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-longduration-mco-critical-f9
   cron: 56 13 4,16,25 * *
   steps:
@@ -378,6 +343,48 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: Critical
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-longduration-mco-p1-f9
+  cron: 55 21 3,12,24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-longduration-mco-p2-f9
+  cron: 22 22 2,11,23 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-longduration-mco-p3-f9
+  cron: 53 1 4,16,25 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
@@ -2277,6 +2284,23 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: gcp-ipi-ovn-winc-f28-compliance
+  cron: 43 15 13 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
 - as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
   cron: 51 0 21 * *
   steps:
@@ -3280,34 +3304,34 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
-- as: vsphere-ipi-template-f28
-  cron: 31 9 24 * *
+- as: vsphere-ipi-template-usertags-f28
+  cron: 32 7 3 * *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-automated-release
-    workflow: cucushift-installer-rehearse-vsphere-ipi-template
-- as: vsphere-ipi-template-f28-destructive
-  cron: 32 6 17 * *
+    workflow: cucushift-installer-rehearse-vsphere-ipi-template-usertags
+- as: vsphere-ipi-template-usertags-f28-destructive
+  cron: 13 5 16 * *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-vsphere-ipi-template
-- as: vsphere-ipi-zones-f28
-  cron: 2 4 27 * *
+    workflow: cucushift-installer-rehearse-vsphere-ipi-template-usertags
+- as: vsphere-ipi-zones-template-f28
+  cron: 22 4 24 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: vsphere-ipi-zones-f28-destructive
-  cron: 35 18 19 * *
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
+- as: vsphere-ipi-zones-template-f28-destructive
+  cron: 21 17 12 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
 - as: vsphere-ipi-zones-f28-longduration-cloud
   cron: 11 20 22 * *
   steps:

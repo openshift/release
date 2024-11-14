@@ -15,15 +15,21 @@ chain:
       trap cleanup EXIT
 
       function patch_image_streams() {
+        # with OCP <= 4.17,
         # imagestreams on the hosted cluster are ignoring
         # the CA injected at creation/(installation) time.
         # see: https://issues.redhat.com/browse/RFE-3093
         # and: https://github.com/openshift/enhancements/pull/416/commits/e46072ecf77b58c79b4bece5e0c6a5a5546a1b8a
 
-        echo "#### Add trust for the mirroring registry"
-        oc get cm -n openshift-config user-ca-bundle -o json | jq -r '.data["ca-bundle.crt"]' > /tmp/ca-bundle.crt
-        oc create configmap registry-config --from-file=${DS_REGISTRY//:/..}=/tmp/ca-bundle.crt -n openshift-config
-        oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
+        OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
+        if [ "$OCP_MINOR_VERSION" -le "17" ]; then
+           echo "#### Add trust for the mirroring registry"
+           oc get cm -n openshift-config user-ca-bundle -o json | jq -r '.data["ca-bundle.crt"]' > /tmp/ca-bundle.crt
+           oc create configmap registry-config --from-file=${DS_REGISTRY//:/..}=/tmp/ca-bundle.crt -n openshift-config
+           oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
+        else
+           oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" patch hostedclusters -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}" --type='merge' -p '{"spec":{"configuration":{"image":{"additionalTrustedCA":{"name": "user-ca-bundle"}}}}}'
+        fi
         sleep 60
       }
 
@@ -49,9 +55,10 @@ chain:
 
       }
       
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+      export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       
@@ -138,6 +145,10 @@ chain:
         TEST_SKIPS="${TEST_SKIPS:+${TEST_SKIPS}\|}\[Suite:openshift/conformance/parallel\]"
         TEST_SUITE="openshift/conformance/parallel"
       fi
+
+      if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
+        export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+      fi
       
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
@@ -204,6 +215,12 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+        program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+        details. The file must be present in ${SHARED_DIR}.
     resources:
       requests:
         cpu: "3"

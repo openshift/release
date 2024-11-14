@@ -39,11 +39,6 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     candidate:
@@ -118,6 +113,9 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_BYO_IAM_PROFILE_CONTROL_PLANE: "false"
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "false"
+      ENABLE_BYO_IAM_PROFILE_DEFAULT_MACHINE: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -145,6 +143,9 @@ tests:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_BYO_IAM_ROLE_CONTROL_PLANE: "false"
+      ENABLE_BYO_IAM_ROLE_CUMPUTE: "false"
+      ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -501,6 +502,9 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_CUSTOM_SG_CONTROL_PLANE: "false"
+      ENABLE_CUSTOM_SG_CUMPUTE: "false"
+      ENABLE_CUSTOM_SG_DEFAULT_MACHINE: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -898,8 +902,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-oidc-amd-f28-destructive
-  cron: 0 1 2 * *
+- as: azure-ipi-oidc-mini-perm-amd-f28-destructive
+  cron: 27 12 5 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -907,9 +911,9 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
-- as: azure-ipi-oidc-arm-f7
-  cron: 13 0 2,11,18,25 * *
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-minimal-permission
+- as: azure-ipi-oidc-mini-perm-arm-f7
+  cron: 1 18 7,16,23,30 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -919,7 +923,7 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-minimal-permission
 - as: azure-ipi-ovn-etcd-encryption-compact-amd-f28-destructive
   cron: 32 1 2 * *
   steps:
