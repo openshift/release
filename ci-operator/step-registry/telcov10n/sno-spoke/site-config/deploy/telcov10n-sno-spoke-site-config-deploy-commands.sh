@@ -120,7 +120,7 @@ function generate_site_config {
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     if [ "${root_device}" != "" ]; then
-      ignition_config_override="'{\\\"ignition\\\":{\\\"version\\\":\\\"3.2.0\\\"},\\\"storage\\\":{\\\"disks\\\":[{\\\"device\\\":\\\"${root_device}\\\",\\\"wipeTable\\\":true, \\\"partitions\\\": []}]}}'"
+      ignition_config_override='{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"'${root_device}'\",\"wipeTable\":true, \"partitions\": []}]}}'
     fi
 
     cat << EOF > ${site_config_file}
@@ -138,7 +138,8 @@ spec:
   clusters:
   - clusterName: "${SPOKE_CLUSTER_NAME}"
     networkType: "OVNKubernetes"
-    # installConfigOverrides: '$(echo ${B64_INSTALL_CONFIG_OVERRIDES} | base64 -d)'
+    # See: oc get clusterversion version -o json | jq -rc .status.capabilities
+    # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
     extraManifestPath: sno-extra-manifest/
     clusterType: sno
     clusterProfile: du
@@ -156,7 +157,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${AUX_HOST}
-    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    # ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
@@ -170,7 +171,7 @@ spec:
           ${root_device:+deviceName: ${root_device}}
           ${root_dev_hctl:+hctl: ${root_dev_hctl}}
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ${ignition_config_override:+ignitionConfigOverride: "${ignition_config_override}"}
+        # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
         nodeNetwork:
           interfaces:
             - name: "${baremetal_iface}"
@@ -208,7 +209,9 @@ git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 mkdir -pv \${ztp_repo_dir}/site-configs/sno-extra-manifest
 mkdir -pv \${ztp_repo_dir}/site-policies
-echo "$(cat ${site_config_file})" > \${ztp_repo_dir}/site-configs/site-config.yaml
+cat <<EOS > \${ztp_repo_dir}/site-configs/site-config.yaml
+$(cat ${site_config_file})
+EOS
 cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
 generators:
   - site-config.yaml
