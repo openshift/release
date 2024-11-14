@@ -66,10 +66,8 @@ instance_type=${EC2_INSTANCE_TYPE}
 
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && \
   unzip -q awscliv2.zip
-mkdir -p "${HOME}/.local/bin"
-./aws/install -b "${HOME}/.local/bin"
-export PATH="${HOME}/.local/bin:$PATH"
-rm -rf ./aws awscliv2.zip
+rm -rf awscliv2.zip
+alias aws="${PWD}/aws/dist/aws"
 
 function save_stack_events_to_shared()
 {
