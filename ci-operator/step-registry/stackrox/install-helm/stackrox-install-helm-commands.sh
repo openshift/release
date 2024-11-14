@@ -3,7 +3,7 @@
 set -eou pipefail
 
 cat <<EOF
->>> Install ACS using helm into a single cluster [$(date -u)].
+>>> Install ACS using helm into a single cluster [$(date -u || true)].
 * Run roxctl image to create helm template with it
 * Install central from generated helm template
   * Wait for Central to start.
@@ -23,8 +23,6 @@ TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
 ACS_VERSION_TAG=""
-
-# TODO: Ensure not leaking!!!
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 
 SCRATCH=$(mktemp -d)
@@ -35,7 +33,7 @@ function exit_handler() {
   exitcode=$?
   set +e
   echo ">>> End ACS install"
-  echo "[$(date -u)] SECONDS=${SECONDS}"
+  echo "[$(date -u || true)] SECONDS=${SECONDS}"
   rm -rf "${SCRATCH}"
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
@@ -150,7 +148,7 @@ function install_central_with_helm() {
   installflags=('--set' 'central.persistence.none=true')
   installflags+=('--set' 'imagePullSecrets.allowNone=true')
   SMALL_INSTALL=true
-  if [[ "$SMALL_INSTALL" == "true" ]]; then
+  if [[ "${SMALL_INSTALL}" == "true" ]]; then
       installflags+=('--set' 'central.resources.requests.memory=1Gi')
       installflags+=('--set' 'central.resources.requests.cpu=1')
       installflags+=('--set' 'central.resources.limits.memory=4Gi')
@@ -184,6 +182,20 @@ function get_init_bundle() {
   retry init_bundle
 }
 
+# Taken from: tests/roxctl/slim-collector.sh
+# Use built-in echo to not expose $2 in the process list.
+function curl_cfg() {
+  echo -n "$1 = \"${2//[\"\\]/\\&}\""
+}
+
+function curl_central() {
+  # Trim leading '/'
+  local url="${1#/}"
+
+  [[ -n "${url}" ]] || die "No URL specified"
+  curl --retry 5 --retry-connrefused -Sskf --config <(curl_cfg user "admin:${ROX_PASSWORD}") "https://localhost:8443/${url}"
+}
+
 function install_secured_cluster_with_helm() {
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
   --values "${SCRATCH}/helm-init-bundle-values.yaml" \
@@ -210,5 +222,23 @@ wait_deploy admission-control
 
 retry oc get pods --namespace stackrox
 
-# Validate that secured cluster is connected and everything is ready.
-# TODO: Add step to validate central->sensor connection
+nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
+
+# Wait for secured cluster to be connect to central.
+max_retry_verify_connected_cluster=30
+for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ ));
+do
+  echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
+  connected_clusters_count=$(curl_central /v1/clusters | jq '.clusters | length')
+  if (( connected_clusters_count >= 1 )); then
+    echo "Found '${connected_clusters_count}' connected cluster(s)"
+    break
+  fi
+
+  if (( retry_count == max_retry_verify_connected_cluster )); then
+    echo "Error: Waiting for sensor connection reached max retries"
+    exit 1
+  fi
+
+  sleep 3
+done
