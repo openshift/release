@@ -5,14 +5,88 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted
+    optional: true
+    rerun_command: /test e2e-metal-assisted
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-assisted
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-12
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-12
     rerun_command: /test e2e-metal-assisted-4-12
@@ -24,7 +98,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-12-cluster-profile
         - --target=e2e-metal-assisted-4-12
         command:
         - ci-operator
@@ -41,8 +114,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-12-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -66,9 +137,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -80,21 +148,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted-4-12,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-13
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-13
-    optional: true
     rerun_command: /test e2e-metal-assisted-4-13
     spec:
       containers:
@@ -104,7 +171,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-13-cluster-profile
         - --target=e2e-metal-assisted-4-13
         command:
         - ci-operator
@@ -121,8 +187,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-13-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -146,9 +210,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -164,17 +225,16 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-14
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-14
-    optional: true
     rerun_command: /test e2e-metal-assisted-4-14
     spec:
       containers:
@@ -184,7 +244,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-14-cluster-profile
         - --target=e2e-metal-assisted-4-14
         command:
         - ci-operator
@@ -201,8 +260,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -226,9 +283,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -244,17 +298,16 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-15
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-15
-    optional: true
     rerun_command: /test e2e-metal-assisted-4-15
     spec:
       containers:
@@ -264,7 +317,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-15-cluster-profile
         - --target=e2e-metal-assisted-4-15
         command:
         - ci-operator
@@ -281,8 +333,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-15-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -306,9 +356,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -324,17 +371,16 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-4-16
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-16
-    optional: true
     rerun_command: /test e2e-metal-assisted-4-16
     spec:
       containers:
@@ -344,7 +390,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-16-cluster-profile
         - --target=e2e-metal-assisted-4-16
         command:
         - ci-operator
@@ -361,8 +406,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -386,9 +429,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -400,22 +440,22 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted-4-16,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-cnv-4-16
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-4-17
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-cnv-4-16
-    rerun_command: /test e2e-metal-assisted-cnv-4-16
-    run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-17
+    optional: true
+    rerun_command: /test e2e-metal-assisted-4-17
     spec:
       containers:
       - args:
@@ -424,8 +464,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
-        - --target=e2e-metal-assisted-cnv-4-16
+        - --target=e2e-metal-assisted-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -441,8 +480,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -466,9 +503,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -478,20 +512,94 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-cnv-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-17,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-cnv-4-17
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-cnv-4-17
+    rerun_command: /test e2e-metal-assisted-cnv-4-17
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-assisted-cnv-4-17
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-cnv-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-day2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-day2
     rerun_command: /test e2e-metal-assisted-day2
@@ -503,7 +611,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-day2-cluster-profile
         - --target=e2e-metal-assisted-day2
         command:
         - ci-operator
@@ -520,8 +627,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-day2-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -545,9 +650,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -563,14 +665,14 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-ipv4v6
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-ipv4v6
     rerun_command: /test e2e-metal-assisted-ipv4v6
@@ -582,7 +684,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
         - --target=e2e-metal-assisted-ipv4v6
         command:
         - ci-operator
@@ -599,8 +700,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -624,9 +723,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -642,14 +738,14 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-lvm
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-lvm
     rerun_command: /test e2e-metal-assisted-lvm
@@ -662,7 +758,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-lvm-cluster-profile
         - --target=e2e-metal-assisted-lvm
         command:
         - ci-operator
@@ -679,8 +774,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-lvm-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -704,9 +797,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -722,17 +812,17 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-odf-4-16
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-odf-4-17
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-odf-4-16
-    rerun_command: /test e2e-metal-assisted-odf-4-16
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-odf-4-17
+    rerun_command: /test e2e-metal-assisted-odf-4-17
     run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
@@ -742,8 +832,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
-        - --target=e2e-metal-assisted-odf-4-16
+        - --target=e2e-metal-assisted-odf-4-17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -759,8 +848,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -784,9 +871,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -796,99 +880,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-odf-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-odf-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
-    context: ci/prow/e2e-metal-assisted-onprem
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-onprem
-    rerun_command: /test e2e-metal-assisted-onprem
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
-        - --target=e2e-metal-assisted-onprem
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-onprem-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-onprem,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^cloud_hotfix_releases$
-    - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-single-node
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-single-node
     rerun_command: /test e2e-metal-assisted-single-node
@@ -900,7 +905,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-single-node-cluster-profile
         - --target=e2e-metal-assisted-single-node
         command:
         - ci-operator
@@ -917,8 +921,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-single-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -942,9 +944,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -960,14 +959,14 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/e2e-metal-assisted-static-ip-suite
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-static-ip-suite
     rerun_command: /test e2e-metal-assisted-static-ip-suite
@@ -979,7 +978,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
         - --target=e2e-metal-assisted-static-ip-suite
         command:
         - ci-operator
@@ -996,8 +994,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1021,9 +1017,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1039,12 +1032,12 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-images
     rerun_command: /test images
@@ -1093,12 +1086,12 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/lint
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-lint
     rerun_command: /test lint
@@ -1147,12 +1140,12 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/subsystem-aws
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-subsystem-aws
     rerun_command: /test subsystem-aws
@@ -1216,12 +1209,12 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/unit-test
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-unit-test
     rerun_command: /test unit-test
@@ -1278,12 +1271,12 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build01
     context: ci/prow/verify-generated-code
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-verify-generated-code
     rerun_command: /test verify-generated-code

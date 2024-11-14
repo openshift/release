@@ -16,10 +16,10 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 35,
-        'us-west-2': 40,
+        'us-east-1': 60,
+        'us-east-2': 60,
+        'us-west-1': 55,
+        'us-west-2': 60,
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
@@ -70,7 +70,7 @@ CONFIG = {
     'aws-interop-qe-quota-slice': {
         'us-east-2': 5,
     },
-    'aws-local-zones-quota-slice': {
+    'aws-edge-zones-quota-slice': {
         'us-east-1': 5,
         'us-west-2': 5
     },
@@ -90,6 +90,10 @@ CONFIG = {
     'aws-serverless-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
+    },
+    'aws-sustaining-autorelease-412-quota-slice': {
+        # We can re-configure later as per requirement
+        'us-east-1': 2,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -151,7 +155,7 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
-   'azurestack-qe-quota-slice': {
+    'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
     'azuremag-quota-slice': {
@@ -159,8 +163,20 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'southcentralus': 10,
+        'westus2': 10,
         'centralus': 10
+    },
+    'azure-hcp-qe-quota-slice': {
+        'westus': 5,
+        'eastus': 5,
+        'uksouth': 5,
+        'westeurope': 5,
+    },
+    'azure-hcp-ha-qe-quota-slice': {
+        'westus2': 5,
+        'southcentralus': 5,
+        'eastasia': 5,
+        'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
         'eastus2': 4
@@ -211,7 +227,8 @@ CONFIG = {
     'gcp-telco-quota-slice': {
         'us-central1': 40,
     },
-    'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-1-quota-slice': {},
+    'libvirt-s390x-2-quota-slice': {},
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
@@ -224,6 +241,7 @@ CONFIG = {
     'nutanix-qe-quota-slice': {},
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
+    'nutanix-qe-gpu-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
         'default': 18,
@@ -310,6 +328,9 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
+    'ibmcloud-gpu-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-east': 3,
     },
@@ -357,6 +378,12 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
+    },
+    'gcp-chaos-quota-slice': {
+        'us-central1': 10,
+    },
+    'aws-kubevirt-quota-slice': {
+        'us-east-2': 10,
     },
     'hypershift-powervs-quota-slice': {
         'default': 3,
@@ -418,12 +445,19 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+    },
+    'aro-redhat-tenant-quota-slice': {
+        'default': 1,
+    },
+    'aws-ovn-perfscale-quota-slice': {
+        'us-west-2': 4,
+        'us-east-1': 4,
     }
 }
 
 for i in range(2,7):
     for j in range(2):
-        CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+        CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
 for i in range(3):
     for j in range(4):
@@ -442,6 +476,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-zone-quota-slice']['nutanix-qe-zone-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-gpu-quota-slice']['nutanix-qe-gpu-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

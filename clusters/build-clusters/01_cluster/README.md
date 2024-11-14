@@ -124,16 +124,16 @@ $ curl --insecure -v https://api.build01.ci.devcluster.openshift.com:6443 2>&1 |
 Use `cert-manager` to generate the secret containing the certificates:
 
 ```bash
-$ oc  --context build01 get secret -n openshift-ingress apps-build01-tls
+$ oc  --context build01 get secret -n openshift-ingress apps-tls
 NAME               TYPE                DATA   AGE
-apps-build01-tls   kubernetes.io/tls   3      6d23h
+apps-tls   kubernetes.io/tls   3      6d23h
 ```
 
 Use the secret in apiserver's config: manual step only for test, see [default_ingresscontroller.yaml](openshift-ingress-operator/default_ingresscontroller.yaml)
 
 > oc patch ingresscontroller.operator default \
      --type=merge -p \
-     '{"spec":{"defaultCertificate": {"name": "apps-build01-tls"}}}' \
+     '{"spec":{"defaultCertificate": {"name": "apps-tls"}}}' \
      -n openshift-ingress-operator
 
 Verify if it works:

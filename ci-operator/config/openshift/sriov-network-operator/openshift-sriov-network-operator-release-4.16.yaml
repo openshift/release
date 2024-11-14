@@ -31,6 +31,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: sriov-network-device-plugin
+  sriov-network-metrics-exporter:
+    name: "4.16"
+    namespace: ocp
+    tag: sriov-network-metrics-exporter
 build_root:
   from_repository: true
 images:
@@ -61,9 +65,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: sriov-network-webhook
+- dockerfile_path: bundleci.Dockerfile
+  to: sriov-network-operator-bundle
 operator:
   bundles:
-  - as: sriov-network-operator-bundle
+  - as: operator-bundle
     base_index: operator-index
     dockerfile_path: bundleci.Dockerfile
     update_graph: replaces
@@ -82,6 +88,8 @@ operator:
     with: pipeline:sriov-network-webhook
   - pullspec: quay.io/openshift/origin-sriov-network-operator:.*
     with: pipeline:sriov-network-operator
+  - pullspec: quay.io/openshift/origin-sriov-network-metrics-exporter:.*
+    with: pipeline:sriov-network-metrics-exporter
 promotion:
   to:
   - name: sriov-4.16
@@ -124,7 +132,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -163,19 +171,19 @@ tests:
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
-- as: e2e-openstack-nfv-hwoffload
+- as: e2e-openstack-nfv-config-drive
   optional: true
   steps:
-    cluster_profile: openstack-hwoffload
+    cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index-sriov-network-operator-bundle
+      OO_INDEX: ci-index-operator-bundle
     env:
-      ADDITIONAL_WORKERS_NETWORKS: ""
-      OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
+      CONFIG_DRIVE: "true"
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - as: security
   optional: true
@@ -188,10 +196,59 @@ tests:
   as: e2e-telco5g-sriov
   cluster: build05
   optional: true
+  restrict_network_access: false
   steps:
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
     env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
       T5CI_JOB_TYPE: sriov
       T5CI_VERSION: "4.16"
+    test:
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e-validation
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-conformance
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: telco5g-sriov
   timeout: 6h0m0s
 zz_generated_metadata:

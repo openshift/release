@@ -21,6 +21,12 @@ function get_tp_operator(){
     "4.16")
     tp_operator=("cluster-api" "olm")
     ;;
+    "4.17")
+    tp_operator=("cluster-api" "olm")
+    ;;
+    "4.18")
+    tp_operator=("cluster-api" "olm")
+    ;;
     *)
     tp_operator=()
     ;;
@@ -220,22 +226,6 @@ function post-OCP-53921(){
     return 0
 }
 
-function post-OCP-69948(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    tmp_log=$(mktemp)
-    oc -n openshift-cluster-version logs -l k8s-app=cluster-version-operator --tail=-1|grep "Verifying release authenticity" 2>&1 | tee "${tmp_log}"
-    if test -s "${tmp_log}"; then
-        if grep -qE "falling back to default stores|https://storage.googleapis.com/openshift-release/official/signatures/openshift/release" "${tmp_log}"; then
-            echo "Default signaturestore should not be used but found in cvo log!"
-            return 1
-        fi
-    else
-        echo "Fail to get signature verify info in cvo log!"
-        return 1
-    fi
-    return 0
-}
-
 function post-OCP-56083(){
     echo "Post Test Start: OCP-56083"
     echo "Upgrade cluster when channel is unset"
@@ -265,7 +255,26 @@ function post-OCP-60396(){
     verify_output \
     "cvo image is manifest.list" \
     "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
-    "application/vnd.docker.distribution.manifest.list.v2+json"
+    "application/vnd.docker.distribution.manifest.list.v2+json" \
+    || return 1
+
+    TARGET_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[0].version}')"
+    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+    # rollback on 4.16+
+    if [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true"
+        SOURCE_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[1].version}')"
+        SOURCE_IMAGE="$(oc get clusterversion version -ojsonpath='{.status.history[1].image}')"
+        TARGET_IMAGE="$(oc get clusterversion version -ojsonpath='{.status.history[0].image}')" 
+        out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
+        expected="error: previous version ${SOURCE_VERSION} (${SOURCE_IMAGE}) is greater than or equal to current version ${TARGET_VERSION} (${TARGET_IMAGE}).  Use 'oc adm upgrade ...' to update, and not this rollback command."
+        if [[ ${out} != *"${expected}"* ]]; then
+            echo -e "to-multi rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
+            return 1
+        else
+            echo "to-multi rollback reject step passed."
+        fi
+    fi
 }
 
 function post-OCP-60397(){
@@ -274,6 +283,20 @@ function post-OCP-60397(){
     "cvo image is manifest.list" \
     "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
     "application/vnd.docker.distribution.manifest.list.v2+json"
+}
+
+function post-OCP-23799(){
+    export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true" #OCPBUGS-33905, rollback is protected by env feature gate now
+    SOURCE_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[1].version}')"
+    TARGET_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[0].version}')"
+    out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
+    expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
+    if [[ ${out} != "${expected}" ]]; then
+        echo -e "to-latest rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
+        return 1
+    else
+        echo "to-latest rollback reject step passed."
+    fi
 }
 
 # This func run all test cases with with checkpoints which will not break other cases,

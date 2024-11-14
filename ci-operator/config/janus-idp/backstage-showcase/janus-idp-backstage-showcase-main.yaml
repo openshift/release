@@ -1,7 +1,7 @@
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
       RUN yum -y install make wget gcc git httpd-tools
 images:
 - context_dir: .ibm/images
@@ -35,20 +35,25 @@ tests:
   steps:
     test:
     - ref: janus-idp-backstage-showcase-nightly
-- as: e2e-tests-nightly-ocp-v4-14
+- as: e2e-tests-nightly-ocp-v4-15
   cron: 0 2 * * *
+  steps:
+    env:
+      OC_CLIENT_VERSION: stable-4.15
+    test:
+    - ref: janus-idp-backstage-showcase-nightly
+- as: e2e-tests-nightly-ocp-v4-14
+  cron: 0 3 * * *
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.14
     test:
     - ref: janus-idp-backstage-showcase-nightly
-- as: e2e-tests-nightly-ocp-v4-13
-  cron: 0 3 * * *
+- as: e2e-tests-nightly-aks
+  cron: 0 7 * * *
   steps:
-    env:
-      OC_CLIENT_VERSION: stable-4.13
     test:
-    - ref: janus-idp-backstage-showcase-nightly
+    - ref: janus-idp-backstage-showcase-helm-aks-nightly
 zz_generated_metadata:
   branch: main
   org: janus-idp

@@ -122,3 +122,26 @@ case "$OPENSTACK_AUTHENTICATION_METHOD" in
 	*)
 		info "Unknown authentication method '${OPENSTACK_AUTHENTICATION_METHOD}'."; exit 1 ;;
 esac
+
+# This creates another cloud entry when we want to use IPv6 endpoint that exists on the OpenStack cloud.
+# Requirements:
+# - control plane subnet for ipv6
+# - a proxy running and listening on that IP and port "13001" (used https://github.com/pierreprinetti/openstack-mitm)
+# - squid installed on the OpenStack cloud, it'll be used as a proxy to redirect the traffic to the real IPv6 endpoint which itselfs
+#   redirects to the actual OpenStack endpoint (IPv4).
+if [[ "${CONFIG_TYPE}" == *"singlestackv6"* ]]; then
+	yq --yml-output ".clouds[\"${OS_CLOUD}-ipv6\"] = .clouds[\"${OS_CLOUD}\"]" "${SHARED_DIR}/clouds.yaml" > "${SHARED_DIR}/clouds-ipv6.yaml"
+	CONTROL_PLANE_SUBNET_V6="${CONTROL_PLANE_SUBNET_V6:-$(<"${SHARED_DIR}/CONTROL_PLANE_SUBNET_V6")}"
+	export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+	GATEWAY_IP=$(openstack subnet show "${CONTROL_PLANE_SUBNET_V6}" -c gateway_ip -f value)
+	if [[ -z "${GATEWAY_IP}" ]]; then
+		info "Gateway IP for subnet ${CONTROL_PLANE_SUBNET_V6} not found."
+		exit 1
+	fi
+	# We need to add the /v3 here otherwise Gophercloud returns an error:
+	# "No supported version available from endpoint".
+	yq --yaml-output --in-place ".
+		| .clouds[\"${OS_CLOUD}-ipv6\"].auth.auth_url = \"https://[${GATEWAY_IP}]:13001/v3\"
+	" "${SHARED_DIR}/clouds-ipv6.yaml"
+	mv "${SHARED_DIR}/clouds-ipv6.yaml" "${SHARED_DIR}/clouds.yaml"
+fi

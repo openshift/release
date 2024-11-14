@@ -1,0 +1,32 @@
+ref:
+  as: telcov10n-sno-hub-ztp-verify-hub
+  commands: telcov10n-sno-hub-ztp-verify-hub-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: AUX_HOST
+    default: ""
+  - name: OCP_HUB_VERSION
+    documentation: |-
+      OCP Hub version to be installed (i.e.: '4.15' or '4.15.22' are both valid values, but in the first case
+      any value will match since it checks if the version starts with that value)
+  - name: PYTEST_VERBOSITY
+    default: "-vv -s"
+    documentation: |-
+      pytest trace level
+  - name: MCH_NAMESPACE
+    default: "ocm"
+    documentation: |-
+      default namespace for applying multicluster hub. Override this in your config env if you want to change it.
+  documentation: |-
+    This step allows to test the OCP Hub cluster deployment

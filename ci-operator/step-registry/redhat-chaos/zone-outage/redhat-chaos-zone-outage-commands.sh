@@ -20,11 +20,13 @@ cat "/secret/telemetry/.awscred" > $HOME/.aws/config
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
 ls -al /secret/telemetry/
 
-ES_PASSWORD=$(cat "/secret/es/password")
-ES_USERNAME=$(cat "/secret/es/username")
+ES_PASSWORD=$(cat "/secret/es/password" || "")
+ES_USERNAME=$(cat "/secret/es/username" || "")
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-export ELASTIC_INDEX=krkn_chaos_ci
+export ES_PASSWORD
+export ES_USERNAME
+
+export ELASTIC_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 # # read passwords from vault
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")

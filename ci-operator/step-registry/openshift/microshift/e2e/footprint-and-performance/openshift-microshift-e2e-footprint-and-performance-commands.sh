@@ -1,61 +1,27 @@
-#!/usr/bin/env bash
-
-set -xeuo pipefail
-
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
-
-cat << 'EOF' > /tmp/prepare.sh
 #!/bin/bash
 set -xeuo pipefail
 
-if ! sudo subscription-manager status >&/dev/null; then
-    sudo subscription-manager register \
-        --org="$(cat /tmp/subscription-manager-org)" \
-        --activationkey="$(cat /tmp/subscription-manager-act-key)"
-fi
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
 
-cp /tmp/pull-secret "${HOME}/.pull-secret.json"
+cat <<EOF > /tmp/prepare.sh
+#!/bin/bash
+set -xeuo pipefail
 
-mkdir -p -m 0700 ${HOME}/.aws/
+source /tmp/ci-functions.sh
+ci_subscription_register
+ci_copy_secrets "${CACHE_REGION}"
 
-# Profile configuration
-cat <<EOF2 >> ${HOME}/.aws/config
-[microshift-ci]
-region = us-west-2
-output = json
-EOF2
-
-# Profile credentials
-cat <<EOF2 >>${HOME}/.aws/credentials
-[microshift-ci]
-aws_access_key_id = $(cat /tmp/aws_access_key_id)
-aws_secret_access_key = $(cat /tmp/aws_secret_access_key)
-EOF2
-
-# Permissions and environment settings
-chmod -R go-rwx ${HOME}/.aws/
-
-chmod 0755 ~
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 EOF
 chmod +x /tmp/prepare.sh
 
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+
 scp \
+  "${SHARED_DIR}/ci-functions.sh" \
   /tmp/prepare.sh \
   /var/run/rhsm/subscription-manager-org \
   /var/run/rhsm/subscription-manager-act-key \
@@ -90,4 +56,41 @@ while true ; do
     sleep 30
 done
 
-ssh "${INSTANCE_PREFIX}" 'bash -x $HOME/microshift//scripts/ci-footprint-and-performance/3-test.sh'
+# Example of $CLONEREFS_OPTIONS:
+# {
+#     "src_root": "/go",
+#     "log": "/dev/null",
+#     "git_user_name": "ci-robot",
+#     "git_user_email": "ci-robot@openshift.io",
+#     "refs": [
+#         {
+#             "org": "openshift",
+#             "repo": "release",
+#             "base_ref": "master",
+#             "base_sha": "2bab4e1b820127733105b1d170c47fd71ca0b8f1",
+#             "pulls": [
+#                 {
+#                     "number": 55565,
+#                     "author": "pmtk",
+#                     "sha": "2154ef6d003515dfb93909c9e404acd0c775c611",
+#                     "link": "https://github.com/openshift/release/pull/55565"
+#                 }
+#             ]
+#         },
+#         {
+#             "org": "openshift",
+#             "repo": "microshift",
+#             "base_ref": "main",
+#             "workdir": true
+#         }
+#     ],
+#     "fail": true
+# }
+BRANCH=$(echo $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.repo=="microshift") | .base_ref')
+if [[ "${BRANCH}" == "" ]]; then
+    echo "BRANCH turned out to be empty - investigate"
+    env
+    exit 1
+fi
+
+ssh "${INSTANCE_PREFIX}" "JOB_TYPE=${JOB_TYPE} BRANCH=${BRANCH} bash -x \$HOME/microshift//scripts/ci-footprint-and-performance/3-test.sh"

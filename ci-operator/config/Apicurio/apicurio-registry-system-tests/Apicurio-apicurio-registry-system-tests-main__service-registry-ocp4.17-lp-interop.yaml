@@ -23,7 +23,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: service-registry-2-5
+- as: service-registry-2-6-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "service-registry-run-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "service-registry-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "APICURQE", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","service-registry-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario service-registry
+    test:
+    - ref: service-registry-run-tests
+    workflow: firewatch-ipi-aws
+  timeout: 4h0m0s
+- as: service-registry-2-6
   cron: 0 6 11 2 *
   steps:
     cluster_profile: aws-cspi-qe

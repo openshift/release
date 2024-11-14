@@ -1,0 +1,79 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: build05-kwk66-worker-gpu-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build05-kwk66
+      machine.openshift.io/cluster-api-machineset: build05-kwk66-worker-gpu-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build05-kwk66
+        machine.openshift.io/cluster-api-machine-role: worker-gpu
+        machine.openshift.io/cluster-api-machine-type: worker-gpu
+        machine.openshift.io/cluster-api-machineset: build05-kwk66-worker-gpu-us-east-1a
+    spec:
+      lifecycleHooks: {}
+      metadata: {}
+      taints:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        value: 'true'
+      providerSpec:
+        value:
+          ami:
+            id: ami-0efc96a4e17e7b048
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 3000
+              volumeSize: 200
+              volumeType: gp2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build05-kwk66-worker-profile
+          instanceType: g6.2xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build05-kwk66-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - build05-kwk66-private-us-east-1a
+          tags:
+          - name: kubernetes.io/cluster/build05-kwk66
+            value: owned
+          - name: red-hat-managed
+            value: "true"
+          - name: red-hat-clustertype
+            value: osd
+          userDataSecret:
+            name: worker-user-data
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build05-kwk66-worker-gpu-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 5
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build05-kwk66-worker-gpu-us-east-1a

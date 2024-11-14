@@ -32,19 +32,25 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate414:
+  custom:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  intermediate1:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.14"
-  intermediate415:
+  intermediate2:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.15"
-  intermediate416:
+  intermediate3:
     candidate:
       architecture: multi
       product: ocp
@@ -77,23 +83,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-4hops
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-upi-basecap-none-arm-f28
@@ -101,7 +91,6 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
@@ -110,23 +99,7 @@ tests:
       PERSISTENT_MONITORING: "false"
       WORKER_INSTANCE_TYPE: m6g.xlarge
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-4hops
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
@@ -138,23 +111,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-4hops
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 zz_generated_metadata:

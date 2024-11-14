@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 canonical_go_repository: github.com/openshift/osd-example-operator
 promotion:
   to:
@@ -16,6 +16,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-harness-build
+  container:
+    from: src
+  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
 - as: lint
   commands: |
     export HOME=$(mktemp -d)

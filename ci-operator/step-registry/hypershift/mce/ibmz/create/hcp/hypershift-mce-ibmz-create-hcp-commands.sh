@@ -153,6 +153,10 @@ if [[ $ENABLE_ICSP == "true" ]]; then
   ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
 fi
 
+# Set RENDER_COMMAND based on MCE_VERSION
+# >2.6: "--render-sensitive --render", else: "--render"
+RENDER_COMMAND=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render" || echo "--render" )
+
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
     --pull-secret="${PULL_SECRET_FILE}" \
@@ -163,7 +167,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
-    --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
+    --release-image=${OCP_IMAGE_MULTI} ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"

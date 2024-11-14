@@ -45,10 +45,6 @@ if [[ -z "${DOMAIN}" ]]; then
   exit 1
 fi
 
-# We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
-# have to use a hack like this.
-[[ ${CONTROLPLANE_OPERATOR_IMAGE} = "LATEST" ]] && CONTROLPLANE_OPERATOR_IMAGE="${HYPERSHIFT_RELEASE_LATEST}"
-
 HASH="$(echo -n $PROW_JOB_ID|sha256sum)"
 CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
@@ -81,9 +77,8 @@ case "${PLATFORM}" in
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
       --release-image "${RELEASE_IMAGE}" \
-      --control-plane-operator-image "${CONTROLPLANE_OPERATOR_IMAGE:-}" \
       --node-selector "hypershift.openshift.io/control-plane=true" \
-      --olm-catalog-placement guest \
+      --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
@@ -135,7 +130,6 @@ case "${PLATFORM}" in
       --pull-secret=/etc/registry-pull-credentials/.dockerconfigjson \
       --release-image ${RELEASE_IMAGE} \
       --olm-catalog-placement guest \
-      --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
       --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
       --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
       --vpc-region ${POWERVS_VPC_REGION} \

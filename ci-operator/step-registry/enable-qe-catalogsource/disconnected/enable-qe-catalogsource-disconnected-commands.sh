@@ -16,8 +16,8 @@ function set_proxy () {
         # cat "${SHARED_DIR}/proxy-conf.sh"
         echo "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
-	export no_proxy=$no_proxy,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
-	export NO_PROXY=$NO_PROXY,brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+	export no_proxy=brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+	export NO_PROXY=brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
     else
         echo "no proxy setting."
     fi
@@ -145,7 +145,7 @@ function mirror_optional_images () {
     skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
     skopeo login quay.io/openshift-qe-optional-operators -u ${optional_auth_user} -p ${optional_auth_password}
 
-    echo "skopeo copy docker://${origin_index_image} oci://${work_dir}**/**oci-local-catalog --remove-signatures"
+    echo "skopeo copy docker://${origin_index_image} oci://${work_dir}/oci-local-catalog --remove-signatures"
 
     RETRY_COUNT=0
     MAX_RETRIES=3
@@ -476,7 +476,7 @@ function check_olm_capability(){
         enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
           if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
               echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
-              return 0
+              return 1
           fi
     fi
     return 0
@@ -519,7 +519,7 @@ set_CA_for_nodes
 #
 #ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 kube_major=$(oc version -o json |jq -r '.serverVersion.major')
-kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' |sed 's/[^0-9\.]//g')
+kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
 origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 echo "origin_index_image: ${origin_index_image}"

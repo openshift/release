@@ -177,6 +177,11 @@ else
    log "determined this is an IPI job"
 fi
 
+if [[ -n "${MULTI_NIC_IPI}" ]]; then
+  echo "multi-nic is enabled, an additional NIC will be attached to nodes"
+  VSPHERE_EXTRA_LEASED_RESOURCE=1
+fi
+
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   log "creating extra lease resources"
 
@@ -205,7 +210,6 @@ spec:
   i=$((i + 1))
   done
 fi
-
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
@@ -301,6 +305,7 @@ declare -A vcenter_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
+vsphere_extra_portgroup=""
 LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
@@ -337,6 +342,7 @@ EOF
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
+  vsphere_extra_portgroup="${portgroup_name}"
 
   else
     vcenter_portgroups[$VCENTER]=${portgroup_name}
@@ -344,7 +350,6 @@ EOF
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-
 done
 
 # debug, confirm correct subnets.json
@@ -361,6 +366,13 @@ log "building local variables and failure domains"
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
+
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
+    log "storing primary lease as LEASE_single"
+    cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
+  fi
+
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
   oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
@@ -390,7 +402,22 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   else
     resource_pool=${cluster}/Resources/ipi-ci-clusters
   fi
-  platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+
+  # prevent duplicate failure domains if in the event we have a network-only lease in addition to the primary lease
+  add_failure_domain=0
+  failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
+  if [[ $failure_domain_count == 0 ]]; then
+    add_failure_domain=1
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$name" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+    add_failure_domain=1
+  fi
+
+  if [[ $add_failure_domain == 1 ]] ; then
+    if [ -n "${MULTI_NIC_IPI}" ]; then
+      network="${network}\",\"${vsphere_extra_portgroup}"
+    fi
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
@@ -416,14 +443,19 @@ fi
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-cp /tmp/lease.json "${SHARED_DIR}"/LEASE_single.json
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
 source /tmp/envvars
+
+
+if [[ -z "${GOVC_URL}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF

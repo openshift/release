@@ -1,0 +1,104 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: odf-interop-aws
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "odf-prepare-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-apply-storage-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "pod_failure", "classification": "Test Execution",  "group": {"name": "lp-tests", "priority": 4}, "jira_additional_labels": ["!default","interop-tests"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OCSQE", "group": {"name": "lp-tests", "priority": 4},"jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","odf-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ebenahar@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.15"
+      OPERATORS: |
+        [
+            {"name": "odf-operator", "install_namespace": "openshift-storage", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
+        ]
+      USER_TAGS: |
+        scenario odf
+      ZONES_COUNT: "3"
+    test:
+    - ref: odf-prepare-cluster
+    - ref: install-operators
+    - ref: odf-apply-storage-cluster
+    - ref: interop-tests-ocs-tests
+    workflow: firewatch-ipi-aws
+- as: odf-interop-aws-fips
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "odf-prepare-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-apply-storage-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "pod_failure", "classification": "Test Execution",  "group": {"name": "lp-tests", "priority": 4}, "jira_additional_labels": ["!default","interop-tests"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OCSQE", "group": {"name": "lp-tests", "priority": 4},"jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","fips","odf-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ebenahar@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.15"
+      OPERATORS: |
+        [
+            {"name": "odf-operator", "install_namespace": "openshift-storage", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
+        ]
+      USER_TAGS: |
+        scenario odf
+      ZONES_COUNT: "3"
+    test:
+    - ref: odf-prepare-cluster
+    - ref: install-operators
+    - ref: odf-apply-storage-cluster
+    - ref: interop-tests-ocs-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: red-hat-storage
+  repo: ocs-ci
+  variant: odf-ocp4.18-lp-interop

@@ -3,7 +3,6 @@
 set -e
 set -u
 set -o pipefail
-set -x
 
 function check_if_hypershift_env () {
     if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
@@ -53,9 +52,7 @@ function set_common_variables () {
 function check_idp () {
     # Check if runtime_env exists and then check if $USERS is not empty
     if [ -f "${SHARED_DIR}/runtime_env" ]; then
-        set +x
         source "${SHARED_DIR}/runtime_env"
-        set -x
     else
         echo "runtime_env does not exist, continuing checking..."
         USERS=""
@@ -64,12 +61,10 @@ function check_idp () {
     # Fetch the detailed identityProviders configuration if any
     # Don't quote the $TARGET_RESOURCE variable because it may include spaces
     current_idp_config=$(oc get $TARGET_RESOURCE -o jsonpath='{range '$IDP_FIELD'[*]}{.name}{" "}{.type}{"\n"}{end}')
-    set +x
     if [ -n "$current_idp_config" ] && [ "$current_idp_config" != "null" ] && [ -n "$USERS" ]; then
         echo -e "Skipping addition of new htpasswd IDP because already configured IDP as below:\n$current_idp_config"
         exit 0
     fi
-    set -x
 }
 
 function set_proxy () {
@@ -91,7 +86,6 @@ function set_users () {
     for i in $(seq 1 50);
     do
         username="testuser-${i}"
-        set +x
         password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
         users+="${username}:${password},"
         if [ -f "${htpass_file}" ]; then
@@ -99,7 +93,6 @@ function set_users () {
         else
             htpasswd -c -B -b ${htpass_file} "${username}" "${password}"
         fi
-        set -x
     done
 
     # current generation
@@ -133,14 +126,12 @@ function set_users () {
         source "${SHARED_DIR}/runtime_env"
     fi
     runtime_env="${SHARED_DIR}/runtime_env"
-    set +x
     users=${users::-1}
 
 
     cat <<EOF >>"${runtime_env}"
 export USERS=${users}
 EOF
-    set -x
 }
 
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then

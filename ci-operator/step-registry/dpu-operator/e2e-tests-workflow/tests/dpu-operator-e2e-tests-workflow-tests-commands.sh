@@ -1,79 +1,50 @@
 #!/bin/bash
 
-wait_for_job_to_run() {
-	echo "Waiting for job to start..."
-	max_sleep_duration=432000  # Maximum sleep duration in seconds (5 days)
-	sleep_counter=0
-	while :
-	do
-		JSON_FILE=$(mktemp /tmp/pullnumber.XXX)
-    		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
-
-    		pullnumber_job=$(cat $JSON_FILE | jq -r '.actions[] | select(.parameters) | .parameters[] | select(.name == "pullnumber") | .value')
-
-    		if [[ "$pullnumber_job" == "$PULL_NUMBER" ]]; then
-			ID=$(cat $JSON_FILE | jq -r '.id')	
-			break
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting- job has not started for longer than 5 days..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
-	done
-}
-
-wait_for_job_to_finish_running() {
-	job_url_id="https://${endpoint}/job/$test_name/$ID"
-	max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
-	sleep_counter=0
-	while :
-	do	
-		JSON_FILE=$(mktemp /tmp/output.XXX)
-		curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" > $JSON_FILE
-
-    		# Extract the result field
-    		result=$(cat $JSON_FILE | jq -r '.result')
-
-    		if [[ "$result" != "null" ]]; then
-        		# Job has completed
-        		echo "Job Result: $result"
-	
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url_id}/consoleText")
-			echo "$curl_info"
-        
-			if [ "$result" == "SUCCESS" ]; then
-            			exit 0
-        		else
-            			exit 1
-        		fi
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting due to long sleep duration..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
-	done
-}
+echoerr() { echo "$@" 1>&2; }
 
 trigger_build() {
-	curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/view/dpu-test/job/${test_name}/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
+    curl --resolve "${endpoint_resolve}" -X POST "$queue_url" -H "Content-Type: application/json" -d "{\"pullnumber\": \"${PULL_NUMBER}\"}"
 }
 
-token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
-endpoint=$(cat "/var/run/token/dpu-token/url")
-test_name="99_Lab217_E2E_IPU_Deploy"
+check_pull_number() {
+    check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
+    
+    check_pull_number_return_code=$(echo "$check_pull_number_response" | jq -r '.return_code')
+    
+    while [ -n "$check_pull_number_response" ]; do
+        check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
+        check_pull_number_return_code=$(echo "$check_pull_number_response" | jq -r '.return_code')
 
-job_url="https://${endpoint}/job/${test_name}/lastBuild"
-endpoint_resolve="${endpoint}:443:10.0.180.88"
+        if [[ "$check_pull_number_return_code" == '200' ]] || [[ "$check_pull_number_return_code" == '400' ]]; then
+            job_status=$(echo "$check_pull_number_response" | jq -r '.message')
 
-trigger_build
+            if [[ "$job_status" == 'SUCCESS' ]]; then
+                exit 0
+            else    
+                exit 1
+            fi
+        fi
+        sleep 300
+    done
+}
 
-wait_for_job_to_run
+queue_url=$(cat "/var/run/token/dpu-token/queue-url")
+queue_endpoint=$(cat "/var/run/token/dpu-token/queue-endpoint")
+endpoint_resolve="${queue_endpoint}:80:10.30.44.209"
+queue_put_response=$(trigger_build)
 
-wait_for_job_to_finish_running
+if [ $? -ne 0 ]; then
+    echoerr "Error: Failed to trigger build."
+    exit 1
+fi
+
+put_queue_return_code=$(echo "$queue_put_response" | jq -r '.return_code')
+
+if [ "$put_queue_return_code" -eq 200 ]; then
+    echo "Success: Successfully added to queue. Return_code is 200"
+    uuid=$(echo "$queue_put_response" | jq -r '.message')
+    check_pull_number "$uuid"
+else
+    echo "Error: Queue is full. Returned with: $put_queue_return_code. Try again later."
+fi
 

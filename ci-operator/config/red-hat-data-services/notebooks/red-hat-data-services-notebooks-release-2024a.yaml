@@ -102,6 +102,26 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-ubi9-python-3.9
   to: runtime-cuda-tensorflow-ubi9-python-3.9
+- context_dir: rocm/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: rocm-ubi9-python-3.9
+- context_dir: jupyter/minimal/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-ubi9-python-3.9
+  to: rocm-jupyter-minimal-ubi9-python-3.9
+- context_dir: jupyter/datascience/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-jupyter-minimal-ubi9-python-3.9
+  to: rocm-jupyter-datascience-ubi9-python-3.9
+- context_dir: jupyter/rocm/tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-jupyter-datascience-ubi9-python-3.9
+  to: rocm-jupyter-tensorflow-ubi9-python-3.9
+- context_dir: jupyter/rocm/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-jupyter-datascience-ubi9-python-3.9
+  to: rocm-jupyter-pytorch-ubi9-python-3.9
 - context_dir: base/anaconda-python-3.8
   dockerfile_path: Dockerfile
   to: base-anaconda-python-3.8
@@ -116,6 +136,14 @@ images:
 - context_dir: base/rhel9-python-3.9
   dockerfile_path: Dockerfile
   to: base-rhel9-python-3.9
+- context_dir: runtimes/rocm-pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-ubi9-python-3.9
+  to: runtime-rocm-pytorch-ubi9-python-3.9
+- context_dir: runtimes/rocm-tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: rocm-ubi9-python-3.9
+  to: runtime-rocm-tensorflow-ubi9-python-3.9
 promotion:
   to:
   - namespace: red-hat-data-services
@@ -316,6 +344,36 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.9-2024a
     workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-rocm-jupyter-minimal-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rocm-jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: rocm-notebooks
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-minimal-ubi9-python-3.9-2024a
+    workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-rocm-jupyter-tf-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rocm-jupyter-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: rocm-notebooks
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-tensorflow-ubi9-python-3.9-2024a
+    workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-rocm-jupyter-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rocm-jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: rocm-notebooks
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rocm-jupyter-pytorch-ubi9-python-3.9-2024a
+    workflow: red-hat-data-services-ci-image-mirror
 - as: notebook-jupyter-datascience-anaconda-python-3-8-image-mirror
   postsubmit: true
   steps:
@@ -345,6 +403,26 @@ tests:
       IMAGE_REPO: odh-base-rhel9
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: base-rhel9-python-3.9-2024a
+    workflow: red-hat-data-services-ci-image-mirror
+- as: runtime-rocm-pytorch-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: runtime-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: runtime-rocm-pytorch-ubi9-python-3.9-2024a
+    workflow: red-hat-data-services-ci-image-mirror
+- as: runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-rocm-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: runtime-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: runtime-rocm-tensorflow-ubi9-python-3.9-2024a
     workflow: red-hat-data-services-ci-image-mirror
 zz_generated_metadata:
   branch: release-2024a

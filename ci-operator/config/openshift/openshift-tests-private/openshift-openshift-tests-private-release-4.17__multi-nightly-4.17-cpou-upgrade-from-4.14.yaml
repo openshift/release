@@ -18,7 +18,7 @@ base_images:
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.14"
   tools:
     name: "4.14"
     namespace: ocp
@@ -32,13 +32,13 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate415:
+  intermediate1:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.15"
-  intermediate416:
+  intermediate2:
     candidate:
       architecture: multi
       product: ocp
@@ -61,40 +61,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-sdn-arm-f14
-  cron: 36 23 7,22 * *
+- as: aws-ipi-mini-perm-arm-f28
+  cron: 19 0 17 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      FILTERS_ADDITIONAL: ~TELCO&
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.14 and @aws-ipi and
-        not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.14 and @aws-ipi and
-        not @fips'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-upgrade-qe-test-eus
-    workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: gcp-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 16 10 5,20 * *
+    - ref: cucushift-upgrade-setedge-3hops
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 26 15 25 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -107,23 +88,9 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-3hops
     - ref: ipi-install-heterogeneous
-    - chain: openshift-upgrade-qe-test-eus
+    - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 zz_generated_metadata:
   branch: release-4.17

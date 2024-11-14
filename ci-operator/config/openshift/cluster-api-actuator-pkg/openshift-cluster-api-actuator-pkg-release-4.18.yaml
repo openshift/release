@@ -1,15 +1,24 @@
 base_images:
-  base:
-    name: "4.18"
-    namespace: ocp
-    tag: base
+  openshift_release_golang-1.22:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
 build_root:
   from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    openshift_release_golang-1.22:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.22
+  to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
     disabled: true
+    excluded_images:
+    - cluster-api-actuator-pkg-test
     name: "4.18"
     namespace: ocp
 releases:
@@ -27,7 +36,7 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.18"
 resources:
   '*':
     requests:

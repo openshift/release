@@ -1,20 +1,16 @@
 base_images:
   base:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base
   base-9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
+    tag: rhel-8-golang-1.22-openshift-4.18
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -28,12 +24,9 @@ images:
   dockerfile_path: cnf-tests/Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
   to: cnf-tests
 - context_dir: tools/s2i-dpdk/
   dockerfile_path: Dockerfile
@@ -43,24 +36,24 @@ images:
   dockerfile_path: ztp/resource-generator/Containerfile
   from: os-min8
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
   to: ztp-site-generator
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.18"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -133,38 +126,41 @@ tests:
   as: e2e-telco5g-cnftests
   cluster: build05
   optional: true
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.17"
+      T5CI_VERSION: "4.18"
     workflow: telco5g-cnf
   timeout: 6h0m0s
 - always_run: false
   as: e2e-telco5g-sno-cnftests
   cluster: build05
   optional: true
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.17"
+      T5CI_VERSION: "4.18"
     workflow: telco5g-sno-cnf
 - always_run: false
   as: e2e-telco5g-hcp-cnftests
   cluster: build05
   optional: true
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.17"
+      T5CI_VERSION: "4.18"
     workflow: telco5g-hcp-cnf
 zz_generated_metadata:
   branch: master

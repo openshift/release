@@ -3,33 +3,33 @@ base_images:
     name: nodejs-10-rhel7
     namespace: openshift
     tag: latest
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-base-nodejs-openshift-4.17:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    tag: rhel-9-base-nodejs-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-base-nodejs-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-base-nodejs-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.18
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: console
 - dockerfile_path: Dockerfile.plugins.demo
   from: nodejs-10
@@ -77,17 +77,21 @@ tests:
   commands: ./test-backend.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
     git config --global --add safe.directory /go/src/github.com/openshift/console
     ./test-frontend.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: analyze
   commands: ./analyze.sh
   container:
     from: test-bin
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: e2e-gcp-console
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     test:

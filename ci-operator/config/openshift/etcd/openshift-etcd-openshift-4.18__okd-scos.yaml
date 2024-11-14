@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.21-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.18
+    tag: rhel-9-golang-1.22-openshift-4.18
   origin_scos-4.18_base-stream9:
     name: scos-4.18
     namespace: origin
@@ -19,10 +19,10 @@ images:
   dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.18_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: etcd
 - build_args:
   - name: TAGS
@@ -30,10 +30,10 @@ images:
   dockerfile_path: Dockerfile.installer
   from: origin_scos-4.18_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer-etcd-artifacts
 promotion:
   to:
@@ -42,6 +42,7 @@ promotion:
 releases:
   latest:
     integration:
+      include_built_images: true
       name: scos-4.18
       namespace: origin
 resources:
@@ -49,6 +50,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: openshift-4.18
   org: openshift

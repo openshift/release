@@ -89,6 +89,12 @@ if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-file
     oc whoami
 fi
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 # setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
@@ -207,6 +213,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
@@ -254,6 +261,8 @@ fi
 function remove_kubeadmin_user() {
     if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
         ret_delete_admin=0
+        unset QE_KUBEADMIN_PASSWORD 
+        # remove kubeadmin password so that golang code get empty because kubeadmin user is removed
 
         ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
         ## it means you only see hosted cluster in testing
@@ -367,9 +376,10 @@ function run {
 
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
+    remove_kubeadmin_user
+    create_must-gather_dir_for_case
     ret_value=0
     set -x
-    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
@@ -608,6 +618,23 @@ function check_case_selected {
         echo "find case"
     else
         echo "do not find case"
+    fi
+}
+function create_must-gather_dir_for_case {
+    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
+    # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
+
+    if echo ${test_scenarios} | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
+        mkdir -p "${ARTIFACT_DIR}/must-gather" || true
+        if [ -d "${ARTIFACT_DIR}/must-gather" ]; then
+            export QE_MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
+        else
+            unset QE_MUST_GATHER_DIR
+        fi
+        # need to check if QE_MUST_GATHER_DIR is empty in case code. 
+        # if empty, it means there is no such dir, can not put must-gather file into there.
+        # if it is not empty, it means there is such dir. and need to check the existing dir size + must-gather file size is 
+        # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
 run

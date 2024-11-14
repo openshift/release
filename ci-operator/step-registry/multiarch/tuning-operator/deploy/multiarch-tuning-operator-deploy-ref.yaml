@@ -1,0 +1,35 @@
+ref:
+  as: multiarch-tuning-operator-deploy
+  from_image:
+    namespace: origin
+    name: operator-sdk-mto
+    tag: main
+  cli: latest
+  commands: multiarch-tuning-operator-deploy-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MTO_OPERATOR_INSTALL_METHOD
+    default: "bundle"
+    documentation: |-
+      One of the value in "catalog" or "bundle". If set to bundle, uses a bundle and operator-sdk run bundle.
+      If set to catalog, uses a kustomization CR to create resources
+  - name: KUSTOMIZE_ENV
+    default: ""
+    documentation: |-
+      One of the envs in https://github.com/openshift/multiarch-tuning-operator/tree/main/deploy/envs (prow, konflux).
+      We can use it to create some resources, e.g., Namespace, CatalogSource, OperatorGroup, Subscription, ImageDigestMirrorSet...
+  - name: BUNDLE_OVERRIDE
+    default: ""
+    documentation: if set, override bundle image
+  - name: CATALOG_IMAGE_OVERRIDE
+    default: ""
+    documentation: if set, patch CatalogSource image to the kustomization in this step.
+  - name: SUBSCRIPTION_CHANNEL_OVERRIDE
+    default: ""
+    documentation: if set, patch Subscription channel to the kustomization in this step.
+  documentation: |-
+    Deploy Multiarch Tuning Operator in the "openshift-multiarch-tuning-operator" namespace.

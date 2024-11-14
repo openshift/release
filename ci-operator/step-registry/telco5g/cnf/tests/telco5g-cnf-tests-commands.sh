@@ -161,7 +161,7 @@ function is_bm_node {
 
     if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
         # Define thresholds
-        CPU_THRESHOLD=80
+        CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
 
         echo "Checking if node $node is baremetal or virtual"
@@ -574,6 +574,8 @@ ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html
 [[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.json
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
+
+[[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
 set +x
