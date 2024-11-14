@@ -148,6 +148,9 @@ proxy_private_url="http://${proxy_credential}@${bastion_private_ip}:3128"
 echo "${proxy_public_url}" > "${SHARED_DIR}/proxy_public_url"
 echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
+tar -czf ${ARTIFACT_DIR}/proxy_public_url.tar.gz ${SHARED_DIR}/proxy_public_url
+tar -czf ${ARTIFACT_DIR}/proxy_private_url.tar.gz ${SHARED_DIR}/proxy_private_url
+
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
 
