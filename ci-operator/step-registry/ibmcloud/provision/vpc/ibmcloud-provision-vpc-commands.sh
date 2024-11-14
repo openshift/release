@@ -106,7 +106,7 @@ function create_vpc() {
 
     echo "Creating vpc $vpcName under $rg ..."
     # create vpc
-    IBMCLOUD_TRACE=true  "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}"
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
