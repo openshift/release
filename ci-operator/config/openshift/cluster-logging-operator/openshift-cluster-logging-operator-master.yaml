@@ -19,6 +19,14 @@ base_images:
     name: "6.1"
     namespace: logging
     tag: vector
+  loki-operator:
+    name: 5.y
+    namespace: logging
+    tag: loki-operator
+  loki-operator-src:
+    name: 5.y
+    namespace: logging
+    tag: loki-operator-src
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -47,11 +55,15 @@ images:
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
+    FROM loki-operator-src AS lo-src
     FROM registry.redhat.io/ubi9/go-toolset:latest
     ADD . /go/src/github.com/openshift/cluster-logging-operator
     COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
+    COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
+    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+      && chmod 755 kubectl && mv kubectl /go/bin
     RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
     RUN go mod download
     RUN make tools
@@ -64,6 +76,9 @@ images:
     elasticsearch-operator-src:
       as:
       - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
+    loki-operator-src:
+      as:
+      - loki-operator-src
   to: cluster-logging-operator-e2e
 operator:
   bundles:
@@ -116,7 +131,9 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+      commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; pushd /go/src/github.com/openshift/loki/operator
+        && make deploy IMG=${IMAGE_LOKI_OPERATOR} && popd && FAKE_HOME_DIR=/tmp/home
+        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
         make test-e2e
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
@@ -129,6 +146,8 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
+      - env: IMAGE_LOKI_OPERATOR
+        name: pipeline:loki-operator
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
