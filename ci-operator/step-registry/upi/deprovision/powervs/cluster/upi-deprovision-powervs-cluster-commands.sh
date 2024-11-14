@@ -7,6 +7,7 @@ IBMCLOUD_HOME=/tmp/ibmcloud
 export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
+export VPC_REGION
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
@@ -111,7 +112,6 @@ function fix_user_permissions() {
 }
 
 # Cleanup prior runs
-#
 # VPC: Load Balancers, images, vm instances
 # PowerVS: images, pvm instances
 # Not Covered:

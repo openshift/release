@@ -78,7 +78,7 @@ case "${PLATFORM}" in
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
       --release-image "${RELEASE_IMAGE}" \
       --node-selector "hypershift.openshift.io/control-plane=true" \
-      --olm-catalog-placement guest \
+      --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \

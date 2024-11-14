@@ -1,0 +1,72 @@
+base_images:
+  ocp_4.17_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+images:
+- dockerfile_path: Dockerfile.base
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+  to: ovn-kubernetes-base
+- dockerfile_path: Dockerfile
+  from: ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: ovn-kubernetes
+- dockerfile_path: Dockerfile.microshift
+  from: ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: ovn-kubernetes-microshift
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-virt-techpreview-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+    workflow: openshift-e2e-aws-ovn-virt
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: ovn-kubernetes
+  variant: periodics

@@ -93,7 +93,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 2,
+        'us-east-1': 5,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
