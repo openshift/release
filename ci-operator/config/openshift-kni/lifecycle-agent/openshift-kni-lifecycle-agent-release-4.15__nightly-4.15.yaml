@@ -1,5 +1,5 @@
 base_images:
-  lca-operator:
+  lifecycle-agent-operator:
     name: "4.15"
     namespace: ocp-kni
     tag: lifecycle-agent-operator
@@ -7,6 +7,15 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: tests
+build_root:
+  from_repository: true
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
+    with: pipeline:lifecycle-agent-operator
 releases:
   latest:
     integration:
@@ -24,9 +33,8 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      OO_BUNDLE: operator-bundle
     env:
-      LCA_PULL_REF_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator:4.15
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.15"
       SEED_FLOATING_TAG: "4.15"
