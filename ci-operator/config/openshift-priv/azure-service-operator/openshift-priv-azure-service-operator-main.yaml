@@ -1,8 +1,8 @@
 base_images:
-  ci-artifacts:
-    name: master
-    namespace: psap
-    tag: ci-artifacts
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.17"
   ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
@@ -11,11 +11,12 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+binary_build_commands: make binaries
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-nfd-operator
+canonical_go_repository: github.com/Azure/azure-service-operator
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: openshift/Dockerfile
   inputs:
     ocp_4.18_base-rhel9:
       as:
@@ -23,14 +24,7 @@ images:
     ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: cluster-nfd-operator
-operator:
-  bundles:
-  - context_dir: manifests/stable
-    dockerfile_path: bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/openshift/origin-cluster-nfd-operator:4.18
-    with: pipeline:cluster-nfd-operator
+  to: azure-service-operator
 promotion:
   to:
   - name: 4.18-priv
@@ -47,30 +41,32 @@ releases:
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: openshift/unit-tests.sh
 tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: verify
-  commands: make verify
-  container:
-    from: src
-- as: e2e-aws
+- as: e2e-azure-ovn-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
+    cluster_profile: azure4
     env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: nfd
-      OO_TARGET_NAMESPACES: '!install'
-    workflow: optional-operators-ci-aws
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: unit
+  commands: openshift/unit-tests.sh
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openshift-priv
-  repo: cluster-nfd-operator
+  repo: azure-service-operator
