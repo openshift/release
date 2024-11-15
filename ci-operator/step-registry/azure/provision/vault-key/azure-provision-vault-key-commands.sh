@@ -20,6 +20,9 @@ function poll() {
 }
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+    AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -31,7 +34,8 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 set -x
 
 KV_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-LOCATION="$LEASED_RESOURCE"
+LOCATION=${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}
+
 if [[ $AZURE_KEYVAULT_USE_AKS_RG == "true" ]]; then
     RESOURCE_GROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
 else
