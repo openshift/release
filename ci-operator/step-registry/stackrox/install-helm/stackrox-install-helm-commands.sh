@@ -61,7 +61,7 @@ function wait_deploy() {
     }
 }
 
-function fetch_last_nigthly_tag() {
+function fetch_last_nightly_tag() {
   # Support Linux and MacOS (requires brew coreutils)
   local acs_tag_suffix=""
 
@@ -203,7 +203,7 @@ function install_secured_cluster_with_helm() {
   --set imagePullSecrets.allowNone=true
 }
 
-fetch_last_nigthly_tag
+fetch_last_nightly_tag
 prepare_helm_templates
 install_helm
 
@@ -223,6 +223,7 @@ wait_deploy admission-control
 retry oc get pods --namespace stackrox
 
 nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
+echo $! > "${SCRATCH}/port_forward_pid"
 
 # Wait for secured cluster to be connect to central.
 max_retry_verify_connected_cluster=30
@@ -242,3 +243,7 @@ do
 
   sleep 3
 done
+
+# Cleanup nohup
+kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
+rm "${SCRATCH}/port_forward_pid"
