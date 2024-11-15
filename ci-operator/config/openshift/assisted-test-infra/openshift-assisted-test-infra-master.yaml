@@ -24,7 +24,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   tests:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tests
   tests-4.12:
@@ -47,8 +47,12 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: tests
-  upi-installer:
+  tests-4.17:
     name: "4.17"
+    namespace: ocp
+    tag: tests
+  upi-installer:
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -70,13 +74,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -258,7 +262,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -276,7 +280,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -343,7 +347,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -389,7 +393,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -456,6 +460,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
       PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -470,6 +476,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -847,13 +855,15 @@ tests:
         IPXE_BOOT=true
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-ctlplane-scaleup
+  as: e2e-metal-ctlplane-scaleup-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
+        OPENSHIFT_VERSION=4.18
         NUM_DAY2_MASTERS=2
         WORKERS_COUNT=2
         TEST_FUNC=test_ctlplane_scaleup
@@ -1035,6 +1045,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        DAY2_CPU_ARCHITECTURE=arm64
     workflow: assisted-equinix
 - as: e2e-metal-assisted-day2-arm-workers-periodic
   cron: 30 01 * * 1,4
@@ -1049,6 +1060,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        DAY2_CPU_ARCHITECTURE=arm64
     workflow: assisted-equinix
 - always_run: false
   as: e2e-oci-assisted

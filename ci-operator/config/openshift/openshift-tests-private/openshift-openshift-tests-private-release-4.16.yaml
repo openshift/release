@@ -204,7 +204,6 @@ tests:
         oc image extract quay.io/openshifttest/openshift4-tools:v2 --file=/tmp/OpenShift4-tools.tar && tar -C "${HOME}" -xf OpenShift4-tools.tar && rm -fr OpenShift4-tools.tar
 
         export PATH=$PATH:$HOME:${HOME}/OpenShift4-tools
-        oc-mirror --help
 
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
@@ -223,7 +222,7 @@ tests:
   optional: true
   run_if_changed: frontend/tests/.*.cy.ts
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp
     test:
     - ref: enable-qe-catalogsource
     - as: console-test
@@ -308,6 +307,19 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+- as: debug-winc-vsphere-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

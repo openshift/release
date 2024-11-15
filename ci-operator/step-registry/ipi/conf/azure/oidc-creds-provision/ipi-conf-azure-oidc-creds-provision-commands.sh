@@ -16,6 +16,10 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 BASE_DOMAIN_RESOURCE_GROUP_NAME=$(fgrep 'baseDomainResourceGroupName:' ${CONFIG} | cut -d ":" -f2 | tr -d " ")
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${SHARED_DIR}/azure_minimal_permission_sts" ]]; then
+    echo "Setting AZURE credential with minimal permissions for CCO"
+    AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission_sts"
+fi
 if [ ! -f "$AZURE_AUTH_LOCATION" ]; then
     echo "File not found: $AZURE_AUTH_LOCATION"
     exit 1

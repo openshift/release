@@ -39,6 +39,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   console-tests:
     name: "4.18"
     namespace: ocp
@@ -63,6 +67,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: libvirt-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   upi-installer:
     name: "4.18"
     namespace: ocp
@@ -663,7 +671,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
@@ -869,7 +877,7 @@ tests:
     workflow: telco5g-hcp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   restrict_network_access: false
   steps:
     env:
@@ -881,7 +889,7 @@ tests:
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   restrict_network_access: false
   steps:
     env:
@@ -892,7 +900,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   steps:
     cluster_profile: aws
     test:
@@ -900,7 +908,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   steps:
     cluster_profile: aws
     test:
@@ -909,7 +917,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1834,6 +1842,22 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-crun
   timeout: 5h0m0s
+- as: e2e-rosa-sts-ovn
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: rosa-aws-sts-conformance
+  timeout: 6h0m0s
+- as: e2e-rosa-sts-hypershift-ovn
+  cluster: build09
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    workflow: rosa-aws-sts-hcp-conformance
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
