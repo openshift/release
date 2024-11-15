@@ -31,6 +31,15 @@ if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
     CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
 fi
 
+CERT_ROTATION_ARGS=""
+if [[ "${ENABLE_AKS_CERT_ROTATION:-}" == "true" ]]; then
+    CERT_ROTATION_ARGS+=" --enable-secret-rotation"
+
+    if [[ "${AKS_CERT_ROTATION_POLL_INTERVAL:-}" != "" ]]; then
+        CERT_ROTATION_ARGS+=" --rotation-poll-interval ${AKS_CERT_ROTATION_POLL_INTERVAL}"
+    fi
+fi
+
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
 az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
@@ -46,6 +55,7 @@ AKS_CREATE_COMMAND=(
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
     "${CLUSTER_AUTOSCALER_ARGS:-}"
+    "${CERT_ROTATION_ARGS:-}"
     --location "$AZURE_LOCATION"
 )
 
