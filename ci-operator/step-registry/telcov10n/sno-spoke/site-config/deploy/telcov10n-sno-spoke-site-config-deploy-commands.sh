@@ -84,6 +84,47 @@ function generate_network_config {
   #   done
 }
 
+function get_storage_class_name {
+
+  echo "Get the Storage Class name to be used..."
+
+  if [ -n "$(oc get pod -A | grep "openshift-storage.*lvms-operator" || echo)" ];then
+    cat <<EOF | oc apply -f -
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: lvmcluster
+  namespace: openshift-storage
+spec:
+  storage:
+    deviceClasses:
+    - fstype: xfs
+      name: vg1
+      thinPoolConfig:
+        chunkSizeCalculationPolicy: Static
+        name: thin-pool-1
+        overprovisionRatio: 10
+        sizePercent: 90
+EOF
+    #sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
+    sc_name="lvms-vg1"
+    set -x
+    attempts=0
+    while sleep 10s ; do
+      oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
+      [ $(( attempts=${attempts} + 1 )) -lt 3 ] || exit 1
+    done
+    set +x
+    oc -n openshift-storage get lvmcluster/lvmcluster -oyaml
+  else
+    sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
+  fi
+
+  oc get sc
+  echo
+  echo "Using ${sc_name} Storage Class name"
+}
+
 function generate_site_config {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
@@ -277,7 +318,7 @@ EOF
   oc get Provisioning provisioning-configuration -oyaml
   set +x
 
-  sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
+  get_storage_class_name
 
   agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
 
