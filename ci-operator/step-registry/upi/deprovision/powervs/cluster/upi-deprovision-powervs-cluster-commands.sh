@@ -92,7 +92,7 @@ function download_automation_code() {
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
     echo "Attempting to install terraform using gzip"
-    curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashibmcloudorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+    curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME}"/ocp-install-dir/terraform
     echo "Terraform installed. expect to see version"
