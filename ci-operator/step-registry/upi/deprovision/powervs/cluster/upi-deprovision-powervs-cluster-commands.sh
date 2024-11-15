@@ -119,6 +119,8 @@ function fix_user_permissions() {
 function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    export VPC_NAME
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
     for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
