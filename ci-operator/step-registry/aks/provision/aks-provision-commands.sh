@@ -49,6 +49,10 @@ AKS_CREATE_COMMAND=(
     --location "$AZURE_LOCATION"
 )
 
+if [[ -n "$AKS_ADDONS" ]]; then
+     AKS_CREATE_COMMAND+=(--enable-addons "$AKS_ADDONS")
+fi
+
 # Version prioritization: specific > latest > default
 if [[ -n "$AKS_K8S_VERSION" ]]; then
     AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
@@ -75,7 +79,16 @@ fi
 
 echo "Creating AKS cluster"
 eval "${AKS_CREATE_COMMAND[*]}"
+
+echo "Saving cluster info"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
+if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
+    az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
+    # Grant MI required permissions to the KV which will be created in the same RG as the AKS cluster
+    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
+    RG_ID="$(az group show -n "$RESOURCEGROUP" --query id -o tsv)"
+    az role assignment create --assignee-object-id "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" --role "Key Vault Secrets User" --scope "${RG_ID}" --assignee-principal-type ServicePrincipal
+fi
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(
