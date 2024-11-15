@@ -1,17 +1,11 @@
-base_images:
-  coreos_coreos-assembler_latest:
+build_root:
+  image_stream_tag:
     name: coreos-assembler
     namespace: coreos
     tag: latest
-build_root:
-  image_stream_tag:
-    name: fcos-buildroot
-    namespace: coreos
-    tag: testing-devel
 images:
 - dockerfile_literal: |
-    # COSA + source code
-    FROM registry.ci.openshift.org/coreos/coreos-assembler:latest
+    FROM overridden
     WORKDIR /src
     # Tell the build scripts that we have setup a directory for unprivileged build
     ENV COSA_DIR=/tmp/cosa
@@ -29,10 +23,7 @@ images:
     # Go back to unprivileged user for COSA
     USER builder
     WORKDIR /tmp/cosa
-  inputs:
-    coreos_coreos-assembler_latest:
-      as:
-      - registry.ci.openshift.org/coreos/coreos-assembler:latest
+  from: root
   to: build-image
 promotion:
   to:
