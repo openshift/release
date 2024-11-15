@@ -452,8 +452,10 @@ for aws_region in "${regions[@]}"; do
       scp -F "/alabama/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt" || true
       scp -F "/output/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt" || true
 
+      sleep 60m
+
       echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared
