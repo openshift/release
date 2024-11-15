@@ -124,7 +124,7 @@ echo "Change the host from localhost to hypervisor"
 sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/hosted_bm_cluster.yaml
 
 # shellcheck disable=SC1083
-HYPERV_HOST="$(grep "${CLUSTER_HV_IP} " inventory/allhosts | awk {'print $1'})"
+HYPERV_HOST="$(grep -h "${CLUSTER_HV_IP} " inventory/* | awk {'print $1'})"
 # In BOS2 we use a regular dnsmasq, not the NetworkManager based
 # Use ProxyJump if using BOS2
 if $BASTION_ENV; then
@@ -200,6 +200,8 @@ EOF
 
 # TODO: add this to image build
 pip3 install dnspython netaddr
+ansible-galaxy collection install -r ansible-requirements.yaml
+
 
 cp $SHARED_DIR/inventory inventory/billerica_inventory
 
@@ -293,6 +295,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_release=nightly \
+    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
 

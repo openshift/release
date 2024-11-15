@@ -1,0 +1,71 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: gcp-ipi-sdn-fips-f7-logging
+  cron: 6 22 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CLO_SUB_CHANNEL: stable-6.0
+      CLO_TARGET_NAMESPACES: ""
+      COMPUTE_NODE_TYPE: e2-standard-8
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      FORCE_SUCCESS_EXIT: "true"
+      LO_SUB_CHANNEL: stable-6.0
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.0
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_IMPORTANCE: ""
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: operatorhub-subscribe-cluster-logging-operator
+    - ref: operatorhub-subscribe-loki-operator
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-openshift-logging-6.0

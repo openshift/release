@@ -205,7 +205,6 @@ Resources:
     Properties:
       ImageId: !Ref Ami
       IamInstanceProfile: !Ref ProxyInstanceProfile
-      KeyName: "openshift-dev"
       InstanceType: "m5.xlarge"
       NetworkInterfaces:
       - AssociatePublicIpAddress: "true"

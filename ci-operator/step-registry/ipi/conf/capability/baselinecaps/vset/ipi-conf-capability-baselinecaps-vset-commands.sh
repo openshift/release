@@ -52,9 +52,11 @@ v412_set="${v411_set} v4.12"
 v413_set="${v412_set} v4.13"
 v414_set="${v413_set} v4.14"
 v415_set="${v414_set} v4.15"
-# shellcheck disable=SC2034
 v416_set="${v415_set} v4.16"
-latest_version_set="v416_set"
+v417_set="${v416_set} v4.17"
+# shellcheck disable=SC2034
+v418_set="${v417_set} v4.18"
+latest_version_set="v418_set"
 
 # the content of each capset
 v411="baremetal marketplace openshift-samples"
@@ -63,9 +65,11 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
-# shellcheck disable=SC2034
 v416=" ${v415} CloudControllerManager Ingress"
-latest_version="v416"
+v417=" ${v416}"
+# shellcheck disable=SC2034
+v418=" ${v417}"
+latest_version="v418"
 
 # define capability dependency
 declare -A dependency_caps

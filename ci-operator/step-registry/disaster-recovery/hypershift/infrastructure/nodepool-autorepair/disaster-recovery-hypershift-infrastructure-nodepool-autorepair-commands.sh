@@ -2,21 +2,9 @@
 
 set -euxo pipefail
 
-function delete_sts() {
-    KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc delete sts "$workload_name" -n "$workload_namespace"
-    KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc wait sts "$workload_name" -n "$workload_namespace" --for=delete --timeout=3m
-}
-
-function create_workload_on_nodes() {
-    local nodes_for_workload=""
-    local num_nodes_selected=""
+function create_workload_on_np() {
     local volumes_attached=""
 
-    nodes_for_workload="$(tr ' ' ',' <<< "$nodes_selected")"
-    num_nodes_selected="$(wc -w <<< "$nodes_selected")"
-
-    # Create workload that attaches volumes to the selected nodes
-    trap delete_sts EXIT
     cat <<EOF | tee "${ARTIFACT_DIR}/hcp_autorepair_test_${workload_name}.yaml" | KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc create -f -
 apiVersion: apps/v1
 kind: StatefulSet
@@ -24,7 +12,7 @@ metadata:
   name: $workload_name
   namespace: $workload_namespace
 spec:
-  replicas: $num_nodes_selected
+  replicas: $np_selected_replicas
   selector:
     matchLabels:
       app: azure-disk
@@ -37,7 +25,7 @@ spec:
       - name: azure-disk-container
         image: busybox
         command: ["/bin/sh"]
-        args: ["-c", "while true; do echo $(date) >> /mnt/azure-disk/data.txt; sleep 36000; done"]
+        args: ["-c", "while true; do echo $(date) >> /mnt/azure-disk/data.txt; sleep 10; done"]
         volumeMounts:
         - mountPath: /mnt/azure-disk
           name: azure-disk
@@ -46,9 +34,10 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: kubernetes.io/hostname
+              - key: hypershift.openshift.io/nodePool
                 operator: In
-                values: [$nodes_for_workload]
+                values:
+                - $np_selected
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -70,9 +59,9 @@ spec:
           storage: 100Mi
 EOF
 
-    KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc rollout status statefulset "$workload_name" -n "$workload_namespace" --timeout=5m
+    wait_for_sts_readiness
 
-    for node in $nodes_selected; do
+    for node in $np_selected_nodes; do
         volumes_attached=$(KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc get node "$node" -o jsonpath='{.status.volumesAttached}')
         if [[ -z "$volumes_attached" ]]; then
             echo "No volume attached to node $node, exiting" >&2
@@ -126,6 +115,10 @@ function wait_for_hc_recovery() {
     KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc wait co --all --for=condition=Degraded=False --timeout=10m
 }
 
+function wait_for_sts_readiness() {
+    KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc rollout status statefulset "$workload_name" -n "$workload_namespace" --timeout=5m
+}
+
 # Timestamp
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
 
@@ -155,8 +148,9 @@ if (( nps_autorepair_count == 0 )); then
     exit 1
 fi
 np_selected="${nps_autorepair_arr[0]}"
-nodes_selected="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get node -l=hypershift.openshift.io/nodePool="$np_selected" -o jsonpath='{.items[*].metadata.name}')"
-if [[ -z $nodes_selected ]]; then
+np_selected_replicas="$(oc get np "$np_selected" -n clusters -o jsonpath='{.spec.replicas}')"
+np_selected_nodes="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get node -l=hypershift.openshift.io/nodePool="$np_selected" -o jsonpath='{.items[*].metadata.name}')"
+if [[ -z $np_selected_nodes ]]; then
     echo "NodePool $np_selected has no nodes, exiting" >&2
     exit 1
 fi
@@ -170,13 +164,17 @@ if (( mhc_count != nps_autorepair_count )); then
 fi
 mhc_selected="$np_selected"
 max_unhealthy="$(oc get mhc "$mhc_selected" -n "$hcp_ns" -o jsonpath='{.spec.maxUnhealthy}')"
+nodes_selected="$(cut -d ' ' -f 1-"$max_unhealthy" <<< "$np_selected_nodes")"
 
 # Create workload
-nodes_selected="$(cut -d ' ' -f 1-"$max_unhealthy" <<< "$nodes_selected")"
 workload_name="${np}-sts"
-workload_namespace=default
-create_workload_on_nodes
+workload_namespace="np-autorepair-test"
+trap 'KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc delete ns $workload_namespace' EXIT
+KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc create ns "$workload_namespace"
+create_workload_on_np
 
+# Perform NP autorepair test
 stop_kubelet_on_nodes
 wait_for_machine_deletion
 wait_for_hc_recovery
+wait_for_sts_readiness

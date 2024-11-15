@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.31.0
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
   os-min9:
     name: ubi-minimal
     namespace: ocp
@@ -26,6 +30,8 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: numaresources-operator
+- dockerfile_path: bundle.Dockerfile
+  to: numaresources-operator-bundle
 - dockerfile_path: Dockerfile.openshift.rte
   from: os-min9
   inputs:
@@ -44,11 +50,10 @@ images:
   to: numaresources-operator-tests
 operator:
   bundles:
-  - as: numaresources-operator-bundle
-    dockerfile_path: bundle.Dockerfile
+  - dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-kni/numaresources-operator:4.18.999-snapshot
-    with: numaresources-operator
+    with: pipeline:numaresources-operator
 promotion:
   to:
   - name: numaresources-operator
@@ -153,6 +158,25 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
+- as: ci-e2e-install-hypershift
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: numaresources-operator
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-hypershift
 - as: security
   optional: true
   steps:
