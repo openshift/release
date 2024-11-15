@@ -452,7 +452,10 @@ for aws_region in "${regions[@]}"; do
       scp -F "/alabama/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt" || true
       scp -F "/output/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt" || true
 
-      sleep 60m
+      ls -lah /
+      ls -lah "${HOME}"
+      echo "${HOME}"
+      ls -lah "${HOME}/.ssh"
 
       echo "Waiting up to 5 min for RHEL host to be up."
       timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
