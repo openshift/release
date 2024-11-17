@@ -58,7 +58,7 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
-curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
+curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/pacevedom/microshift/refs/heads/USHIFT-4893/scripts/aws/cf-gen.yaml
 
 ec2Type="VirtualMachine"
 if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
