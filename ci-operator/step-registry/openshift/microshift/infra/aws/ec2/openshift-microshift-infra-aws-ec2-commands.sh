@@ -58,360 +58,44 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
+curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
+
 ec2Type="VirtualMachine"
 if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
   ec2Type="MetalMachine"
 fi
 instance_type=${EC2_INSTANCE_TYPE}
 
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && \
+  unzip -q awscliv2.zip
+rm -rf awscliv2.zip
+
+aws="${PWD}/aws/dist/aws"
+
 function save_stack_events_to_shared()
 {
   set +o errexit
-  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
+  "${aws}" --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
   set -o errexit
 }
-
-# shellcheck disable=SC2154
-cat > "${cf_tpl_file}" << EOF
-AWSTemplateFormatVersion: 2010-09-09
-Description: Template for RHEL machine Launch
-Conditions:
-  AddSecondaryVolume: !Not [!Equals [!Ref EC2Type, 'MetalMachine']]
-Mappings:
- VolumeSize:
-   MetalMachine:
-     PrimaryVolumeSize: "300"
-     SecondaryVolumeSize: "0"
-     Throughput: 750
-     Iops: 6000
-   VirtualMachine:
-     PrimaryVolumeSize: "200"
-     SecondaryVolumeSize: "10"
-     Throughput: 125
-     Iops: 3000
-Parameters:
-  EC2Type:
-    Default: 'VirtualMachine'
-    Type: String
-  VpcCidr:
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
-    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
-    Default: 10.192.0.0/16
-    Description: CIDR block for VPC.
-    Type: String
-  PublicSubnetCidr:
-    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
-    Type: String
-    Default: 10.192.10.0/24
-  AmiId:
-    Description: Current RHEL AMI to use.
-    Type: AWS::EC2::Image::Id
-  Machinename:
-    AllowedPattern: ^([a-zA-Z][a-zA-Z0-9\-]{0,26})$
-    MaxLength: 27
-    MinLength: 1
-    ConstraintDescription: Machinename
-    Description: Machinename
-    Type: String
-    Default: rhel-testbed-ec2-instance
-  HostInstanceType:
-    Default: t2.medium
-    Type: String
-  PublicKeyString:
-    Type: String
-    Description: The public key used to connect to the EC2 instance
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-    - Label:
-        default: "Host Information"
-      Parameters:
-      - HostInstanceType
-    - Label:
-        default: "Network Configuration"
-      Parameters:
-      - PublicSubnet
-    ParameterLabels:
-      PublicSubnet:
-        default: "Worker Subnet"
-      HostInstanceType:
-        default: "Worker Instance Type"
-
-Resources:
-## VPC Creation
-
-  RHELVPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Ref VpcCidr
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
-      Tags:
-        - Key: Name
-          Value: RHELVPC
-
-  RHELVPCIPv6Cidr:
-    Type: AWS::EC2::VPCCidrBlock
-    Properties:
-      AmazonProvidedIpv6CidrBlock: true
-      VpcId: !Ref RHELVPC
-
-## Setup internet access
-
-  RHELInternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: RHELInternetGateway
-
-  RHELGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref RHELVPC
-      InternetGatewayId: !Ref RHELInternetGateway
-
-  RHELPublicSubnet:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref RHELVPC
-      CidrBlock: !Ref PublicSubnetCidr
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: RHELPublicSubnet
-
-  RHELPublicSubnet:
-    Type: AWS::EC2::Subnet
-    DependsOn: RHELVPCIPv6Cidr
-    Properties:
-      VpcId: !Ref RHELVPC
-      CidrBlock: !Ref PublicSubnetCidr
-      MapPublicIpOnLaunch: true
-      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt RHELVPC.Ipv6CidrBlocks], 256, 64 ]]
-      AssignIpv6AddressOnCreation: true
-      Tags:
-        - Key: Name
-          Value: RHELPublicSubnet
-
-  RHELRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref RHELVPC
-      Tags:
-        - Key: Name
-          Value: RHELRouteTable
-
-  RHELPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: RHELGatewayAttachment
-    Properties:
-      RouteTableId: !Ref RHELRouteTable
-      DestinationCidrBlock: "0.0.0.0/0"
-      GatewayId: !Ref RHELInternetGateway
-
-  RHELPublicRouteIpv6:
-    Type: AWS::EC2::Route
-    DependsOn: RHELGatewayAttachment
-    Properties:
-      RouteTableId: !Ref RHELRouteTable
-      DestinationIpv6CidrBlock: "::/0"
-      GatewayId: !Ref RHELInternetGateway
-
-  RHELPublicSubnetRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref RHELRouteTable
-      SubnetId: !Ref RHELPublicSubnet
-
-## Setup EC2 Roles and security
-
-  RHELIamRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-        - Effect: "Allow"
-          Principal:
-            Service:
-            - "ec2.amazonaws.com"
-          Action:
-          - "sts:AssumeRole"
-      Path: "/"
-
-  RHELInstanceProfile:
-    Type: "AWS::IAM::InstanceProfile"
-    Properties:
-      Path: "/"
-      Roles:
-      - Ref: "RHELIamRole"
-
-  RHELSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: RHEL Host Security Group
-      SecurityGroupIngress:
-      - IpProtocol: icmp
-        FromPort: -1
-        ToPort: -1
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: icmpv6
-        FromPort: -1
-        ToPort: -1
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 443
-        ToPort: 443
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 443
-        ToPort: 443
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 5353
-        ToPort: 5353
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 5353
-        ToPort: 5353
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 5678
-        ToPort: 5678
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 5678
-        ToPort: 5678
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 6443
-        ToPort: 6443
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 6443
-        ToPort: 6443
-        CidrIpv6: ::/0
-      - IpProtocol: tcp
-        FromPort: 30000
-        ToPort: 32767
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 30000
-        ToPort: 32767
-        CidrIpv6: ::/0
-      - IpProtocol: udp
-        FromPort: 30000
-        ToPort: 32767
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: udp
-        FromPort: 30000
-        ToPort: 32767
-        CidrIpv6: ::/0
-      VpcId: !Ref RHELVPC
-
-  rhelLaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
-    Properties:
-      LaunchTemplateName: ${stack_name}-launch-template
-      LaunchTemplateData:
-        BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
-            VolumeType: gp3
-            Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
-            Iops: !FindInMap [VolumeSize, !Ref EC2Type, Iops]
-        - !If
-          - AddSecondaryVolume
-          - DeviceName: /dev/sdc
-            Ebs:
-              VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
-              VolumeType: gp3
-          - !Ref AWS::NoValue
-
-  RHELInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: !Ref AmiId
-      LaunchTemplate:
-        LaunchTemplateName: ${stack_name}-launch-template
-        Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
-      IamInstanceProfile: !Ref RHELInstanceProfile
-      InstanceType: !Ref HostInstanceType
-      NetworkInterfaces:
-      - AssociatePublicIpAddress: "True"
-        DeviceIndex: "0"
-        GroupSet:
-        - !GetAtt RHELSecurityGroup.GroupId
-        SubnetId: !Ref RHELPublicSubnet
-      Tags:
-      - Key: Name
-        Value: !Join ["", [!Ref Machinename]]
-      PrivateDnsNameOptions:
-        EnableResourceNameDnsARecord: true
-        HostnameType: resource-name
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
-          echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
-          # Use the same defaults as OCP to avoid failing requests to apiserver, such as
-          # requesting logs.
-          echo "====== Updating inotify =====" | tee -a /tmp/init_output.txt
-          echo "fs.inotify.max_user_watches = 65536" >> /etc/sysctl.conf
-          echo "fs.inotify.max_user_instances = 8192" >> /etc/sysctl.conf
-          sysctl --system |& tee -a /tmp/init_output.txt
-          sysctl -a |& tee -a /tmp/init_output.txt
-
-Outputs:
-  InstanceId:
-    Description: RHEL Host Instance ID
-    Value: !Ref RHELInstance
-  PrivateIp:
-    Description: The bastion host Private DNS, will be used for cluster install pulling release image
-    Value: !GetAtt RHELInstance.PrivateIp
-  PublicIp:
-    Description: The bastion host Public IP, will be used for registering minIO server DNS
-    Value: !GetAtt RHELInstance.PublicIp
-EOF
-
-
 
 for aws_region in "${regions[@]}"; do
   REGION="${aws_region}"
   echo "Current region: ${REGION}"
   ami_id="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
 
-  if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+  if "${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
     --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
       echo "Appears that stack ${stack_name} already exists"
-      aws --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
+      "${aws}" --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
       echo "Deleted stack ${stack_name}"
-      aws --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
+      "${aws}" --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
       echo "Waited for stack-delete-complete ${stack_name}"
   fi
 
   echo -e "${REGION} ${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 
-  if aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
+  if "${aws}" --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
     --template-body "file://${cf_tpl_file}" \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
@@ -419,21 +103,22 @@ for aws_region in "${regions[@]}"; do
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
+        ParameterKey=StackLaunchTemplate,ParameterValue="${stack_name}-launch-template" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" && \
-    aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"; then
+    "${aws}" --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"; then
 
       echo "Stack created"
       set -e
       # shellcheck disable=SC2016
-      INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
+      INSTANCE_ID="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
       echo "Instance ${INSTANCE_ID}"
       echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-id"
       # shellcheck disable=SC2016
-      HOST_PUBLIC_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PublicIp`].OutputValue' --output text)"
+      HOST_PUBLIC_IP="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PublicIp`].OutputValue' --output text)"
       # shellcheck disable=SC2016
-      HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
+      HOST_PRIVATE_IP="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
       # shellcheck disable=SC2016
-      IPV6_ADDRESS=$(aws --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)
+      IPV6_ADDRESS="$("${aws}" --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)"
 
       echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
       echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
@@ -441,8 +126,11 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      ci_script_prologue
+      scp -F "${HOME}/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
+
       echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared
