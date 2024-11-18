@@ -27,6 +27,7 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export ENABLE_PRINT_EVENT_STDOUT=true
+export REPORT_HANDLE_PATH="/usr/bin"
 
 # add for hosted kubeconfig in the hosted cluster env
 if test -f "${SHARED_DIR}/nested_kubeconfig"; then
@@ -321,18 +322,21 @@ function handle_result {
     fi
 
     split_ret=0
-    mkdir -p "${ARTIFACT_DIR}/junit/"
-    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py "${ARTIFACT_DIR}/junit/"
-    #chmod u+w /logs/artifacts/
+    #mkdir -p "${ARTIFACT_DIR}/junit/"
+    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp/pkg/handleresult.py
+    chmod u+w /tmp/pkg
     whoami
-    python3 "/${ARTIFACT_DIR}/junit/handleresult.py" -a split -i ${resultfile} || split_ret=$?
+    python3 /tmp/pkg/handleresult.py -a split -i ${resultfile} || split_ret=$?
+    #python3 "/${ARTIFACT_DIR}/junit/handleresult.py" -a split -i ${resultfile} || split_ret=$?
     if ! [ "W${split_ret}W" == "W0W" ]; then
         echo "splitting file is not ok"
         rm -fr ${resultfile}
         return
     fi
-    #mkdir -p "${ARTIFACT_DIR}/junit/"
-    #cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
+    mkdir -p "${ARTIFACT_DIR}/junit/"
+    echo "-----------------------------------------------"
+    pwd
+    cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${resultfile}
     rm -fr /${ARTIFACT_DIR}/junit/handleresult.py
 }
