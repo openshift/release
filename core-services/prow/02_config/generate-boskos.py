@@ -84,6 +84,9 @@ CONFIG = {
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
     },
+    'metal-perfscale-jetlag-quota-slice': {
+        'metal-perfscale-jetlag-rdu3': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
