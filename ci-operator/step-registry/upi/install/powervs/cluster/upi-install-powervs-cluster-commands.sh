@@ -191,7 +191,7 @@ function cleanup_prior() {
 
     # Dev: functions don't work inline with xargs
     echo "Delete network non-'ocp-net' on PowerVS region"
-    ibmcloud pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} || true
+    ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
     echo "Done deleting non-'ocp-net' on PowerVS"
 
     # VPC Instances
