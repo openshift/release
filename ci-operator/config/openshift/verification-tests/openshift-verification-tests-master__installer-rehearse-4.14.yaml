@@ -40,14 +40,27 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: vsphere-connected-2
+    leases:
+    - env: VSPHERE_EXTRA_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     env:
-      SLEEP_DURATION: 1h
+      SLEEP_DURATION: 4h
     post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    - chain: gather
+    - chain: gather-core-dump
+    - ref: ipi-deprovision-vsphere-diags
+    - ref: ipi-deprovision-deprovision
+    - ref: ipi-deprovision-vsphere-dns
+    - ref: ipi-deprovision-vsphere-lb
+    - ref: ipi-deprovision-vsphere-lease
+    - ref: vsphere-deprovision-customized-resourcepool-check
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - chain: ipi-conf-vsphere
+    - chain: ipi-install-vsphere
+    - ref: enable-qe-catalogsource
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-vsphere-customized-resourcepool
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
