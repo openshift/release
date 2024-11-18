@@ -178,6 +178,9 @@ packet|equinix*)
         # Set test provider for only versions greater than or equal to 4.8
         set_test_provider
 
+        echo "Listing pull request"
+        ls -l ${DS_WORKING_DIR}/pull_secret.json
+        sleep 2000
         # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
     else
