@@ -153,7 +153,7 @@ spec:
           Type=oneshot
           RemainAfterExit=yes
 
-          ExecCondition=/bin/bash -c "[ -n \"$(restorecon -nv /var/lib/etcd)\" ]" 
+          ExecCondition=/bin/bash -c "[ -n \"$(/usr/sbin/restorecon -nv /var/lib/etcd)\" ]" 
 
           ExecStart=/usr/sbin/restorecon -R /var/lib/etcd
 
