@@ -32,11 +32,13 @@ set -o pipefail
 
   # Token (example token here, replace with your actual token generation method)
   TOKEN_VALUE=$(openssl rand -hex 32 | base64 | tr -d '\n')
-
+  export TOKEN_VALUE
   # Self-signed Certificate
   openssl req -x509 -newkey rsa:4096 -keyout tls.key -out tls.crt -days 365 -nodes -subj "/CN=mydomain.com"
   CERTIFICATE=$(cat tls.crt | base64 | tr -d '\n')
+  export CERTIFICATE
   PRIVATE_KEY=$(cat tls.key | base64 | tr -d '\n')
+  export PRIVATE_KEY
   oc -n multi-image create -f workloads/etcd-perf/testsec.yaml
   rm -f sshkey sshkey.pub tls.crt tls.key
   git clone https://github.com/peterducai/etcd-tools.git;sleep 10;
