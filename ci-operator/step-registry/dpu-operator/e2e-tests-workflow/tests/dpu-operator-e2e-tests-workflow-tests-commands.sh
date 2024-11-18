@@ -23,6 +23,9 @@ check_pull_number() {
 
         if [[ "$check_pull_number_return_code" == '200' ]] || [[ "$check_pull_number_return_code" == '400' ]]; then
             job_status=$(echo "$check_pull_number_response" | jq -r '.message')
+	    job_console=$(echo "$check_pull_number_response" | jq -r '.console_logs')
+
+	    echo "$job_console"
 
             if [[ "$job_status" == 'SUCCESS' ]]; then
                 exit 0
