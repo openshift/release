@@ -3,11 +3,13 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+binary_build_commands: mknod /dev/kvm c 10 232; ls -l /dev; false
 build_root:
-  image_stream_tag:
-    name: fcos-buildroot
-    namespace: coreos
-    tag: testing-devel
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/coreos/coreos-assembler:latest
+      USER root
+      RUN mkdir /go && chmod 777 /go
 images:
 - dockerfile_literal: |
     # COSA + source code
@@ -30,7 +32,7 @@ images:
     USER builder
     WORKDIR /tmp/cosa
   inputs:
-    coreos_coreos-assembler_latest:
+    bin:
       as:
       - registry.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-image
@@ -52,8 +54,11 @@ releases:
       namespace: ocp
 resources:
   '*':
+    limits:
+      devices.kubevirt.io/kvm: "1"
     requests:
       cpu: 100m
+      devices.kubevirt.io/kvm: "1"
       memory: 200Mi
   rhcos-9-build-test-metal:
     limits:
