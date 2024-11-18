@@ -159,12 +159,12 @@ function cleanup_prior() {
         if [ -n "${VALID_SUB}" ]
         then
             # Searches the VSIs and LBs to delete them
-            for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+            for VSI in $(ibmcloud is subnet "${VALID_SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
             do
                 ibmcloud is instance-delete "${VSI}" --force || true
             done
 
-            for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+            for LB in $(ibmcloud is subnet "${VALID_SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
             do
                 ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
             done
@@ -189,7 +189,7 @@ function destroy_upi_cluster() {
     echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars
 
     cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-publibmcloudkey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
     chmod 0600 "${IBMCLOUD_HOME}"/ocp-install-dir/id_rsa
 
     cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
