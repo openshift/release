@@ -246,7 +246,7 @@ function run {
     if [[ -n "$TEST_FILTERS_CLUSTERINFRASTRUCTURE" ]]; then
         hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter="${TEST_FILTERS_CLUSTERINFRASTRUCTURE}" -p || ret_value=$?
     else
-        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!disruptive' -p || ret_value=$?
+        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='disruptive' -p || ret_value=$?
     fi
     set +x
     set +e
@@ -321,16 +321,20 @@ function handle_result {
     fi
 
     split_ret=0
-    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp/handleresult.py
-    python3 /tmp/handleresult.py -a split -i ${resultfile} || split_ret=$?
+    mkdir -p "${ARTIFACT_DIR}/junit/"
+    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py "${ARTIFACT_DIR}/junit/"
+    #chmod u+w /logs/artifacts/
+    whoami
+    python3 "/${ARTIFACT_DIR}/junit/handleresult.py" -a split -i ${resultfile} || split_ret=$?
     if ! [ "W${split_ret}W" == "W0W" ]; then
         echo "splitting file is not ok"
         rm -fr ${resultfile}
         return
     fi
-    mkdir -p "${ARTIFACT_DIR}/junit/"
-    cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
+    #mkdir -p "${ARTIFACT_DIR}/junit/"
+    #cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${resultfile}
+    rm -fr /${ARTIFACT_DIR}/junit/handleresult.py
 }
 function check_case_selected {
     found_ok=$1
