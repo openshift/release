@@ -722,6 +722,7 @@ IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-c
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
 IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
+IBMCLOUD_CAPI_MANAGER_BOOTSTRAP_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_CAPI_MANAGER_BOOTSTRAP_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
 POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
@@ -889,6 +890,25 @@ stringData:
   ibmcloud_api_key: ${IBMCLOUD_REGISTRY_INSTALLER_CREDS}
 type: Opaque
 EOF
+
+if [ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]; then
+  echo "Creating capi secrets" # REMOVE THIS LINE
+  cat > "${dir}/manifests/openshift-cluster-api-capi-ibmcloud-manager-bootstrap-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: capi-ibmcloud-manager-bootstrap-credentials
+  namespace: openshift-cluster-api
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_CAPI_MANAGER_BOOTSTRAP_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_CAPI_MANAGER_BOOTSTRAP_CREDS}
+type: Opaque
+EOF
+fi
+
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
