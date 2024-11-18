@@ -270,7 +270,7 @@ EOF
     done
     # This shell script and its step are mainly for coverage of Auth ldap integration in the CI jobs for real customer scenarios, thus only the ldap users/passwords will be passed down to follow-up CI steps for e2e cases' logins, the htpasswd IDP's users/passwords will not. The htpasswd IDP's users/passwords are created only for the secret creation here
     oc create secret generic htpasswd-secret --from-file=htpasswd=${htpass_file} -n "$MIDDLE_NAMESPACE"
-    jq $IDP_FIELD' += [{"htpasswd":{"fileData":{"name":"htpasswd-secret"}},"mappingMethod":"claim","name":"idp-2-htpasswd-provider","type":"HTPasswd"}]' "${oauth_file_src}" > "${oauth_file_dst}"
+    jq $IDP_FIELD' |= [{"htpasswd":{"fileData":{"name":"htpasswd-secret"}},"mappingMethod":"claim","name":"idp-2-htpasswd-provider","type":"HTPasswd"}] + .' "${oauth_file_src}" > "${oauth_file_dst}"
     oc replace -f "${oauth_file_dst}"
 
     echo "Waiting for oauth-openshift pods to roll out"
