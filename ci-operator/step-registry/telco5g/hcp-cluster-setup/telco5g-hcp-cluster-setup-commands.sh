@@ -52,13 +52,6 @@ if $INTERNAL_ONLY && $INTERNAL; then
 elif $INTERNAL; then
     CL_SEARCH="any"
 fi
-
-if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
-    INTERNAL=true
-    INTERNAL_ONLY=true
-    CL_SEARCH="computeqe"
-fi
-
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
@@ -322,6 +315,8 @@ if [[ "$status" == "0" ]]; then
     echo "Run fetching information for clusters"
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
+
+ansible-playbook -vv playbooks/performance_profile.yml -e kubeconfig=$SHARED_DIR/mgmt-kubeconfig
 
 echo "Exiting with status ${status}"
 exit ${status}
