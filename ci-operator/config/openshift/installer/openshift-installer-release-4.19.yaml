@@ -804,6 +804,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-multi-vcenter-ovn
   optional: true
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1010,6 +1011,30 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-ha-dualstack
+  timeout: 6h0m0s
+- as: e2e-agent-4control-ipv4
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
+        NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-5control-ipv4
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
+        NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
   optional: true
