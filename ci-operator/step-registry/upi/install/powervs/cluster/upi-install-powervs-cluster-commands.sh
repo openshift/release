@@ -191,16 +191,23 @@ function cleanup_prior() {
 
     # Dev: functions don't work inline with xargs
     echo "Delete network non-'ocp-net' on PowerVS region"
-    ibmcloud pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} || true
+    ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
     echo "Done deleting non-'ocp-net' on PowerVS"
 
     # VPC Instances
     # VPC LBs 
     WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
 
     echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
         echo "Subnet: ${SUB}"
