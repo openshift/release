@@ -366,6 +366,8 @@ git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BR
 
 cd ptp-operator-conformance-test
 
+echo "DZK"
+
 # configuration
 cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 ---
