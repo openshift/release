@@ -31,14 +31,14 @@ EOF
 	fi
 }
 
-if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
-	if [[ -z "${POLICY_ARN-}" ]]; then
-		echo "POLICY_ARN must be defined with the Policy ARN when SKIP_CREATE_POLICY is set."
-		exit 1
-	fi
-	echo "Detected to skip policy creation by SKIP_CREATE_POLICY=yes. The existing POLICY_ARN must have required permissions to install a cluster."
-	exit 0
-fi
+# if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
+# 	if [[ -z "${POLICY_ARN-}" ]]; then
+# 		echo "POLICY_ARN must be defined with the Policy ARN when SKIP_CREATE_POLICY is set."
+# 		exit 1
+# 	fi
+# 	echo "Detected to skip policy creation by SKIP_CREATE_POLICY=yes. The existing POLICY_ARN must have required permissions to install a cluster."
+# 	exit 0
+# fi
 
 RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
 if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then

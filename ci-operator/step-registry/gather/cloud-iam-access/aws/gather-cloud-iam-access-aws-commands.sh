@@ -92,16 +92,31 @@ log_msg "Starting event gathering with timestamps: "
 echo "start=[${GATHER_EVENT_START_TIME}] end=[${GATHER_EVENT_END_TIME}] limit=[${GATHER_EVENT_END_LIMIT_TIME}]"
 
 mkdir -pv "${EVENTS_PATH_RAW}" || true
+# Time control. (change only when you are observed fatest data available on s3)
 GATHER_THRESHOLD=0
-RETRY_LIMIT=10
+GATHER_COUNT=0
+RETRY_LIMIT=15
+
 RETRY_INTERVAL_SEC=60
 while true; do
 	GATHER_THRESHOLD=$((GATHER_THRESHOLD+1))
-	if [ "${GATHER_THRESHOLD}" -ge ${RETRY_LIMIT} ]; then
-		log_msg "ERROR Timeout waiting for newer events, trying the best effort parsing existing logs"
+	GATHER_COUNT=$((GATHER_COUNT+1))
+
+	# Force timeout. It must be aligned with step timeout (do we need this?)
+	if [ "${GATHER_COUNT}" -ge 30 ]; then
+		log_msg "ERROR no more events after timeout, starting processor"
+		exit 1
+	fi
+	# RETRY_LIMIT ensures stop after no event was found in RETRY_LIMIT*RETRY_INTERVAL_SEC.
+	# CloudTrail process the audit logs in batch in background, saving in chunks of files
+	# of 5 minutes on a S3 Bucket. Each chunk can have api calls of 10 minutes or more before
+	# the data is available.
+	if [ "${GATHER_THRESHOLD}" -gt ${RETRY_LIMIT} ]; then
+		log_msg "WARN no more events after timeout, starting processor"
 		break
 	fi
-	log_msg "Collecting archives between ${GATHER_EVENT_START_TIME} and ${GATHER_EVENT_END_LIMIT_TIME}"
+
+	log_msg "Collecting archives between ${GATHER_EVENT_START_TIME} and ${GATHER_EVENT_END_LIMIT_TIME} for cluster ${CLUSTER_NAME}"
 	aws s3api list-objects-v2 \
 		--bucket "${AWS_TRAIL_BUCKET_NAME}" \
 		--prefix "${OBJECTS_PREFIX_START}" \
@@ -110,8 +125,8 @@ while true; do
 
 	found=$(jq -r '.|length' "${EVENTS_PATH_RAW}"-metadata)
 	if [[ ${found} -eq 0 ]]; then
-		log_msg "Found 0 event, waiting 30s for next iteration [${GATHER_THRESHOLD}/${RETRY_LIMIT}]";
-		sleep 30;
+		log_msg "Found 0 event, waiting ${RETRY_INTERVAL_SEC}s for next iteration [${GATHER_THRESHOLD}/${RETRY_LIMIT}]";
+		sleep ${RETRY_INTERVAL_SEC};
 		continue
 	fi
 	log_msg "Found [$(jq -r '.|length' "${EVENTS_PATH_RAW}"-metadata)] archive files with events"
@@ -134,17 +149,37 @@ while true; do
 	log_msg "Checking timestamp of the last record"
 	LOG_LATEST_EVENT=$(zcat "${EVENTS_PATH_RAW}"/* | jq -r '.Records[].eventTime'| sort -n | tail -n1 || true)
 
-	log_msg "Found event timestamps: initial=[${LOG_INITIAL_EVENT}] final=[${LOG_LATEST_EVENT}]"
+	log_msg "Checking total events"
+	LOG_COUNT_EVENTS=$(zcat "${EVENTS_PATH_RAW}"/* | jq -r .Records[].eventTime | wc -l || true)
 
-	# Check if the latest event is greater than desired stop time.
-	if [ "$(date -ud "${LOG_LATEST_EVENT}" +%s)" -gt "$(date -ud "${GATHER_EVENT_END_TIME}" +%s)" ];
+	log_msg "Found events: initial=[${LOG_INITIAL_EVENT}] final=[${LOG_LATEST_EVENT}] count=[${LOG_COUNT_EVENTS}] files=[${found}]"
+
+	# General flow
+	# t0: create custom IAM user
+	# t1: regular job flow (install, run e2e, destroy)
+	# t2: delete user
+	# t3: gather started
+	# We want the events between t0-t2, Although CloudTrail would take 10-12 minutes to deliver the events
+	# to AWS S3 Bucket. We need to make sure we'll not lost events, so we want to collect up to 15 minutes after the
+	# t2 (it may not incurr more costs as:
+	#  A) infra is already deleted;
+	#  B) S3 API prevents to retrieve objects (only metadata);
+	#  C) downloaded objects will be skipped.
+
+	# Skip increment when latest event isn't is the final timestamp
+	if [ "$(date -ud "${LOG_LATEST_EVENT}" +%s)" -le "$(date -ud "${GATHER_EVENT_END_TIME}" +%s)" ];
 	then
-		log_msg "Found event with timestamp newer than desired: [${LOG_LATEST_EVENT}]"
-		break
+		log_msg "Latest[${LOG_LATEST_EVENT}] event is older than the desired[${GATHER_EVENT_END_TIME}]"
+		GATHER_THRESHOLD=0
+	elif [ "$(date -ud "${LOG_LATEST_EVENT}" +%s)" -gt "$(date -ud "${GATHER_EVENT_END_TIME}" +%s)" ];
+	then
+		log_msg "Found event(s) with timestamp newer than desired: [${LOG_LATEST_EVENT}], unblocking threshold [${GATHER_THRESHOLD}/${RETRY_LIMIT}]"
+	else
+		log_msg "No event found. Retrieving later until timeout."
 	fi
+	# Is there a condition to leave the loop safety - without losing data?
 
-	log_msg "Latest[${LOG_LATEST_EVENT}] event is older than the desired[${GATHER_EVENT_END_TIME}]"
-	log_msg "Pausing ${RETRY_INTERVAL_SEC} seconds before checking latest events. [${GATHER_THRESHOLD}/${RETRY_LIMIT}]"
+	log_msg "Pausing ${RETRY_INTERVAL_SEC} seconds before checking latest events. [${GATHER_COUNT}/${GATHER_THRESHOLD}/${RETRY_LIMIT}]"
 	sleep ${RETRY_INTERVAL_SEC}
 done
 
@@ -182,7 +217,8 @@ mkdir -v "${EVENTS_PATH_PARSED}" || true
 ${CCI} --command extract \
 	--events-path "${EVENTS_PATH_RAW}" \
 	--output "${EVENTS_PATH_PARSED}" \
-    --filters principal-prefix="${CLUSTER_NAME}",principal-name="${INSTALLER_USER_NAME}"
+    --filters principal-prefix="${CLUSTER_NAME}" \
+	--installer-user-name="${INSTALLER_USER_NAME}"
 
 #
 # Extract credentials requests
@@ -220,9 +256,9 @@ fi
 
 ${CCI} --command compare \
 	--events-path "${EVENTS_PATH_PARSED}"/events.json \
-	--output "${EVENTS_PATH_PARSED}" \
-	--installer-user-name "${INSTALLER_USER_NAME}" \
-	--installer-requests-file "${INSTALLER_REQUEST_FILE}" \
+	--output="${EVENTS_PATH_PARSED}" \
+	--installer-user-name="${INSTALLER_USER_NAME}" \
+	--installer-user-policy="${INSTALLER_REQUEST_FILE}" \
 	--filters cluster-name="${CLUSTER_NAME}" \
 	${CCI_EXTRA_ARGS-}
 
