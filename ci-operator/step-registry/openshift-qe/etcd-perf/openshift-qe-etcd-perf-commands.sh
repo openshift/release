@@ -5,7 +5,8 @@ set -o pipefail
   #CASE 01 create 100 projects in the batches of 500
   #for i in {1..100}; do oc new-project project-$i;oc create configmap project-$i --from-file=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt; done
   #for i in {1..500}; do oc new-project project-$i;oc -n project-$i create configmap project-$i --from-file=/etc/pki/ca-trust/source/anchors;done
-  for i in {1..5}; do oc new-project project-$i;oc -n project-$i create configmap project-$i --from-file=/etc/pki/ca-trust/source/anchors;done
+  oc get cm/etcd-ca-bundle -n openshift-config -o=jsonpath='{.data.ca-bundle\.crt}' > /tmp/ca-bundle.crt
+  for i in {1..5}; do oc new-project project-$i;oc -n project-$i create configmap project-$i --from-file=/tmp/ca-bundle.crt;done
   date;oc adm top node
   echo "to check endpoint health after creating many projects"
   for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
