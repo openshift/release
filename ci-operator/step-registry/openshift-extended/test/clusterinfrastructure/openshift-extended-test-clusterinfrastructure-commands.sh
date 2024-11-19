@@ -313,6 +313,7 @@ EOF
 }
 
 function handle_result {
+    echo "handle_result-----------------------------------------------"
     ls "${ARTIFACT_DIR}"
     resultfile=$(ls -rt -1 "${ARTIFACT_DIR}/junit_cluster-api-actuator-testutils.xml" 2>&1 || true)
     echo "$resultfile"
@@ -323,10 +324,23 @@ function handle_result {
 
     split_ret=0
     #mkdir -p "${ARTIFACT_DIR}/junit/"
-    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp/pkg/handleresult.py
-    chmod u+w /tmp/pkg
+
+    #git clone https://github.com/sunzhaohua2/cluster-api-actuator-pkg.git /tmp/cluster-api-actuator-pkg
+    #cd /tmp/cluster-api-actuator-pkg
+    #git checkout permission
+    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp
+    echo "artifacts-----------------------------------------------"
+    ls -ld /logs/artifacts
+    chown -R $(whoami) /logs/artifacts
+    chmod -R u+w /logs/artifacts
+    cd /tmp/output
+    ls -ld /tmp/output
+    #chmod -R 777 /logs/artifacts
+    #chmod u+w /logs/artifacts/import-Cluster_Infrastructure.xml
+
+    #chmod u+w /tmp/pkg
     whoami
-    python3 /tmp/pkg/handleresult.py -a split -i ${resultfile} || split_ret=$?
+    python3 /tmp/handleresult.py -a split -i ${resultfile} || split_ret=$?
     #python3 "/${ARTIFACT_DIR}/junit/handleresult.py" -a split -i ${resultfile} || split_ret=$?
     if ! [ "W${split_ret}W" == "W0W" ]; then
         echo "splitting file is not ok"
@@ -338,7 +352,7 @@ function handle_result {
     pwd
     cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${resultfile}
-    rm -fr /${ARTIFACT_DIR}/junit/handleresult.py
+    #rm -fr /${ARTIFACT_DIR}/junit/handleresult.py
 }
 function check_case_selected {
     found_ok=$1
