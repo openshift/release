@@ -9,7 +9,6 @@ trap 'rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.p
 
 
 JSONER_PY="/tmp/jsoner.py"
-GET_ACTIONS_PY="/tmp/get_actions.py"
 
 function create_jsoner_py()
 {
@@ -32,29 +31,26 @@ EOF
 	fi
 }
 
-function create_get_actions_py()
-{
-	if [[ ! -f ${GET_ACTIONS_PY} ]]; then
-		cat <<EOF >"${GET_ACTIONS_PY}"
-import json
-import sys
-p = []
-with open(sys.argv[1], 'r') as f:
-    data = json.load(f)
-    for s in data['Statement']:
-        for a in s['Action']:
-            if a not in p:
-                p.append(a)
-p.sort()
-print('\n'.join(p))
-EOF
-	fi
-}
+# if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
+# 	if [[ -z "${POLICY_ARN-}" ]]; then
+# 		echo "POLICY_ARN must be defined with the Policy ARN when SKIP_CREATE_POLICY is set."
+# 		exit 1
+# 	fi
+# 	echo "Detected to skip policy creation by SKIP_CREATE_POLICY=yes. The existing POLICY_ARN must have required permissions to install a cluster."
+# 	exit 0
+# fi
 
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
+if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
+	# If there is no initial release, we will be installing latest.
+	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
 fi
-
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
+ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
+ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
+rm /tmp/pull-secret
 
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
@@ -77,10 +73,10 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	# 
 	USER_POLICY_FILENAME="aws-permissions-policy-creds.json"
 	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
-	PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
 	if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
 		# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
+		PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
 		cat <<EOF >"${PERMISION_LIST}"
 autoscaling:DescribeAutoScalingGroups
@@ -295,6 +291,11 @@ EOF
 			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
 			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
 		fi
+
+		create_jsoner_py
+		# generate policy file
+		cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+
 	else
 		dir=/tmp/min_perms/
 
@@ -305,27 +306,11 @@ EOF
 
 		openshift-install create permissions-policy --dir ${dir}
 
-		# Save policy to artifact dir for debugging
-		mv ${dir}/${USER_POLICY_FILENAME} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json
-
-		# AWS: the policy created by permissions-policy may exceed the 6144 limition
-		# https://issues.redhat.com/browse/OCPBUGS-45612
-		# Merge multi-Sid into one Sid
-		create_get_actions_py
-		python3 $GET_ACTIONS_PY ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json > ${PERMISION_LIST}
-
-		# temp workaround for
-		#  https://issues.redhat.com/browse/OCPBUGS-45218
-		#  https://issues.redhat.com/browse/OCPBUGS-46596 
-		echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
+		# Save policy to shared dir so later steps have access to it.
+		mv ${dir}/${USER_POLICY_FILENAME} ${USER_POLICY_FILE}
 
 		rm -rf "${dir}"
 	fi
-
-	create_jsoner_py
-	
-	# generate policy file and save it to shared dir so later steps have access to it.
-	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 
 	# Save policy as a step artifact
 	cp ${USER_POLICY_FILE} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}
