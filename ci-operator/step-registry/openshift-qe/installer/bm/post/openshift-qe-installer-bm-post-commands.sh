@@ -6,12 +6,10 @@ set -x
 
 
 bastion=$(cat "/secret/address")
-mkdir ~/.ssh
-cp /secret/jh_priv_ssh_key ~/.ssh/id_rsa
-chmod 0600 ~/.ssh/id_rsa
+SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 
 # Clean up JetLag
-ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "./clean-resources.sh"
+ssh ${SSH_ARGS} root@${bastion} "./clean-resources.sh"
 
 # Clean up Crucible
-ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "buildah rm --all; rm -Rfv /opt/crucible* /var/lib/crucible* /etc/sysconfig/crucible  /root/.crucible /etc/profile.d/crucible_completions.sh"
+ssh ${SSH_ARGS} root@${bastion} "buildah rm --all; rm -Rfv /opt/crucible* /var/lib/crucible* /etc/sysconfig/crucible  /root/.crucible /etc/profile.d/crucible_completions.sh"
