@@ -7,7 +7,8 @@ set -o pipefail
 echo "ARCH=${ARCH}"
 echo "BRANCH=${BRANCH}"
 echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
-
+echo "Printing feature set"
+echo ${FEATURE_SET}
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # Temporarily commenting out this section (lines 11 - 50 below) until profiles are supported in powervs environment
