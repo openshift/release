@@ -121,6 +121,7 @@ function cleanup_prior() {
     WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
     export VPC_NAME
+
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
     for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
@@ -145,6 +146,12 @@ function cleanup_prior() {
             sleep 5
         done
         sleep 60
+
+        # Dev: functions don't work inline with xargs
+        echo "Delete network non-'ocp-net' on PowerVS region"
+        ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
+        echo "Done deleting non-'ocp-net' on PowerVS"
+
         echo "[STATUS:Done] Deleting the contents in ${CRN}"
     done
 
