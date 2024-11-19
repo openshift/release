@@ -99,18 +99,6 @@ function download_terraform_binary() {
     terraform version
 }
 
-# facilitates scp copy from inside the contianer
-function fix_user_permissions() {
-    # Dev Note: scp in a container needs this fix-up
-    if ! whoami &> /dev/null
-    then
-        if [[ -w /etc/passwd ]]
-        then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        fi
-    fi
-}
-
 # Cleanup prior runs
 # VPC: Load Balancers, images, vm instances
 # PowerVS: images, pvm instances
@@ -168,7 +156,7 @@ function cleanup_prior() {
     echo "Cleaning up the Security Groups"
     ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
         | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud security-group-delete {} --vpc "${VPC_NAME}" --force\
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
         || true
 
     echo "Cleaning up the VPC Load Balancers"
@@ -210,11 +198,16 @@ function destroy_upi_cluster() {
     chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
     cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
-    cd "${IBMCLOUD_HOME}"/ocp-install-dir/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
-            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+    if [ -f "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate ]
+    then
+        cd "${IBMCLOUD_HOME}"/ocp-install-dir/ocp4-upi-powervs && \
+            "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
+            "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
+                -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
+                -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+    else
+        echo "No tfstate file provided"
+    fi
 }
 
 ############################################################
@@ -229,11 +222,10 @@ setup_ibmcloud_cli
 download_terraform_binary
 download_automation_code
 login_ibmcloud
+cleanup_prior
 
 if [ -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
 then
-    cleanup_prior
-    fix_user_permissions
     destroy_upi_cluster
 fi
 
