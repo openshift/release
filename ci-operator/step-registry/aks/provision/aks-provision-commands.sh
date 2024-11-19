@@ -31,6 +31,15 @@ if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
     CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
 fi
 
+CERT_ROTATION_ARGS=""
+if [[ "${ENABLE_AKS_CERT_ROTATION:-}" == "true" ]]; then
+    CERT_ROTATION_ARGS+=" --enable-secret-rotation"
+
+    if [[ "${AKS_CERT_ROTATION_POLL_INTERVAL:-}" != "" ]]; then
+        CERT_ROTATION_ARGS+=" --rotation-poll-interval ${AKS_CERT_ROTATION_POLL_INTERVAL}"
+    fi
+fi
+
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
 az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
@@ -46,8 +55,13 @@ AKS_CREATE_COMMAND=(
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
     "${CLUSTER_AUTOSCALER_ARGS:-}"
+    "${CERT_ROTATION_ARGS:-}"
     --location "$AZURE_LOCATION"
 )
+
+if [[ -n "$AKS_ADDONS" ]]; then
+     AKS_CREATE_COMMAND+=(--enable-addons "$AKS_ADDONS")
+fi
 
 # Version prioritization: specific > latest > default
 if [[ -n "$AKS_K8S_VERSION" ]]; then
@@ -75,7 +89,16 @@ fi
 
 echo "Creating AKS cluster"
 eval "${AKS_CREATE_COMMAND[*]}"
+
+echo "Saving cluster info"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
+if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
+    az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
+    # Grant MI required permissions to the KV which will be created in the same RG as the AKS cluster
+    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
+    RG_ID="$(az group show -n "$RESOURCEGROUP" --query id -o tsv)"
+    az role assignment create --assignee-object-id "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" --role "Key Vault Secrets User" --scope "${RG_ID}" --assignee-principal-type ServicePrincipal
+fi
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(

@@ -46,38 +46,47 @@ EOF
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:~/jetlag/pull_secret.txt
-
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
+cat > /tmp/clean-resources.sh << 'EOF'
+podman pod stop $(podman pod ps -q) || echo 'No podman pods to stop'
+podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
+podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
+podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
+rm -rf /opt/*
+EOF
+
+jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 
 # Setup Bastion
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
    set -o pipefail
-   cd jetlag
-   if [[ -n '$JETLAG_PR' ]]; then
-     git checkout main
-     git branch -D dev || echo 'No dev branch exists'
-     git fetch origin pull/$JETLAG_PR/head:dev
-     git checkout dev
-   elif [[ ${JETLAG_LATEST} == 'true' ]]; then
-     git checkout main
-     git pull
-   else
-     git pull origin $JETLAG_BRANCH
+   git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
+   cd ${jetlag_repo}
+   # JETLAG_PR or PULL_NUMBER can't be set at the same time
+   if [[ -n '${JETLAG_PR}' ]]; then
+     git pull origin pull/${JETLAG_PR}/head:${JETLAG_PR} --rebase
+     git switch ${JETLAG_PR}
+   elif [[ -n '${PULL_NUMBER}' ]] && [[ '${REPO_NAME}' == 'jetlag' ]]; then
+     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+     git switch ${PULL_NUMBER}
    fi
    git branch
    source bootstrap.sh
-   ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+"
 
-# Attempt Deployment
+sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
+sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    set -e
    set -o pipefail
-   cd jetlag
-   git branch
-   source bootstrap.sh
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
+   cd ${jetlag_repo}
+   source .ansible/bin/activate
+   ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   deactivate
+   rm -rf .ansible
+"

@@ -7,7 +7,13 @@ set -o pipefail
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
-export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+
+if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
+  echo "> Using minimal permissions for 'ccoctl'..."
+  export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/ccoctl_sa.json
+else
+  export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+fi
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
@@ -67,7 +73,6 @@ fi
 
 ccoctl_ouptut="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
-export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
 cat "${ccoctl_ouptut}"
 

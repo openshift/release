@@ -1,0 +1,84 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: deploy-5nodes
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BASTION_CP_INTERFACE: eno1
+      BASTION_LAB_INTERFACE: eno3
+      CONTROLPLANE_LAB_INTERFACE: eno3
+      CRUCIBLE: "false"
+      LAB_CLOUD: cloud19
+      NUM_WORKER_NODES: "2"
+      OCP_VERSION: latest-4.17
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-5nodes-dev
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      LAB_CLOUD: cloud19
+      NUM_WORKER_NODES: "2"
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-sno
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      LAB_CLOUD: cloud19
+      OCP_VERSION: latest-4.17
+      TYPE: sno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-sno-dev
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      LAB_CLOUD: cloud19
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+      TYPE: sno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+zz_generated_metadata:
+  branch: main
+  org: redhat-performance
+  repo: jetlag

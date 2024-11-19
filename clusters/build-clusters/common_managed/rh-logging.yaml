@@ -67,6 +67,14 @@ spec:
             operator: DoesNotExist # We don't want to store the logs for ci-operator pods
         namespaces:
         - ci
+    # temporary adding logging for registry pods
+    - name: image-registry-pod-logs
+      application:
+        selector:
+          matchLabels:
+            docker-registry: "default"
+        namespaces:
+        - openshift-image-registry
   outputs:
     - name: splunk-receiver
       type: splunk
@@ -87,6 +95,11 @@ spec:
     outputRefs:
     - cloudwatch-receiver
     parse: json
+  - name: app-ci-registry-logs
+    inputRefs:
+    - image-registry-pod-logs
+    outputRefs:
+    - cloudwatch-receiver
   - name: container-logs
     inputRefs:
     - application

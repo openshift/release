@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -234,6 +238,24 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-e2e-openstack-ipi
+- as: regression-clusterinfra-aws-ipi-mapi
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift-priv

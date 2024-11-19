@@ -294,10 +294,10 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e vsno_ip=$SNO_IP \
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
-    -e vsno_release=nightly \
+    -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
     -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
-    -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
+    -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.

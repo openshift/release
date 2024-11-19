@@ -66,10 +66,16 @@ if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
 fi
 instance_type=${EC2_INSTANCE_TYPE}
 
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && \
+  unzip -q awscliv2.zip
+rm -rf awscliv2.zip
+
+aws="${PWD}/aws/dist/aws"
+
 function save_stack_events_to_shared()
 {
   set +o errexit
-  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
+  "${aws}" --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
   set -o errexit
 }
 
@@ -78,18 +84,18 @@ for aws_region in "${regions[@]}"; do
   echo "Current region: ${REGION}"
   ami_id="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
 
-  if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+  if "${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
     --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
       echo "Appears that stack ${stack_name} already exists"
-      aws --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
+      "${aws}" --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
       echo "Deleted stack ${stack_name}"
-      aws --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
+      "${aws}" --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
       echo "Waited for stack-delete-complete ${stack_name}"
   fi
 
   echo -e "${REGION} ${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 
-  if aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
+  if "${aws}" --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
     --template-body "file://${cf_tpl_file}" \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
@@ -99,20 +105,20 @@ for aws_region in "${regions[@]}"; do
         ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
         ParameterKey=StackLaunchTemplate,ParameterValue="${stack_name}-launch-template" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" && \
-    aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"; then
+    "${aws}" --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"; then
 
       echo "Stack created"
       set -e
       # shellcheck disable=SC2016
-      INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
+      INSTANCE_ID="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
       echo "Instance ${INSTANCE_ID}"
       echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-id"
       # shellcheck disable=SC2016
-      HOST_PUBLIC_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PublicIp`].OutputValue' --output text)"
+      HOST_PUBLIC_IP="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PublicIp`].OutputValue' --output text)"
       # shellcheck disable=SC2016
-      HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
+      HOST_PRIVATE_IP="$("${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
       # shellcheck disable=SC2016
-      IPV6_ADDRESS=$(aws --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)
+      IPV6_ADDRESS="$("${aws}" --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)"
 
       echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
       echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
@@ -120,8 +126,11 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      ci_script_prologue
+      scp -F "${HOME}/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
+
       echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared
