@@ -204,7 +204,7 @@ function cleanup_prior() {
     echo "Cleaning up the Security Groups"
     ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
         | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud security-group-delete {} --vpc "${VPC_NAME}" --force\
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
         || true
 
     echo "Cleaning up the VPC Load Balancers"
