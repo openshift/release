@@ -52,6 +52,13 @@ if $INTERNAL_ONLY && $INTERNAL; then
 elif $INTERNAL; then
     CL_SEARCH="any"
 fi
+
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    CL_SEARCH="computeqe"
+fi
+
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
