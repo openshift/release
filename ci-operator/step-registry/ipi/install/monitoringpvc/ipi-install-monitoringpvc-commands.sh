@@ -63,3 +63,5 @@ EOF
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | yq-go m - "${PATCH}")"
 yq-go w --style folded -i "${CONFIG}" 'data."config.yaml"' "${CONFIG_CONTENTS}"
 cat "${CONFIG}"
+
+oc apply -f "${CONFIG}"
