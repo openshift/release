@@ -157,33 +157,43 @@ function cleanup_prior() {
 
     # VPC Instances
     # VPC LBs
-    # TODO: FIXME - need to be selective so as not to blow out other workflows being run
-    echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for RESOURCE_TGT in $(ibmcloud is subnets --output json | jq -r '.[].id')
-    do
-        VALID_SUB=$(ibmcloud is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-        if [ -n "${VALID_SUB}" ]
-        then
-            # Searches the VSIs and LBs to delete them
-            for VSI in $(ibmcloud is subnet "${VALID_SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
-            do
-                ibmcloud is instance-delete "${VSI}" --force || true
-            done
+        # VPC Instances
+    # VPC LBs 
+    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
 
-            for LB in $(ibmcloud is subnet "${VALID_SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-            do
-                ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
-            done
-            sleep 60
-        fi
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
+
+    echo "Cleaning up the VPC Load Balancers"
+    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
+    do
+        echo "Subnet: ${SUB}"
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
+        do
+            ibmcloud is instance-delete "${VSI}" --force || true
+        done
+
+        echo "Deleting LB in ${SUB}"
+        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 60
     done
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
     for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
     do
-        ibmcloud is image-delete "${RESOURCE_TGT}"
+        ibmcloud is image-delete "${RESOURCE_TGT}" -f
     done
 
     echo "Done cleaning up prior runs"
