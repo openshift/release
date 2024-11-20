@@ -892,7 +892,7 @@ type: Opaque
 EOF
 
 if [ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]; then
-  echo "Creating capi secrets" # REMOVE THIS LINE
+  echo "Creating capi ibmcloud manager bootstrap credentials"
   cat > "${dir}/manifests/openshift-cluster-api-capi-ibmcloud-manager-bootstrap-credentials.yaml" << EOF
 apiVersion: v1
 kind: Secret
