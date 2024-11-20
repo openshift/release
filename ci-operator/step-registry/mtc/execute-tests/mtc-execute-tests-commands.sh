@@ -28,7 +28,7 @@ RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
 
 # Login to the source cluster and add permissions
 SOURCE_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${SOURCE_CLUSTER_PREFIX}*")
-if [ -f "${TARGET_CLUSTER_DIR}/auth/rosa-admin-password" ]; then
+if [ -f "${SOURCE_CLUSTER_DIR}/auth/rosa-admin-password" ]; then
   SOURCE_KUBEADMIN_PASSWORD_FILE="/${SOURCE_CLUSTER_DIR}/auth/rosa-admin-password"
   TEST_USER="rosa-admin"
 else
