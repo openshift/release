@@ -256,4 +256,5 @@ fi
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
-update_image_registry
+
+oc get nodes > "${ARTIFACT_DIR}/get_nodes.txt"
