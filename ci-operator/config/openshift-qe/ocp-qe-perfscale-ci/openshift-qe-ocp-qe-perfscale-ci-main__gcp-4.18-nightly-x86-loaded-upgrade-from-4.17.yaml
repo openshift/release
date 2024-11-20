@@ -1,0 +1,50 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.17"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: loaded-upgrade-417to418-120nodes
+  always_run: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      WORKER_REPLICA_COUNT: "120"
+      COMPUTE_NODE_TYPE: e2-standard-8
+      PROFILE_TYPE: reporting
+      SIZE_VARIANT: large
+    post:
+    - ref: openshift-qe-kube-burner-index
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: gcp-fips-4.18-nightly-x86-loaded-upgrade-from-4.17
