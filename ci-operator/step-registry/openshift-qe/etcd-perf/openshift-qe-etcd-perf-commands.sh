@@ -94,16 +94,16 @@ parameters:
 EOF
   oc -n multi-image create -f /tmp/testsec.yaml
   rm -f /tmp/sshkey /tmp/sshkey.pub /tmp/tls.crt /tmp/tls.key
-  git clone https://github.com/peterducai/etcd-tools.git;sleep 10;
-  #To check the etcd pod load status
+  cd /tmp; git clone https://github.com/peterducai/etcd-tools.git;sleep 20;
+  echo "To check the etcd pod load status"
   #for i in {3..12500}; do oc create secret generic ${SECRET_NAME}-$i -n $NAMESPACE --from-literal=ssh-private-key="$SSH_PRIVATE_KEY" --from-literal=ssh-public-key="$SSH_PUBLIC_KEY" --from-literal=token="TOKEN_VALUE" --from-literal=tls.crt="CERTIFICATE" --from-literal=tls.key="$PRIVATE_KEY";done
   for i in {3..12}; do oc create secret generic ${SECRET_NAME}-$i -n $NAMESPACE --from-literal=ssh-private-key="$SSH_PRIVATE_KEY" --from-literal=ssh-public-key="$SSH_PUBLIC_KEY" --from-literal=token="TOKEN_VALUE" --from-literal=tls.crt="CERTIFICATE" --from-literal=tls.key="$PRIVATE_KEY";done
 
   echo "to check endpoint health after creating many secrets"
 
-  #------for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
+  for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
   date;oc adm top node;date;etcd-tools/etcd-analyzer.sh;date
-  #Fio Test STARTS...........................................................................!
+  echo "-----------------------Fio Test STARTS...........................................................................!"
   #etcd-tools/fio_suite.sh
   #-------etc_masternode1=`oc get node |grep master|awk '{print $1}'|tail -1`
   #------oc debug -n openshift-etcd --quiet=true node/$etc_masternode1 -- chroot host bash -c "podman run --privileged --volume /var/lib/etcd:/test quay.io/peterducai/openshift-etcd-suite:latest fio"
