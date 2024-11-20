@@ -255,6 +255,6 @@ if ! wait "$!"; then
 fi
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
 
 oc get nodes > "${ARTIFACT_DIR}/get_nodes.txt"
