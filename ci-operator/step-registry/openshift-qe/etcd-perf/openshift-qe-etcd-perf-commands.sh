@@ -56,18 +56,18 @@ EOF
   NAMESPACE="my-namespace"
 
   # SSH key
-  ssh-keygen -t rsa -b 4096 -f sshkey -N ''
-  SSH_PRIVATE_KEY=$(cat sshkey | base64 | tr -d '\n')
-  SSH_PUBLIC_KEY=$(cat sshkey.pub | base64 | tr -d '\n')
+  ssh-keygen -t rsa -b 4096 -f /tmp/sshkey -N '' 
+  SSH_PRIVATE_KEY=$(cat /tmp/sshkey | base64 | tr -d '\n')
+  SSH_PUBLIC_KEY=$(cat /tmp/sshkey.pub | base64 | tr -d '\n')
 
   # Token (example token here, replace with your actual token generation method)
   TOKEN_VALUE=$(openssl rand -hex 32 | base64 | tr -d '\n')
   export TOKEN_VALUE
   # Self-signed Certificate
-  openssl req -x509 -newkey rsa:4096 -keyout tls.key -out tls.crt -days 365 -nodes -subj "/CN=mydomain.com"
-  CERTIFICATE=$(cat tls.crt | base64 | tr -d '\n')
+  openssl req -x509 -newkey rsa:4096 -keyout /tmp/tls.key -out /tmp/tls.crt -days 365 -nodes -subj "/CN=mydomain.com"
+  CERTIFICATE=$(cat /tmp/tls.crt | base64 | tr -d '\n')
   export CERTIFICATE
-  PRIVATE_KEY=$(cat tls.key | base64 | tr -d '\n')
+  PRIVATE_KEY=$(cat /tmp/tls.key | base64 | tr -d '\n')
   export PRIVATE_KEY
   cat<<'EOF' >/tmp/testsec.yaml
 apiVersion: template.openshift.io/v1
@@ -92,8 +92,8 @@ objects:
 parameters:
   - name: NAME
 EOF
-oc -n multi-image create -f /tmp/testsec.yaml
-  rm -f sshkey sshkey.pub tls.crt tls.key
+  oc -n multi-image create -f /tmp/testsec.yaml
+  rm -f /tmp/sshkey /tmp/sshkey.pub /tmp/tls.crt /tmp/tls.key
   git clone https://github.com/peterducai/etcd-tools.git;sleep 10;
   #To check the etcd pod load status
   #for i in {3..12500}; do oc create secret generic ${SECRET_NAME}-$i -n $NAMESPACE --from-literal=ssh-private-key="$SSH_PRIVATE_KEY" --from-literal=ssh-public-key="$SSH_PUBLIC_KEY" --from-literal=token="TOKEN_VALUE" --from-literal=tls.crt="CERTIFICATE" --from-literal=tls.key="$PRIVATE_KEY";done
