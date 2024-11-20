@@ -92,23 +92,11 @@ function download_automation_code() {
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
     echo "Attempting to install terraform using gzip"
-    curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashibmcloudorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+    curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME}"/ocp-install-dir/terraform
     echo "Terraform installed. expect to see version"
     terraform version
-}
-
-# facilitates scp copy from inside the contianer
-function fix_user_permissions() {
-    # Dev Note: scp in a container needs this fix-up
-    if ! whoami &> /dev/null
-    then
-        if [[ -w /etc/passwd ]]
-        then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        fi
-    fi
 }
 
 # Cleanup prior runs
@@ -119,6 +107,9 @@ function fix_user_permissions() {
 function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    export VPC_NAME
+
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
     for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
@@ -143,38 +134,54 @@ function cleanup_prior() {
             sleep 5
         done
         sleep 60
+
+        # Dev: functions don't work inline with xargs
+        echo "Delete network non-'ocp-net' on PowerVS region"
+        ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
+        echo "Done deleting non-'ocp-net' on PowerVS"
+
         echo "[STATUS:Done] Deleting the contents in ${CRN}"
     done
 
     # VPC Instances
     # VPC LBs
-    # TODO: FIXME - need to be selective so as not to blow out other workflows being run
-    echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
-    for RESOURCE_TGT in $(ibmcloud is subnets --output json | jq -r '.[].id')
-    do
-        VALID_SUB=$(ibmcloud is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-        if [ -n "${VALID_SUB}" ]
-        then
-            # Searches the VSIs and LBs to delete them
-            for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
-            do
-                ibmcloud is instance-delete "${VSI}" --force || true
-            done
+        # VPC Instances
+    # VPC LBs 
+    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
 
-            for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-            do
-                ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
-            done
-            sleep 60
-        fi
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
+
+    echo "Cleaning up the VPC Load Balancers"
+    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
+    do
+        echo "Subnet: ${SUB}"
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
+        do
+            ibmcloud is instance-delete "${VSI}" --force || true
+        done
+
+        echo "Deleting LB in ${SUB}"
+        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 60
     done
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
     for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
     do
-        ibmcloud is image-delete "${RESOURCE_TGT}"
+        ibmcloud is image-delete "${RESOURCE_TGT}" -f
     done
 
     echo "Done cleaning up prior runs"
@@ -183,19 +190,36 @@ function cleanup_prior() {
 # Destroy the cluster based on the set configuration / tfvars
 function destroy_upi_cluster() {
     echo "destroy terraform to build PowerVS UPI cluster"
-    cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars 
-    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars
 
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
-    cp "${CLUSTER_PROFILE_DIR}"/ssh-publibmcloudkey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
-    chmod 0600 "${IBMCLOUD_HOME}"/ocp-install-dir/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
+    chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
-    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
-    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
+    # Loads the tfvars if it exists in the shared directory
+    if [ ! -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
+    then
+        echo "No tfvars provided. exiting..."
+        exit 0
+    fi
+
+    cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars 
+    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars
+
+    # Loads the tfstate if it exists in the shared directory
+    if [ ! -f "${SHARED_DIR}"/terraform.tfstate ]
+    then
+        echo "No tfstate file provided"
+        exit 0
+    fi
+
+    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+
+    # Destroys the current installation for this run
+    cd "${IBMCLOUD_HOME}"/ocp-install-dir/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
-            -var-file "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
+            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
+            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
 }
 
 ############################################################
@@ -210,13 +234,8 @@ setup_ibmcloud_cli
 download_terraform_binary
 download_automation_code
 login_ibmcloud
-
-if [ -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
-then
-    cleanup_prior
-    fix_user_permissions
-    destroy_upi_cluster
-fi
+cleanup_prior
+destroy_upi_cluster
 
 echo "IBM Cloud PowerVS resources destroyed successfully $(date)"
 

@@ -349,8 +349,9 @@ tests:
     env:
       USER_TAGS: |
         keyA valueA
-        keyB valueB
-        keyC valueC
+        key2 value2
+        keySpecial v@lu3-Special_.:/=+
+        keyD valueD spaces
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
@@ -472,6 +473,16 @@ tests:
     cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-user-provisioned-dns
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -804,6 +815,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-multi-vcenter-ovn
   optional: true
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1010,6 +1022,30 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-ha-dualstack
+  timeout: 6h0m0s
+- as: e2e-agent-4control-ipv4
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
+        NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-5control-ipv4
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
+        NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
   optional: true
