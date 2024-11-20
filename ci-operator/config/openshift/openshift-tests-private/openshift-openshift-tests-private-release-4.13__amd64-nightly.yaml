@@ -436,6 +436,20 @@ tests:
     test:
     - ref: fips-check-optional-operator-images-scan
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-longduration-mco-fips-proxy-all-f14
+  cron: 10 21 10,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-vpc-phz-f28
   cron: 24 8 23 * *
   steps:
@@ -867,6 +881,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: azure-ipi-fullyprivate-proxy-f28-compliance
+  cron: 7 11 18 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetalds-ipi-ovn-ipv4-fips-f28
   cron: 3 9 2 * *
   steps:

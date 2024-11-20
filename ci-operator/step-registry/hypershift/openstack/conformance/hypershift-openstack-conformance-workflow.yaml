@@ -16,6 +16,8 @@ workflow:
       CONFIG_TYPE: "minimal"
       SKIP_MONITOR_TEST: "true"
       TEST_CSI_DRIVER_MANIFEST: ""
+      API_FIP_ENABLED: "false"
+      INGRESS_FIP_ENABLED: "false"
     pre:
     - ref: ipi-install-rbac
     - chain: hypershift-setup-nested-management-cluster
@@ -25,7 +27,10 @@ workflow:
     - ref: openstack-conf-proxy
     - ref: openstack-conf-externalnetworkid
     - ref: openstack-conf-exportcindercredentials
-    - chain: hypershift-openstack-create
+    - ref: openstack-provision-floatingips
+    - ref: hypershift-openstack-create-hostedcluster
+    - ref: openstack-provision-dnsrecords
+    - ref: hypershift-openstack-create-wait
     - ref: storage-obj-save
     - ref: storage-conf-csi-openstack-cinder
     - ref: storage-conf-csi-openstack-manila
@@ -35,5 +40,7 @@ workflow:
     - ref: storage-obj-check
     - chain: hypershift-dump
     - chain: gather-core-dump
-    - chain: hypershift-openstack-destroy
+    - ref: hypershift-openstack-destroy
+    - ref: openstack-deprovision-dnsrecords
+    - ref: openstack-deprovision-floatingips
     - chain: hypershift-destroy-nested-management-cluster

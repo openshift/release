@@ -52,6 +52,13 @@ if $INTERNAL_ONLY && $INTERNAL; then
 elif $INTERNAL; then
     CL_SEARCH="any"
 fi
+
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    CL_SEARCH="computeqe"
+fi
+
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
@@ -124,7 +131,7 @@ echo "Change the host from localhost to hypervisor"
 sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/hosted_bm_cluster.yaml
 
 # shellcheck disable=SC1083
-HYPERV_HOST="$(grep "${CLUSTER_HV_IP} " inventory/allhosts | awk {'print $1'})"
+HYPERV_HOST="$(grep -h "${CLUSTER_HV_IP} " inventory/* | awk {'print $1'})"
 # In BOS2 we use a regular dnsmasq, not the NetworkManager based
 # Use ProxyJump if using BOS2
 if $BASTION_ENV; then
@@ -200,6 +207,8 @@ EOF
 
 # TODO: add this to image build
 pip3 install dnspython netaddr
+ansible-galaxy collection install -r ansible-requirements.yaml
+
 
 cp $SHARED_DIR/inventory inventory/billerica_inventory
 
@@ -292,10 +301,10 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e vsno_ip=$SNO_IP \
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
-    -e vsno_release=nightly \
+    -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
     -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
-    -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
+    -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.

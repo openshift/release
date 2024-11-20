@@ -97,7 +97,6 @@ tests:
     env:
       FIPS_ENABLED: "true"
     test:
-    - ref: api-job-k8sgpt
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: alibaba-ipi-private-fips-f28-destructive
@@ -790,6 +789,20 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - ref: fips-check-optional-operator-images-scan
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-longduration-mco-fips-proxy-all-f14
+  cron: 6 4 13,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-proxy-sdn-workers-rhel8-fips-f14
   cron: 21 15 13,29 * *
@@ -2875,6 +2888,23 @@ tests:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
+- as: vsphere-ipi-ovn-dualstack-f28-compliance
+  cron: 21 9 20 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28
   cron: 33 5 8 * *

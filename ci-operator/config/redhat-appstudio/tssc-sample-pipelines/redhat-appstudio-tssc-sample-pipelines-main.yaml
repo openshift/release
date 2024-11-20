@@ -39,50 +39,10 @@ tests:
     set -o pipefail
 
     pwd && ls -la
-    yamllint -c yamllint.yaml .
+    yamllint -c ci/config/yamllint.yaml .
   container:
     from: src
   optional: true
-- as: rhtap-sample-pipelines-on-pull-request
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: konflux
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    env:
-      EVENT_TYPE: pull_request
-    post:
-    - ref: redhat-appstudio-rhtap-gather
-    pre:
-    - ref: redhat-appstudio-rhtap-cli
-    test:
-    - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
-    workflow: generic-claim
-- as: rhtap-sample-pipelines-on-push
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: konflux
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    post:
-    - ref: redhat-appstudio-rhtap-gather
-    pre:
-    - ref: redhat-appstudio-rhtap-cli
-    test:
-    - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

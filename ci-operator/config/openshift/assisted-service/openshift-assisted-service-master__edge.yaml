@@ -63,8 +63,12 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: tests
-  upi-installer:
+  tests-4.17:
     name: "4.17"
+    namespace: ocp
+    tag: tests
+  upi-installer:
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -146,18 +150,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
-  latest-418:
-    candidate:
-      product: ocp
-      stream: nightly
       version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -211,6 +210,11 @@ tests:
   steps:
     test:
     - ref: assisted-baremetal-operator-catalog-publish
+- always_run: false
+  as: operator-publish-verify
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-publish
 - as: assisted-operator-catalog-publish-verify
   run_if_changed: ^(deploy/olm-catalog/.*)$
   steps:
@@ -439,12 +443,13 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=4
-      NUM_EXTRA_WORKERS: "3"
+        SPOKE_WORKER_AGENTS=0
+      NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
 - always_run: false
   as: e2e-ai-operator-ztp-5masters
@@ -452,12 +457,13 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-418
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=5
-      NUM_EXTRA_WORKERS: "3"
+        SPOKE_WORKER_AGENTS=0
+      NUM_EXTRA_WORKERS: "5"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
   cron: 00 02 * * 0-5
@@ -976,6 +982,18 @@ tests:
         OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
 - always_run: false
+  as: e2e-metal-assisted-4-17
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.17
+    workflow: assisted-baremetal
+- always_run: false
   as: e2e-metal-assisted-cnv-4-16
   steps:
     cluster_profile: packet-assisted
@@ -998,7 +1016,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -1060,7 +1078,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -1139,10 +1157,14 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
       PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
@@ -1154,10 +1176,14 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
       PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
   timeout: 6h0m0s
@@ -1169,6 +1195,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -1199,6 +1227,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        DAY2_CPU_ARCHITECTURE=arm64
     workflow: assisted-equinix
 - as: e2e-vsphere-assisted
   optional: true
@@ -1359,17 +1388,6 @@ tests:
         PLATFORM=external
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-5-control-planes-4-17
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=5
-        NUM_WORKERS=0
-        OPENSHIFT_VERSION=4.17
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- always_run: false
   as: e2e-metal-assisted-5-control-planes-4-18
   steps:
     cluster_profile: packet-assisted
@@ -1378,17 +1396,6 @@ tests:
         NUM_MASTERS=5
         NUM_WORKERS=0
         OPENSHIFT_VERSION=4.18
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-control-planes-4-17
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=4
-        NUM_WORKERS=1
-        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - always_run: false

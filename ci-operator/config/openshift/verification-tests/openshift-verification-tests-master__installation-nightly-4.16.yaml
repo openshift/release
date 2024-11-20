@@ -127,6 +127,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-ipi-additional-ca-always-arm-f14
+  cron: 56 13 14,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
 - as: azure-ipi-custom-nsg-f28
   cron: 20 20 23 * *
   steps:
@@ -372,6 +387,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
+- as: ibmcloud-ipi-subnet-paging-f28
+  cron: 51 22 8 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "no"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "9"
+      PICKUP_SUBNETS_ORDER: 2Paging
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: nutanix-ipi-zones-single-osimage-customized-reboot-nodes-f28
   cluster: build01
   cron: 21 19 3 * *

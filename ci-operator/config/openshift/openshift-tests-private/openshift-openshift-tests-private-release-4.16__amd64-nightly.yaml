@@ -2620,6 +2620,23 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-f28-compliance
+  cron: 4 11 12 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-proxy-private-rt-f28
   cron: 5 8 26 * *
   steps:
@@ -3211,20 +3228,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-template-usertags
-- as: vsphere-ipi-zones-f28
-  cron: 55 5 24 * *
+- as: vsphere-ipi-zones-template-f28
+  cron: 29 16 25 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: vsphere-ipi-zones-f28-destructive
-  cron: 8 2 6 * *
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
+- as: vsphere-ipi-zones-template-f28-destructive
+  cron: 15 19 3 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
 - as: vsphere-ipi-zones-f28-longduration-cloud
   cron: 45 4 12 * *
   steps:
@@ -3431,6 +3448,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-custom-transit-switch-masquerade-subnet
+- as: vsphere-ipi-ovn-winc-f7
+  cron: 3 18 7,16,23,30 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
