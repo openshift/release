@@ -348,6 +348,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
         keyA valueA
         key2 value2
@@ -361,6 +362,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -380,6 +382,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-custom-security-groups
@@ -387,6 +391,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-aws-post
     - ref: ipi-deprovision-aws-custom-security-groups
@@ -405,13 +411,21 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-aws-post
     - ref: aws-deprovision-iam-profile
     pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-byo-ipv4-pool-public
     - ref: aws-provision-iam-profile
-    - chain: ipi-conf-aws
     - ref: ipi-conf-aws-byo-iam-profile
+    - ref: ipi-conf-aws-user-min-permissions
+    - ref: aws-provision-iam-user
+    - ref: ipi-install-monitoringpvc
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
@@ -422,6 +436,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - always_run: false
@@ -430,6 +446,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - always_run: true
@@ -445,20 +463,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_METADATA_SERVICE_AUTH: Required
-    workflow: openshift-e2e-aws
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-min-perms
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
+      AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
