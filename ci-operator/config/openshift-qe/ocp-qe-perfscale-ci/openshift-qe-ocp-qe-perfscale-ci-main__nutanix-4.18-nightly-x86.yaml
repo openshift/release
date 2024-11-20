@@ -4,6 +4,13 @@ build_root:
     namespace: ci
     tag: latest
 releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.17.0-0
+        upper: 4.18.0-0
   latest:
     candidate:
       product: ocp
@@ -74,6 +81,29 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     workflow: openshift-qe-installer-nutanix
   timeout: 6h0m0s
+- always_run: false
+  as: loaded-upgrade-417to418-24nodes
+  cluster: build01
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      COMPUTE_CPU: "8"
+      COMPUTE_MEMORY: "32000"
+      COMPUTE_REPLICAS: "3"
+      MAX_UNAVAILABLE: "3"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-upgrade
+    workflow: openshift-qe-installer-nutanix-ovn
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
