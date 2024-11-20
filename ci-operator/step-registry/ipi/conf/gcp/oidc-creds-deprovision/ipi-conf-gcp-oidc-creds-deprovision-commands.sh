@@ -5,7 +5,13 @@ set -o errexit
 set -o pipefail
 
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
-export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+
+if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
+  echo "> Using minimal permissions for 'ccoctl'..."
+  export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/ccoctl_sa.json
+else
+  export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+fi
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
@@ -27,5 +33,4 @@ echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"
 
 echo "> Delete credentials infrastructure created by oidc-creds-provision-provision configure step"
-export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 ccoctl gcp delete --name="${infra_name}" --project="${PROJECT}" --credentials-requests-dir="/tmp/credrequests"

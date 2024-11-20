@@ -5,6 +5,7 @@ set -o nounset
 ############################################################
 # Variables
 IBMCLOUD_HOME=/tmp/ibmcloud
+export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
 ############################################################
@@ -119,7 +120,6 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-    retry "ibmcloud plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # Download automation code
@@ -191,17 +191,23 @@ function cleanup_prior() {
 
     # Dev: functions don't work inline with xargs
     echo "Delete network non-'ocp-net' on PowerVS region"
-    export IBMCLOUD_HOME=${IBMCLOUD_HOME}
-    ibmcloud pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} || true
+    ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
     echo "Done deleting non-'ocp-net' on PowerVS"
 
     # VPC Instances
     # VPC LBs 
     WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
 
     echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
         echo "Subnet: ${SUB}"

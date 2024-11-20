@@ -34,7 +34,7 @@ if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
     echo "Deleting sp..."
     sp_ids=$(< "${SHARED_DIR}/azure_sp_id")
     for sp_id in ${sp_ids}; do
-        cmd="az ad sp delete --id ${sp_id}"
+        cmd="az ad app delete --id ${sp_id}"
         run_command "${cmd}"
     done
 fi
