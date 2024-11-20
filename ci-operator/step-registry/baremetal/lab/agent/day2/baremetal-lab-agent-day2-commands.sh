@@ -103,14 +103,13 @@ mkdir -p "${DAY2_INSTALL_DIR}"
 cp "${SHARED_DIR}/nodes-config.yaml" "${DAY2_INSTALL_DIR}/"
 cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
-echo "Create node.iso for day2 worker nodes..."
-/tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
-
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
-
 arch=${ADDITIONAL_WORKER_ARCHITECTURE}
+
 case "${BOOT_MODE}" in
 "iso")
+  echo "Create node.iso for day2 worker nodes..."
+  /tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
@@ -137,8 +136,8 @@ case "${BOOT_MODE}" in
 ;;
 "pxe")
   ### Create pxe files
-  echo -e "\nCreating PXE files..."
-  oinst agent create pxe-files
+  echo "Create pxe files for day2 worker nodes..."
+  /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
