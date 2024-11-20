@@ -12,6 +12,7 @@ bastion=$(cat "/secret/address")
 CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
+PULL_NUMBER=${PULL_NUMBER:-}
 
 cat <<EOF >>/tmp/all.yml
 ---
