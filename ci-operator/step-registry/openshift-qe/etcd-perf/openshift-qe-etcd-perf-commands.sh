@@ -16,7 +16,7 @@ NAME=${NAME:=""}
     then
       oc create ns multi-image;
    fi
-cat<<EOF>/tmp/template_image.yaml
+cat<<'EOF' >/tmp/template_image.yaml
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -26,7 +26,7 @@ objects:
     apiVersion: image.openshift.io/v1
     metadata:
       name: "${NAME}"
-      creationTimestamp:
+      creationTimestamp: null
     dockerImageReference: registry.redhat.io/ubi8/ruby-27:latest
     dockerImageMetadata:
       kind: DockerImage
@@ -40,7 +40,9 @@ parameters:
   - name: NAME
 EOF
   #for i in {1..30000}; do oc -n multi-image process -f /tmp/template_image.yaml -p NAME=testImage-$i | oc -n multi-image create -f - ; done
-  for i in {1..3}; do oc -n multi-image process -f /tmp/template_image.yaml -p NAME=testImage-$i | oc -n multi-image create -f - ; done
+  #for i in {1..3}; do oc -n multi-image process -f /tmp/template_image.yaml -p NAME=testImage-$i | oc -n multi-image create -f - ; done
+  for i in {1..3}; do
+  oc -n multi-image process -f /tmp/template_image.yaml -p NAME=testImage-$i | oc -n multi-image create -f - ;done
   echo "to check endpoint health after creating many images"
   for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
   #CASE 03 Many secrets; 300namespaces each with 400 secrets
@@ -67,7 +69,7 @@ EOF
   export CERTIFICATE
   PRIVATE_KEY=$(cat tls.key | base64 | tr -d '\n')
   export PRIVATE_KEY
-  cat<<EOF>/tmp/testsec.yaml
+  cat<<'EOF' >/tmp/testsec.yaml
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -77,7 +79,7 @@ objects:
     apiVersion: image.openshift.io/v1
     metadata:
       name: "${NAME}"
-      creationTimestamp:
+      creationTimestamp: null
     dockerImageReference: registry.redhat.io/ubi8/ruby-27:latest
     dockerImageMetadata:
       kind: DockerImage
