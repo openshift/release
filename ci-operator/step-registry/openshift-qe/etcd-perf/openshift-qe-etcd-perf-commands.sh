@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+NAME=${NAME:=""}
   #CASE 01 create 100 projects in the batches of 500
   #for i in {1..100}; do oc new-project project-$i;oc create configmap project-$i --from-file=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt; done
   #for i in {1..500}; do oc new-project project-$i;oc -n project-$i create configmap project-$i --from-file=/etc/pki/ca-trust/source/anchors;done
@@ -15,7 +16,7 @@ set -o pipefail
     then
       oc create ns multi-image;
    fi
-  cat<<EOF>/tmp/template_image.yaml
+cat<<EOF>/tmp/template_image.yaml
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
