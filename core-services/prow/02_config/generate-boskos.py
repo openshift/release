@@ -84,6 +84,9 @@ CONFIG = {
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
     },
+    'metal-perfscale-jetlag-quota-slice': {
+        'metal-perfscale-jetlag-rdu3': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -93,7 +96,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 2,
+        'us-east-1': 5,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
