@@ -39,6 +39,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   console-tests:
     name: "4.18"
     namespace: ocp
@@ -63,6 +67,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: libvirt-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   upi-installer:
     name: "4.18"
     namespace: ocp
@@ -469,7 +477,9 @@ tests:
     env:
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+        on the same node\|\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should
+        be able to preserve UDP traffic when server pod cycles for a LoadBalancer
+        service
     observers:
       enable:
       - observers-resource-watch
@@ -580,7 +590,7 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -592,7 +602,7 @@ tests:
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -663,7 +673,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
@@ -1834,6 +1844,22 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-crun
   timeout: 5h0m0s
+- as: e2e-rosa-sts-ovn
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: rosa-aws-sts-conformance
+  timeout: 6h0m0s
+- as: e2e-rosa-sts-hypershift-ovn
+  cluster: build09
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    workflow: rosa-aws-sts-hcp-conformance
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

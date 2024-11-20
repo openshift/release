@@ -187,13 +187,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-gcp-ovn-techpreview
-  optional: true
   steps:
     cluster_profile: gcp
     env:
@@ -353,6 +353,21 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: frrk8s-e2e
+  cluster: build05
+  optional: true
+  run_if_changed: ^bindata\/network\/frr-k8s.*$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
+        RUN_FRR_K8S_TESTS=true
+    workflow: baremetalds-metallb-e2e
 - as: security
   optional: true
   steps:
