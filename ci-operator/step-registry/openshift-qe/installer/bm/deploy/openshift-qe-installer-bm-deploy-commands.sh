@@ -7,6 +7,7 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
 CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
@@ -60,7 +61,7 @@ EOF
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 
 # Setup Bastion
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
    git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
@@ -77,10 +78,10 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    source bootstrap.sh
 "
 
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
+scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
    cd ${jetlag_repo}
