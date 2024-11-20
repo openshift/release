@@ -17,6 +17,8 @@ function debug() {
         echo -e "Describing abnormal mcp...\n"
         oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
+    echo -e "oc get co\n$(oc get co)"
+    echo -e "oc get machineconfigpools\n$(oc get machineconfigpools)"
 }
 
 # Generate the Junit for migration
@@ -63,6 +65,27 @@ function run_command_oc() {
     fi
 
     echo "${ret_val}"
+}
+
+# Wait upgrade to start, https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-25473
+# Progressing=True
+# ReleaseAccepted=True
+# Upgradeable=False (wait for https://issues.redhat.com/browse/OTA-861)
+function wait_upgrade_start(){
+    local retry=0 output
+    echo "Wait for the upgrade to start"
+    while [[ retry -lt 5 ]]; do
+        output="$(${OC} get clusterversion version -ojson)"
+        if [[ "$(echo $output | jq -r '.status.conditions[] | select(.type == "Progressing").status')" == "True" ]] \
+            && [[ "$(echo $output | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" == "True" ]]; then
+            echo "Upgrade is processing"
+            return
+        fi
+        retry=$(( retry+1 ))
+        sleep 1m
+    done
+    echo "After 5 minutes, the upgrade has not started yet"
+    return 1
 }
 
 function check_clusteroperators() {
@@ -182,7 +205,6 @@ function check_mcp() {
         echo "Did not run 'oc get machineconfigpools' successfully!"
         return 1
     fi
-
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
     oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
     # using the size of output to determinate if oc command is executed successfully
@@ -305,12 +327,21 @@ function check_migrate_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${SOURCE_VERSION}" ]]; then
-            echo -e "Migrate succeed\n\n"
-            return 0
+            if check_clusteroperators; then
+                echo -e "Migrate succeed\n\n"
+                return 0
+            else
+                echo -e "CVO reports upgrade completed, but some operators are not\n\n"
+                return 1
+            fi
         fi
     done
     if (( wait_migrate <= 0 )); then
         echo >&2 "Migrate timeout, exiting" && return 1
+    fi
+
+    if [[ "$(oc get clusterversion version -oyaml | yq -r '.status.history[0].state')" != "Completed" ]]; then
+        echo >&2 "history state is not Completed, exiting" && return 1
     fi
 }
 
@@ -321,7 +352,7 @@ function check_arch() {
     if [[ ${msg} == *"architecture=\"Multi\""* ]]; then
         echo "ClusterVersion architecture check PASSED"
     else
-        echo >&2 "ClusterVersion architecture check FAILED, exiting" && return 1
+        echo >&2 "OCP-53921: ClusterVersion architecture check FAILED, exiting" && return 1
     fi
 }
 
@@ -359,11 +390,19 @@ fi
 export OC="run_command_oc"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
-SOURCE_XY_VERSION="$(echo "${SOURCE_VERSION}" | cut -f1,2 -d.)"
 export SOURCE_VERSION
+SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+export SOURCE_MINOR_VERSION
+SOURCE_XY_VERSION="$(echo "${SOURCE_VERSION}" | cut -f1,2 -d.)"
+export SOURCE_XY_VERSION
 
 switch_channel
 migrate
+if [[ "${SOURCE_MINOR_VERSION}" -gt 17 ]]; then
+    wait_upgrade_start
+fi
 check_migrate_status
 check_arch
-health_check
+if [[ "${SOURCE_MINOR_VERSION}" -lt 18 ]]; then
+    health_check
+fi

@@ -71,6 +71,10 @@ tests:
   container:
     from: microshift-test-rpm
   run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 - as: test-rebase
   optional: true
   run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
@@ -187,6 +191,42 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-optional-components-rhel-eus
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-serial-optional-components-rhel-eus
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-optional-components-rhel-eus-arm
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: ocp-full-conformance-serial-optional-components-rhel-eus-arm
+  run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-microshift-e2e-origin-conformance
 - as: e2e-aws-footprint-and-performance
