@@ -1,29 +1,29 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: upstream-1.22
+    tag: upstream-master
   use_build_cache: true
 releases:
   arm64-latest:
     release:
       architecture: arm64
       channel: stable
-      version: "4.16"
+      version: "4.17"
   latest:
     release:
       channel: stable
-      version: "4.16"
+      version: "4.17"
   next:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -105,12 +105,12 @@ tests:
   - mount_path: /creds-github
     name: ossm-github-simple-job
   timeout: 20m0s
-- as: e2e-ocp-4-16
+- as: e2e-ocp-4-17
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.5-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -131,17 +131,20 @@ tests:
           cpu: 200m
           memory: 200Mi
       timeout: 10m0s
-    - as: e2e-ocp-4-16
+    - as: e2e-ocp-4-17
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c "\
+          export VERSIONS_YAML_FILE=versions.yaml && \
           export KUBECONFIG=/work/ci-kubeconfig && \
           oc version && \
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen && \
           make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -155,7 +158,7 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: e2e-ocp-4-17
+- as: e2e-ocp-4-18
   optional: true
   steps:
     cluster_profile: ossm-aws
@@ -183,7 +186,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: e2e-ocp-4-17
+    - as: e2e-ocp-4-18
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -207,7 +210,7 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
-- as: e2e-ocp-4-16-arm
+- as: e2e-ocp-4-17-arm
   steps:
     cluster_profile: ossm-aws
     dependencies:
@@ -237,7 +240,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: e2e-ocp-4-16-arm
+    - as: e2e-ocp-4-17-arm
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -268,7 +271,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.23-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -315,7 +318,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.23-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
