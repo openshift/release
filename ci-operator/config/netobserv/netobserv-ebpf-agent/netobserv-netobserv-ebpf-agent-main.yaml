@@ -1,4 +1,20 @@
 base_images:
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  network-observability-console-plugin:
+    name: network-observability-console-plugin
+    namespace: netobserv
+    tag: ci
+  network-observability-operator:
+    name: network-observability-operator
+    namespace: netobserv
+    tag: ci
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -26,6 +42,32 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: qe-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-netobserv
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    dependencies:
+      PATCH_CONSOLE_PLUGIN_IMAGE: pipeline:netobserv-ebpf-agent
+    env:
+      TEST_FILTERS: NonPreRelease;Serial;Disruptive
+      TEST_SCENARIOS: Network_Observability
+      TEST_TIMEOUT: "35"
+      TIMEOUT: +10 min
+    test:
+    - ref: netobserv-install-operator
+    - ref: wait
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: netobserv
