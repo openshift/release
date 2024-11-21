@@ -19,11 +19,11 @@ function info() {
 #	source "${SHARED_DIR}/proxy-conf.sh"
 # fi
 
-if [[ ! -f "${SHARED_DIR}/underlying-kubeconfig" ]]; then
+if [[ ! -f "/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig" ]]; then
 	info "underlying-kubeconfig wasn't found"
     exit 1
 fi
 
 # Get openstack catalog list from the underlying ocp (where run the RHOSO Control Plane)
-export KUBECONFIG=${SHARED_DIR}/underlying-kubeconfig 
+export KUBECONFIG=/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig
 oc rsh -n openstack openstackclient openstack catalog list
