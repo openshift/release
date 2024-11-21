@@ -19,11 +19,20 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-tests
-  upi-installer:
+  tests:
     name: "4.14"
+    namespace: ocp
+    tag: tests
+  upi-installer:
+    name: "4.15"
     namespace: ocp
     tag: upi-installer
 releases:
+  414-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
   415-latest:
     candidate:
       product: ocp
@@ -43,7 +52,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.17"
   multi-latest:
     candidate:
       architecture: multi
@@ -56,117 +65,29 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-kubevirt-metal-hub414-mce24-hc414-conformance
+- as: e2e-aws-hub415-mce26-hc414-conformance
   cron: 0 17 15 * *
   steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.4"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub414-mce25-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.5"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub415-mce25-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
+    cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:415-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:415-latest
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:414-latest
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.5"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub414-mce26-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
-      HYPERSHIFT_NODE_COUNT: "2"
       MCE_VERSION: "2.6"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
       TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub415-mce26-hc414-conformance
+    workflow: hypershift-mce-aws-conformance
+- as: e2e-aws-hub417-mce27-hc414-conformance
   cron: 0 17 15 * *
   steps:
-    cluster_profile: equinix-ocp-hcp
+    cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:415-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:417-latest
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:414-latest
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.6"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub416-mce26-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:416-latest
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.6"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.16
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub415-mce27-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:415-latest
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      HYPERSHIFT_NODE_COUNT: "2"
+      EXTRA_ARGS: --multi-arch=false
       MCE_VERSION: "2.7"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
       TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub416-mce27-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:416-latest
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.7"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-hub417-mce27-hc414-conformance
-  cron: 0 17 15 * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:417-latest
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.17
-      HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.7"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.16
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
+    workflow: hypershift-mce-aws-conformance
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
