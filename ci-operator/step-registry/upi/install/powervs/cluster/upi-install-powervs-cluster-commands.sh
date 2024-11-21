@@ -125,8 +125,9 @@ function login_ibmcloud() {
 # Download automation code
 function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
+    # Need to revert to ocp-power-automation
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
@@ -311,6 +312,8 @@ ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+
+override_bastion_storage_pool = "General-Flash-7"
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
