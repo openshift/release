@@ -56,7 +56,8 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
     # TODO: change to firewalld or nftables
-    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    # Allow connections on port 22 used by observer pod
+    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
   done
 EOF
 
