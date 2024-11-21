@@ -156,6 +156,33 @@ EOF
 fi
 }
 
+function create_tests_temp_skip_list_19 {
+# List of temporarly skipped tests for 4.19
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
 function is_bm_node {
     node=$1
 
@@ -384,9 +411,9 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
+if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.16"
+    export CNF_TESTS_IMAGE="cnf-tests:4.17"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -425,39 +452,27 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 # Skiplist common for all releases
 create_tests_skip_list_file
 
+if [[ "$CNF_BRANCH" == *"4."* ]]; then
+    function_version="${CNF_BRANCH//4./}"
+    skip_function_name="create_tests_temp_skip_list_${function_version}"
+else
+    # In case of master branch
+    skip_function_name=create_tests_temp_skip_list_18
+fi
+if declare -f "$skip_function_name" > /dev/null; then
+    echo "Executing $skip_function_name for skipping tests"
+    $skip_function_name
+else
+    echo "Function $skip_function_name does not exist. Exiting."
+    exit 1
+fi
+
 # Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
-if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
-    create_tests_temp_skip_list_11
-    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
-
-fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
-    create_tests_temp_skip_list_12
     export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
-
-fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
-    create_tests_temp_skip_list_13
+elif [[ "$CNF_BRANCH" == *"4.14"* ]]; then
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.14"* ]]; then
-    create_tests_temp_skip_list_14
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.15"* ]]; then
-    create_tests_temp_skip_list_15
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.16"* ]]; then
-    create_tests_temp_skip_list_16
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.17"* ]]; then
-    create_tests_temp_skip_list_17
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
-fi
-if [[ "$CNF_BRANCH" == *"4.18"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
-    create_tests_temp_skip_list_18
+else
     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
