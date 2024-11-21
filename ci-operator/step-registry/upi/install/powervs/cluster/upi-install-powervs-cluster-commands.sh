@@ -350,12 +350,10 @@ function build_upi_cluster() {
     fi
 
     echo "Extracting the terraformm output from the state file"
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_private_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_public_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_public_ip > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
     # public ip not shared for security reasons
     BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
