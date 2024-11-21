@@ -103,5 +103,5 @@ EOF
   date;oc adm top node;date;/tmp/etcd-tools/etcd-analyzer.sh;date
   echo "-----------------------Fio Test STARTS...........................................................................!"
   /tmp/etcd-tools/fio_suite.sh
-  /tmp/etc_masternode1=`oc get node |grep master|awk '{print $1}'|tail -1`
+  etc_masternode1=`oc get node |grep master|awk '{print $1}'|tail -1`
   oc debug -n openshift-etcd --quiet=true node/$etc_masternode1 -- chroot host bash -c "podman run --privileged --volume /var/lib/etcd:/test quay.io/peterducai/openshift-etcd-suite:latest fio"
