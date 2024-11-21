@@ -24,6 +24,18 @@ if [[ ! -f "/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubec
     exit 1
 fi
 
-# Get openstack catalog list from the underlying ocp (where run the RHOSO Control Plane)
 export KUBECONFIG=/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig
+
+# Load the proxy
+proxy_host=$(yq -r ".clusters.[].cluster.proxy-url" "$KUBECONFIG" | cut -d/ -f3 | cut -d: -f1)
+info "Permanent proxy detected: $proxy_host"
+export HTTP_PROXY=http://${proxy_host}:3128/
+export HTTPS_PROXY=http://${proxy_host}:3128/
+export NO_PROXY="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+
+export http_proxy=http://${proxy_host}:3128/
+export https_proxy=http://${proxy_host}:3128/
+export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+
+# Get openstack catalog list from the underlying ocp (where run the RHOSO Control Plane)
 oc rsh -n openstack openstackclient openstack catalog list
