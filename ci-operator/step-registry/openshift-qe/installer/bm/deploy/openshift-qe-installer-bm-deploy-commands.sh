@@ -87,6 +87,8 @@ for i in $HOSTS; do
 done
 EOF
 
+scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/pre-reqs.sh root@${bastion}:/tmp
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
