@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+oc get route -A |grep ditty
 NAME=${NAME:=""}
   #CASE 01 create 100 projects in the batches of 500
   #for i in {1..100}; do oc new-project project-$i;oc create configmap project-$i --from-file=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt; done
@@ -109,3 +110,4 @@ EOF
   etcd-tools/fio_suite.sh
   etc_masternode1=`oc get node |grep master|awk '{print $1}'|tail -1`
   oc debug -n openshift-etcd --quiet=true node/$etc_masternode1 -- chroot host bash -c "podman run --privileged --volume /var/lib/etcd:/test quay.io/peterducai/openshift-etcd-suite:latest fio"
+sleep 600  
