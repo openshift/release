@@ -27,7 +27,8 @@ fi
 export KUBECONFIG=/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig
 
 # Load the proxy
-proxy_host=$(yq -r '.clusters[0].cluster.proxy-url' "${KUBECONFIG}" | cut -d/ -f3 | cut -d: -f1)
+grep -n proxy-url ${KUBECONFIG}
+proxy_host=$(cat ${KUBECONFIG} | yq -r '.clusters[0].cluster.proxy-url' | cut -d/ -f3 | cut -d: -f1)
 info "Permanent proxy detected: $proxy_host"
 export HTTP_PROXY=http://${proxy_host}:3128/
 export HTTPS_PROXY=http://${proxy_host}:3128/
