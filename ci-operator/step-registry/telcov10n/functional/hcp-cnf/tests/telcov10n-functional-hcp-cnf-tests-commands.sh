@@ -7,14 +7,6 @@ set -x
 
 echo "************ telco5g cnf-tests commands ************"
 
-## Install ginkgo
-export GOPATH="/root/go"
-export GOBIN="${GOPATH}"/bin
-
-# Deploy ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@latest
-go install github.com/onsi/gomega@latest
-
 # Environment Variables required for running the test
 export CLUSTER_NAME=cnfqe1
 export ROLE_WORKER_CNF=worker
@@ -90,6 +82,14 @@ else
 fi
 
 echo "Go version: $(go version)"
+
+## Install ginkgo
+export GOPATH="${HOME}"/go
+export GOBIN="${GOPATH}"/bin
+
+# Deploy ginkgo
+go install github.com/onsi/ginkgo/v2/ginkgo@latest
+go install github.com/onsi/gomega@latest
 
 echo "************ telco5g cnf-tests commands ************"
 export PATH=$PATH:$GOBIN
