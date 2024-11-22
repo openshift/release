@@ -151,6 +151,31 @@ periodics:
     serviceAccountName: upgrader
 - agent: kubernetes
   cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cluster: app.ci
+    ci.openshift.io/role: infra
+  name: periodic-triggered-jobs-alert
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the number of
+        triggered jobs is high, please check if anything blocks the process.
+  spec:
+    containers:
+    - command:
+      - hack/triggered-jobs-alert.sh
+      image: registry.ci.openshift.org/ocp/cli-jq:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 8 * * 2-5
   decorate: true
   labels:
