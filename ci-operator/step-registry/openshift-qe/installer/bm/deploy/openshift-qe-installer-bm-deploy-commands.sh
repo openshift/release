@@ -116,8 +116,8 @@ ssh ${SSH_ARGS} root@${bastion} "
    cd ${jetlag_repo}
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/pre-reqs.sh
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/pre-reqs.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    deactivate
