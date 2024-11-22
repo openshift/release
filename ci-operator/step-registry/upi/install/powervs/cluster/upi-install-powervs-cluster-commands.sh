@@ -125,8 +125,9 @@ function login_ibmcloud() {
 # Download automation code
 function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
+    # Need to revert to ocp-power-automation
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
@@ -201,12 +202,6 @@ function cleanup_prior() {
     echo "Target region - ${VPC_REGION}"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
 
-    echo "Cleaning up the Security Groups"
-    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
-        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
-        || true
-
     echo "Cleaning up the VPC Load Balancers"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
@@ -218,12 +213,18 @@ function cleanup_prior() {
         done
 
         echo "Deleting LB in ${SUB}"
-        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[]?.name')
         do
             ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
         done
         sleep 60
     done
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
@@ -311,6 +312,8 @@ ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+
+override_bastion_storage_pool = "General-Flash-7"
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
@@ -350,12 +353,10 @@ function build_upi_cluster() {
     fi
 
     echo "Extracting the terraformm output from the state file"
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_private_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_public_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_public_ip > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
     # public ip not shared for security reasons
     BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
