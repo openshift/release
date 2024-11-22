@@ -34,6 +34,15 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
+      for CS in $(ic tg connections "${GW}" --output json | jq -r '.[] | select(.name | contains("vpc-conn")) | .id')
+      do
+          VPC_CONN_NAME=$(ic tg connection "${GW}" "${CS}"  --output json | jq -r .name)
+          VPC_NW_ID=$(ic tg connection "${GW}" "${CS}"  --output json | jq -r .network_id)
+          ic tg connection-delete "${GW}" "${CS}" --force || true
+          sleep 120
+          echo "Old VPC connection for gateway deleted. Creating new VPC connection for gateway now."
+          ic tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+      done
       echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
       if [ ! -z "${WORKFLOW_TYPE}" ]
       then
