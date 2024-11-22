@@ -4,37 +4,22 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
-  echo "ERROR: INSTALL_NAMESPACE is not defined"
-  exit 1
+echo "DEBUG: Starting operator subscription process"
+echo "DEBUG: SUB_INSTALL_NAMESPACE=${SUB_INSTALL_NAMESPACE}"
+echo "DEBUG: SUB_PACKAGE=${SUB_PACKAGE}"
+echo "DEBUG: SUB_CHANNEL=${SUB_CHANNEL}"
+
+# Create the namespace if it doesn't exist
+if ! oc get ns "${SUB_INSTALL_NAMESPACE}"; then
+  echo "DEBUG: Creating namespace ${SUB_INSTALL_NAMESPACE}"
+  oc create ns "${SUB_INSTALL_NAMESPACE}"
+else
+  echo "DEBUG: Namespace ${SUB_INSTALL_NAMESPACE} already exists"
 fi
 
-if [[ -z "${SUB_PACKAGE}" ]]; then
-  echo "ERROR: PACKAGE is not defined"
-  exit 1
-fi
-
-if [[ -z "${SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
-  exit 1
-fi
-
-if [[ "${SUB_TARGET_NAMESPACES}" == "!install" ]]; then
-  SUB_TARGET_NAMESPACES="${SUB_INSTALL_NAMESPACE}"
-fi
-
-echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
-
-# create the install namespace
-oc apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: "${SUB_INSTALL_NAMESPACE}"
-EOF
-
-# deploy new operator group
-oc apply -f - <<EOF
+# Create the OperatorGroup
+echo "DEBUG: Creating OperatorGroup"
+cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -42,10 +27,11 @@ metadata:
   namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
   targetNamespaces:
-  - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
+  - "${SUB_INSTALL_NAMESPACE}"
 EOF
 
-# subscribe to the operator
+# Create the Subscription
+echo "DEBUG: Creating Subscription"
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -54,44 +40,49 @@ metadata:
   namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
   channel: "${SUB_CHANNEL}"
-  installPlanApproval: Automatic
   name: "${SUB_PACKAGE}"
-  source: "${SUB_SOURCE}"
-  sourceNamespace: openshift-marketplace
+  source: "${SUB_SOURCE:-"redhat-operators"}"
+  sourceNamespace: "${SUB_SOURCE_NAMESPACE:-"openshift-marketplace"}"
 EOF
 
-# can't wait before the resource exists. Need to sleep a bit before start watching
-sleep 60
+echo "DEBUG: Checking catalog sources"
+oc get catalogsource -n openshift-marketplace -o wide
 
-RETRIES=30
-CSV=
-for i in $(seq "${RETRIES}"); do
-  if [[ -z "${CSV}" ]]; then
-    CSV=$(oc get subscription -n "${SUB_INSTALL_NAMESPACE}" "${SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
-  fi
-
-  if [[ -z "${CSV}" ]]; then
-    echo "Try ${i}/${RETRIES}: can't get the ${SUB_PACKAGE} yet. Checking again in 30 seconds"
-    sleep 30
-  fi
-
-  if [[ $(oc get csv -n ${SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
-    echo "${SUB_PACKAGE} is deployed"
-    break
+echo "DEBUG: Waiting for operator deployment"
+for i in $(seq 1 30); do
+  echo "DEBUG: Attempt ${i}/30"
+  
+  echo "DEBUG: Checking subscription status"
+  oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
+  
+  echo "DEBUG: Checking CSV status"
+  csv=$(oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}" -o jsonpath='{.status.currentCSV}' || echo "")
+  if [ -n "${csv}" ]; then
+    echo "DEBUG: Found CSV: ${csv}"
+    oc get csv "${csv}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
   else
-    echo "Try ${i}/${RETRIES}: ${SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
-    sleep 30
+    echo "DEBUG: No CSV found yet"
   fi
+  
+  echo "DEBUG: Checking operator pods"
+  oc get pods -n "${SUB_INSTALL_NAMESPACE}"
+  
+  if oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}"; then
+    if [[ "$(oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}" -o jsonpath='{.status.state}')" == "AtLatestKnown" ]]; then
+      echo "DEBUG: Operator successfully deployed"
+      exit 0
+    fi
+  fi
+  
+  echo "DEBUG: Operator not ready yet. Waiting 30 seconds..."
+  sleep 30
 done
 
-if [[ $(oc get csv -n "${SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-  echo "Error: Failed to deploy ${SUB_PACKAGE}"
-  echo "CSV ${CSV} YAML"
-  oc get CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
-  echo
-  echo "CSV ${CSV} Describe"
-  oc describe CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}"
-  exit 1
-fi
+echo "ERROR: Operator deployment timeout"
+echo "DEBUG: Final status check"
+oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
+oc get csv -n "${SUB_INSTALL_NAMESPACE}" -o yaml
+oc get events -n "${SUB_INSTALL_NAMESPACE}"
+oc get pods -n "${SUB_INSTALL_NAMESPACE}"
 
-echo "successfully installed ${SUB_PACKAGE}"
+exit 1
