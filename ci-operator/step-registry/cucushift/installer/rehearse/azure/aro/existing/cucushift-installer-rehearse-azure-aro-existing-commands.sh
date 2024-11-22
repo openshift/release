@@ -12,6 +12,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_REGION="us-east-1"
 export AWS_PAGER=""
 
+ls -l ${AWS_SHARED_CREDENTIALS_FILE}
+
 ## prepare kubeconfig
 aws s3 cp s3://${BUCKET_NAME}/kubeconfig  ${SHARED_DIR}/kubeconfig
 #cp ${SHARED_DIR}/kubeconfig ${SHARED_DIR}/nested_kubeconfig
