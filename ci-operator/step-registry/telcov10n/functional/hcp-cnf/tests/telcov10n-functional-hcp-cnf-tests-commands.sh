@@ -57,9 +57,12 @@ ansible-playbook -vvvv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_prof
 #### If we made this far we are good with running tests
 echo "********************* Running Tests ****************************"
 
-if (( $(echo "${T5CI_VERSION} < 4.18" | bc -l) )); then
-    NTO_BRANCH="release-${T5CI_VERSION}"
-fi
+## commenting out the below code as bc command is not available
+## TODO: clean this up 
+#if (( $(echo "${T5CI_VERSION} < 4.18" | bc -l) )); then
+#    NTO_BRANCH="release-${T5CI_VERSION}"
+#fi
+NTO_BRANCH="release-${T5CI_VERSION}"
 
 ## create NTO REPO DIR only if we have come this far
 NTO_REPO_DIR=${NTO_REPO_DIR:-"$(mktemp -d -t nto-XXXXX)/cluster-node-tuning-operator"}
@@ -88,11 +91,21 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 
 # Deploy ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@latest
-go install github.com/onsi/gomega@latest
+GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
 echo "************ telco5g cnf-tests commands ************"
 export PATH=$PATH:$GOBIN
+echo $PATH
+echo "Current working directory is: ${PWD}"
+# Get gomega library
+go get github.com/onsi/gomega@latest
+
+# Run go mod tidy and vendor
+go mod tidy
+go mod vendor
+
+# Run make vet 
+make vet
 
 echo "Running ${GINKGO_LABEL} tests"
 GOFLAGS=-mod=vendor ginkgo --no-color --v -r ${GINKGO_SUITES}  \
