@@ -52,6 +52,7 @@ envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Clean up previous attempts
 cat > /tmp/clean-resources.sh << 'EOF'
+dnf install -y podman
 podman pod stop $(podman pod ps -q) || echo 'No podman pods to stop'
 podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
 podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
@@ -59,22 +60,36 @@ podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
 rm -rf /opt/*
 EOF
 
-jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
-
 # Pre-reqs
-ssh ${SSH_ARGS} root@${bastion} '
-  USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_user")
-  PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD | jq -r ".nodes[0].pm_password")
-  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:] .[].pm_addr")
-  for i in $HOSTS; do
-    badfish -v -H \$i -u $USER -p $PWD --racreset
-  done
-  sleep 300
-  for i in $HOSTS; do
-    badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
-  done'
+cat > /tmp/pre-reqs.sh << 'EOF'
+USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
+HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
+for i in $HOSTS; do
+  podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
+done
+sleep 300
+for i in $HOSTS; do
+  command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+  desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
+  if [[ "$command_output" != "$desired_output" ]]; then
+    echo "Boot order changed in server $i, waiting ..."
+    sleep 300
+  fi
+done
+for i in $HOSTS; do
+  podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
+  if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
+    echo "$i not in Uefi mode"
+    sleep 10s
+    continue
+  fi
+done
+EOF
+
 
 # Setup Bastion
+jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
@@ -102,6 +117,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/pre-reqs.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    deactivate
