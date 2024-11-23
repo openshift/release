@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export SUB_SOURCE="${SUB_SOURCE:-qe-app-registry}"
+export SUB_SOURCE="qe-app-registry"
 
 # Helper function to execute and log commands
 function run_command() {
@@ -18,7 +18,7 @@ echo "DEBUG: Current environment variables:"
 echo "SUB_INSTALL_NAMESPACE: ${SUB_INSTALL_NAMESPACE}"
 echo "SUB_PACKAGE: ${SUB_PACKAGE}"
 echo "SUB_CHANNEL: ${SUB_CHANNEL}"
-echo "SUB_SOURCE: ${SUB_SOURCE:-qe-app-registry}" 
+echo "SUB_SOURCE: ${SUB_SOURCE}"
 echo "SUB_SOURCE_NAMESPACE: ${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
 
 # Check CatalogSource status and validate
@@ -27,15 +27,8 @@ run_command "oc get catalogsource -n openshift-marketplace"
 
 # Validate CatalogSource exists
 if ! oc get catalogsource "${SUB_SOURCE}" -n openshift-marketplace &> /dev/null; then
-    echo "DEBUG: CatalogSource ${SUB_SOURCE} not found, checking available sources:"
-    available_source=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{.items[0].metadata.name}')
-    if [ -n "${available_source}" ]; then
-        echo "DEBUG: Using available CatalogSource: ${available_source}"
-        SUB_SOURCE="${available_source}"
-    else
-        echo "ERROR: No CatalogSource available"
-        exit 1
-    fi
+    echo "ERROR: CatalogSource ${SUB_SOURCE} not found"
+    exit 1
 fi
 
 echo "DEBUG: Detailed CatalogSource information:"
@@ -85,7 +78,7 @@ metadata:
 spec:
   channel: "${SUB_CHANNEL}"
   name: "${SUB_PACKAGE}"
-  source: "${SUB_SOURCE:-qe-app-registry}"
+  source: "${SUB_SOURCE}"
   sourceNamespace: "${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
 EOF
 
