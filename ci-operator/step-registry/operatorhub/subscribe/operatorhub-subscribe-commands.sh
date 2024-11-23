@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export SUB_SOURCE="${SUB_SOURCE:-qe-app-registry}"
+
 # Helper function to execute and log commands
 function run_command() {
     local CMD="$1"
@@ -16,7 +18,8 @@ echo "DEBUG: Current environment variables:"
 echo "SUB_INSTALL_NAMESPACE: ${SUB_INSTALL_NAMESPACE}"
 echo "SUB_PACKAGE: ${SUB_PACKAGE}"
 echo "SUB_CHANNEL: ${SUB_CHANNEL}"
-echo "SUB_SOURCE: ${SUB_SOURCE:-redhat-operators}"
+#echo "SUB_SOURCE: ${SUB_SOURCE:-redhat-operators}"
+echo "SUB_SOURCE: ${SUB_SOURCE:-qe-app-registry}" 
 echo "SUB_SOURCE_NAMESPACE: ${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
 
 # Check CatalogSource status
@@ -69,7 +72,7 @@ metadata:
 spec:
   channel: "${SUB_CHANNEL}"
   name: "${SUB_PACKAGE}"
-  source: "${SUB_SOURCE:-"redhat-operators"}"
+  source: "${SUB_SOURCE:-"qe-app-registry"}"
   sourceNamespace: "${SUB_SOURCE_NAMESPACE:-"openshift-marketplace"}"
 EOF
 
