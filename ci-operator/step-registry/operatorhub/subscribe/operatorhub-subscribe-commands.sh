@@ -18,13 +18,26 @@ echo "DEBUG: Current environment variables:"
 echo "SUB_INSTALL_NAMESPACE: ${SUB_INSTALL_NAMESPACE}"
 echo "SUB_PACKAGE: ${SUB_PACKAGE}"
 echo "SUB_CHANNEL: ${SUB_CHANNEL}"
-#echo "SUB_SOURCE: ${SUB_SOURCE:-redhat-operators}"
 echo "SUB_SOURCE: ${SUB_SOURCE:-qe-app-registry}" 
 echo "SUB_SOURCE_NAMESPACE: ${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
 
-# Check CatalogSource status
+# Check CatalogSource status and validate
 echo "DEBUG: Checking CatalogSource status:"
 run_command "oc get catalogsource -n openshift-marketplace"
+
+# Validate CatalogSource exists
+if ! oc get catalogsource "${SUB_SOURCE}" -n openshift-marketplace &> /dev/null; then
+    echo "DEBUG: CatalogSource ${SUB_SOURCE} not found, checking available sources:"
+    available_source=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{.items[0].metadata.name}')
+    if [ -n "${available_source}" ]; then
+        echo "DEBUG: Using available CatalogSource: ${available_source}"
+        SUB_SOURCE="${available_source}"
+    else
+        echo "ERROR: No CatalogSource available"
+        exit 1
+    fi
+fi
+
 echo "DEBUG: Detailed CatalogSource information:"
 run_command "oc describe catalogsource ${SUB_SOURCE} -n openshift-marketplace"
 
@@ -43,7 +56,7 @@ echo "DEBUG: Checking available packages from catalog source:"
 run_command "oc get packagemanifest -n openshift-marketplace | grep ${SUB_PACKAGE} || true"
 
 # Create namespace if it doesn't exist
-if ! oc get ns "${SUB_INSTALL_NAMESPACE}"; then
+if ! oc get ns "${SUB_INSTALL_NAMESPACE}" &> /dev/null; then
     echo "DEBUG: Creating namespace ${SUB_INSTALL_NAMESPACE}"
     oc create ns "${SUB_INSTALL_NAMESPACE}"
 fi
@@ -72,8 +85,8 @@ metadata:
 spec:
   channel: "${SUB_CHANNEL}"
   name: "${SUB_PACKAGE}"
-  source: "${SUB_SOURCE:-"qe-app-registry"}"
-  sourceNamespace: "${SUB_SOURCE_NAMESPACE:-"openshift-marketplace"}"
+  source: "${SUB_SOURCE:-qe-app-registry}"
+  sourceNamespace: "${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
 EOF
 
 # Monitor deployment progress
