@@ -165,6 +165,7 @@ elasticloadbalancing:RegisterInstancesWithLoadBalancer
 elasticloadbalancing:RegisterTargets
 elasticloadbalancing:SetLoadBalancerPoliciesOfListener
 iam:AddRoleToInstanceProfile
+iam:CreateServiceLinkedRole
 iam:CreateAccessKey
 iam:CreateInstanceProfile
 iam:CreateRole
