@@ -40,21 +40,22 @@ cd /tmp/cnv-ci || exit 1
 # Overwrite the default configuration file used for testing
 export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
 
-if oc get nodes -o jsonpath='{.items[*].status.nodeInfo.architecture}' | grep -q arm64; then
-  # If the cluster is running any arm64 nodes, we can't use ODF's chef, which is set as the default storage class for testing
-  # in https://github.com/openshift-cnv/cnv-ci/blob/master/manifests/testing/kubevirt-tier1-ocs.json
-  # We replace it here to allow further works to support ODF on clusters with arm64 nodes without needing multiple
-  # Pull Requests in different repositories.
-  cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
+# The default storage class used in the testing configuration file is 'ocs-storagecluster-ceph-rbd', at
+# https://github.com/openshift-cnv/cnv-ci/blob/master/manifests/testing/kubevirt-tier1-ocs.json, that is kept for
+# compatiblity with the current test configs at the time of writing this snippet.
+# The KUBEVIRT_STORAGECLASS_NAME is set to 'ocs-storagecluster-ceph-rbd' in the 'cnv-tests-e2e-deploy' step by default too.
+# Some test configurations like KubeVirt testing on ARM64 cannot use the storage class 'ocs-storagecluster-ceph-rbd' as it
+# is not available on the ARM64 nodes. Users can now set the storage class name to be used in the prow test config definition,
+# avoiding the need to modify these values in different repositories.
+cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
 {
-    "storageClassRhel":        "gp3-csi",
-    "storageClassWindows":     "gp3-csi",
-    "storageRWOBlock":         "gp3-csi",
-    "storageRWOFileSystem":    "gp3-csi",
-    "storageSnapshot":         "gp3-csi"
+    "storageClassRhel":        "${KUBEVIRT_STORAGECLASS_NAME}",
+    "storageClassWindows":     "${KUBEVIRT_STORAGECLASS_NAME}",
+    "storageRWOBlock":         "${KUBEVIRT_STORAGECLASS_NAME}",
+    "storageRWOFileSystem":    "${KUBEVIRT_STORAGECLASS_NAME}",
+    "storageSnapshot":         "${KUBEVIRT_STORAGECLASS_NAME}"
 }
 EOF
-fi
 
 make deploy_test || exit_code=$?
 
