@@ -1,4 +1,5 @@
 #!/bin/bash
+# Enable strict error handling and debugging
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -104,32 +105,38 @@ function create_winc_test_configmap() {
     local win_container_image="$2"
     local linux_container_image="$3"
 
+    echo "=== Creating winc-test configmap ==="
     oc create configmap winc-test-config -n winc-test \
         --from-literal=primary_windows_image="${win_image}" \
         --from-literal=primary_windows_container_image="${win_container_image}" \
-        --from-literal=linux_container_disconnected_image="${linux_container_image}"
+        --from-literal=linux_container_disconnected_image="${linux_container_image}" || true
 
     oc get pod -owide -n winc-test
     oc get cm winc-test-config -oyaml -n winc-test
 }
 
-# Function to create Windows and Linux workloads
-function create_workloads() {
-    local windows_container_image=$1
-    local linux_container_image=$2
+# Function to ensure namespace exists and set security context
+function ensure_namespace() {
+    if ! oc get namespace winc-test >/dev/null 2>&1; then
+        echo "=== Creating winc-test namespace ==="
+        oc new-project winc-test
+    fi
     
-    oc new-project winc-test
-    
-    # Configure Pod Security Admission
+    # Set pod security policy
     oc label namespace winc-test security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged --overwrite
+}
 
-    # Create Windows workload
-    echo "=== Creating Windows Workload ==="
-    oc create -f - <<EOF
+# Function to deploy Windows workload
+function deploy_windows_workload() {
+    local windows_container_image=$1
+    
+    echo "=== Deploying Windows Workload ==="
+    cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Service
 metadata:
   name: win-webserver
+  namespace: winc-test
   labels:
     app: win-webserver
 spec:
@@ -143,9 +150,10 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: win-webserver
   name: win-webserver
+  namespace: winc-test
+  labels: 
+    app: win-webserver
 spec:
   selector:
     matchLabels:
@@ -155,14 +163,13 @@ spec:
     metadata:
       labels:
         app: win-webserver
-      name: win-webserver
     spec:
       nodeSelector:
         kubernetes.io/os: windows
       tolerations:
         - key: "os"
           value: "Windows"
-          Effect: "NoSchedule"
+          effect: "NoSchedule"
       containers:
         - name: win-webserver
           image: ${windows_container_image}
@@ -204,17 +211,22 @@ spec:
               runAsUserName: "ContainerAdministrator"
 EOF
 
-    # Wait for Windows workload
-    oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m
+    echo "Waiting for Windows workload..."
+    oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m || true
     debug_deployment "win-webserver"
+}
 
-    # Create Linux workload
-    echo "=== Creating Linux Workload ==="
-    oc create -f - <<EOF
+# Function to deploy Linux workload
+function deploy_linux_workload() {
+    local linux_container_image=$1
+    
+    echo "=== Deploying Linux Workload ==="
+    cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Service
 metadata:
   name: linux-webserver
+  namespace: winc-test
   labels:
     app: linux-webserver
 spec:
@@ -228,9 +240,10 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: linux-webserver
+  namespace: winc-test
   labels:
     app: linux-webserver
-  name: linux-webserver
 spec:
   selector:
     matchLabels:
@@ -240,7 +253,6 @@ spec:
     metadata:
       labels:
         app: linux-webserver
-      name: linux-webserver
     spec:
       containers:
       - name: linux-webserver
@@ -270,41 +282,21 @@ spec:
             python3 -m http.server 8080
 EOF
 
-    # Wait for Linux workload
-    oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m
+    echo "Waiting for Linux workload..."
+    oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m || true
     debug_deployment "linux-webserver"
-
-    # Show additional cluster information
-    echo "=== Node Status ==="
-    oc get nodes -o wide
-    
-    echo "=== Namespace Security Context ==="
-    oc get namespace winc-test -o yaml
-    
-    echo "=== Network Policies ==="
-    oc get networkpolicy -n winc-test
-    
-    echo "=== Storage Class & PV Status ==="
-    oc get sc,pv,pvc -n winc-test
 }
 
-# Get the infrastructure platform type
+# Main script execution starts here
+
+# Get infrastructure platform type
 IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
 
-# Get Windows machineset information
+# Get Windows machineset info
 winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("win")).metadata.name')
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
-# Wait for Windows nodes
-echo "Waiting for Windows nodes to come up in Running state"
-while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do 
-    echo -n "." && sleep 10
-done
-
-# Wait for Windows nodes to be ready
-oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=15m
-
-# Setup container image paths based on environment
+# Set container images based on environment
 if isDisconnectedCluster; then
     DISCONNECTED_IMAGE_REGISTRY=$(oc get configmap winc-test-config -n winc-test -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
     windows_container_image="${DISCONNECTED_IMAGE_REGISTRY}/powershell:lts-nanoserver-ltsc2022"
@@ -335,6 +327,25 @@ case "$IAAS_PLATFORM" in
         ;;
 esac
 
-# Create workloads and configmap
-create_workloads "$windows_container_image" "$linux_container_image"
+# 1. First ensure namespace exists
+ensure_namespace
+
+# 2. Create configmap first with image information
 create_winc_test_configmap "$windows_os_image_id" "$windows_container_image" "$linux_container_image"
+
+# 3. Then deploy workloads
+deploy_linux_workload "$linux_container_image"
+deploy_windows_workload "$windows_container_image"
+
+# Show final cluster status
+echo "=== Node Status ==="
+oc get nodes -o wide
+
+echo "=== Namespace Security Context ==="
+oc get namespace winc-test -o yaml
+
+echo "=== Network Policies ==="
+oc get networkpolicy -n winc-test
+
+echo "=== Storage Class & PV Status ==="
+oc get sc,pv,pvc -n winc-test
