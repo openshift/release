@@ -447,7 +447,9 @@ fi
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
-oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+    oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+fi
 
 # Skiplist common for all releases
 create_tests_skip_list_file
