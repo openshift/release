@@ -351,6 +351,12 @@ checkout_submodules(){
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
+echo "listing shared dir, find a kubeconfig"
+ls -alsh $SHARED_DIR
+echo "Print kubeconfig"
+cat $SHARED_DIR/*kubeconfig* || true
+echo "End of printing kubeconfig"
+
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
     source $HOME/golang-1.19
@@ -446,10 +452,19 @@ if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5
 fi
 popd
 
-echo "******** Patching OperatorHub to disable all default sources"
 if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+    echo "******** Patching OperatorHub to disable all default sources"
     oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+else
+    echo "******** Skipping patching of OperatorHub for Hypershift jobs"
 fi
+
+echo "listing shared dir, find a kubeconfig"
+ls -alsh $SHARED_DIR
+echo "Print kubeconfig"
+cat $SHARED_DIR/*kubeconfig* || true
+echo "End of printing kubeconfig"
+
 
 # Skiplist common for all releases
 create_tests_skip_list_file

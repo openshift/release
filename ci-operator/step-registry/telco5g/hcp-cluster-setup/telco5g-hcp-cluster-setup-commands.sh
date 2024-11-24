@@ -331,5 +331,12 @@ if [[ "$status" == "0" ]]; then
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
 
+echo "listing shared dir, find a kubeconfig"
+ls -alsh $SHARED_DIR
+echo "Print kubeconfig"
+cat $SHARED_DIR/*kubeconfig* || true
+echo "End of printing kubeconfig"
+
+
 echo "Exiting with status ${status}"
 exit ${status}
