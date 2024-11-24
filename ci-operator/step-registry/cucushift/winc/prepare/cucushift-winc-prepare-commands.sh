@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -21,10 +21,13 @@ function debug_deployment() {
     echo "=== Deployment Status ==="
     oc describe deployment $deployment_name -n winc-test
     
-    # Show pod logs
-    echo "=== Pod Logs ==="
+    # Show pod logs with environment status
+    echo "=== Pod Logs (with Environment Status) ==="
     for pod in $(oc get pods -n winc-test -l app=$deployment_name -o name); do
         echo "--- Logs for $pod ---"
+        echo "Environment Status Check:"
+        oc logs -n winc-test $pod | grep -i "Environment Status"
+        echo "Full Logs:"
         oc logs -n winc-test $pod
     done
     
@@ -38,6 +41,14 @@ function disconnected_prepare() {
     # Extract registry hostname from image
     DISCONNECTED_REGISTRY=$(echo $1 | awk -F/ '{print $1}')
     export DISCONNECTED_REGISTRY
+    
+    echo "Checking if environment is disconnected..."
+    if curl -s --connect-timeout 5 https://registry.redhat.io > /dev/null; then
+        echo "Environment is connected, skipping disconnected preparation"
+        return 0
+    fi
+    
+    echo "Environment is disconnected, starting preparation..."
     
     # Add the registry certificate to trust
     echo "=== Adding registry certificate to trust ==="
@@ -54,25 +65,36 @@ function disconnected_prepare() {
 
 # Function to check if cluster is disconnected
 function isDisconnectedCluster() {
+    echo "Checking if cluster is disconnected..."
+    
+    # Try to access external registry
+    if curl -s --connect-timeout 5 https://registry.redhat.io > /dev/null; then
+        echo "External registry is accessible - Connected environment detected"
+        return 1
+    fi
+    
+    echo "External registry is not accessible - Disconnected environment detected"
+    
     local output
-    # Get configmap content
     output=$(oc get configmap winc-test-config -n winc-test -o yaml 2>/dev/null)
     if [ $? -ne 0 ]; then
+        echo "ConfigMap not found - assuming connected environment"
         return 1
     fi
 
-    # Check if values are placeholders
     if echo "$output" | grep -q "<primary_windows_container_disconnected_image>" || \
        echo "$output" | grep -q "<linux_container_disconnected_image>"; then
+        echo "Found placeholder values in ConfigMap - assuming connected environment"
         return 1
     fi
 
-    # Check if required keys exist
     if ! echo "$output" | grep -q "primary_windows_container_disconnected_image:" || \
        ! echo "$output" | grep -q "linux_container_disconnected_image:"; then
+        echo "Missing required keys in ConfigMap - assuming connected environment"
         return 1
     fi
 
+    echo "Confirmed disconnected environment"
     return 0
 }
 
@@ -82,7 +104,6 @@ function create_winc_test_configmap() {
         --from-literal=primary_windows_image="${1}" \
         --from-literal=primary_windows_container_image="${2}"
 
-    # Display pods and configmap
     oc get pod -owide -n winc-test
     oc get cm winc-test-config -oyaml -n winc-test
 }
@@ -141,7 +162,34 @@ spec:
           command:
             - pwsh.exe
             - -command
-            - \$listener = New-Object System.Net.HttpListener; \$listener.Prefixes.Add('http://*:80/'); \$listener.Start();Write-Host('Listening at http://*:80/'); while (\$listener.IsListening) { \$context = \$listener.GetContext(); \$response = \$context.Response; \$content='<html><body><H1>Windows Container Web Server</H1></body></html>'; \$buffer = [System.Text.Encoding]::UTF8.GetBytes(\$content); \$response.ContentLength64 = \$buffer.Length; \$response.OutputStream.Write(\$buffer, 0, \$buffer.Length); \$response.Close(); };
+            - |
+              \$isDisconnected = \$false
+              try {
+                  Write-Host "Checking environment connectivity..."
+                  Invoke-WebRequest -Uri 'https://registry.redhat.io' -TimeoutSec 5 -UseBasicParsing | Out-Null
+                  Write-Host "Environment Status: Connected"
+              } catch {
+                  \$isDisconnected = \$true
+                  Write-Host "Environment Status: Disconnected"
+              }
+
+              Write-Host "Starting web server..."
+              \$listener = New-Object System.Net.HttpListener
+              \$listener.Prefixes.Add('http://*:80/')
+              \$listener.Start()
+              Write-Host('Listening at http://*:80/')
+
+              while (\$listener.IsListening) {
+                  \$context = \$listener.GetContext()
+                  \$response = \$context.Response
+                  \$content = '<html><body><H1>Windows Container Web Server</H1>'
+                  \$content += '<p>Environment Status: ' + (if (\$isDisconnected) { 'Disconnected' } else { 'Connected' }) + '</p>'
+                  \$content += '</body></html>'
+                  \$buffer = [System.Text.Encoding]::UTF8.GetBytes(\$content)
+                  \$response.ContentLength64 = \$buffer.Length
+                  \$response.OutputStream.Write(\$buffer, 0, \$buffer.Length)
+                  \$response.Close()
+              }
           securityContext:
             runAsNonRoot: false
             windowsOptions:
@@ -189,8 +237,28 @@ spec:
       containers:
       - name: linux-webserver
         image: quay.io/openshifttest/hello-openshift:multiarch-winc
-        ports:
-        - containerPort: 8080
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Checking environment connectivity..."
+            if curl -s --connect-timeout 5 https://registry.redhat.io > /dev/null; then
+              echo "Environment Status: Connected"
+              ENV_STATUS="Connected"
+            else
+              echo "Environment Status: Disconnected"
+              ENV_STATUS="Disconnected"
+            fi
+            
+            echo "Starting Python web server..."
+            cat > index.html << END
+            <html><body>
+            <h1>Linux Container Web Server</h1>
+            <p>Environment Status: \$ENV_STATUS</p>
+            </body></html>
+            END
+            
+            python3 -m http.server 8080
 EOF
 
     # Wait for Linux workload
