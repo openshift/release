@@ -100,9 +100,14 @@ function isDisconnectedCluster() {
 
 # Function to create test configmap
 function create_winc_test_configmap() {
+    local win_image="$1"
+    local win_container_image="$2"
+    local linux_container_image="$3"
+
     oc create configmap winc-test-config -n winc-test \
-        --from-literal=primary_windows_image="${1}" \
-        --from-literal=primary_windows_container_image="${2}"
+        --from-literal=primary_windows_image="${win_image}" \
+        --from-literal=primary_windows_container_image="${win_container_image}" \
+        --from-literal=linux_container_disconnected_image="${linux_container_image}"
 
     oc get pod -owide -n winc-test
     oc get cm winc-test-config -oyaml -n winc-test
@@ -110,6 +115,9 @@ function create_winc_test_configmap() {
 
 # Function to create Windows and Linux workloads
 function create_workloads() {
+    local windows_container_image=$1
+    local linux_container_image=$2
+    
     oc new-project winc-test
     
     # Configure Pod Security Admission
@@ -157,7 +165,7 @@ spec:
           Effect: "NoSchedule"
       containers:
         - name: win-webserver
-          image: ${1}
+          image: ${windows_container_image}
           imagePullPolicy: IfNotPresent
           command:
             - pwsh.exe
@@ -236,7 +244,8 @@ spec:
     spec:
       containers:
       - name: linux-webserver
-        image: quay.io/openshifttest/hello-openshift:multiarch-winc
+        image: ${linux_container_image}
+        imagePullPolicy: IfNotPresent
         command:
           - /bin/sh
           - -c
@@ -299,9 +308,11 @@ oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=1
 if isDisconnectedCluster; then
     DISCONNECTED_IMAGE_REGISTRY=$(oc get configmap winc-test-config -n winc-test -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
     windows_container_image="${DISCONNECTED_IMAGE_REGISTRY}/powershell:lts-nanoserver-ltsc2022"
+    linux_container_image=$(oc get configmap winc-test-config -n winc-test -o jsonpath='{.data.linux_container_disconnected_image}')
     disconnected_prepare "${DISCONNECTED_IMAGE_REGISTRY}"
 else
     windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
+    linux_container_image="quay.io/openshifttest/hello-openshift:multiarch-winc"
 fi
 
 # Get Windows OS image ID based on platform
@@ -325,5 +336,5 @@ case "$IAAS_PLATFORM" in
 esac
 
 # Create workloads and configmap
-create_workloads $windows_container_image
-create_winc_test_configmap $windows_os_image_id $windows_container_image
+create_workloads "$windows_container_image" "$linux_container_image"
+create_winc_test_configmap "$windows_os_image_id" "$windows_container_image" "$linux_container_image"
