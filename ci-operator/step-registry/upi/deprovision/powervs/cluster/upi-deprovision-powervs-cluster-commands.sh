@@ -153,12 +153,6 @@ function cleanup_prior() {
     echo "Target region - ${VPC_REGION}"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
 
-    echo "Cleaning up the Security Groups"
-    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
-        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
-        || true
-
     echo "Cleaning up the VPC Load Balancers"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
@@ -176,6 +170,12 @@ function cleanup_prior() {
         done
         sleep 60
     done
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?

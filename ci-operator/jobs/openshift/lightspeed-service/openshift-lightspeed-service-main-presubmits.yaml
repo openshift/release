@@ -6,15 +6,17 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-ols-cluster-4-15
+    context: ci/prow/4.15-e2e-ols-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: "4.15"
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-lightspeed-service-main-e2e-ols-cluster-4-15
-    rerun_command: /test e2e-ols-cluster-4-15
+    name: pull-ci-openshift-lightspeed-service-main-4.15-e2e-ols-cluster
+    rerun_command: /test 4.15-e2e-ols-cluster
     run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
     spec:
       containers:
@@ -24,7 +26,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ols-cluster-4-15
+        - --target=e2e-ols-cluster
+        - --variant=4.15
         command:
         - ci-operator
         image: ci-operator:latest
@@ -69,22 +72,82 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ols-cluster-4-15,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-e2e-ols-cluster,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.15-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.15"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lightspeed-service-main-4.15-images
+    rerun_command: /test 4.15-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.15-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-ols-cluster-4-16
+    context: ci/prow/4.16-e2e-ols-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: "4.16"
       ci.openshift.io/generator: prowgen
+      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-lightspeed-service-main-e2e-ols-cluster-4-16
-    rerun_command: /test e2e-ols-cluster-4-16
+    name: pull-ci-openshift-lightspeed-service-main-4.16-e2e-ols-cluster
+    rerun_command: /test 4.16-e2e-ols-cluster
     run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
     spec:
       containers:
@@ -94,7 +157,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ols-cluster-4-16
+        - --target=e2e-ols-cluster
+        - --variant=4.16
         command:
         - ci-operator
         image: ci-operator:latest
@@ -139,22 +203,82 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ols-cluster-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.16-e2e-ols-cluster,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.16-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.16"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lightspeed-service-main-4.16-images
+    rerun_command: /test 4.16-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.16
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-ols-cluster-4-17
+    context: ci/prow/4.17-e2e-ols-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: "4.17"
       ci.openshift.io/generator: prowgen
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-lightspeed-service-main-e2e-ols-cluster-4-17
-    rerun_command: /test e2e-ols-cluster-4-17
+    name: pull-ci-openshift-lightspeed-service-main-4.17-e2e-ols-cluster
+    rerun_command: /test 4.17-e2e-ols-cluster
     run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
     spec:
       containers:
@@ -164,7 +288,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ols-cluster-4-17
+        - --target=e2e-ols-cluster
+        - --variant=4.17
         command:
         - ci-operator
         image: ci-operator:latest
@@ -209,7 +334,65 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ols-cluster-4-17,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.17-e2e-ols-cluster,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.17-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.17"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lightspeed-service-main-4.17-images
+    rerun_command: /test 4.17-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.17
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.17-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

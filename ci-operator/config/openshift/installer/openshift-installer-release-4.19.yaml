@@ -95,6 +95,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -1051,6 +1055,19 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
         NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv6-minimaliso
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV6
+        MIRROR_IMAGES=true
+        AGENT_MINIMAL_ISO=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
