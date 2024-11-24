@@ -1,4 +1,4 @@
-#!/bin/bash
+#!bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -36,7 +36,8 @@ function debug_deployment() {
 # Function to handle disconnected environment setup
 function disconnected_prepare() {
     # Extract registry hostname from image
-    export DISCONNECTED_REGISTRY=$(echo $1 | awk -F/ '{print $1}')
+    DISCONNECTED_REGISTRY=$(echo $1 | awk -F/ '{print $1}')
+    export DISCONNECTED_REGISTRY
     
     # Add the registry certificate to trust
     echo "=== Adding registry certificate to trust ==="
