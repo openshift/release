@@ -292,6 +292,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
     shell: >-
       oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
 
+  - name: Patching hostedcluster to disable all default sources"
+    shell: >-
+      oc --kubeconfig=/home/kni/.kube/config_${SNO_NAME} patch hostedcluster ${CLUSTER_NAME} -n clusters --type=merge -p '{"spec": {"configuration": {"operatorhub": {"disableAllDefaultSources": true}}}}
+
 EOF
 
 # Run the playbook to install the cluster
