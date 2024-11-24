@@ -33,6 +33,24 @@ function debug_deployment() {
     oc get events -n winc-test --sort-by='.lastTimestamp' | grep $deployment_name
 }
 
+# Function to handle disconnected environment setup
+function disconnected_prepare() {
+    # Extract registry hostname from image
+    export DISCONNECTED_REGISTRY=$(echo $1 | awk -F/ '{print $1}')
+    
+    # Add the registry certificate to trust
+    echo "=== Adding registry certificate to trust ==="
+    oc -n openshift-config get cm custom-ca -o yaml
+    
+    if [ -n "${DISCONNECTED_REGISTRY}" ]; then
+        echo "Setting up disconnected registry: ${DISCONNECTED_REGISTRY}"
+        oc extract -n openshift-config secret/pull-secret --to=.
+        jq -r '.auths += {"'"${DISCONNECTED_REGISTRY}"'": {"auth": "'"$(echo -n "key:value" | base64 -w0)"'","email": "test@test.com"}}' .dockerconfigjson > ./pull-secret
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=./pull-secret
+        rm -f ./.dockerconfigjson ./pull-secret
+    fi
+}
+
 # Function to create test configmap
 function create_winc_test_configmap() {
     oc create configmap winc-test-config -n winc-test \
@@ -187,9 +205,21 @@ oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=1
 # Determine Windows container version based on OS version
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
-windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
-if [[ "$os_version" == *"2019"* ]]; then
-    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
+# Setup container image paths based on environment
+if [ -n "${DISCONNECTED_IMAGE_REGISTRY:-}" ]; then
+    # Use disconnected registry paths
+    windows_container_image="${DISCONNECTED_IMAGE_REGISTRY}/powershell:lts-nanoserver-ltsc2022"
+    if [[ "$os_version" == *"2019"* ]]; then
+        windows_container_image="${DISCONNECTED_IMAGE_REGISTRY}/powershell:lts-nanoserver-1809"
+    fi
+    # Setup disconnected environment
+    disconnected_prepare "${DISCONNECTED_IMAGE_REGISTRY}"
+else
+    # Use public registry paths
+    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
+    if [[ "$os_version" == *"2019"* ]]; then
+        windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
+    fi
 fi
 
 # Get Windows OS image ID based on platform
