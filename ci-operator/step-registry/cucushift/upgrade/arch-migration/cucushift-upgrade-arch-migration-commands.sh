@@ -401,8 +401,9 @@ migrate
 if [[ "${SOURCE_MINOR_VERSION}" -gt 17 ]]; then
     wait_upgrade_start
 fi
-check_migrate_status
-check_arch
 if [[ "${SOURCE_MINOR_VERSION}" -lt 18 ]]; then
     health_check
 fi
+
+check_migrate_status
+check_arch
