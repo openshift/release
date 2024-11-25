@@ -21,6 +21,15 @@ fi
 oc config view
 oc projects
 
+# Login to the Quay.io private registry
+if [ ${OCP_BUILD} == "dev"]; then
+  SRIOV_AUTH="$(cat /secret/sriov_auth)"
+  echo ${SRIOV_AUTH} > .dockerconfigjson
+  oc create secret generic quay-robot-secret --from-file=.dockerconfigjson=.dockerconfigjson --type=kubernetes.io/dockerconfigjson
+  oc secrets link default quay-robot-secret --for=pull
+  rm -f .dockerconfigjson || true
+fi
+
 # Install the SRIOV operator
 cat << EOF| oc apply -f -
 apiVersion: v1
