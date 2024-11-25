@@ -324,6 +324,7 @@ EOF
 function build_upi_cluster() {
     OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
+    export TF_LOG=debug
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
