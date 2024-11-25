@@ -309,7 +309,7 @@ fi
 
 # Wait for Windows nodes to be ready
 echo "Waiting for Windows nodes to be in Ready state..."
-if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=15m; then
+if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m; then
     echo "Error: Timeout waiting for Windows nodes to be ready"
     # Show node status for debugging
     oc get nodes -l kubernetes.io/os=windows -o wide
