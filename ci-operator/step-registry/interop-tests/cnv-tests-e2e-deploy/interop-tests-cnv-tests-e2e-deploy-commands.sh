@@ -46,17 +46,18 @@ export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
 # avoiding the need to modify these values in different repositories.
 cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
 {
-    ${KUBEVIRT_STORAGECLASS_NAME:+"storageClassRhel": "${KUBEVIRT_STORAGECLASS_NAME}",}
-    ${KUBEVIRT_STORAGECLASS_NAME:+"storageClassWindows": "${KUBEVIRT_STORAGECLASS_NAME}",}
-    ${KUBEVIRT_STORAGECLASS_RWX_NAME:+"storageRWXBlock": "${KUBEVIRT_STORAGECLASS_RWX_NAME}",}
-    ${KUBEVIRT_STORAGECLASS_NAME:+"storageRWOFileSystem": "${KUBEVIRT_STORAGECLASS_NAME}",}
-    ${KUBEVIRT_STORAGECLASS_NAME:+"storageRWOBlock": "${KUBEVIRT_STORAGECLASS_NAME}",}
-    ${KUBEVIRT_STORAGECLASS_NAME:+"storageSnapshot": "${KUBEVIRT_STORAGECLASS_NAME}",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageClassRhel\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageClassWindows\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_RWX_NAME:+\"storageRWXBlock\": \"${KUBEVIRT_STORAGECLASS_RWX_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageRWOFileSystem\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageRWOBlock\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageSnapshot\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
 }
 EOF
 cat manifests/testing/kubevirt-tier1-ocs.json
 
-make deploy_test || exit_code=$?
+# shellcheck disable=SC2086
+make ${MAKEFILE_TARGET} || exit_code=$?
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
