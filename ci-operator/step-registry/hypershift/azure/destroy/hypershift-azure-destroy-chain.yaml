@@ -9,6 +9,9 @@ chain:
       documentation: |-
         Specifies the Azure location of the cluster. If intentionally left as an empty string, 
         it defaults to that of the management cluster.
+    - name: HYPERSHIFT_AZURE_CP_MI
+      default: "false"
+      documentation: Specifies whether control plane components should authenticate to Azure using managed identities.
     - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
       default: "false"
       documentation: |-
@@ -24,21 +27,26 @@ chain:
         AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
       fi
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
-
-      RESOURCE_GROUP_NAME=""
-      if [[ $HYPERSHIFT_CUSTOM_RESOURCE_GROUP == "true" ]]; then
-        RESOURCE_GROUP_NAME="$(cat "${SHARED_DIR}/resourcegroup")"
-      fi
-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster azure \
+
+      COMMAND=(
+        bin/hypershift destroy cluster azure \
         --azure-creds=${AZURE_CREDS} \
         --name ${CLUSTER_NAME} \
         --location ${HC_LOCATION} \
-        --resource-group-name=${RESOURCE_GROUP_NAME} \
         --cluster-grace-period 40m
+      )
 
+      if [[ $HYPERSHIFT_CUSTOM_RESOURCE_GROUP == "true" ]]; then
+        COMMAND+=(--resource-group-name "$(<"${SHARED_DIR}/resourcegroup")")
+      fi
+      
+      if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
+        COMMAND+=(--skip-service-principal-deletion)
+      fi
+
+      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+      eval "${COMMAND[@]}"
       echo "$(date) Finished deleting cluster"
     from: hypershift-operator
     grace_period: 5m0s

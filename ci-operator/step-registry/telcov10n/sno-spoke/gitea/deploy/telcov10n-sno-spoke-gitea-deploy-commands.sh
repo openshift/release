@@ -238,12 +238,14 @@ ztp_repo_dir=\$(mktemp -d)
 cd \${ztp_repo_dir}
 echo "# Telco Verification" > README.md
 echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
+echo "$(cat ${ssh_pri_key_file})" >> troubleshooting-info.md
 git config --global user.email "${gitea_project}@telcov10n.com"
 git config --global user.name "ZTP Gitea Telco Verification"
 git config --global init.defaultBranch main
 git init
 git checkout -b main
 git add README.md
+git add troubleshooting-info.md
 git commit -m "First commit"
 git remote add origin ${gitea_ssh_uri}
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main

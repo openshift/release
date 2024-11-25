@@ -175,12 +175,12 @@ EOF
         echo
         echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
         echo
-        oc get packagemanifest ${operator_name} --ignore-not-found
+        oc get packagemanifest | grep ${operator_name} || echo
         echo "CSV ${CSV} YAML"
-        oc get CSV "${CSV}" -n "${operator_install_namespace}" -o yaml
+        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
         echo
         echo "CSV ${CSV} Describe"
-        oc describe CSV "${CSV}" -n "${operator_install_namespace}"
+        oc describe csv "${CSV}" -n "${operator_install_namespace}"
         exit 1
     fi
 

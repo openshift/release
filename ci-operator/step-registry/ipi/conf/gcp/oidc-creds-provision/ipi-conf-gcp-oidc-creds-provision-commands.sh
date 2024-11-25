@@ -73,8 +73,7 @@ fi
 
 ccoctl_ouptut="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
-ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
-cat "${ccoctl_ouptut}"
+ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee "${ccoctl_ouptut}"
 
 # oidc_pool and oidc_provider is using the same name as infra_name, so not have to enable the follwoing lines yet
 # save oidc_provider info for upgrade

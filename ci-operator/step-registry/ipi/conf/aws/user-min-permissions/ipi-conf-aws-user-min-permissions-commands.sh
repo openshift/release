@@ -7,33 +7,57 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
 
-USER_POLICY_FILENAME="aws-permissions-policy-creds.json"
-USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
 
-if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" != "yes" ]]; then
-	echo "Custom AWS user with minimal permissions is disabled. Using AWS user from cluster profile."
-	exit 0
-fi
+JSONER_PY="/tmp/jsoner.py"
 
-RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
-if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
-	# If there is no initial release, we will be installing latest.
-	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
-fi
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
-rm /tmp/pull-secret
+function create_jsoner_py()
+{
+	if [[ ! -f ${JSONER_PY} ]]; then
+		cat <<EOF >"${JSONER_PY}"
+import json
+import sys
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+data = sys.stdin.read().splitlines()
+out = {
+	"Version": "2012-10-17",
+	"Statement": [{
+		"Effect": "Allow",
+		"Resource": "*",
+		"Action": data,
+	}]
+}
+print(json.dumps(out, indent=2))
+EOF
+	fi
+}
 
-if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
-	# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
-	PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
+if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
-	cat <<EOF >"${PERMISION_LIST}"
+	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
+	if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
+		# If there is no initial release, we will be installing latest.
+		RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
+	fi
+	cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+	oc registry login --to /tmp/pull-secret
+	ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
+	ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
+	ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
+	rm /tmp/pull-secret
+
+	# Do NOT change USER_POLICY_FILENAME
+	#   It's the same as the output of openshift-install create permissions-policy 
+	# 
+	USER_POLICY_FILENAME="aws-permissions-policy-creds.json"
+	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
+
+	if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
+		# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
+		PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
+
+		cat <<EOF >"${PERMISION_LIST}"
 autoscaling:DescribeAutoScalingGroups
 ec2:AllocateAddress
 ec2:AssociateAddress
@@ -137,10 +161,8 @@ elasticloadbalancing:RegisterInstancesWithLoadBalancer
 elasticloadbalancing:RegisterTargets
 elasticloadbalancing:SetLoadBalancerPoliciesOfListener
 iam:AddRoleToInstanceProfile
-iam:CreateAccessKey
 iam:CreateInstanceProfile
 iam:CreateRole
-iam:CreateUser
 iam:DeleteAccessKey
 iam:DeleteInstanceProfile
 iam:DeleteRole
@@ -217,66 +239,126 @@ s3:PutObjectTagging
 servicequotas:ListAWSDefaultServiceQuotas
 tag:GetResources
 EOF
-	# additional permisions for 4.11+
-	if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
-		echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
-		echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
+
+		if [[ ${CREDENTIALS_MODE} == "Mint" ]] || [[ ${CREDENTIALS_MODE} == "" ]]; then
+			echo "iam:CreateAccessKey" >> "${PERMISION_LIST}"
+			echo "iam:CreateUser" >> "${PERMISION_LIST}"
+		fi
+
+		# additional permisions for 4.11+
+		if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
+			echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
+			echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
+		fi
+
+		# additional permisions for 4.14+
+		if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
+			echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
+
+			# sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
+			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
+		fi
+
+		# additional permisions for 4.15+
+		if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
+			echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
+		fi
+
+		# additional permisions for 4.16+
+		if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
+			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
+			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
+		fi
+
+		create_jsoner_py
+		# generate policy file
+		cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+
+	else
+		dir=/tmp/min_perms/
+
+		mkdir -p ${dir}
+
+		# Make a copy of the install-config.yaml since the installer will consume it.
+		cp "${SHARED_DIR}/install-config.yaml" ${dir}/
+
+		openshift-install create permissions-policy --dir ${dir}
+
+		# Save policy to shared dir so later steps have access to it.
+		mv ${dir}/${USER_POLICY_FILENAME} ${USER_POLICY_FILE}
+
+		rm -rf "${dir}"
 	fi
 
-	# additional permisions for 4.14+
-	if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
-		echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
-
-		# sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
-		echo "sts:AssumeRole" >>"${PERMISION_LIST}"
-	fi
-
-	# additional permisions for 4.15+
-	if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
-		echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
-	fi
-
-	# additional permisions for 4.16+
-	if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
-		echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
-		echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
-		echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
-	fi
-
-	cat <<EOF >"/tmp/jsoner.py"
-import json
-import sys
-
-data = sys.stdin.read().splitlines()
-out = {
-	"Version": "2012-10-17",
-	"Statement": [{
-		"Effect": "Allow",
-		"Resource": "*",
-		"Action": data,
-	}]
-}
-print(json.dumps(out, indent=2))
-EOF
-	# generate policy file
-	cat "${PERMISION_LIST}" | python3 /tmp/jsoner.py >"${USER_POLICY_FILE}"
-	rm -f /tmp/jsoner.py
+	# Save policy as a step artifact
+	cp ${USER_POLICY_FILE} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}
+	echo "Created policy profile ${USER_POLICY_FILE}"
 
 else
-	dir=/tmp/min_perms/
-
-	mkdir -p ${dir}
-
-	# Make a copy of the install-config.yaml since the installer will consume it.
-	cp "${SHARED_DIR}/install-config.yaml" ${dir}/
-
-	openshift-install create permissions-policy --dir ${dir}
-
-	# Save policy to shared dir so later steps have access to it.
-	mv ${dir}/${USER_POLICY_FILENAME} ${USER_POLICY_FILE}
-
-	rm -rf "${dir}"
+	echo "Custom AWS user with minimal permissions is disabled for installer. Using AWS user from cluster profile."
 fi
 
-# Save policy as a step artifact
-cp ${USER_POLICY_FILE} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}
+
+
+if [[ "${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
+
+	USER_POLICY_FILENAME="aws-permissions-policy-creds-ccoctl.json"
+	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
+
+	PERMISION_LIST="${ARTIFACT_DIR}/permision_list_ccoctl.txt"
+	cat <<EOF > "${PERMISION_LIST}"
+cloudfront:ListCloudFrontOriginAccessIdentities
+cloudfront:ListDistributions
+cloudfront:ListTagsForResource
+iam:CreateOpenIDConnectProvider
+iam:CreateRole
+iam:DeleteOpenIDConnectProvider
+iam:DeleteRole
+iam:DeleteRolePolicy
+iam:GetOpenIDConnectProvider
+iam:GetRole
+iam:GetUser
+iam:ListOpenIDConnectProviders
+iam:ListRolePolicies
+iam:ListRoles
+iam:PutRolePolicy
+iam:TagOpenIDConnectProvider
+iam:TagRole
+s3:CreateBucket
+s3:DeleteBucket
+s3:DeleteObject
+s3:GetBucketAcl
+s3:GetBucketTagging
+s3:GetObject
+s3:GetObjectAcl
+s3:GetObjectTagging
+s3:ListBucket
+s3:PutBucketAcl
+s3:PutBucketPolicy
+s3:PutBucketPublicAccessBlock
+s3:PutBucketTagging
+s3:PutObject
+s3:PutObjectAcl
+s3:PutObjectTagging
+EOF
+	if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
+		# enable option --create-private-s3-bucket
+		echo "cloudfront:CreateCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
+		echo "cloudfront:CreateDistribution" >> "${PERMISION_LIST}"
+		echo "cloudfront:DeleteCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
+		echo "cloudfront:DeleteDistribution" >> "${PERMISION_LIST}"
+		echo "cloudfront:GetCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
+		echo "cloudfront:GetCloudFrontOriginAccessIdentityConfig" >> "${PERMISION_LIST}"
+		echo "cloudfront:GetDistribution" >> "${PERMISION_LIST}"
+		echo "cloudfront:TagResource" >> "${PERMISION_LIST}"
+		echo "cloudfront:UpdateDistribution" >> "${PERMISION_LIST}"
+  	fi
+
+	create_jsoner_py
+	# generate policy file
+	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+	echo "Created policy profile ${USER_POLICY_FILE}"
+else
+	echo "Custom AWS user with minimal permissions is disabled for ccoctl tool. Using AWS user from cluster profile."
+fi

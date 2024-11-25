@@ -67,6 +67,10 @@ if [[ -z $DONT_DEPLOY_OPERATOR ]]; then
   echo "### deploying metallb through operator"
   ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_metallb.sh"
 fi
+if [[ "$DEPLOY_FRRK8S_FROM_CNO" == "true" ]]; then
+  ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_frr_k8s_from_cno.sh"
+fi
+
 echo "### running metallb E2E tests"
 
 # setting +e so we won't exit in case of test failure and the artifacts are going to be copied

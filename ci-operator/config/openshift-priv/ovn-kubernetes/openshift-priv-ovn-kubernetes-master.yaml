@@ -326,6 +326,45 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l3
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l3-pods
+  timeout: 8h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l2
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+      KUBE_BURNER_VERSION: 1.5.0
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l2-pods
+  timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:

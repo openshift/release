@@ -175,6 +175,10 @@ function rhel_upgrade(){
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
     check_upgrade_status
+}
+
+function rhel_post_upgrade(){
+    echo "Run sanity checking after RHEL upgrade"
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -186,7 +190,7 @@ function rhel_upgrade(){
     if [[ ${exp_version} == "${act_version}" ]]; then
         echo "RHEL worker has correct K8s version"
     else
-        echo "RHEL worker has incorrect K8s version" && exit 1
+        echo "RHEL worker has incorrect K8s version" && return 1
     fi
 
     echo "Check the upgrade hook flags created"
@@ -194,10 +198,20 @@ function rhel_upgrade(){
         if [[ -f /tmp/${hookname} ]]; then
             echo "The hook ${hookname}.yaml was executed."
         else
-            echo "The hook ${hookname}.yaml was NOT executed." && exit 1
+            echo "The hook ${hookname}.yaml was NOT executed." && return 1
         fi
     done
         
+    echo "Make sure oc logs works well with pod running on RHEL worker"
+    mcd_rhel_pod=$(oc get pod -n openshift-machine-config-operator -o wide | grep "${rhel_0}" |grep "machine-config-daemon" | awk '{print $1}')
+    local ret=0
+    run_command "oc logs -n openshift-machine-config-operator ${mcd_rhel_pod} -c machine-config-daemon" || ret=1
+    if [[ "$ret" == "0" ]]; then
+        echo "oc logs checking command passed."
+    else
+        echo "oc logs checking command failed." && return 1
+    fi
+
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
@@ -302,6 +316,7 @@ if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     rhel_repo
     rhel_pre_upgrade
     rhel_upgrade
+    rhel_post_upgrade
     check_mcp
     check_history
 fi

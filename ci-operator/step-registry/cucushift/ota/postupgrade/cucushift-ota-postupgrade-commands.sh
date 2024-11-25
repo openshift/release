@@ -179,12 +179,7 @@ function post-OCP-47197(){
 
 function post-OCP-53921(){
     echo "Test Start: ${FUNCNAME[0]}"
-    local arch version
-    arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
-    if [[ "${arch}" != *"Multi"* ]]; then
-        echo "The architecture info: ${arch} is not expected!"
-        return 1
-    fi
+    local version recommends x_ver y_ver ver images metadata
     version="$(oc get clusterversion --no-headers | awk '{print $2}')"
     if [ -z "${version}" ] ; then
         echo "Fail to get cluster version!"

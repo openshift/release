@@ -222,8 +222,7 @@ else
       --name ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       --format qcow2 \
-      --capacity ${VOLUME_CAPACITY} \
-      --prealloc-metadata
+      --capacity ${VOLUME_CAPACITY}
 
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
@@ -313,7 +312,6 @@ clone_volume () {
   ${VIRSH} vol-clone \
     --pool ${POOL_NAME} \
     --vol ${VOLUME_NAME} \
-    --prealloc-metadata \
     --newname ${1}
 }
 
