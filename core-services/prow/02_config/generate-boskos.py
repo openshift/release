@@ -212,6 +212,9 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-qe-c3-metal-quota-slice': {
+        'us-central1': 4,
+    },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 4,
     },
