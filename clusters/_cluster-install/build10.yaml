@@ -6,5 +6,132 @@ onboard:
   hosted: false
   unmanaged: false
   useTokenFileInKubeconfig: true
+  machineSet:
+    aws:
+      profiles:
+        infra:
+          machineAutoscaler: false
+          architectures:
+            aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+        worker:
+          architectures:
+            amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+            aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+      # FIXME: https://issues.redhat.com/browse/DPTP-4245
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/securityGroups", "value": [{"filters": [{"name": "tag:Name", "values": ["build10-znq8n-worker-sg"]}]}]}]
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '^.+\-worker-.+$'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/volumeSize", "value": 800}]
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '^.+\-infra-.+$'
+      inline: [
+        {"op": "add", "path": "/spec/replicas", "value": 1},
+        {"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m6g.2xlarge"},
+        {"op": "add", "path": "/spec/template/spec/taints", "value": [{"effect": "NoSchedule", "key": "node-role.kubernetes.io/infra", "value": "reserved"}]}]
   ciSchedulingWebhook:
     skip: true
+  passthrough:
+    exclude:
+    - ci-operator/**
+  openshiftMonitoring:
+    patches:
+    - matches:
+      - kind: ConfigMap
+        name: cluster-monitoring-config
+        namespace: openshift-monitoring
+      inline:
+        data:
+          config.yaml: |
+            alertmanagerMain:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            prometheusK8s:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+              volumeClaimTemplate:
+                spec:
+                  resources:
+                    requests:
+                      storage: 400Gi
+            prometheusOperator:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            metricsServer:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            kubeStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            telemeterClient:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            openshiftStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            thanosQuerier:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
