@@ -194,6 +194,9 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'azure-sustaining-autorelease-412-quota-slice': {
+        'eastus': 10,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 70,
     },
