@@ -25,8 +25,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/root/.krew/bin:$PATH
-export REPORT_HANDLE_PATH="/usr/bin"
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export ENABLE_PRINT_EVENT_STDOUT=true
 
 # add for hosted kubeconfig in the hosted cluster env
@@ -51,8 +50,6 @@ if ! which kubectl; then
     export PATH=$PATH:$HOME
     ln -s "$(which oc)" ${HOME}/kubectl
 fi
-
-which extended-platform-tests
 
 # setup proxy
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
@@ -240,116 +237,19 @@ fi
 
 # execute the cases
 function run {
-    test_scenarios=""
-    echo "TEST_SCENARIOS_SUPPLEMENTARY: \"${TEST_SCENARIOS_SUPPLEMENTARY:-}\""
-    echo "TEST_ADDITIONAL_SUPPLEMENTARY: \"${TEST_ADDITIONAL_SUPPLEMENTARY:-}\""
-    echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_TIMEOUT_SUPPLEMENTARY: \"${TEST_TIMEOUT_SUPPLEMENTARY}\""
-    if [[ -n "${TEST_SCENARIOS_SUPPLEMENTARY:-}" ]]; then
-        readarray -t scenarios <<<"${TEST_SCENARIOS_SUPPLEMENTARY}"
-        for scenario in "${scenarios[@]}"; do
-            if [ "W${scenario}W" != "WW" ]; then
-                test_scenarios="${test_scenarios}|${scenario}"
-            fi
-        done
-    else
-        echo "there is no scenario"
-        return
-    fi
-
-    if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENARIOS_SUPPLEMENTARY}"
-        exit 1
-    fi
-    echo "test scenarios: ${test_scenarios:1}"
-    test_scenarios="${test_scenarios:1}"
-
-    test_additional=""
-    if [[ -n "${TEST_ADDITIONAL_SUPPLEMENTARY:-}" ]]; then
-        readarray -t additionals <<<"${TEST_ADDITIONAL_SUPPLEMENTARY}"
-        for additional in "${additionals[@]}"; do
-            test_additional="${test_additional}|${additional}"
-        done
-    else
-        echo "there is no additional"
-    fi
-
-    if [ "W${test_additional}W" != "WW" ]; then
-        if [ "W${test_additional: -1}W" != "W|W" ]; then
-            echo "test additional: ${test_additional:1}"
-            test_scenarios="${test_scenarios}|${test_additional:1}"
-        else
-            echo "test additional: ${test_additional:1:-1}"
-            test_scenarios="${test_scenarios}|${test_additional:1:-1}"
-        fi
-    fi
-
-    echo "final scenarios: ${test_scenarios}"
-    ret_grep=0
-    extended-platform-tests run all --dry-run |
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" >./case_selected || ret_grep=$?
-    if [ "W${ret_grep}W" != "W0W" ]; then
-        echo "fail to select case. possible no case, and please check it"
-        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-            echo "do not force success exit"
-            exit 1
-        fi
-        echo "force success exit"
-        exit 0
-    fi
-
-    hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
-    if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
-        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
-    fi
-    echo "TEST_FILTERS_SUPPLEMENTARY: \"${hardcoded_filters};${TEST_FILTERS_SUPPLEMENTARY:-}\""
-    echo "FILTERS_ADDITIONAL_SUPPLEMENTARY: \"${FILTERS_ADDITIONAL_SUPPLEMENTARY:-}\""
-    test_filters="${hardcoded_filters};${TEST_FILTERS_SUPPLEMENTARY}"
-    if [[ -n "${FILTERS_ADDITIONAL_SUPPLEMENTARY:-}" ]]; then
-        echo "add FILTERS_ADDITIONAL_SUPPLEMENTARY into test_filters"
-        test_filters="${hardcoded_filters};${TEST_FILTERS_SUPPLEMENTARY};${FILTERS_ADDITIONAL_SUPPLEMENTARY}"
-    fi
-    echo "------handle test filter start------"
-    echo "${test_filters}"
-    handle_filters "${test_filters}"
-    echo "------handle test filter done------"
-
-    echo "------handle module filter start------"
-    echo "MODULE_FILTERS_SUPPLEMENTARY: \"${MODULE_FILTERS_SUPPLEMENTARY:-}\""
-    handle_module_filter "${MODULE_FILTERS_SUPPLEMENTARY}"
-    echo "------handle module filter done------"
-
-    echo "------------------the case selected------------------"
-    selected_case_num=$(cat ./case_selected | wc -l)
-    if [ "W${selected_case_num}W" == "W0W" ]; then
-        echo "No Case Selected"
-        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-            echo "do not force success exit"
-            exit 1
-        fi
-        echo "force success exit"
-        exit 0
-    fi
-    echo ${selected_case_num}
-    cat ./case_selected
-    echo "-----------------------------------------------------"
-
+    cd /go/src/github.com/openshift/cluster-api-actuator-pkg
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
-    if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
-            -o "${ARTIFACT_DIR}/extended.log" \
-            --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+    echo "TEST_FILTERS_CLUSTERINFRASTRUCTURE: \"${TEST_FILTERS_CLUSTERINFRASTRUCTURE:-}\""
+    if [[ -n "$TEST_FILTERS_CLUSTERINFRASTRUCTURE" ]]; then
+        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter="${TEST_FILTERS_CLUSTERINFRASTRUCTURE}" -p || ret_value=$?
     else
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
-            --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
-            --timeout "${TEST_TIMEOUT_SUPPLEMENTARY}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!disruptive' -p || ret_value=$?
     fi
     set +x
     set +e
-    rm -fr ./case_selected
     echo "try to handle result"
     handle_result
     echo "done to handle result"
@@ -374,7 +274,8 @@ function run {
         fi
     fi
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" >/tmp/zzz-tmp.log || exit 0
+    input_file="/tmp/zzz-tmp.log"
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" >"$input_file" || exit 0
     while read row; do
         for ctype in "${!results[@]}"; do
             count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<<$row)"
@@ -382,20 +283,20 @@ function run {
                 let results[$ctype]+=count || true
             fi
         done
-    done </tmp/zzz-tmp.log
+    done <"$input_file"
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat >"${TEST_RESULT_FILE}" <<-EOF
-openshift-extended-test-supplementary:
+openshift-e2e-test-clusterinfra-qe:
   total: ${results[tests]}
   failures: ${results[failures]}
   errors: ${results[errors]}
   skipped: ${results[skipped]}
 EOF
-
     if [ ${results[failures]} != 0 ]; then
         echo '  failingScenarios:' >>"${TEST_RESULT_FILE}"
-        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
+        # Every failure scenario will have a directory in machine-api-e2e-suite
+        readarray -t failingscenarios < <(find "${ARTIFACT_DIR}/machine-api-e2e-suite/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort --unique)
         for ((i = 0; i < ${#failingscenarios[@]}; i++)); do
             echo "    - ${failingscenarios[$i]}" >>"${TEST_RESULT_FILE}"
         done
@@ -410,166 +311,27 @@ EOF
     fi
 }
 
-# select the cases per FILTERS
-function handle_filters {
-    filter_tmp="$1"
-    if [ "W${filter_tmp}W" == "WW" ]; then
-        echo "there is no filter"
-        return
-    fi
-    echo "try to handler filters..."
-    IFS=";" read -r -a filters <<<"${filter_tmp}"
-
-    filters_and=()
-    filters_or=()
-    for filter in "${filters[@]}"; do
-        echo "${filter}"
-        valid_filter "${filter}"
-        filter_logical="$(echo $filter | grep -Eo '[&]?$')"
-
-        if [ "W${filter_logical}W" == "W&W" ]; then
-            filters_and+=("$filter")
-        else
-            filters_or+=("$filter")
-        fi
-    done
-
-    echo "handle AND logical"
-    for filter in ${filters_and[*]}; do
-        echo "handle filter_and ${filter}"
-        handle_and_filter "${filter}"
-    done
-
-    echo "handle OR logical"
-    rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}; do
-        echo "handle filter_or ${filter}"
-        handle_or_filter "${filter}"
-    done
-    if [[ -e ./case_selected_or ]]; then
-        sort -u ./case_selected_or >./case_selected && rm -fr ./case_selected_or
-    fi
-}
-
-function valid_filter {
-    filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
-        exit 1
-    fi
-    action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
-    logical="$(echo $filter | grep -Eo '[&]?$')"
-    echo "$action--$value--$logical"
-}
-
-function handle_and_filter {
-    action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
-
-    ret=0
-    if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" >./case_selected_and || ret=$?
-        check_case_selected "${ret}"
-    else
-        cat ./case_selected | grep -v -E "${value}" >./case_selected_and || ret=$?
-        check_case_selected "${ret}"
-    fi
-    if [[ -e ./case_selected_and ]]; then
-        cp -fr ./case_selected_and ./case_selected && rm -fr ./case_selected_and
-    fi
-}
-
-function handle_or_filter {
-    action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
-
-    ret=0
-    if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" >>./case_selected_or || ret=$?
-        check_case_selected "${ret}"
-    else
-        cat ./case_selected | grep -v -E "${value}" >>./case_selected_or || ret=$?
-        check_case_selected "${ret}"
-    fi
-}
-
-function handle_module_filter {
-    local module_filter="$1"
-    declare -a module_filter_keys
-    declare -a module_filter_values
-    valid_and_get_module_filter "$module_filter"
-
-    for i in "${!module_filter_keys[@]}"; do
-
-        module_key="${module_filter_keys[$i]}"
-        filter_value="${module_filter_values[$i]}"
-        echo "moudle: $module_key"
-        echo "filter: $filter_value"
-        [ -s ./case_selected ] || {
-            echo "No Case already Selected before handle ${module_key}"
-            continue
-        }
-
-        cat ./case_selected | grep -v -E "${module_key}" >./case_selected_exclusive || true
-        cat ./case_selected | grep -E "${module_key}" >./case_selected_inclusive || true
-        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
-
-        handle_filters "${filter_value}"
-
-        [ -e ./case_selected ] && cat ./case_selected_exclusive >>./case_selected && rm -fr ./case_selected_exclusive
-        [ -e ./case_selected ] && sort -u ./case_selected >./case_selected_sort && mv -f ./case_selected_sort ./case_selected
-
-    done
-}
-
-function valid_and_get_module_filter {
-    local module_filter_tmp="$1"
-
-    IFS='#' read -ra pairs <<<"$module_filter_tmp"
-    for pair in "${pairs[@]}"; do
-        IFS=':' read -ra kv <<<"$pair"
-        if [[ ${#kv[@]} -ne 2 ]]; then
-            echo "moudle filter format is not correct"
-            exit 1
-        fi
-
-        module_key="${kv[0]}"
-        filter_value="${kv[1]}"
-        module_filter_keys+=("$module_key")
-        module_filter_values+=("$filter_value")
-    done
-}
-
 function handle_result {
-    resultfile=$(ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true)
-    echo $resultfile
+    ls "${ARTIFACT_DIR}"
+    resultfile=$(ls -rt -1 "${ARTIFACT_DIR}/junit_cluster-api-actuator-testutils.xml" 2>&1 || true)
+    echo "$resultfile"
     if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory"); then
         echo "there is no result file generated"
         return
     fi
-    current_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
-    replace_ret=0
-    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
-    if ! [ "W${replace_ret}W" == "W0W" ]; then
-        echo "replacing file is not ok"
+
+    split_ret=0
+    cp /go/src/github.com/openshift/cluster-api-actuator-pkg/pipeline/handleresult.py /tmp/handleresult.py
+    cd /tmp/output
+    python3 /tmp/handleresult.py -a split -i ${resultfile} || split_ret=$?
+    if ! [ "W${split_ret}W" == "W0W" ]; then
+        echo "splitting file is not ok"
         rm -fr ${resultfile}
         return
     fi
-    rm -fr ${resultfile}
-
-    echo ${newresultfile}
-    split_ret=0
-    pwd
-    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${newresultfile} || split_ret=$?
-    if ! [ "W${split_ret}W" == "W0W" ]; then
-        echo "splitting file is not ok"
-        rm -fr ${newresultfile}
-        return
-    fi
+    mkdir -p "${ARTIFACT_DIR}/junit/"
     cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
-    rm -fr ${newresultfile}
+    rm -fr ${resultfile}
 }
 function check_case_selected {
     found_ok=$1
