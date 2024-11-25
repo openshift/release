@@ -332,22 +332,30 @@ fi
 
 # Get Windows OS image ID based on platform
 case "$IAAS_PLATFORM" in
-    aws)
-        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.ami.id}" -n openshift-machine-api)
-        ;;
-    azure)
-        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
-        ;;
-    vsphere)
-        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
-        ;;
-    gcp)
-        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
-        ;;
-    *)
-        echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"
-        exit 1
-        ;;
+  aws)
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.ami.id}" -n openshift-machine-api)
+    ;;
+  azure)
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
+	;;
+  vsphere)
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
+    ;;
+  gcp)
+	# we need the value after family/
+	# in this example projects/windows-cloud/global/images/family/windows-2022-core
+	# windows_os_image_id needs to be windows-2022-core
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
+    ;;
+  nutanix)
+        # Extract the image name from Nutanix providerSpec
+        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.name}" -n openshift-machine-api)
+    ;;
+  *)
+    echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"
+    exit 1
+    ;;
+
 esac
 
 # 1. Ensure namespace exists
