@@ -316,6 +316,9 @@ if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --time
     exit 1
 fi
 
+# Get mirror registry hostname from route
+REGISTRY_HOST=$(oc get route -n openshift-console console -o jsonpath='{.spec.host}' | sed 's/console-openshift-console/bastion.mirror-registry.qe.devcluster.openshift.com:5000/')
+
 # Set container images based on environment
 if isDisconnectedCluster; then
     DISCONNECTED_IMAGE_REGISTRY=$(oc get configmap winc-test-config -n winc-test -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
@@ -324,7 +327,7 @@ if isDisconnectedCluster; then
     disconnected_prepare "${DISCONNECTED_IMAGE_REGISTRY}"
 else
     windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
-    linux_container_image="quay.io/openshifttest/hello-openshift:multiarch-winc"
+    linux_container_image="${REGISTRY_HOST}/hello-openshift:multiarch-winc"
 fi
 
 # Get Windows OS image ID based on platform
@@ -354,8 +357,8 @@ ensure_namespace
 create_winc_test_configmap "$windows_os_image_id" "$windows_container_image" "$linux_container_image"
 
 # 3. Deploy workloads
-deploy_linux_workload "$linux_container_image"
 deploy_windows_workload "$windows_container_image"
+deploy_linux_workload "$linux_container_image"
 
 # Show final cluster status
 echo "=== Node Status ==="
