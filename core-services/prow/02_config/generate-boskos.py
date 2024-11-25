@@ -219,13 +219,13 @@ CONFIG = {
         'us-central1': 4,
     },
     'gcp-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-3-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
