@@ -455,7 +455,7 @@ fi
 create_tests_skip_list_file
 
 if [[ "$CNF_BRANCH" == *"4."* ]]; then
-    function_version="${CNF_BRANCH//4./}"
+    function_version="${CNF_BRANCH//release-4./}"
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch
