@@ -12,11 +12,12 @@ cat /etc/os-release
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 if [ ${BAREMETAL} == "true" ]; then
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
@@ -42,12 +43,12 @@ LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmark
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 
 if [ ${BAREMETAL} == "true" ]; then
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "export ALL_SCENARIOS=false;export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com";cd /tmp/e2e-benchmarking/workloads/network-perf-v2; sed -i s/--retry-all-errors//g run.sh;VIRT=true WORKLOAD=full-run.yaml ./run.sh"
+  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
+  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
+  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
+  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "export ALL_SCENARIOS=false;export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com";cd /tmp/e2e-benchmarking/workloads/network-perf-v2; sed -i s/--retry-all-errors//g run.sh;VIRT=true WORKLOAD=full-run.yaml ./run.sh"
 
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
+  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   # kill the ssh tunnel so the job completes
   pkill ssh
 else

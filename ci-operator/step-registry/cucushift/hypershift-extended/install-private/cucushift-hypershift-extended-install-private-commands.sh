@@ -21,6 +21,22 @@ COMMAND=(
     --wait-until-available
 )
 
+case "${HYPERSHIFT_FEATURE_SET:-}" in
+"")
+    ;;
+TechPreviewNoUpgrade)
+    COMMAND+=(--tech-preview-no-upgrade)
+    ;;
+*)
+    echo "Unsupported feature set ${HYPERSHIFT_FEATURE_SET}" >&2
+    exit 1
+    ;;
+esac
+
+if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
+    COMMAND+=(--aro-hcp-key-vault-users-client-id="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")")
+fi
+
 if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
     COMMAND+=(--managed-service="$HYPERSHIFT_MANAGED_SERVICE")
 fi

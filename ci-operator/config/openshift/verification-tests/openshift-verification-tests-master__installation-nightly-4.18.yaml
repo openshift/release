@@ -23,6 +23,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -219,6 +223,17 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
+- as: azure-ipi-bootstrap-check-arm-f28
+  cron: 54 1 19 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-azure-cases-bootstrap
 - as: azure-ipi-confidentialvm-vmgueststateonly-compute-f28
   cron: 15 21 17 * *
   steps:
@@ -576,6 +591,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
+- as: ibmcloud-ipi-subnet-paging-f28
+  cron: 5 19 13 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "no"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "9"
+      PICKUP_SUBNETS_ORDER: 2Paging
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: nutanix-ipi-zones-single-osimage-customized-reboot-nodes-f28
   cluster: build01
   cron: 21 21 14 * *
