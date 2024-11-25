@@ -1,9 +1,9 @@
 #!/bin/bash
-# Enable strict error handling and debugging
-set -o errexit
-set -o nounset
-set -o pipefail
-set -x
+# Enable strict error handling and debug mode
+set -o errexit    # Exit immediately if a command exits with a non-zero status
+set -o nounset    # Treat unset variables as an error
+set -o pipefail   # Pipeline fails on any command failure
+set -x            # Print commands and their arguments as they are executed
 
 # Function to debug deployment status and logs
 function debug_deployment() {
@@ -22,7 +22,7 @@ function debug_deployment() {
     echo "=== Deployment Status ==="
     oc describe deployment $deployment_name -n winc-test
     
-    # Show pod logs with environment status
+    # Show pod logs and environment status
     echo "=== Pod Logs (with Environment Status) ==="
     for pod in $(oc get pods -n winc-test -l app=$deployment_name -o name); do
         echo "--- Logs for $pod ---"
@@ -44,6 +44,7 @@ function disconnected_prepare() {
     export DISCONNECTED_REGISTRY
     
     echo "Checking if environment is disconnected..."
+    # Test if external registry is accessible
     if curl -s --connect-timeout 5 https://registry.redhat.io > /dev/null; then
         echo "Environment is connected, skipping disconnected preparation"
         return 0
@@ -51,10 +52,11 @@ function disconnected_prepare() {
     
     echo "Environment is disconnected, starting preparation..."
     
-    # Add the registry certificate to trust
+    # Add registry certificate to trust list
     echo "=== Adding registry certificate to trust ==="
     oc -n openshift-config get cm custom-ca -o yaml
     
+    # If disconnected registry exists, set up authentication
     if [ -n "${DISCONNECTED_REGISTRY}" ]; then
         echo "Setting up disconnected registry: ${DISCONNECTED_REGISTRY}"
         oc extract -n openshift-config secret/pull-secret --to=.
@@ -76,6 +78,7 @@ function isDisconnectedCluster() {
     
     echo "External registry is not accessible - Disconnected environment detected"
     
+    # Check configmap existence and content
     local output
     output=$(oc get configmap winc-test-config -n winc-test -o yaml 2>/dev/null)
     if [ $? -ne 0 ]; then
@@ -83,12 +86,14 @@ function isDisconnectedCluster() {
         return 1
     fi
 
+    # Check for placeholder values in configmap
     if echo "$output" | grep -q "<primary_windows_container_disconnected_image>" || \
        echo "$output" | grep -q "<linux_container_disconnected_image>"; then
         echo "Found placeholder values in ConfigMap - assuming connected environment"
         return 1
     fi
 
+    # Check for required keys
     if ! echo "$output" | grep -q "primary_windows_container_disconnected_image:" || \
        ! echo "$output" | grep -q "linux_container_disconnected_image:"; then
         echo "Missing required keys in ConfigMap - assuming connected environment"
@@ -292,9 +297,24 @@ EOF
 # Get infrastructure platform type
 IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
 
-# Get Windows machineset info
+# Get Windows machineset information
 winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("win")).metadata.name')
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
+
+# Check Windows machineset replica count
+if [ "$winworker_machineset_replicas" -lt 1 ]; then
+    echo "Error: Windows machineset must have at least 1 replica"
+    exit 1
+fi
+
+# Wait for Windows nodes to be ready
+echo "Waiting for Windows nodes to be in Ready state..."
+if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=15m; then
+    echo "Error: Timeout waiting for Windows nodes to be ready"
+    # Show node status for debugging
+    oc get nodes -l kubernetes.io/os=windows -o wide
+    exit 1
+fi
 
 # Set container images based on environment
 if isDisconnectedCluster; then
@@ -327,13 +347,13 @@ case "$IAAS_PLATFORM" in
         ;;
 esac
 
-# 1. First ensure namespace exists
+# 1. Ensure namespace exists
 ensure_namespace
 
-# 2. Create configmap first with image information
+# 2. Create configmap with image information
 create_winc_test_configmap "$windows_os_image_id" "$windows_container_image" "$linux_container_image"
 
-# 3. Then deploy workloads
+# 3. Deploy workloads
 deploy_linux_workload "$linux_container_image"
 deploy_windows_workload "$windows_container_image"
 
