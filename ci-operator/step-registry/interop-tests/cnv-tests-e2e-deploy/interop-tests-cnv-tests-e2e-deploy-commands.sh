@@ -57,7 +57,8 @@ cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
 }
 EOF
 
-make deploy_test || exit_code=$?
+# shellcheck disable=SC2086
+make ${MAKEFILE_TARGET} || exit_code=$?
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
