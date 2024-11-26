@@ -1,22 +1,23 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
-      RUN yum -y install make wget gcc git httpd-tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -26,10 +27,20 @@ resources:
       memory: 2Gi
 tests:
 - as: e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
   skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md$
   steps:
     test:
     - ref: janus-idp-backstage-showcase
+    workflow: generic-claim
 - as: e2e-tests-nightly
   cron: 0 1 * * *
   steps:
