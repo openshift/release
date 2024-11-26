@@ -15,10 +15,6 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: windows-machine-config-operator-test
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -43,6 +39,7 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
+    disabled: true
     name: "4.19"
     namespace: ocp
 releases:
@@ -75,19 +72,19 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|renovate\.json|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: build
   commands: make build
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|renovate\.json|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|renovate\.json|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|renovate\.json|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
@@ -134,6 +131,13 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
   steps:

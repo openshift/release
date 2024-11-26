@@ -141,11 +141,11 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}_2"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
-   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}.img"
+   "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}_2.img"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
-   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}.img"
+   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}_2.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"

@@ -95,10 +95,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -387,8 +383,6 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-custom-security-groups
@@ -407,6 +401,7 @@ tests:
     - chain: ipi-conf-aws-sharednetwork
     - ref: aws-provision-security-group
     - ref: ipi-conf-aws-custom-security-groups
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
@@ -428,8 +423,7 @@ tests:
     - ref: ipi-conf-aws-byo-ipv4-pool-public
     - ref: aws-provision-iam-profile
     - ref: ipi-conf-aws-byo-iam-profile
-    - ref: ipi-conf-aws-user-min-permissions
-    - ref: aws-provision-iam-user
+    - chain: aws-provision-iam-user-minimal-permission
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
     test:

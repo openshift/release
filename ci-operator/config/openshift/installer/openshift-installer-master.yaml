@@ -32,59 +32,59 @@ base_images:
     namespace: ci
     tag: v1.59.0
   ocp_4.10_cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
   ocp_4.17_base-rhel9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   ocp_4.17_cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
   ocp_4.17_etcd:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: etcd
   ocp_4.17_hyperkube:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: hyperkube
   ocp_4.17_installer-etcd-artifacts:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-etcd-artifacts
   ocp_4.17_installer-kube-apiserver-artifacts:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
   ocp_4.17_installer-terraform-providers:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-terraform-providers
   ocp_4.18_base-rhel9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   ocp_4.18_etcd:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: etcd
   ocp_4.18_hyperkube:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: hyperkube
   ocp_4.18_installer-etcd-artifacts:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-etcd-artifacts
   ocp_4.18_installer-kube-apiserver-artifacts:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
   ocp_4.18_installer-terraform-providers:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: installer-terraform-providers
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -95,10 +95,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -238,30 +234,30 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -385,8 +381,6 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-custom-security-groups
@@ -405,6 +399,7 @@ tests:
     - chain: ipi-conf-aws-sharednetwork
     - ref: aws-provision-security-group
     - ref: ipi-conf-aws-custom-security-groups
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
@@ -426,8 +421,7 @@ tests:
     - ref: ipi-conf-aws-byo-ipv4-pool-public
     - ref: aws-provision-iam-profile
     - ref: ipi-conf-aws-byo-iam-profile
-    - ref: ipi-conf-aws-user-min-permissions
-    - ref: aws-provision-iam-user
+    - chain: aws-provision-iam-user-minimal-permission
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
     test:
