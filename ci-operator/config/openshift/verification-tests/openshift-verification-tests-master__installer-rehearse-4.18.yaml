@@ -40,17 +40,22 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: gcp-qe-c3-metal
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
       COMPUTE_NODE_REPLICAS: "2"
-      SLEEP_DURATION: 10m
+      COMPUTE_NODE_TYPE: c3-highcpu-192-metal
+      CONFIDENTIAL_COMPUTE: Disabled
+      CONTROL_PLANE_NODE_TYPE: n2-standard-4
+      ON_HOST_MAINTENANCE: Terminate
+      SLEEP_DURATION: 30m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone-provision
+    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
@@ -62,8 +67,8 @@ tests:
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone
+    cluster_profile: gcp-qe-c3-metal
+    workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
 zz_generated_metadata:
   branch: master
   org: openshift
