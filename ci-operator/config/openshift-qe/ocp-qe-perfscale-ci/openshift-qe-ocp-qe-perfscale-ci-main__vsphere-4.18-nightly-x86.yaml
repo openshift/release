@@ -101,6 +101,66 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
+- always_run: false
+  as: vcenter-1-control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      DEFAULT_NETWORK_TYPE: public-ipv6
+      OPENSHIFT_REQUIRED_CORES: "24"
+      OPENSHIFT_REQUIRED_MEMORY: "96"
+      POOLS: vcenter-1.devqe.ibmc.devcluster.openshift.com-devqedatacenter-1-devqecluster-1
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-multi-vcenter
+  timeout: 5h0m0s
+- always_run: false
+  as: vcenter-1-control-plane-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      DEFAULT_NETWORK_TYPE: public-ipv6
+      OPENSHIFT_REQUIRED_CORES: "108"
+      OPENSHIFT_REQUIRED_MEMORY: "432"
+      POOLS: vcenter-1.devqe.ibmc.devcluster.openshift.com-devqedatacenter-1-devqecluster-1
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-multi-vcenter
+  timeout: 5h0m0s
+- always_run: false
+  as: vcenter-1-ipv4ipv6dual-control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      DEFAULT_NETWORK_TYPE: public-ipv6
+      OPENSHIFT_REQUIRED_CORES: "24"
+      OPENSHIFT_REQUIRED_MEMORY: "96"
+      POOLS: vcenter-1.devqe.ibmc.devcluster.openshift.com-devqedatacenter-1-devqecluster-1
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-dualstack
+  timeout: 5h0m0s
+- as: vcenter-1-ipv4ipv6dual-control-plane-24nodes
+  cron: 0 7 2,9,16,23 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      DEFAULT_NETWORK_TYPE: public-ipv6
+      OPENSHIFT_REQUIRED_CORES: "108"
+      OPENSHIFT_REQUIRED_MEMORY: "432"
+      POOLS: vcenter-1.devqe.ibmc.devcluster.openshift.com-devqedatacenter-1-devqecluster-1
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-dualstack
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
