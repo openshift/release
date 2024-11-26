@@ -194,6 +194,9 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'azure-sustaining-autorelease-412-quota-slice': {
+        'eastus': 10,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 70,
     },
@@ -209,17 +212,20 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-qe-c3-metal-quota-slice': {
+        'us-central1': 4,
+    },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 4,
     },
     'gcp-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-3-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
@@ -258,6 +264,9 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
+    'rhoso-giant28-quota-slice': {
+        'default': 1,
+    },    
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
@@ -455,6 +464,10 @@ CONFIG = {
     'aws-ovn-perfscale-quota-slice': {
         'us-west-2': 4,
         'us-east-1': 4,
+    },
+    'aws-rhoai-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
     }
 }
 

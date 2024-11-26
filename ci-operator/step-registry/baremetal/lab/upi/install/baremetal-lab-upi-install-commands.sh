@@ -207,6 +207,13 @@ function update_image_registry() {
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -329,7 +336,6 @@ fi
 
 destroy_bootstrap &
 approve_csrs &
-update_image_registry &
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
@@ -348,6 +354,7 @@ fi
 # mixed arch nodes.
 echo -e "\nWaiting for all the nodes to be ready..."
 wait_for_nodes_readiness ${EXPECTED_NODES}
+update_image_registry
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch  "${SHARED_DIR}/success"
