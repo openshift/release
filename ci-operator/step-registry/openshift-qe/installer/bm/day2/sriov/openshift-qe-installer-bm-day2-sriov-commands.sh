@@ -22,7 +22,7 @@ oc config view
 oc projects
 
 # Login to the Quay.io private registry
-if [ ${OCP_BUILD} == "dev"]; then
+if [ ${OCP_BUILD} == "dev" ]; then
   SRIOV_AUTH="$(cat /secret/sriov_auth)"
   echo ${SRIOV_AUTH} > .dockerconfigjson
   oc create secret generic quay-robot-secret --from-file=.dockerconfigjson=.dockerconfigjson --type=kubernetes.io/dockerconfigjson
