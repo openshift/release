@@ -66,10 +66,13 @@ echo "Running prereqs.sh"
 USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
-for i in $HOSTS; do
-  podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
-done
-sleep 300
+# IDRAC reset
+if [ $RESET_IDRAC ]; then
+  for i in $HOSTS; do
+    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
+  done
+  sleep 300
+fi
 for i in $HOSTS; do
   # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
   #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
@@ -94,7 +97,7 @@ for i in $HOSTS; do
   fi
 done
 EOF
-envsubst '${QUADS_INSTANCE},${LAB_CLOUD}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${RESET_IDRAC}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
