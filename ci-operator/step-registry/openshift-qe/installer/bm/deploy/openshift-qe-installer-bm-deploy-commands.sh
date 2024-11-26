@@ -75,6 +75,7 @@ for i in $HOSTS; do
   #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
   command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
   desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
+  echo $command_output
   if [[ "$command_output" != "$desired_output" ]]; then
     WAIT=true
     echo "Boot order changed in server $i"
