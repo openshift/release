@@ -8,4 +8,4 @@ set -o pipefail
 [ -e "$HOME/fix_uid.sh" ] && "$HOME/fix_uid.sh" || echo "$HOME/fix_uid.sh was not found" >&2
 
  echo "************ telcov10n sleep for 3h for debugging purposes ************"
-sleep 3h
+sleep 7h

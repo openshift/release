@@ -16,9 +16,10 @@ cp -R /tmp/telco-dast-qe /tmp/telco-dast-qe && cd /tmp/telco-dast-qe
 
 # Execute test
 chainsaw test \
---config ".chainsaw" \
+--config ".chainsaw.yaml" \
 --report-name "junit_telco_tests_dast" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
+/tmp/telco-dast-qe/tests/dast
 tests/dast
