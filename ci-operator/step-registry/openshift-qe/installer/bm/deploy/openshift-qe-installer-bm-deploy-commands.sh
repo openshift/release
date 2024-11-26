@@ -47,11 +47,11 @@ jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
-
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Clean up previous attempts
 cat > /tmp/clean-resources.sh << 'EOF'
+echo 'Running clean-resources.sh'
 dnf install -y podman
 podman pod stop $(podman pod ps -q) || echo 'No podman pods to stop'
 podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
@@ -61,7 +61,8 @@ rm -rf /opt/*
 EOF
 
 # Pre-reqs
-cat > /tmp/pre-reqs.sh << 'EOF'
+cat > /tmp/prereqs.sh << 'EOF'
+echo "Running prereqs.sh"
 USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
@@ -70,13 +71,19 @@ for i in $HOSTS; do
 done
 sleep 300
 for i in $HOSTS; do
-  command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+  # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
+  #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+  command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
   desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
   if [[ "$command_output" != "$desired_output" ]]; then
-    echo "Boot order changed in server $i, waiting ..."
-    sleep 300
+    WAIT=true
+    echo "Boot order changed in server $i"
   fi
 done
+if [ $WAIT ]; then
+  echo "Waiting after boot order changes ..."
+  sleep 300
+fi
 for i in $HOSTS; do
   podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
   if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
@@ -86,9 +93,7 @@ for i in $HOSTS; do
   fi
 done
 EOF
-
-scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
-scp -q ${SSH_ARGS} /tmp/pre-reqs.sh root@${bastion}:/tmp
+envsubst '${QUADS_INSTANCE},${LAB_CLOUD}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
@@ -111,6 +116,8 @@ ssh ${SSH_ARGS} root@${bastion} "
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
 scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
 
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
@@ -119,7 +126,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/pre-reqs.sh
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    deactivate
