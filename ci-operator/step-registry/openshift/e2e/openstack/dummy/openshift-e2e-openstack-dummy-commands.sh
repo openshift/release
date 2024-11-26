@@ -30,6 +30,9 @@ if [[ ! -f "${KUBECONFIG}" ]]; then
     exit 1
 fi
 
+# Test curl agains giant28 proxy
+curl -vvv 10.37.137.38:3128
+
 # Load the proxy
 proxy_host=$(yq -r '.clusters[0].cluster."proxy-url"' "${KUBECONFIG}" | cut -d/ -f3 | cut -d: -f1)
 info "Permanent proxy detected: $proxy_host"
