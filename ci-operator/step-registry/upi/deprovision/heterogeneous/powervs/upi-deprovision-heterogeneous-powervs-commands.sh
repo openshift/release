@@ -33,7 +33,7 @@ function cleanup_ibmcloud_powervs() {
             echo "deleting VPC connection"
             ic tg connection-delete "${GW}" "${CS}" --force || true
             sleep 120
-            echo "Done Cleaning up GW-VPC Connection"
+            echo "Done Cleaning up GW VPC Connection"
         else
             echo "no vpc-conn needed"
         fi
@@ -234,7 +234,7 @@ then
 	do
 		VPC_CONN_NAME=$(ic is vpc "${CS}" --output json | jq -r .name)
 		VPC_NW_ID=$(ic is vpc "${CS}" --output json | jq -r .crn)
-		echo "Creating new VPC connection for Transit gateway now."
+		echo "Creating new VPC connection for Transit gateway."
 		ic tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
 	done
   done
