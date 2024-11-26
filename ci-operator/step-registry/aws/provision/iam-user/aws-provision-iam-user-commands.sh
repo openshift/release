@@ -8,6 +8,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'rm -f /tmp/aws_cred_output' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+REGION="${LEASED_RESOURCE}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 function run_command() {
 	local cmd="$1"
@@ -48,50 +50,66 @@ function aws_create_user() {
 	return 0
 }
 
-REGION="${LEASED_RESOURCE}"
-CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-PERMISSIONS_POLICY_FILENAME="aws-permissions-policy-creds.json"
-USER_POLICY_FILE="${SHARED_DIR}/${PERMISSIONS_POLICY_FILENAME}"
-USER_CREDENTIALS_OUTPUT_FILENAME="aws_minimal_permission"
+function create_cred_file()
+{
+	local policy_file=$1
+	local postfix=$2
+	local cred_file=$3
+	local policy_name policy_doc policy_outout
+	local user_name policy_arn user_outout cred_outout
+	local key_id key_sec
 
-if [ ! -f ${USER_POLICY_FILE} ]; then
-	echo "User permission policy file not found. Skipping user creation"
-	exit 0
-fi
+	
 
-echo "Policy file:"
-jq . $USER_POLICY_FILE
+	echo "Policy file:"
+	jq . $policy_file
 
-POLICY_NAME="${CLUSTER_NAME}-required-policy"
-POLICY_DOC=$(cat "${USER_POLICY_FILE}" | jq -c .)
-POLICY_OUTOUT=/tmp/aws_policy_output
+	policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
+	policy_doc=$(cat "${policy_file}" | jq -c .)
+	policy_outout=/tmp/aws_policy_output
 
-echo "Creating policy ${POLICY_NAME}"
-aws_create_policy $REGION "${POLICY_NAME}" "${POLICY_DOC}" "${POLICY_OUTOUT}"
+	echo "Creating policy ${policy_name}"
+	aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
 
-USER_NAME="${CLUSTER_NAME}-minimal-perm"
-POLICY_ARN=$(jq -r '.Policy.Arn' ${POLICY_OUTOUT})
-USER_OUTOUT=/tmp/aws_user_output
-CRED_OUTOUT=/tmp/aws_cred_output
+	user_name="${CLUSTER_NAME}-minimal-perm-${postfix}"
+	policy_arn=$(jq -r '.Policy.Arn' ${policy_outout})
+	user_outout=/tmp/aws_user_output
+	cred_outout=/tmp/aws_cred_output
 
-echo "Creating user ${USER_NAME}"
-aws_create_user $REGION "${USER_NAME}" "${POLICY_ARN}" "${USER_OUTOUT}" "${CRED_OUTOUT}"
+	echo "Creating user ${user_name}"
+	aws_create_user $REGION "${user_name}" "${policy_arn}" "${user_outout}" "${cred_outout}"
 
-key_id=$(jq -r '.AccessKey.AccessKeyId' ${CRED_OUTOUT})
-key_sec=$(jq -r '.AccessKey.SecretAccessKey' ${CRED_OUTOUT})
+	key_id=$(jq -r '.AccessKey.AccessKeyId' ${cred_outout})
+	key_sec=$(jq -r '.AccessKey.SecretAccessKey' ${cred_outout})
 
-if [[ "${key_id}" == "" ]] || [[ "${key_sec}" == "" ]]; then
-	echo "No AccessKeyId or SecretAccessKey, exit now"
-	exit 1
-fi
+	if [[ "${key_id}" == "" ]] || [[ "${key_sec}" == "" ]]; then
+		echo "No AccessKeyId or SecretAccessKey, exit now"
+		return 1
+	fi
 
-echo "Key id: ${key_id} sec: ${key_sec:0:5}"
-cat <<EOF >"${SHARED_DIR}/${USER_CREDENTIALS_OUTPUT_FILENAME}"
+
+	echo "Key id: ${key_id} sec: ${key_sec:0:5}"
+	cat <<EOF >"${cred_file}"
 [default]
 aws_access_key_id     = ${key_id}
 aws_secret_access_key = ${key_sec}
 EOF
+	# for destroy
+	echo ${policy_arn} >> "${SHARED_DIR}/aws_policy_arns"
+	echo ${user_name} >> "${SHARED_DIR}/aws_user_names"
+}
 
-# for destroy
-echo ${POLICY_ARN} >"${SHARED_DIR}/aws_policy_arns"
-echo ${USER_NAME} >"${SHARED_DIR}/aws_user_names"
+POLICY_FILE_INSTALLER="${SHARED_DIR}/aws-permissions-policy-creds.json"
+POLICY_FILE_CCOCTL="${SHARED_DIR}/aws-permissions-policy-creds-ccoctl.json"
+
+if [ -f "${POLICY_FILE_INSTALLER}" ]; then
+	create_cred_file "${POLICY_FILE_INSTALLER}" "installer" "${SHARED_DIR}/aws_minimal_permission"
+else
+	echo "User permission policy file for installer not found. Skipping user creation"
+fi
+
+if [ -f "${POLICY_FILE_CCOCTL}" ]; then
+	create_cred_file "${POLICY_FILE_CCOCTL}" "ccoctl" "${SHARED_DIR}/aws_minimal_permission_ccoctl"
+else
+	echo "User permission policy file for ccoctl not found. Skipping user creation"
+fi

@@ -168,7 +168,7 @@ function cleanup_prior() {
         do
             ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
         done
-        sleep 60
+        sleep 120
     done
 
     echo "Cleaning up the Security Groups"
