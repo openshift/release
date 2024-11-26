@@ -77,16 +77,17 @@ tests:
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
-- as: openshift-e2e-aws-techpreview
+- as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: upstream-e2e
       cli: latest
       commands: make -C openshift test-e2e
+      dependencies:
+      - env: E2E_REGISTRY_IMAGE
+        name: e2e-test-registry
       from: src
       resources:
         requests:

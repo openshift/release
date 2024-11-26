@@ -21,3 +21,34 @@ onboard:
         value: openshift-ci-build-farm
   ciSchedulingWebhook:
     skip: true
+  multiarchBuilderController:
+    skip: true
+  machineSet:
+    skip: true
+  passthrough:
+    exclude:
+    - supplemental-ci-images/**
+    - upgrader-sa.yaml
+  openshiftMonitoring:
+    patches:
+    - matches:
+      - kind: ConfigMap
+        name: cluster-monitoring-config
+        namespace: openshift-monitoring
+      inline:
+        data:
+          config.yaml: |
+            prometheusK8s:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: standard
+                  resources:
+                    requests:
+                      storage: 400Gi
+            alertmanagerMain:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: standard
+                  resources:
+                    requests:
+                      storage: 10Gi
