@@ -19,12 +19,16 @@ function info() {
 #	source "${SHARED_DIR}/proxy-conf.sh"
 # fi
 
-if [[ ! -f "/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig" ]]; then
+export SECRECTS="/var/run/cluster-secrets/rhoso-giant28"
+export KUBECONFIG=${SECRECTS}/underlying-kubeconfig
+export OSPCERT=${SECRECTS}/osp-ca.crt
+export OS_CLIENT_CONFIG_FILE=${SECRECTS}/clouds.yaml
+export OS_CLOUD=openstack
+
+if [[ ! -f "${KUBECONFIG}" ]]; then
 	info "underlying-kubeconfig wasn't found"
     exit 1
 fi
-
-export KUBECONFIG=/var/run/cluster-secrets/openstack-vh-mecha-central/underlying-kubeconfig
 
 # Load the proxy
 proxy_host=$(yq -r '.clusters[0].cluster."proxy-url"' "${KUBECONFIG}" | cut -d/ -f3 | cut -d: -f1)
@@ -38,4 +42,8 @@ export https_proxy=http://${proxy_host}:3128/
 export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 
 # Get openstack catalog list from the underlying ocp (where run the RHOSO Control Plane)
+info "Get openstack catalog list from the underlying ocp"
 oc rsh -n openstack openstackclient openstack catalog list
+
+info "Get openstack catalog list from using the openstackclient"
+openstack --os-cacert ${OSPCERT} catalog list
