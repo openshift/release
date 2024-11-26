@@ -324,7 +324,6 @@ EOF
 function build_upi_cluster() {
     OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
-    export TF_LOG=debug
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
@@ -371,7 +370,7 @@ function build_upi_cluster() {
     fi
 
     echo "Retrieving the SSH key"
-    scp -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 
