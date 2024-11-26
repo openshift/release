@@ -300,6 +300,8 @@ IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStat
 # Get Windows machineset information
 winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("win")).metadata.name')
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
+export winworker_machineset_replicas
+
 
 # Check Windows machineset replica count
 if [ "$winworker_machineset_replicas" -lt 1 ]; then
