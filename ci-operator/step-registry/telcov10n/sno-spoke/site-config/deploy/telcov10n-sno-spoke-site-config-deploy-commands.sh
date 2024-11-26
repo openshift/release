@@ -84,6 +84,47 @@ function generate_network_config {
   #   done
 }
 
+function get_storage_class_name {
+
+  echo "Get the Storage Class name to be used..."
+
+  if [ -n "$(oc get pod -A | grep "openshift-storage.*lvms-operator" || echo)" ];then
+    cat <<EOF | oc apply -f -
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: lvmcluster
+  namespace: openshift-storage
+spec:
+  storage:
+    deviceClasses:
+    - fstype: xfs
+      name: vg1
+      thinPoolConfig:
+        chunkSizeCalculationPolicy: Static
+        name: thin-pool-1
+        overprovisionRatio: 10
+        sizePercent: 90
+EOF
+    #sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
+    sc_name="lvms-vg1"
+    set -x
+    attempts=0
+    while sleep 10s ; do
+      oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
+      [ $(( attempts=${attempts} + 1 )) -lt 3 ] || exit 1
+    done
+    set +x
+    oc -n openshift-storage get lvmcluster/lvmcluster -oyaml
+  else
+    sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
+  fi
+
+  oc get sc
+  echo
+  echo "Using ${sc_name} Storage Class name"
+}
+
 function generate_site_config {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
@@ -120,7 +161,7 @@ function generate_site_config {
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     if [ "${root_device}" != "" ]; then
-      ignition_config_override="'{\\\"ignition\\\":{\\\"version\\\":\\\"3.2.0\\\"},\\\"storage\\\":{\\\"disks\\\":[{\\\"device\\\":\\\"${root_device}\\\",\\\"wipeTable\\\":true, \\\"partitions\\\": []}]}}'"
+      ignition_config_override='{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"'${root_device}'\",\"wipeTable\":true, \"partitions\": []}]}}'
     fi
 
     cat << EOF > ${site_config_file}
@@ -138,7 +179,8 @@ spec:
   clusters:
   - clusterName: "${SPOKE_CLUSTER_NAME}"
     networkType: "OVNKubernetes"
-    # installConfigOverrides: '$(echo ${B64_INSTALL_CONFIG_OVERRIDES} | base64 -d)'
+    # See: oc get clusterversion version -o json | jq -rc .status.capabilities
+    # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
     extraManifestPath: sno-extra-manifest/
     clusterType: sno
     clusterProfile: du
@@ -156,7 +198,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${AUX_HOST}
-    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    # ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
@@ -170,7 +212,7 @@ spec:
           ${root_device:+deviceName: ${root_device}}
           ${root_dev_hctl:+hctl: ${root_dev_hctl}}
         # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        ${ignition_config_override:+ignitionConfigOverride: "${ignition_config_override}"}
+        # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
         nodeNetwork:
           interfaces:
             - name: "${baremetal_iface}"
@@ -208,7 +250,9 @@ git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 mkdir -pv \${ztp_repo_dir}/site-configs/sno-extra-manifest
 mkdir -pv \${ztp_repo_dir}/site-policies
-echo "$(cat ${site_config_file})" > \${ztp_repo_dir}/site-configs/site-config.yaml
+cat <<EOS > \${ztp_repo_dir}/site-configs/site-config.yaml
+$(cat ${site_config_file})
+EOS
 cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
 generators:
   - site-config.yaml
@@ -274,7 +318,7 @@ EOF
   oc get Provisioning provisioning-configuration -oyaml
   set +x
 
-  sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
+  get_storage_class_name
 
   agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
 
