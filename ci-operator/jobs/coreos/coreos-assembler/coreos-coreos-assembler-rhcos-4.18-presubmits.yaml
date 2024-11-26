@@ -1,67 +1,11 @@
 presubmits:
-  openshift/os:
+  coreos/coreos-assembler:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.7$
-    - ^release-4\.7-
-    cluster: build02
-    context: ci/prow/build-test-qemu
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      devices.kubevirt.io/kvm: "1"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.7-build-test-qemu
-    rerun_command: /test build-test-qemu
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=build-test-qemu
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build-test-qemu,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.7$
-    - ^release-4\.7-
-    cluster: build10
+    - ^rhcos-4\.18$
+    - ^rhcos-4\.18-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -69,7 +13,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.7-images
+    name: pull-ci-coreos-coreos-assembler-rhcos-4.18-images
     rerun_command: /test images
     spec:
       containers:
@@ -114,25 +58,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.7$
-    - ^release-4\.7-
-    cluster: build10
-    context: ci/prow/validate
+    - ^rhcos-4\.18$
+    - ^rhcos-4\.18-
+    cluster: build02
+    context: ci/prow/rhcos
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.7-validate
-    rerun_command: /test validate
+    name: pull-ci-coreos-coreos-assembler-rhcos-4.18-rhcos
+    rerun_command: /test rhcos
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=validate
+        - --target=rhcos
         command:
         - ci-operator
         image: ci-operator:latest
@@ -165,4 +110,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )validate,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhcos,?($|\s.*)
