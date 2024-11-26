@@ -41,9 +41,9 @@ export http_proxy=http://${proxy_host}:3128/
 export https_proxy=http://${proxy_host}:3128/
 export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 
+info "Get openstack catalog list from using the openstackclient"
+openstack --os-cacert ${OSPCERT} catalog list
+
 # Get openstack catalog list from the underlying ocp (where run the RHOSO Control Plane)
 info "Get openstack catalog list from the underlying ocp"
 oc rsh -n openstack openstackclient openstack catalog list
-
-info "Get openstack catalog list from using the openstackclient"
-openstack --os-cacert ${OSPCERT} catalog list
