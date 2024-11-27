@@ -15,10 +15,12 @@ export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
+sleep 3600
+
 if ! command -v aws &> /dev/null
 then
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
-    export PATH="${HOME}/.local/bin:${PATH}" 
+    export PATH="${HOME}/.local/bin:${PATH}"
 
     if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
     then
@@ -28,13 +30,13 @@ then
     then
       python -m ensurepip
       if command -v pip3 &> /dev/null
-      then        
+      then
         pip3 install --user awscli
       elif command -v pip &> /dev/null
       then
         pip install --user awscli
       fi
-    else    
+    else
       echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
       exit 1
     fi
