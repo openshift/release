@@ -215,6 +215,80 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+function auth_test(){
+  AgentAuthToken=$(jq -r '."*gencrypto.AuthConfig"."AgentAuthToken"' "${INSTALL_DIR}/.openshift_install_state.json")
+  UserAuthToken=$(jq -r '."*gencrypto.AuthConfig"."UserAuthToken"' "${INSTALL_DIR}/.openshift_install_state.json")
+  WatcherAuthToken=$(jq -r '."*gencrypto.AuthConfig"."WatcherAuthToken"' "${INSTALL_DIR}/.openshift_install_state.json")
+
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+
+
+    echo "Get infra-envs with USER_AUTH"
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $UserAuthToken" -o "${INSTALL_DIR}/response.json"
+
+    INFRA_ENV_ID=$(jq -r '.[] | ."id"' "${INSTALL_DIR}/response.json")
+
+    # expected: should be able to query successfully.
+
+    echo  "Get infra-envs with AGENT_AUTH and correct header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "X-Secret-Key: $AgentAuthToken"
+
+    # expected not allowed
+
+    echo "Get infra-envs with AGENT_AUTH and incorrect header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $AgentAuthToken"
+
+
+    echo "Get infra-envs with WATCHER_AUTH and correct header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Watcher-Authorization: $WatcherAuthToken"
+
+    # expected: should be able to query successfully.
+
+
+    echo  "Get infra-envs with WATCHER_AUTH and incorrect header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $WatcherAuthToken"
+
+    # expect not allowed
+
+    curl --proxy "$proxy" ""http://${ip}:8090/api/assisted-install/v2/infra-envs"/${INFRA_ENV_ID}" -H "Authorization: $UserAuthToken"
+
+    # expected: should be able to query successfully.
+
+    echo  "Get infra-envs with AGENT_AUTH and correct header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "X-Secret-Key: $AgentAuthToken"
+
+    # expected not allowed
+
+    echo "Get infra-envs with AGENT_AUTH and incorrect header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Authorization: $AgentAuthToken"
+
+
+    echo "Get infra-envs with WATCHER_AUTH and correct header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Watcher-Authorization: $WatcherAuthToken"
+
+    # expected: should be able to query successfully.
+
+
+    echo  "Get infra-envs with WATCHER_AUTH and incorrect header"
+
+    curl --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Authorization: $WatcherAuthToken"
+
+    # expect not allowed
+
+  done
+
+}
+
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -235,6 +309,8 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
 sleep 900
 echo "Launching 'wait-for bootstrap-complete' installation step....."
+
+auth_test >> "${ARTIFACT_DIR}/auth_test.txt" &
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.
 # Let's use a proxy here as the internal net is not routable from the container running the installer.
