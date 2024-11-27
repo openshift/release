@@ -27,6 +27,21 @@ function cleanup_ibmcloud_powervs() {
 
   echo "Cleaning up the Transit Gateways"
   RESOURCE_GROUP_ID=$(ic resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
+  for GW in $(ic tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+  do
+    VPC_CONN="${WORKSPACE_NAME}-vpc"
+    VPC_CONN_ID="$(ic tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
+    if [ ! -z "${VPC_CONN_ID}" ]
+    then
+      echo "deleting VPC connection"
+      ic tg connection-delete "${GW}" "${CS}" --force || true
+      sleep 120
+      echo "Done Cleaning up GW VPC Connection"
+    else
+      echo "no vpc-conn needed"
+    fi
+  done
+
   for GW in $(ic tg gateways --output json | jq -r '.[].id')
   do
     echo "Checking the resource_group and location for the transit gateways ${GW}"
@@ -377,6 +392,18 @@ case "$CLUSTER_TYPE" in
       # created resources.
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
+      #Create the VPC Connection for the TG
+      for GW in $(ic tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+      do
+	for CS in $(ic is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+	do
+  	  VPC_CONN_NAME=$(ic is vpc "${CS}" --output json | jq -r .name)
+	  VPC_NW_ID=$(ic is vpc "${CS}" --output json | jq -r .crn)
+	  echo "Creating new VPC connection for gateway now."
+	  ic tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+	done
+      done
+      
       cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform plan -var-file=data/var.tfvars -no-color \
