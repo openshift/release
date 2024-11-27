@@ -11,9 +11,6 @@ export KUBECONFIG=${WORKSPACE}/kubeconfig
 # Unset environment variables which conflict with kubectl
 unset NAMESPACE
 
-#Copy the distributed-tracing-qe repo files to a writable directory.
-cp -R /tmp/telco-dast-qe /tmp/telco-dast-qe && cd /tmp/telco-dast-qe
-
 # Execute test
 chainsaw test \
 --config ".chainsaw.yaml" \
@@ -22,4 +19,3 @@ chainsaw test \
 --report-format "XML" \
 --test-dir \
 /tmp/telco-dast-qe/tests/dast
-tests/dast
