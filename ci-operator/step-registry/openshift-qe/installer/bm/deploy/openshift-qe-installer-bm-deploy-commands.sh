@@ -104,9 +104,9 @@ for i in $HOSTS; do
 done
 EOF
 if [[ $LAB == "performancelab" ]]; then
-  QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
+  export QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
 elif [[ $LAB == "scalelab" ]]; then
-  QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
 fi
 envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${RESET_IDRAC}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
