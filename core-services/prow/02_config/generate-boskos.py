@@ -473,6 +473,10 @@ CONFIG = {
     'aws-managed-rosa-rhoai-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
+    },
+    'aws-managed-osd-rhoai-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
     }
 }
 
