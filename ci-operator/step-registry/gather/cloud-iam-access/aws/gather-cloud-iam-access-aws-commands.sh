@@ -64,13 +64,15 @@ function log_msg() {
 #
 # Globals
 #
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
 EVENT_WORKDIR=/tmp/iam-events-"${CLUSTER_NAME}"
 EVENTS_PATH_RAW=${EVENT_WORKDIR}/objects
 EVENTS_PATH_PARSED=${EVENT_WORKDIR}/parsed
 CREDS_REQ_PATH=${EVENT_WORKDIR}/credrequests
 CREDS_REQ_PATH_RAW=${EVENT_WORKDIR}/credrequests-raw
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+INSTALLER_USER_NAME=$(head -n1 "${SHARED_DIR}/aws_user_names")
 
 DATETIME_FORMAT="%Y-%m-%dT%H:%M:%SZ"
 DATETIME_NOW="$(date -u +"${DATETIME_FORMAT}")"
@@ -85,6 +87,60 @@ ACCOUNT_ID="$(aws sts get-caller-identity | jq -r .Account)"
 OBJECTS_PREFIX="AWSLogs/${ACCOUNT_ID}/CloudTrail/${LEASED_RESOURCE}"
 OBJECTS_PREFIX_START="${OBJECTS_PREFIX}/$(date -ud "${GATHER_EVENT_START_TIME}" +%Y/%m)"
 
+
+# Create depdencies
+mkdir -v "${EVENTS_PATH_PARSED}" || true
+mkdir -v "${CREDS_REQ_PATH}" || true
+mkdir -v "${CREDS_REQ_PATH_RAW}" || true
+
+function install_cci() {
+	#
+	# Download cci (cloud credentials insights)
+	#
+	# TODO(mtulio): define where to save that cross-component tool to parse IAM events.
+	# This script must not be savend in component repo as it is intented to be used by
+	# CI.
+	CCI=/tmp/cci
+	log_msg "Downloading cci (cloud credential insights) utility"
+	curl -s https://raw.githubusercontent.com/mtulio/mtulio.labs/refs/heads/exp-ocp-cred-informer/labs/ocp-identity/cloud-credentials-insights/cci.py > ${CCI}
+	chmod +x ${CCI}
+
+	# Dependencies required for CCI.
+	pip3 install pyyaml
+}
+
+#
+# Extracting events from audit logs
+#
+function extract_events() {
+	log_msg "\nChecking the size of discovered events / raw data"
+	du -sh "${EVENTS_PATH_RAW}"
+
+	log_msg "Extracting insights from events"
+	${CCI} --command extract \
+		--events-path "${EVENTS_PATH_RAW}" \
+		--output "${EVENTS_PATH_PARSED}" \
+		--filters principal-prefix="${CLUSTER_NAME}" \
+		--installer-user-name="${INSTALLER_USER_NAME}"
+}
+
+function show_parsed_user_stats() {
+	echo ">>>>>"
+	mapfile -t IAM_USERS < <(jq -r '.|keys|.[]' "${EVENTS_PATH_PARSED}"/events.json)
+	log_msg "Found ${#IAM_USERS[@]} IAM users. Coutning events for each:"
+	for IAM_USER in ${IAM_USERS[@]};
+	do
+		count=$(jq -r ".[\"${IAM_USER}\"].events|length" "${EVENTS_PATH_PARSED}"/events.json)
+		echo "Identity ${IAM_USER} has ${count} events"
+	done
+	echo "<<<<<"
+}
+
+function extract_and_show() {
+	extract_events
+	show_parsed_user_stats
+}
+
 #
 # Init event discovery
 #
@@ -92,12 +148,13 @@ log_msg "Starting event gathering with timestamps: "
 echo "start=[${GATHER_EVENT_START_TIME}] end=[${GATHER_EVENT_END_TIME}] limit=[${GATHER_EVENT_END_LIMIT_TIME}]"
 
 mkdir -pv "${EVENTS_PATH_RAW}" || true
+
 # Time control. (change only when you are observed fatest data available on s3)
 GATHER_THRESHOLD=0
 GATHER_COUNT=0
 RETRY_LIMIT=15
 
-RETRY_INTERVAL_SEC=60
+RETRY_INTERVAL_SEC=120
 while true; do
 	GATHER_THRESHOLD=$((GATHER_THRESHOLD+1))
 	GATHER_COUNT=$((GATHER_COUNT+1))
@@ -154,6 +211,7 @@ while true; do
 
 	log_msg "Found events: initial=[${LOG_INITIAL_EVENT}] final=[${LOG_LATEST_EVENT}] count=[${LOG_COUNT_EVENTS}] files=[${found}]"
 
+	extract_and_show
 	# General flow
 	# t0: create custom IAM user
 	# t1: regular job flow (install, run e2e, destroy)
@@ -185,48 +243,12 @@ done
 
 # TODO/Q: should we need to check if there are 0 events when expected to have, then fail?
 
-
-#
-# Download cci (cloud credentials insights)
-#
-# TODO(mtulio): define where to save that cross-component tool to parse IAM events.
-# This script must not be savend in component repo as it is intented to be used by
-# CI.
-CCI=/tmp/cci
-log_msg "Downloading cci (cloud credential insights) utility"
-curl -s https://raw.githubusercontent.com/mtulio/mtulio.labs/refs/heads/exp-ocp-cred-informer/labs/ocp-identity/cloud-credentials-insights/cci.py > ${CCI}
-chmod +x ${CCI}
-
-# Dependencies required for CCI.
-pip3 install pyyaml
-
-#
-# Extracting events
-#
-log_msg "\nChecking the size of discovered events / raw data"
-du -sh "${EVENTS_PATH_RAW}"
-
-log_msg "Extracting insights from events"
-
-#INSTALLER_USER_NAME="${CLUSTER_NAME}"-installer 
-#INSTALLER_USER_NAME="${CLUSTER_NAME}"-minimal-perm 
-#INSTALLER_USER_NAME=origin-ci-robot-provision
-INSTALLER_USER_NAME=$(head -n1 "${SHARED_DIR}/aws_user_names")
-
-mkdir -v "${EVENTS_PATH_PARSED}" || true
-${CCI} --command extract \
-	--events-path "${EVENTS_PATH_RAW}" \
-	--output "${EVENTS_PATH_PARSED}" \
-    --filters principal-prefix="${CLUSTER_NAME}" \
-	--installer-user-name="${INSTALLER_USER_NAME}"
+extract_and_show
 
 #
 # Extract credentials requests
 #
 log_msg "Attempting to extract credential requests from RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:-}"
-
-mkdir -v "${CREDS_REQ_PATH}" || true
-mkdir -v "${CREDS_REQ_PATH_RAW}" || true
 
 function extract_credrequests() {
 	pushd "${CREDS_REQ_PATH_RAW}"

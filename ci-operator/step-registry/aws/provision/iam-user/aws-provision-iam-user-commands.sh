@@ -84,7 +84,7 @@ function create_cred_file()
 	user_outout=/tmp/aws_user_output
 	cred_outout=/tmp/aws_cred_output
 
-	echo "Creating user ${USER_NAME}"
+	echo "Creating user ${user_name}"
 	aws_create_user $REGION "${user_name}" "${policy_arn}" "${user_outout}" "${cred_outout}"
 
 	key_id=$(jq -r '.AccessKey.AccessKeyId' ${cred_outout})
