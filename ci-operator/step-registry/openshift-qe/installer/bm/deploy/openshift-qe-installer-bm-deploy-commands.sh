@@ -67,7 +67,7 @@ USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".no
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
 # IDRAC reset
-if [[ $RESET_IDRAC == "true" ]; then
+if [[ "$RESET_IDRAC" == "true" ]; then
   echo "Resetting IDRACs ..."
   for i in $HOSTS; do
     echo "Resetting IDRAC of server $i ..."
