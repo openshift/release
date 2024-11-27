@@ -1,0 +1,24 @@
+branch-protection:
+  orgs:
+    konflux-ci:
+      repos:
+        build-definitions:
+          unmanaged: true
+tide:
+  merge_method:
+    # some logic in the build-definitions push pipeline depends on the existence of merge commits,
+    # so we can't use 'rebase'
+    konflux-ci/build-definitions: merge
+  queries:
+  - labels:
+    - approved
+    - lgtm
+    missingLabels:
+    - backports/unvalidated-commits
+    - do-not-merge/hold
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/work-in-progress
+    - jira/invalid-bug
+    - needs-rebase
+    repos:
+    - konflux-ci/build-definitions
