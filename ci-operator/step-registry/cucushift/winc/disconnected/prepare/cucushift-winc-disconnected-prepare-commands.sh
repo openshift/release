@@ -8,8 +8,8 @@ script_dir=$(dirname "$0")
 work_dir=$PWD
 NAMESPACE="winc-test"
 
-# Get mirror registry hostname from route
-DISCONNECTED_REGISTRY=$(oc get route -n openshift-console console -o jsonpath='{.spec.host}' | sed 's/console-openshift-console/bastion.mirror-registry.qe.devcluster.openshift.com:5000/')
+# Get registry hostname from environment variable or use default value
+DISCONNECTED_REGISTRY=${REGISTRY_HOST:-"bastion.mirror-registry.qe.devcluster.openshift.com:5000"}
 
 # Or directly get from existing configmap if it exists
 if oc get configmap winc-test-config -n winc-test &>/dev/null; then
@@ -20,6 +20,7 @@ fi
 LINUX_CONTAINER_IMAGE="${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc"
 PRIMARY_WINDOWS_CONTAINER_IMAGE="${DISCONNECTED_REGISTRY}/powershell:lts-nanoserver-ltsc2022"
 PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
+INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 
 # Function to print log messages with timestamp
 log_message() {
@@ -39,6 +40,20 @@ create_or_switch_to_namespace() {
   # Set pod security configuration
   oc label namespace ${NAMESPACE} security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged --overwrite
   echo "Namespace ${NAMESPACE} is ready."
+}
+
+# Function to create and import ImageStream
+create_and_import_imagestream() {
+  log_message "Creating and importing ImageStream..."
+  
+  # Create ImageStream for PowerShell
+  oc create imagestream powershell -n ${NAMESPACE} || true
+  
+  # Import the image
+  oc import-image powershell:latest --from=mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022 --confirm -n ${NAMESPACE}
+  
+  # Verify ImageStream
+  oc get is powershell -n ${NAMESPACE}
 }
 
 # Function to create ConfigMap with container configurations
@@ -93,7 +108,7 @@ spec:
         kubernetes.io/os: windows
       containers:
       - name: win-webserver
-        image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}
+        image: ${INTERNAL_REGISTRY}/${NAMESPACE}/powershell:latest
         command: ["pwsh.exe"]
         args: ["-Command", "while(\$true) { Write-Host 'Windows container is running...'; Start-Sleep -Seconds 30 }"]
         ports:
@@ -105,8 +120,6 @@ spec:
       - name: config-volume
         configMap:
           name: winc-test-config
-      imagePullSecrets:
-      - name: windows-registry-secret
 EOF
 
   # Wait for Windows workload to be ready
@@ -184,10 +197,13 @@ log_message "Using disconnected registry: ${DISCONNECTED_REGISTRY}"
 # 1. Create ConfigMap
 create_winc_test_configmap
 
-# 2. Create Windows workloads
+# 2. Create and import ImageStream
+create_and_import_imagestream
+
+# 3. Create Windows workloads
 create_windows_workloads
 
-# 3. Create Linux workloads
+# 4. Create Linux workloads
 create_linux_workloads
 
 log_message "Deployment completed successfully."
