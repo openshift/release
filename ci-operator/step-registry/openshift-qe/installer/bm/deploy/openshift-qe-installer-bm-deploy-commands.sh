@@ -67,17 +67,21 @@ USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".no
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
 # IDRAC reset
-if [ $RESET_IDRAC ]; then
+if [[ $RESET_IDRAC == "true" ]; then
+  echo "Resetting IDRACs ..."
   for i in $HOSTS; do
+    echo "Resetting IDRAC of server $i ..."
     podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
   done
   sleep 300
 fi
+echo "Cheking boot order ..."
 for i in $HOSTS; do
   # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
   #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
   command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/badfish_interfaces.yml -t foreman 2>&1)
   desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
+  echo "Cheking boot order of server $i ..."
   echo $command_output
   if [[ "$command_output" != "$desired_output" ]]; then
     WAIT=true
@@ -88,7 +92,9 @@ if [ $WAIT ]; then
   echo "Waiting after boot order changes ..."
   sleep 300
 fi
+echo "Cheking UEFI setup ..."
 for i in $HOSTS; do
+  echo "Cheking UEFI setup of server $i ..."
   podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
   if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
     echo "$i not in Uefi mode"
@@ -97,6 +103,11 @@ for i in $HOSTS; do
   fi
 done
 EOF
+if [[ $LAB == "performancelab" ]]; then
+  QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
+elif [[ $LAB == "scalelab" ]]; then
+  QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+fi
 envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${RESET_IDRAC}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
