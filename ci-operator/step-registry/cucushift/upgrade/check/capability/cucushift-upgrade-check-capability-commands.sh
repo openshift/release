@@ -74,8 +74,14 @@ function get_caps_for_version_capset() {
     "v4.16")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
     ;;
-    *)
+    "v4.17")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
+    ;;
+    "v4.18")
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress OperatorLifecycleManagerV1"
+    ;;
+    *)
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress OperatorLifecycleManagerV1"
     ;;
     esac
 
@@ -282,6 +288,7 @@ caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lif
 caps_operator[CloudCredential]="cloud-credential"
 caps_operator[CloudControllerManager]="cloud-controller-manager"
 caps_operator[Ingress]="ingress"
+caps_operator[OperatorLifecycleManagerV1]="olm"
 
 # Mapping between optional capability and resources
 # Need update when new resource marks as optional
