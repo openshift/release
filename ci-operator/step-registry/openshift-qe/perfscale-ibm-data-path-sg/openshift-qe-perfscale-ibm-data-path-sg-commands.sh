@@ -20,8 +20,8 @@ echo "logging in..."
 resource_group_name=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
 echo resource group is $resource_group_name
 
-ibmcloud resource group $resource_group_name || exit 1
-ibmcloud target -g $resource_group_name -r $region
+"${IBMCLOUD_CLI}" resource group $resource_group_name || exit 1
+"${IBMCLOUD_CLI}" target -g $resource_group_name -r $region
 sg=$(ibmcloud is sgs --resource-group-name $resource_group_name --output json | jq -r '.[] | select(.name | contains("cluster-wide"))|.id')
 echo "Print security group in detail"
 
