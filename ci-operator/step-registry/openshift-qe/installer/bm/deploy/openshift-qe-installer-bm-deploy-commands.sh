@@ -24,13 +24,15 @@ sno_node_count: $NUM_SNO_NODES
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
-public_vlan: true
+public_vlan: $PUBLIC_VLAN
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
-smcipmitool_url:
+bastion_controlplane_interface: $BASTION_CP_INTERFACE
+controlplane_network: 192.168.216.1/21
+controlplane_network_prefix: 21
 bastion_lab_interface: $LAB_INTERFACE
 controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
@@ -158,8 +160,10 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m copy -a remote_src=/root/${TYPE}/kubeconfig dest=${jetlag_repo}/kubeconfig
+   mkdir -p /root/${TYPE}/$LAB_CLOUD
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m copy -a remote_src=/root/${TYPE}/kubeconfig dest=/root/$TYPE/$LAB_CLOUD/kubeconfig
    deactivate
    rm -rf .ansible
 "
 
+scp -q ${SSH_ARGS} root@${bastion}:/root/${TYPE}/${LAB_CLOUD}/kubeconfig ${SHARED_DIR}/kubeconfig
