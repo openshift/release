@@ -227,46 +227,60 @@ function auth_test(){
 
 
     echo "Get infra-envs with USER_AUTH"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $UserAuthToken" -o "${INSTALL_DIR}/response.json"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $UserAuthToken" -o "${INSTALL_DIR}/response.json"
+    echo "expected: should be able to query successfully."
 
-    echo "Get infra-envs with WATCHER_AUTH and correct header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "\n Get infra-envs with WATCHER_AUTH and correct header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "expected: should be able to query successfully."
 
-    echo  "Get infra-envs with WATCHER_AUTH and incorrect header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $WatcherAuthToken"
+    echo  "\n Get infra-envs with WATCHER_AUTH and incorrect header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $WatcherAuthToken"
+    echo "expect not allowed"
 
-    echo  "Get infra-envs with AGENT_AUTH and correct header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "X-Secret-Key: $AgentAuthToken"
+    echo  "\n Get infra-envs with AGENT_AUTH and correct header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "X-Secret-Key: $AgentAuthToken"
+    echo "expected not allowed"
 
-    echo "Get infra-envs with AGENT_AUTH and incorrect header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $AgentAuthToken"
+    echo "\n Get infra-envs with AGENT_AUTH and incorrect header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs" -H "Authorization: $AgentAuthToken"
+    echo "expected not allowed"
 
     INFRA_ENV_ID=$(jq -r '.[] | ."id"' "${INSTALL_DIR}/response.json")
 
-    echo  "Get a specific infra-envs with ID using USER_AUTH"
-    curl -v --proxy "$proxy" ""http://${ip}:8090/api/assisted-install/v2/infra-envs"/${INFRA_ENV_ID}" -H "Authorization: $UserAuthToken"
+    echo  "\n Get a specific infra-envs with ID using USER_AUTH"
+    curl -vv --proxy "$proxy" ""http://${ip}:8090/api/assisted-install/v2/infra-envs"/${INFRA_ENV_ID}" -H "Authorization: $UserAuthToken"
+    echo "expected: should be able to query successfully."
 
-    echo  "Get a specific infra-envs with ID using AGENT_AUTH"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "X-Secret-Key: $AgentAuthToken"
+    echo  "\n Get a specific infra-envs with ID using AGENT_AUTH"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "X-Secret-Key: $AgentAuthToken"
+    echo "expected: should be able to query successfully."
 
-    echo  "Get a specific infra-envs with ID using AGENT_AUTH but wrong header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Authorization: $AgentAuthToken"
+    echo  "\n Get a specific infra-envs with ID using AGENT_AUTH but wrong header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Authorization: $AgentAuthToken"
+    echo "expected: error"
 
-    echo  "Get a specific infra-envs with ID using WATCHER_AUTH"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Watcher-Authorization: $WatcherAuthToken"
+    echo  "\n Get a specific infra-envs with ID using WATCHER_AUTH"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs"/$INFRA_ENV_ID -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "expected: error"
 
-    echo  "Get host details associated with an infra-env using USER_AUTH"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Authorization: $AgentAuthToken"
+    echo  "\n Get host details associated with an infra-env using USER_AUTH"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Authorization: $UserAuthToken"
+    echo "expected: should be able to query successfully."
 
-    echo  "Get host details associated with an infra-env using WATCHER_AUTH and correct header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo  "\n Get host details associated with an infra-env using WATCHER_AUTH and correct header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "expected: error"
 
-    echo  "Get host details associated with an infra-env using WATCHER_AUTH and incorrect header"
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Authorization: $WatcherAuthToken"
+    echo  "\n Get host details associated with an infra-env using WATCHER_AUTH and incorrect header"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/infra-envs/${INFRA_ENV_ID}/hosts" -H "Authorization: $WatcherAuthToken"
+    echo "expected: error"
 
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/events" -H "Watcher-Authorization: $WatcherAuthToken"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/events" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "expected: PASS"
 
-    curl -v --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/clusters" -H "Watcher-Authorization: $WatcherAuthToken"
+    curl -vv --proxy "$proxy" "http://${ip}:8090/api/assisted-install/v2/clusters" -H "Watcher-Authorization: $WatcherAuthToken"
+    echo "expected: PASS"
 
   done
 
