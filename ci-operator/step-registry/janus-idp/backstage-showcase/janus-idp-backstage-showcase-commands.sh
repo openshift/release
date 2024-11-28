@@ -11,8 +11,10 @@ GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
 # Clone and checkout the specific PR
-git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+# git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+git clone "https://github.com/subhashkhileri/backstage-showcase.git"
 cd backstage-showcase || exit
+git checkout ephemeral-env-setup || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
@@ -115,5 +117,6 @@ fi
 # sleep 60*60
 oc version
 oc auth can-i '*' '*'
-
-# bash ./.ibm/pipelines/openshift-ci-tests.sh
+echo "cluster route:"
+echo $(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+bash ./.ibm/pipelines/openshift-ci-tests.sh
