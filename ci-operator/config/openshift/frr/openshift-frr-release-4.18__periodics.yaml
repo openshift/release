@@ -3,6 +3,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  metallb:
+    name: "4.18"
+    namespace: ocp
+    tag: metallb
+  metallb-frr:
+    name: "4.18"
+    namespace: ocp
+    tag: metallb-frr
+  metallb-operator:
+    name: "4.18"
+    namespace: ocp
+    tag: metallb-operator
   ocp_builder_rhel-9-base-openshift-4.18:
     name: builder
     namespace: ocp
@@ -16,24 +28,16 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.16
-images:
-- dockerfile_path: Dockerfile.openshift
-  from: ocp_builder_rhel-9-base-openshift-4.18
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: metallb-frr
 releases:
   initial:
     integration:
       name: "4.18"
       namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -55,6 +59,8 @@ tests:
         IP_STACK=v4
         BGP_TYPE=frr-k8s-cno
         RUN_FRR_K8S_TESTS=true
+        DEPLOY_FRRK8S_FROM_CNO=true
+        DONT_DEPLOY_OPERATOR=true
     workflow: baremetalds-metallb-e2e
 zz_generated_metadata:
   branch: release-4.18
