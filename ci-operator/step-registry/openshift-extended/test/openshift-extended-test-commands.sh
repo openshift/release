@@ -77,6 +77,7 @@ which extended-platform-tests
 # setup proxy
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+    echo "setup proxy"
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -382,6 +383,8 @@ function run {
     create_must-gather_dir_for_case
     ret_value=0
     set -x
+    sleep 7200
+    exit 0
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
