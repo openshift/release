@@ -3,6 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
+  ccoctl:
+    name: "4.17"
+    namespace: "ocp"
+    tag: cloud-credential-operator
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -113,6 +117,129 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator-aws-sts
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: inject-region-pod-identity-webhook
+      cli: latest
+      commands: |
+        #!/bin/bash
+        
+        oc scale --replicas=0 -n openshift-cluster-version deploy/cluster-version-operator
+        oc scale --replicas=0 -n openshift-cloud-credential-operator deployment/cloud-credential-operator
+
+        AWS_REGION=$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)
+        oc patch deployment pod-identity-webhook \
+        -n openshift-cloud-credential-operator \
+        --type=json \
+        -p '[
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/args",
+            "value": ["--aws-default-region='${AWS_REGION}'"]
+          }
+        ]'
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - ref: optional-operators-operator-sdk
+    - as: ccoctl-role-provision
+      cli: latest
+      commands: |
+        #!/bin/bash
+
+        cd $(mktemp -d)
+        mkdir cred-req
+
+        cat << EOF > cred-req/cred-req.yaml
+        apiVersion: cloudcredential.openshift.io/v1
+        kind: CredentialsRequest
+        metadata:
+          name: cert-manager
+          namespace: openshift-cloud-credential-operator
+        spec:
+          providerSpec:
+            apiVersion: cloudcredential.openshift.io/v1
+            kind: AWSProviderSpec
+            statementEntries:
+            - action:
+              - route53:GetChange
+              effect: Allow
+              resource: arn:aws:route53:::change/*
+            - action:
+              - route53:ChangeResourceRecordSets
+              - route53:ListResourceRecordSets
+              effect: Allow
+              resource: arn:aws:route53:::hostedzone/*
+            - action:
+              - route53:ListHostedZonesByName
+              effect: Allow
+              resource: "*"
+          secretRef:
+            name: aws-creds
+            namespace: cert-manager
+          serviceAccountNames:
+          - cert-manager
+        EOF
+        
+        INFRA_NAME=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
+        AWS_REGION=$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)
+        OIDC_ARN=$(cat "${SHARED_DIR}/aws_oidc_provider_arn")
+
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        ccoctl aws create-iam-roles --credentials-requests-dir ./cred-req --identity-provider-arn $OIDC_ARN --name $INFRA_NAME --output-dir . --region $AWS_REGION | tee ccoctl-output.log
+
+        oc apply -f ./manifests
+
+        # AWS_ROLE_ARN=$(cat ccoctl-output.log | grep -oP 'arn:aws:iam::\d+:role/[a-zA-Z0-9+=,.@_-]+')
+        # echo ${AWS_ROLE_ARN} 
+
+        curl -d "cert-manager-operator sts job finished ccoctl-role-provision" ntfy.sh/swghosh-openshift-ci
+      from: ccoctl
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    # - as: debug-sleeper
+    #   commands: |
+    #     #!/bin/bash
+    #     curl -d "cert-manager-operator sts job reached debug-sleeper state" ntfy.sh/swghosh-openshift-ci
+
+    #     echo "1.5hours of debugging time for you"
+    #     total_duration=5400
+    #     elapsed_time=0
+    #     while [ $elapsed_time -lt $total_duration ]; do
+    #         sleep 30
+    #         elapsed_time=$((elapsed_time + 30))
+    #         echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+    #     done
+    #   from: src
+    #   resources:
+    #     limits:
+    #       cpu: 100m
+    #       memory: 50Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        curl https://patch-diff.githubusercontent.com/raw/openshift/cert-manager-operator/pull/219.diff > pr.diff
+        git apply pr.diff
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !CredentialsMode:Mint"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 256Mi
+    workflow: openshift-e2e-aws-manual-oidc-sts
 zz_generated_metadata:
   branch: master
   org: openshift
