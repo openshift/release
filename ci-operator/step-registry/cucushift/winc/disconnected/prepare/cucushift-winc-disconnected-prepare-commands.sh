@@ -27,6 +27,26 @@ log_message() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Function to check Windows worker nodes
+check_windows_nodes() {
+    # Get Windows machineset replicas
+    winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api -l machine.openshift.io/os-id=Windows -o jsonpath='{.items[0].spec.replicas}')
+
+    if [ "$winworker_machineset_replicas" -lt 1 ]; then
+        echo "Error: Windows machineset must have at least 1 replica"
+        exit 1
+    fi
+
+    # Wait for Windows nodes to be ready
+    echo "Waiting for Windows nodes to be in Ready state..."
+    if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m; then
+        echo "Error: Timeout waiting for Windows nodes to be ready"
+        # Show node status for debugging
+        oc get nodes -l kubernetes.io/os=windows -o wide
+        exit 1
+    fi
+}
+
 # Function to create or switch to namespace
 create_or_switch_to_namespace() {
   echo "Ensuring the ${NAMESPACE} namespace exists..."
@@ -110,6 +130,8 @@ spec:
       - key: "os"
         value: "Windows"
         effect: "NoSchedule"
+      imagePullSecrets:
+      - name: local-registry-secret
       containers:
       - name: win-webserver
         image: ${INTERNAL_REGISTRY}/${NAMESPACE}/powershell:latest
@@ -168,6 +190,8 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
+      imagePullSecrets:
+      - name: local-registry-secret
       containers:
       - name: linux-webserver
         image: ${LINUX_CONTAINER_IMAGE}
@@ -197,6 +221,9 @@ EOF
 # Main execution flow
 log_message "Starting deployment in disconnected environment..."
 log_message "Using disconnected registry: ${DISCONNECTED_REGISTRY}"
+
+# 0. Check Windows nodes
+check_windows_nodes
 
 # 1. Create ConfigMap
 create_winc_test_configmap
