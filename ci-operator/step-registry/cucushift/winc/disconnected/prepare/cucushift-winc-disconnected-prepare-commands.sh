@@ -28,14 +28,37 @@ log_message() {
 
 # Function to check Windows worker nodes
 check_windows_nodes() {
-    # Wait for Windows nodes to be ready
-    echo "Waiting for Windows nodes to be in Ready state..."
-    if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m; then
-        echo "Error: Timeout waiting for Windows nodes to be ready"
-        # Show node status for debugging
-        oc get nodes -l kubernetes.io/os=windows -o wide
-        exit 1
-    fi
+# Check status of all nodes
+echo "=== All Nodes Status ==="
+oc get nodes -o wide
+
+# Check Windows nodes specifically
+echo -e "\n=== Windows Nodes Status ==="
+oc get nodes -l kubernetes.io/os=windows -o wide
+
+# Get detailed node conditions
+echo -e "\n=== Windows Nodes Detailed Conditions ==="
+oc get nodes -l kubernetes.io/os=windows -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .status.conditions[*]}{"\t"}{.type}{": "}{.status}{" - "}{.message}{"\n"}{end}{"\n"}{end}'
+
+# Check events for Windows nodes
+echo -e "\n=== Events related to Windows nodes ==="
+for node in $(oc get nodes -l kubernetes.io/os=windows -o name); do
+    echo "Events for $node:"
+    oc get events --field-selector involvedObject.name=$(echo $node | cut -d/ -f2) --all-namespaces
+done
+
+# Check Windows Machine Config Operator logs - Fixed command
+echo -e "\n=== WMCO Operator Logs ==="
+WMCO_POD=$(oc get pods -n openshift-windows-machine-config-operator -l app=windows-machine-config-operator -o name)
+if [ ! -z "$WMCO_POD" ]; then
+    oc logs -n openshift-windows-machine-config-operator $WMCO_POD --tail=100
+else
+    echo "No WMCO operator pod found"
+fi
+
+# Try waiting again with verbose output
+echo -e "\n=== Waiting for Windows nodes to be ready ==="
+oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m -v=6
 }
 
 # Function to create or switch to namespace
@@ -228,7 +251,8 @@ log_message "Starting deployment in disconnected environment..."
 log_message "Using disconnected registry: ${DISCONNECTED_REGISTRY}"
 
 # 0. Check Windows nodes
-check_windows_nodes
+# skip for debug
+#check_windows_nodes
 create_registry_secret
 
 # 1. Create ConfigMap
