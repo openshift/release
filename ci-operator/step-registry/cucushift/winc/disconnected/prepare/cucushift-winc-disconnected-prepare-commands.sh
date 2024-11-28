@@ -17,8 +17,7 @@ if oc get configmap winc-test-config -n winc-test &>/dev/null; then
 fi
 
 # Define image paths
-LINUX_CONTAINER_IMAGE="${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc"
-PRIMARY_WINDOWS_CONTAINER_IMAGE="${DISCONNECTED_REGISTRY}/powershell:lts-nanoserver-ltsc2022"
+PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
 PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
 INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 
@@ -29,14 +28,6 @@ log_message() {
 
 # Function to check Windows worker nodes
 check_windows_nodes() {
-    # Get Windows machineset replicas
-    winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api -l machine.openshift.io/os-id=Windows -o jsonpath='{.items[0].spec.replicas}')
-
-    if [ "$winworker_machineset_replicas" -lt 1 ]; then
-        echo "Error: Windows machineset must have at least 1 replica"
-        exit 1
-    fi
-
     # Wait for Windows nodes to be ready
     echo "Waiting for Windows nodes to be in Ready state..."
     if ! oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m; then
@@ -88,7 +79,6 @@ metadata:
   name: winc-test-config
   namespace: ${NAMESPACE}
 data:
-  linux_container_disconnected_image: "${LINUX_CONTAINER_IMAGE}"
   primary_windows_container_disconnected_image: "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
   primary_windows_container_image: "mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
   primary_windows_image: "${PRIMARY_WINDOWS_IMAGE}"
@@ -134,7 +124,7 @@ spec:
       - name: local-registry-secret
       containers:
       - name: win-webserver
-        image: ${INTERNAL_REGISTRY}/${NAMESPACE}/powershell:latest
+        image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}
         command: ["pwsh.exe"]
         args: ["-Command", "while(\$true) { Write-Host 'Windows container is running...'; Start-Sleep -Seconds 30 }"]
         ports:
@@ -190,13 +180,11 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-      imagePullSecrets:
-      - name: local-registry-secret
       containers:
-      - name: linux-webserver
-        image: ${LINUX_CONTAINER_IMAGE}
-        ports:
-        - containerPort: 8080
+      - name: webserver
+        image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+        command: ["sleep"]
+        args: ["infinity"]
 EOF
 
   # Wait for Linux workload to be ready
@@ -218,12 +206,30 @@ EOF
   done
 }
 
+# Function to create registry secret
+create_registry_secret() {
+  log_message "Creating registry secret..."
+  create_or_switch_to_namespace
+
+  # Create docker-registry secret with hardcoded credentials
+  oc create secret docker-registry local-registry-secret \
+    --docker-server=${DISCONNECTED_REGISTRY} \
+    --docker-username=dummy \
+    --docker-password=dummy \
+    --docker-email=unused \
+    -n ${NAMESPACE} || true
+
+  # Link the secret to the default service account
+  oc secrets link default local-registry-secret --for=pull -n ${NAMESPACE}
+}
+
 # Main execution flow
 log_message "Starting deployment in disconnected environment..."
 log_message "Using disconnected registry: ${DISCONNECTED_REGISTRY}"
 
 # 0. Check Windows nodes
 check_windows_nodes
+create_registry_secret
 
 # 1. Create ConfigMap
 create_winc_test_configmap
