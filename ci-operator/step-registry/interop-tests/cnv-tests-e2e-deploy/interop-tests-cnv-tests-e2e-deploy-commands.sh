@@ -36,7 +36,28 @@ cd /tmp/cnv-ci || exit 1
 
 # Overwrite the default configuration file used for testing
 export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
-make deploy_test || exit_code=$?
+
+# The default storage class used in the testing configuration file is 'ocs-storagecluster-ceph-rbd', at
+# https://github.com/openshift-cnv/cnv-ci/blob/master/manifests/testing/kubevirt-tier1-ocs.json, that is kept for
+# compatiblity with the current test configs at the time of writing this snippet.
+# The KUBEVIRT_STORAGECLASS_NAME is set to 'ocs-storagecluster-ceph-rbd' in the 'cnv-tests-e2e-deploy' step by default too.
+# Some test configurations like KubeVirt testing on ARM64 cannot use the storage class 'ocs-storagecluster-ceph-rbd' as it
+# is not available on the ARM64 nodes. Users can now set the storage class name to be used in the prow test config definition,
+# avoiding the need to modify these values in different repositories.
+cat > manifests/testing/kubevirt-tier1-ocs.json <<EOF
+{
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageClassRhel\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageClassWindows\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_RWX_NAME:+\"storageRWXBlock\": \"${KUBEVIRT_STORAGECLASS_RWX_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageRWOFileSystem\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageRWOBlock\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+    ${KUBEVIRT_STORAGECLASS_NAME:+\"storageSnapshot\": \"${KUBEVIRT_STORAGECLASS_NAME}\",}
+}
+EOF
+cat manifests/testing/kubevirt-tier1-ocs.json
+
+# shellcheck disable=SC2086
+make ${MAKEFILE_TARGET} || exit_code=$?
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
