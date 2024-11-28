@@ -66,13 +66,16 @@ function log_msg() {
 #
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+# Installer user
+INSTALLER_USER_NAME=$(head -n1 "${SHARED_DIR}/aws_user_names")
+
+# CCI / cloud credentials insights
+CCI=/tmp/cci
 EVENT_WORKDIR=/tmp/iam-events-"${CLUSTER_NAME}"
 EVENTS_PATH_RAW=${EVENT_WORKDIR}/objects
 EVENTS_PATH_PARSED=${EVENT_WORKDIR}/parsed
 CREDS_REQ_PATH=${EVENT_WORKDIR}/credrequests
 CREDS_REQ_PATH_RAW=${EVENT_WORKDIR}/credrequests-raw
-
-INSTALLER_USER_NAME=$(head -n1 "${SHARED_DIR}/aws_user_names")
 
 DATETIME_FORMAT="%Y-%m-%dT%H:%M:%SZ"
 DATETIME_NOW="$(date -u +"${DATETIME_FORMAT}")"
@@ -82,16 +85,8 @@ GATHER_EVENT_END_TIME=${GATHER_EVENT_END_TIME:-${DATETIME_NOW}}
 GATHER_EVENT_END_LIMIT_TIME="$(date -ud "${GATHER_EVENT_END_TIME} +30 minutes" +"${DATETIME_FORMAT}")"
 
 ACCOUNT_ID="$(aws sts get-caller-identity | jq -r .Account)"
-
-#FILE_PREFIX="${ACCOUNT_ID}_CloudTrail_${JOB_REGION}"
 OBJECTS_PREFIX="AWSLogs/${ACCOUNT_ID}/CloudTrail/${LEASED_RESOURCE}"
 OBJECTS_PREFIX_START="${OBJECTS_PREFIX}/$(date -ud "${GATHER_EVENT_START_TIME}" +%Y/%m)"
-
-
-# Create depdencies
-mkdir -v "${EVENTS_PATH_PARSED}" || true
-mkdir -v "${CREDS_REQ_PATH}" || true
-mkdir -v "${CREDS_REQ_PATH_RAW}" || true
 
 function install_cci() {
 	#
@@ -100,9 +95,8 @@ function install_cci() {
 	# TODO(mtulio): define where to save that cross-component tool to parse IAM events.
 	# This script must not be savend in component repo as it is intented to be used by
 	# CI.
-	CCI=/tmp/cci
 	log_msg "Downloading cci (cloud credential insights) utility"
-	curl -s https://raw.githubusercontent.com/mtulio/mtulio.labs/refs/heads/exp-ocp-cred-informer/labs/ocp-identity/cloud-credentials-insights/cci.py > ${CCI}
+	wget -qO $CCI https://raw.githubusercontent.com/openshift-splat-team/cloud-credentials-insights/refs/heads/devel-cci-aws/cci.py
 	chmod +x ${CCI}
 
 	# Dependencies required for CCI.
@@ -142,18 +136,26 @@ function extract_and_show() {
 }
 
 #
+# Init
+#
+install_cci
+
+# Create depdencies
+mkdir -pv "${EVENTS_PATH_RAW}" || true
+mkdir -v "${EVENTS_PATH_PARSED}" || true
+mkdir -v "${CREDS_REQ_PATH}" || true
+mkdir -v "${CREDS_REQ_PATH_RAW}" || true
+
+#
 # Init event discovery
 #
 log_msg "Starting event gathering with timestamps: "
 echo "start=[${GATHER_EVENT_START_TIME}] end=[${GATHER_EVENT_END_TIME}] limit=[${GATHER_EVENT_END_LIMIT_TIME}]"
 
-mkdir -pv "${EVENTS_PATH_RAW}" || true
-
-# Time control. (change only when you are observed fatest data available on s3)
+# Collect audit logs from s3 bucket/object path
 GATHER_THRESHOLD=0
 GATHER_COUNT=0
 RETRY_LIMIT=15
-
 RETRY_INTERVAL_SEC=120
 while true; do
 	GATHER_THRESHOLD=$((GATHER_THRESHOLD+1))
@@ -211,18 +213,7 @@ while true; do
 
 	log_msg "Found events: initial=[${LOG_INITIAL_EVENT}] final=[${LOG_LATEST_EVENT}] count=[${LOG_COUNT_EVENTS}] files=[${found}]"
 
-	extract_and_show
-	# General flow
-	# t0: create custom IAM user
-	# t1: regular job flow (install, run e2e, destroy)
-	# t2: delete user
-	# t3: gather started
-	# We want the events between t0-t2, Although CloudTrail would take 10-12 minutes to deliver the events
-	# to AWS S3 Bucket. We need to make sure we'll not lost events, so we want to collect up to 15 minutes after the
-	# t2 (it may not incurr more costs as:
-	#  A) infra is already deleted;
-	#  B) S3 API prevents to retrieve objects (only metadata);
-	#  C) downloaded objects will be skipped.
+	extract_and_show || true
 
 	# Skip increment when latest event isn't is the final timestamp
 	if [ "$(date -ud "${LOG_LATEST_EVENT}" +%s)" -le "$(date -ud "${GATHER_EVENT_END_TIME}" +%s)" ];
