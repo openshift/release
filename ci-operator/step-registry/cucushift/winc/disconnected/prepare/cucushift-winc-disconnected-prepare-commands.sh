@@ -106,6 +106,10 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: windows
+      tolerations:
+      - key: "os"
+        value: "Windows"
+        effect: "NoSchedule"
       containers:
       - name: win-webserver
         image: ${INTERNAL_REGISTRY}/${NAMESPACE}/powershell:latest
