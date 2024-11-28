@@ -160,10 +160,10 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
-   mkdir -p /root/${TYPE}/$LAB_CLOUD
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m copy -a remote_src=/root/${TYPE}/kubeconfig dest=/root/$TYPE/$LAB_CLOUD/kubeconfig
+   mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m copy -a 'remote_src=yes src=/root/${TYPE}/kubeconfig dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig'
    deactivate
    rm -rf .ansible
 "
 
-scp -q ${SSH_ARGS} root@${bastion}:/root/${TYPE}/${LAB_CLOUD}/kubeconfig ${SHARED_DIR}/kubeconfig
+scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig
