@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+dastdir="/tmp/telco-dast-qe/tests/dast"
 # set default values
 WORKSPACE=${SHARED_DIR}
 export KUBECONFIG=${WORKSPACE}/kubeconfig
@@ -13,9 +14,9 @@ unset NAMESPACE
 
 # Execute test
 chainsaw test \
---config ".chainsaw.yaml" \
+--config "$dastdir/.chainsaw.yaml" \
 --report-name "junit_telco_tests_dast" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
-/tmp/telco-dast-qe/tests/dast
+$dastdir
