@@ -75,6 +75,14 @@ if [[ "$RESET_IDRAC" == "true" ]]; then
   done
   sleep 300
 fi
+echo "Clearing job queue ..."
+if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
+  echo "Clearing job queue ..."
+  for i in $HOSTS; do
+    echo "Clear job queue of server $i ..."
+    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --clear-jobs --force
+  done
+fi
 echo "Cheking boot order ..."
 for i in $HOSTS; do
   # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
@@ -92,23 +100,25 @@ if [ $WAIT ]; then
   echo "Waiting after boot order changes ..."
   sleep 300
 fi
-echo "Cheking UEFI setup ..."
-for i in $HOSTS; do
-  echo "Cheking UEFI setup of server $i ..."
-  podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
-  if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
-    echo "$i not in Uefi mode"
-    sleep 10s
-    continue
-  fi
-done
+if [[ "$PRE_UEFI" == "true" ]]; then
+  echo "Cheking UEFI setup ..."
+  for i in $HOSTS; do
+    echo "Cheking UEFI setup of server $i ..."
+    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
+    if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
+      echo "$i not in Uefi mode"
+      sleep 10s
+      continue
+    fi
+  done
+fi
 EOF
 if [[ $LAB == "performancelab" ]]; then
   export QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
 fi
-envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${RESET_IDRAC}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${PRE_RESET_IDRAC},${PRE_CLEAR_JOB_QUEUE},${PRE_UEFI}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
