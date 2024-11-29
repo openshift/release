@@ -76,3 +76,11 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+echo "Creating patch file to use custom rhcos image"
+
+cat > "${SHARED_DIR}/clusterosimage_patch_install_config.yaml" <<EOF
+platform:
+  baremetal:
+    clusterOSImage: http://openshift-qe-metal-ci.arm.eng.rdu2.redhat.com/rhcos-9.4.202411282253.0-ostree.aarch64.ociarchive?sha256=50d95c532ae811f2b60e47e9b7a5cc963c00cbb7517ef327cc99ad6ef4bf41f8
+EOF
