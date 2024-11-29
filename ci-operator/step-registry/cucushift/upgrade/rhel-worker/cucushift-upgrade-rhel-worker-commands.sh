@@ -117,6 +117,54 @@ EOF
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
+function rhel_pre_upgrade(){
+    cat > /tmp/pre_cordon.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_cordon"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/pre_uncordon.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_uncordon"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/pre_upgrade.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/pre_upgrade"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    cat > /tmp/post_upgrade.yaml <<-'EOF'
+---
+- name: create a flag file for this playbook under /tmp
+  file:
+    path: "/tmp/post_upgrade"
+    state: touch
+  delegate_to: localhost
+EOF
+
+    echo "Adding upgrade hooks to the inventory"
+    cat > /tmp/upgrade_hooks <<-'EOF'
+openshift_node_pre_cordon_hook=/tmp/pre_cordon.yaml
+openshift_node_pre_uncordon_hook=/tmp/pre_uncordon.yaml
+openshift_node_pre_upgrade_hook=/tmp/pre_upgrade.yaml
+openshift_node_post_upgrade_hook=/tmp/post_upgrade.yaml
+EOF
+
+    sed -i '/\[all\:vars\]/r /tmp/upgrade_hooks' "${SHARED_DIR}/ansible-hosts"
+}
+
 # Upgrade RHEL node
 function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
@@ -127,6 +175,10 @@ function rhel_upgrade(){
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
     check_upgrade_status
+}
+
+function rhel_post_upgrade(){
+    echo "Run sanity checking after RHEL upgrade"
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -138,8 +190,28 @@ function rhel_upgrade(){
     if [[ ${exp_version} == "${act_version}" ]]; then
         echo "RHEL worker has correct K8s version"
     else
-        echo "RHEL worker has incorrect K8s version" && exit 1
+        echo "RHEL worker has incorrect K8s version" && return 1
     fi
+
+    echo "Check the upgrade hook flags created"
+    for hookname in pre_cordon pre_uncordon pre_upgrade post_upgrade; do
+        if [[ -f /tmp/${hookname} ]]; then
+            echo "The hook ${hookname}.yaml was executed."
+        else
+            echo "The hook ${hookname}.yaml was NOT executed." && return 1
+        fi
+    done
+        
+    echo "Make sure oc logs works well with pod running on RHEL worker"
+    mcd_rhel_pod=$(oc get pod -n openshift-machine-config-operator -o wide | grep "${rhel_0}" |grep "machine-config-daemon" | awk '{print $1}')
+    local ret=0
+    run_command "oc logs -n openshift-machine-config-operator ${mcd_rhel_pod} -c machine-config-daemon" || ret=1
+    if [[ "$ret" == "0" ]]; then
+        echo "oc logs checking command passed."
+    else
+        echo "oc logs checking command failed." && return 1
+    fi
+
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
@@ -242,7 +314,9 @@ echo -e "The source release version is gotten from clusterversion resource, that
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     run_command "oc get node -owide"
     rhel_repo
+    rhel_pre_upgrade
     rhel_upgrade
+    rhel_post_upgrade
     check_mcp
     check_history
 fi

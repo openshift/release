@@ -1,8 +1,20 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.22.5
+      USER 0
+      RUN dnf install -y python3-pip && pip install ansible
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -19,6 +31,17 @@ tests:
   commands: make test
   container:
     from: src
+- always_run: false
+  as: e2e-capi-multinode
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-capi
+- as: e2e-capi-multinode-postsubmit
+  postsubmit: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-capi
 zz_generated_metadata:
   branch: master
   org: openshift-assisted

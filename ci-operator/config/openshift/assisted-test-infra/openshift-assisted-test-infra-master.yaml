@@ -460,6 +460,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
       PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -474,6 +476,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -1041,7 +1045,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
-        CPU_ARCHITECTURE=arm64
+        DAY2_CPU_ARCHITECTURE=arm64
     workflow: assisted-equinix
 - as: e2e-metal-assisted-day2-arm-workers-periodic
   cron: 30 01 * * 1,4
@@ -1056,7 +1060,7 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
-        CPU_ARCHITECTURE=arm64
+        DAY2_CPU_ARCHITECTURE=arm64
     workflow: assisted-equinix
 - always_run: false
   as: e2e-oci-assisted
@@ -1107,6 +1111,15 @@ tests:
       ASSISTED_CONFIG: |
         OCI_BOOT_VOLUME_TYPE="ISCSI"
     workflow: assisted-oci
+- as: e2e-metal-assisted-4-control-planes-periodic
+  cron: 30 20 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=4
+        NUM_WORKERS=1
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift
