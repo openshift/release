@@ -20,6 +20,9 @@ declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 installer_dir=/tmp/installer
 
@@ -39,7 +42,11 @@ export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 
-source "${SHARED_DIR}/govc.sh"
+
+# These two environment variables are coming from vsphere_context.sh 
+# and govc.sh. The file they are assigned to is not available in this step.
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses
@@ -111,3 +118,6 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+
+echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

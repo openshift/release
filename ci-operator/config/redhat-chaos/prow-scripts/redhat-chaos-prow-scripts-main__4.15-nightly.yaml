@@ -35,7 +35,7 @@ resources:
       memory: 200Mi
 tests:
 - as: krkn-hub-tests-415
-  cron: 0 4 8,24 * *
+  cron: 0 4 8 * *
   steps:
     cluster_profile: aws-chaos
     env:
@@ -52,15 +52,14 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: redhat-chaos-krkn-hub-tests
-    - chain: redhat-chaos-hog-scenarios
   timeout: 6h0m0s
-- as: krkn-hub-tests-415-hog
-  cron: 0 1 8,24 * *
+- as: krkn-hub-node-tests-415
+  cron: 0 4 7 * *
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      SPOT_INSTANCES: "true"
+      SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.15
     observers:
       enable:
@@ -70,10 +69,10 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    test:
-    - chain: redhat-chaos-hog-scenarios
+    workflow: redhat-chaos-krkn-hub-node-tests
+  timeout: 6h0m0s
 - as: krkn-hub-tests-415-azure
-  cron: 29 5 * * 2
+  cron: 29 5 9 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -88,27 +87,36 @@ tests:
     workflow: openshift-qe-installer-azure
   timeout: 6h0m0s
 - as: krkn-hub-tests-415-gcp
-  cron: 29 5 9,25 * 2
+  cron: 29 5 6 * *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: gcp-chaos
     test:
     - chain: redhat-chaos-krkn-hub-tests
     - chain: redhat-chaos-hog-scenarios
     workflow: openshift-qe-installer-gcp
   timeout: 6h0m0s
-- as: krkn-hub-cloud-api-tests
-  cron: 0 4 8,24 * *
+- as: krkn-hub-tests-aro-415
+  cron: 0 8 4 * *
   steps:
-    cluster_profile: aws-chaos
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
     env:
-      BASE_DOMAIN: aws.rhperfscale.org
-      SPOT_INSTANCES: "false"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: redhat-chaos-krkn-hub-cloud-tests
+      ARO_MASTER_VM_SIZE: Standard_D16s_v3
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "4"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-aro-4.15
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
+    - chain: redhat-chaos-hog-scenarios
+    workflow: openshift-qe-installer-azure-aro-upi
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

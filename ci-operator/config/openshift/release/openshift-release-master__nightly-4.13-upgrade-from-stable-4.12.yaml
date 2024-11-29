@@ -39,10 +39,15 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
-    release:
-      channel: candidate
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.12"
   latest:
     candidate:
@@ -55,13 +60,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-sdn-bm-upgrade
+- as: e2e-metal-ipi-sdn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -105,7 +109,7 @@ tests:
 - as: e2e-vsphere-upgrade
   cron: 11 13 * * 6
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch

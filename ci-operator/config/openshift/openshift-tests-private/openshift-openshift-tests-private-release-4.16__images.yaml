@@ -15,18 +15,14 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.16"
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
+  netobserv_network-observability-cli_ci:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   ocp_4.16_tools:
     name: "4.16"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -35,7 +31,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.16
@@ -46,6 +42,9 @@ images:
     ci_tests-private-builder_4.16:
       as:
       - registry.ci.openshift.org/ci/tests-private-builder:4.16
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -69,7 +68,7 @@ images:
     RUN set -x && \
         curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel nss libXScrnSaver alsa-lib" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
         declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
                             [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
@@ -89,27 +88,13 @@ images:
       - registry.ci.openshift.org/ocp/4.16:tools
   optional: true
   to: tests-private-base
-- dockerfile_path: images/Dockerfile.base.rhel9
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-  optional: true
-  to: tests-private-base-rhel9
 - dockerfile_path: images/Dockerfile.builder
-  inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  optional: true
-  to: tests-private-builder
-- dockerfile_path: images/Dockerfile.builder.rhel9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   optional: true
-  to: tests-private-builder-rhel9
+  to: tests-private-builder
 promotion:
   to:
   - namespace: ci

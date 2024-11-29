@@ -82,7 +82,7 @@ else
     long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
     CLUSTER_NAME="$CLUSTER_PREFIX-$long_name_prefix"
   fi
-  
+
   #set the domain prefix of length (<=15)
   MAX_DOMAIN_PREFIX_LENGTH=15
   if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
@@ -164,12 +164,58 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   version_cmd="$version_cmd --hosted-cp"
 fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+  # shellcheck disable=SC2089
   version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
   version_cmd="$version_cmd | jq -r '.[].raw_id'"
 fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
+
+# If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
+# supplied by CI for the payload to use. This only really works for nightlies. ROSA
+# SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
+# and it can take for up to 60 minutes in practice for the nightly to be available and listed
+# from the ROSA CLI, so we keep retrying with a back off.
+if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
+  PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)
+
+  DELAY=60
+  MAX_DELAY=360
+  TIME_LIMIT=3600
+  start_time=$(date +%s)
+
+  while true; do
+    versionList=$(eval $version_cmd)
+    echo -e "Looking for $PAYLOAD_TAG in available cluster versions:\n${versionList}"
+    # Check if image has been synced yet
+    if echo "$versionList" | grep -q "$PAYLOAD_TAG"; then
+      echo "$PAYLOAD_TAG is available from ROSA, continuing..."
+      OPENSHIFT_VERSION=$PAYLOAD_TAG
+      break
+    fi
+
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - start_time))
+
+    # Don't wait longer than $TIME_LIMIT for the payload to be synced
+    if [[ $elapsed_time -ge $TIME_LIMIT ]]; then
+      minutes=$((TIME_LIMIT / 60))
+      echo "Error: timed out after $minutes minutes waiting for $PAYLOAD_TAG to become available"
+      exit 1
+    fi
+
+    # Wait for the current delay before retrying
+    echo "Payload tag not found. Waiting for $DELAY seconds before retrying..."
+    sleep $DELAY
+
+    # Double the delay for exponential back-off, but cap it at the max delay
+    DELAY=$((DELAY * 2))
+    if [[ $DELAY -gt $MAX_DELAY ]]; then
+       DELAY=$MAX_DELAY
+    fi
+  done
+fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
@@ -198,11 +244,22 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-TAGS="prowci:${CLUSTER_NAME}"
+# add USER_TAGS to help with cloud cost
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
+if [[ -z "$TAG_Author" ]]; then
+  TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
+fi
+TAG_Author=${TAG_Author:-"periodic"}
+TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
+TAG_Job_Type=$JOB_TYPE
+TAG_CI="prow"
+TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
 
+# Record the configurations
 cat > ${cluster_config_file} << EOF
 {
   "name": "${CLUSTER_NAME}",
@@ -263,8 +320,8 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-  record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
+    COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+    record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
 fi
 
 AUDIT_LOG_SWITCH=""
@@ -272,6 +329,15 @@ if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
   iam_role_arn=$(head -n 1 ${SHARED_DIR}/iam_role_arn)
   AUDIT_LOG_SWITCH="--audit-log-arn $iam_role_arn"
   record_cluster "audit_log_arn" $iam_role_arn
+fi
+
+BILLING_ACCOUNT_SWITCH=""
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  BILLING_ACCOUNT=$(head -n 1 ${CLUSTER_PROFILE_DIR}/aws_billing_account)
+  BILLING_ACCOUNT_SWITCH="--billing-account ${BILLING_ACCOUNT}"
+  record_cluster "billing_account" ${BILLING_ACCOUNT}
+
+  BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
 fi
 
 # If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
@@ -289,10 +355,12 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
     MIN_REPLICAS=3
   fi
   COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  record_cluster "nodes" "install_nodes" ${MIN_REPLICAS}
   record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
   record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
+  record_cluster "nodes" "install_nodes" ${REPLICAS}
   record_cluster "nodes" "replicas" ${REPLICAS}
 fi
 
@@ -337,7 +405,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
-      if [[ "$topology" == "*dedicated*" ]] ; then
+      if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then
       	PROVISION_SHARD_ID=${ps}
       fi
     done
@@ -536,6 +604,9 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
+#Record installation start time
+record_cluster "timers" "global_start" "$(date +'%s')"
+
 # Provision cluster
 cmd="rosa create cluster -y \
 ${STS_SWITCH} \
@@ -569,6 +640,7 @@ ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
+${BILLING_ACCOUNT_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
@@ -578,6 +650,10 @@ cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACC
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
 fi
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g")
+fi
+
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"

@@ -74,8 +74,14 @@ function get_caps_for_version_capset() {
     "v4.16")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
     ;;
-    *)
+    "v4.17")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
+    ;;
+    "v4.18")
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress OperatorLifecycleManagerV1"
+    ;;
+    *)
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress OperatorLifecycleManagerV1"
     ;;
     esac
 
@@ -96,6 +102,7 @@ function extract_manifests() {
     fi
 
     # Extract manifests
+    echo "INFO: Extracting manifest to ${work_dir} from ${release}"
     if ! oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --to ${work_dir} --from ${release}; then
         echo "ERROR: Extracting manifest failed"
         return 1
@@ -164,22 +171,13 @@ function get_new_caps() {
 
 # compares two payloads for capabilities difference at manifest level
 function extract_migrated_caps() {
-    echo "Extracting migrated caps between 2 releases..."
-    local source="$1"
-    local target="$2"
-    local source_dir target_dir source_cap_files
+    local source_dir="$1"
+    local target_dir="$2"
+    local source_cap_files source_file filename target_file source_cap target_cap
 
     # Check for missing environment variables
-    if [ -z "$source" ] || [ -z "$target" ]; then
+    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
         echo "ERROR: Missing required arguments"
-        return 1
-    fi
-
-    source_dir="/tmp/source"
-    target_dir="/tmp/target"
-    mkdir -p ${source_dir} ${target_dir}
-
-    if ! extract_manifests "${source_dir}" "${source}" || ! extract_manifests "${target_dir}" "${target}"; then
         return 1
     fi
 
@@ -194,14 +192,47 @@ function extract_migrated_caps() {
 
             if [ "$source_cap" != "$target_cap" ]; then
                 echo "Migrated capability in $filename: $source_cap -> $target_cap"
-                migrated_caps["$source_cap"]=$target_cap
+                # Example:
+                # Migrated capability in 0000_26_cloud-controller-manager-operator_18_credentialsrequest-nutanix.yaml:  CloudCredential ->  CloudCredential+CloudControllerManager
+                # Migrated capability in 0000_50_cluster-ingress-operator_00-ingress-credentials-request.yaml:  CloudCredential ->  CloudCredential+Ingress
+                if [[ -n "${migrated_caps[${source_cap}]:-}" ]]; then
+                    migrated_caps["${source_cap}"]+="+${target_cap}"
+                else
+                    migrated_caps["${source_cap}"]="${target_cap}"
+                fi
             fi
         fi
     done
 }
 
-function check_cvo_cap() {
+# Get the capabilities which are introdcued for the 1st time in the target payload
+# By comparing two payloads at manifest level
+function extract_potential_new_caps() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local target_cap_files target_file filename source_file target_cap
+    local candidate_new_caps=""
 
+    # Check for missing environment variables
+    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
+        echo "ERROR: Missing required arguments"
+        return 1
+    fi
+
+    target_cap_files=$(grep -rl "capability.openshift.io/name" ${target_dir})
+    for target_file in ${target_cap_files}; do
+        filename=$(basename "${target_file}")
+        source_file="$source_dir/$filename"
+
+        if [ ! -f "$source_file" ]; then
+            target_cap=$(grep 'capability.openshift.io/name:' "$target_file" | cut -d ':' -f2 | tr -d '"' | sort | uniq )
+            candidate_new_caps="${candidate_new_caps} ${target_cap}"
+        fi
+    done
+    echo "${candidate_new_caps}" | xargs -n1 | sort -u | xargs
+}
+
+function check_cvo_cap() {
     local result=0
     local capability_set=$1
     local expected_status=$2
@@ -275,6 +306,7 @@ caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lif
 caps_operator[CloudCredential]="cloud-credential"
 caps_operator[CloudControllerManager]="cloud-controller-manager"
 caps_operator[Ingress]="ingress"
+caps_operator[OperatorLifecycleManagerV1]="olm"
 
 # Mapping between optional capability and resources
 # Need update when new resource marks as optional
@@ -284,10 +316,12 @@ caps_resource[Build]="builds buildconfigs"
 caps_resource[DeploymentConfig]="deploymentconfigs"
 
 # Initialize the variables
+source_manifests_dir=$(mktemp -d)
+extract_manifests "${source_manifests_dir}" "${version_set[-1]}"
+target_manifests_dir=$(mktemp -d)
+extract_manifests "${target_manifests_dir}" "${version_set[0]}"
 declare -A migrated_caps=()
-if ! extract_migrated_caps "${version_set[-1]}" "${version_set[0]}"; then
-    echo "ERROR: extract_migrated_caps failed" && exit 1
-fi
+extract_migrated_caps "${source_manifests_dir}" "${target_manifests_dir}"
 
 expected_enabled_caps=""
 expected_implicit_caps=""
@@ -299,14 +333,22 @@ target_baseline_caps=$(get_caps_for_version_capset "${version_set[0]}" "${baseli
 source_known_caps=$(get_caps_for_version_capset "${version_set[-1]}" "vCurrent")
 target_known_caps=$(get_caps_for_version_capset "${version_set[0]}" "vCurrent")
 
-new_caps=$(get_new_caps "${source_known_caps}" "${target_known_caps}")
-
-additionalcaps_from_cluster=$(oc get clusterversion version -ojson | jq -r 'if .spec.capabilities.additionalEnabledCapabilities then .spec.capabilities.additionalEnabledCapabilities[] else empty end')
-
 echo -e "\nsource_baseline_caps is ${source_baseline_caps}\
 \ntarget_baseline_caps is ${target_baseline_caps}\
-\nsource_known_caps is ${source_known_caps}\ntarget_known_caps is ${target_known_caps}\
-\nnew_caps is ${new_caps}\nadditionalcaps_from_cluster is ${additionalcaps_from_cluster}"
+\nsource_known_caps is ${source_known_caps}\
+\ntarget_known_caps is ${target_known_caps}"
+
+new_caps=$(get_new_caps "${source_known_caps}" "${target_known_caps}")
+echo -e "\nnew_caps is ${new_caps}"
+potential_new_caps=$(extract_potential_new_caps "${source_manifests_dir}" "${target_manifests_dir}")
+for cap in $potential_new_caps; do
+    new_caps=${new_caps/$cap}
+done
+echo -e "after strip those capacities which are not existing in source version and introduced for the 1st time in target version\
+\nnew_caps is ${new_caps}"
+
+additionalcaps_from_cluster=$(oc get clusterversion version -ojson | jq -r 'if .spec.capabilities.additionalEnabledCapabilities then .spec.capabilities.additionalEnabledCapabilities[] else empty end')
+echo -e "\nadditionalcaps_from_cluster is ${additionalcaps_from_cluster}"
 
 # vCurrent baseline set should grow new caps of target version explicitly after upgrade
 if [[ "${baselinecaps_from_cluster}" == "vCurrent" ]]; then
@@ -316,6 +358,7 @@ fi
 # v4.x baseline set should grow new caps in v4.x of target version explicitly after upgrade
 # v4.x baseline set should grow new caps in target version implicitly
 # v4.x baseline set should grow new caps implicitly after upgrade if cap migrates to a cap out of v4.x & additional caps of target version
+# NOTE: here "new caps" means caps are existing in previous version, become optional operators in target version
 if [[ "${baselinecaps_from_cluster}" == "v4."* ]]; then
     source_enabled_caps="${source_baseline_caps} ${additionalcaps_from_cluster}"
     target_enabled_caps="${target_baseline_caps} ${additionalcaps_from_cluster}"
@@ -329,9 +372,30 @@ if [[ "${baselinecaps_from_cluster}" == "v4."* ]]; then
     else
         echo "migrated_caps is not empty."
         for key in "${!migrated_caps[@]}"; do
-            if [[ $source_enabled_caps == *$key* ]] && [[ $target_enabled_caps != *${migrated_caps[$key]}* ]]; then
-                expected_enabled_caps="${expected_enabled_caps} ${migrated_caps[$key]}"
-                expected_implicit_caps="${expected_implicit_caps} ${migrated_caps[$key]}"
+            # Handle the scenario of multiple caps in key
+            IFS='+' read -r -a key_caps <<< "$key"
+            all_key_caps_exist=true
+            for cap in "${key_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${source_enabled_caps} " =~ " ${cap} " ]]; then
+                    all_key_caps_exist=false
+                    break
+                fi
+            done
+
+            # Handle the scenario of multiple caps in value
+            IFS='+' read -r -a value_caps <<< "${migrated_caps[$key]}"
+            value_caps_to_add=()
+            for cap in "${value_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${target_enabled_caps} " =~ " ${cap} " ]]; then
+                    value_caps_to_add+=("$cap")
+                fi
+            done
+
+            if $all_key_caps_exist && [ ${#value_caps_to_add[@]} -ne 0 ]; then
+                expected_enabled_caps="${expected_enabled_caps} ${value_caps_to_add[*]}"
+                expected_implicit_caps="${expected_implicit_caps} ${value_caps_to_add[*]}"
             fi
         done
     fi
@@ -339,6 +403,7 @@ fi
 
 # None baseline set should grow new caps of target version implicitly after upgrade
 # None baseline set should grow new caps if caps migrate to someones that are not in additional caps
+# NOTE: here "new caps" means caps are existing in previous version, become optional operators in target version
 if [[ "${baselinecaps_from_cluster}" == "None" ]]; then
     expected_enabled_caps="${additionalcaps_from_cluster}"
     expected_enabled_caps="${expected_enabled_caps} ${new_caps}"
@@ -349,9 +414,30 @@ if [[ "${baselinecaps_from_cluster}" == "None" ]]; then
     else
         echo "migrated_caps is not empty."
         for key in "${!migrated_caps[@]}"; do
-            if [[ ${additionalcaps_from_cluster} == *$key* ]] && [[ ${additionalcaps_from_cluster} != *${migrated_caps[$key]}* ]]; then
-                expected_enabled_caps="${expected_enabled_caps} ${migrated_caps[$key]}"
-                expected_implicit_caps="${expected_implicit_caps} ${migrated_caps[$key]}"
+            # Handle the scenario of multiple caps in key
+            IFS='+' read -r -a key_caps <<< "$key"
+            all_key_caps_exist=true
+            for cap in "${key_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${additionalcaps_from_cluster} " =~ " ${cap} " ]]; then
+                    all_key_caps_exist=false
+                    break
+                fi
+            done
+
+            # Handle the scenario of multiple caps in value
+            IFS='+' read -r -a value_caps <<< "${migrated_caps[$key]}"
+            value_caps_to_add=()
+            for cap in "${value_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${additionalcaps_from_cluster} " =~ " ${cap} " ]]; then
+                    value_caps_to_add+=("$cap")
+                fi
+            done
+
+            if $all_key_caps_exist && [ ${#value_caps_to_add[@]} -ne 0 ]; then
+                expected_enabled_caps="${expected_enabled_caps} ${value_caps_to_add[*]}"
+                expected_implicit_caps="${expected_implicit_caps} ${value_caps_to_add[*]}"
             fi
         done
     fi

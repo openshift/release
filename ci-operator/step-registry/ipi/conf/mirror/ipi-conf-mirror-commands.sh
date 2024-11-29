@@ -7,13 +7,13 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # mirror registry
-install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-if [ ! -f "${install_config_icsp_patch}" ]; then
-    echo "File ${install_config_icsp_patch} does not exist."
+install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
+if [ ! -f "${install_config_mirror_patch}" ]; then
+    echo "File ${install_config_mirror_patch} does not exist."
     exit 1
 fi
 
-echo -e "image registry:\n$(cat ${install_config_icsp_patch})"
+echo -e "image registry:\n$(cat ${install_config_mirror_patch})"
 
 # mirror registry credential
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
@@ -29,7 +29,7 @@ echo '{"auths":{}}' | jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \
 CONFIG_PATCH="${SHARED_DIR}/pull_secret_ca.yaml.patch"
 
 additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
-cat /var/run/vault/mirror-registry/client_ca.crt > "${additional_trust_bundle}"
+cat /var/run/vault/mirror-registry/client_ca.crt >> "${additional_trust_bundle}"
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   echo >> "${additional_trust_bundle}"
   cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" >> "${additional_trust_bundle}"
@@ -43,6 +43,6 @@ EOF
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
 # imageContentSources patch
-yq-go m -x -i "${CONFIG}" "${install_config_icsp_patch}"
+yq-go m -x -i "${CONFIG}" "${install_config_mirror_patch}"
 
 rm -f "${mirror_registry_pull_secret}"

@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -91,7 +99,8 @@ keyvault_name="${KV_BASE_NAME}-kv"
 key_name="${KV_BASE_NAME}-key"
 user_assinged_identity_name="${KV_BASE_NAME}-identity"
 # create keyvault
-run_command "az keyvault create --name ${keyvault_name} --resource-group ${RESOURCE_GROUP} --enable-purge-protection --enable-rbac-authorization"
+# set soft delete data retention to 7 days (minimum) instead of the default 90 days to reduce the risk of Key Vault name collisions
+run_command "az keyvault create --name ${keyvault_name} --resource-group ${RESOURCE_GROUP} --enable-purge-protection --enable-rbac-authorization --retention-days 7"
 kv_id=$(az keyvault show --resource-group ${RESOURCE_GROUP} --name ${keyvault_name} --query id --output tsv)
 sp_id=$(az ad sp show --id ${AZURE_AUTH_CLIENT_ID} --query id -o tsv)
 #assign role for sp on scope keyvault

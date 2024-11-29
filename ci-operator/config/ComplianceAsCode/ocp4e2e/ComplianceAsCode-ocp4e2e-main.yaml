@@ -56,6 +56,25 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-ocp4-stig
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_CONTAINER_PUSH=true
+        export PROFILE=stig
+        export PRODUCT=ocp4
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-rhcos4-moderate
   steps:
     cluster_profile: quay-aws

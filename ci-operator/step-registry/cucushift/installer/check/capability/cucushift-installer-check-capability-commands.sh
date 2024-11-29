@@ -52,26 +52,13 @@ else
     exit 1
 fi
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-# A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
-ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
 # Setting proxy only if you need to communicate with installed cluster
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+ocp_major_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1)
+ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 # Mapping between optional capability and operators
 # Need to be updated when new operator marks as optional
@@ -87,6 +74,7 @@ caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
+caps_operator[OperatorLifecycleManagerV1]="olm"
 caps_operator[CloudCredential]="cloud-credential"
 caps_operator[CloudControllerManager]="cloud-controller-manager"
 caps_operator[Ingress]="ingress"
@@ -105,11 +93,13 @@ v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
-latest_defined="v416"
+v417=" ${v416}"
+v418=" ${v417} OperatorLifecycleManagerV1" 
+latest_defined="v418"
 always_default="${!latest_defined}"
 # always enabled capabilities
-declare -A always_enabled_caps
-always_enabled_caps[416]="Ingress"
+#declare -A always_enabled_caps
+#always_enabled_caps[416]="Ingress"
 
 # Determine vCurrent
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -149,6 +139,12 @@ case ${baselinecaps_from_config} in
 "v4.16")
   enabled_capability_set="${v416}"
   ;;
+"v4.17")
+  enabled_capability_set="${v417}"
+  ;;
+"v4.18")
+  enabled_capability_set="${v418}"
+  ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"
   ;;
@@ -162,11 +158,11 @@ if [[ "${additional_caps_from_config}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
 
-for version in "${!always_enabled_caps[@]}"; do
-    if [[ ${ocp_version/.} -ge ${version} ]]; then
-        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
-    fi
-done
+#for version in "${!always_enabled_caps[@]}"; do
+#    if [[ ${ocp_version/.} -ge ${version} ]]; then
+#        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
+#    fi
+#done
 enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do

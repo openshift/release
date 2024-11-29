@@ -1,0 +1,16 @@
+workflow:
+  as: oadp-ipi-ibmcloud
+  steps:
+    env:
+        RE_TRIGGER_ON_FAILURE: "true"
+    pre:
+    - chain: ipi-ibmcloud-pre
+    - ref: oadp-s3-create
+    post:
+    - ref: oadp-ibmcloud-snapshots-destroy
+    - ref: oadp-s3-destroy
+    - chain: ipi-ibmcloud-post
+    - ref: firewatch-report-issues
+    - ref: job-re-trigger
+  documentation: |-
+    An extension of the firewatch-ipi-ibmcloud workflow that adds a S3 bucket creation and destruction step specific to the OADP interop scenario.

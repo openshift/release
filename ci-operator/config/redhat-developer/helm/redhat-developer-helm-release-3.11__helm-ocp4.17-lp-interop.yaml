@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: base
+binary_build_commands: make -f openshift-ci/Makefile build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tests
+images:
+- dockerfile_path: openshift-ci/Dockerfile.tests
+  from: base
+  to: helm
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.17.0-0
+        stream: 4-stable
+        upper: 4.18.0-0
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: helm-interop-ibmcloud
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "helm-acceptance-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "helm-acceptance-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "HELM", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","helm-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+    test:
+    - as: helm-acceptance-test
+      commands: |
+        make -f openshift-ci/Makefile build test-acceptance
+        mv  acceptance-testing/.acceptance/results.xml acceptance-testing/.acceptance/junit_results.xml
+        cp -r acceptance-testing/.acceptance/junit_*.xml ${ARTIFACT_DIR}/
+        cp -r acceptance-testing/.acceptance/*.html ${ARTIFACT_DIR}/
+      from: helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: firewatch-ipi-ibmcloud
+zz_generated_metadata:
+  branch: release-3.11
+  org: redhat-developer
+  repo: helm
+  variant: helm-ocp4.17-lp-interop

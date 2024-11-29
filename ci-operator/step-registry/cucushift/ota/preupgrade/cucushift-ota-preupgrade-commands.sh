@@ -19,7 +19,13 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
+    ;;
+    "4.17")
+    tp_operator=("cluster-api" "olm")
+    ;;
+    "4.18")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -89,6 +95,95 @@ function check_manifest_annotations(){
     done
     return 0
 }
+
+function verify_output(){
+    local out rc message="${1}" cmd="${2}" expected="${3}" expected_rc="${4:-0}"
+    out=$(eval "${cmd}" 2>&1); rc=$?
+    if [[ "${rc}" -ne "${expected_rc}" ]]; then
+        echo >&2 -e "Failed to execute \"${cmd}\" while verifying ${message} \nunexpected rcode ${rc} expecting ${expected_rc} \nreceived \"${out}\" \nexiting" && return 1
+    fi
+    if ! [[ "${out}" == *"${expected}"* ]]; then
+        echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
+    fi
+    echo "passed verifying ${message}"
+    return 0 # not really needed cause return 0 is default, but adding for consistency
+}
+
+function switch_channel() {
+    local SOURCE_VERSION SOURCE_XY_VERSION ret chan="${1:-candidate}"
+    if [[ "$(oc get clusterversion version -o jsonpath='{.spec.channel}')" == *"${chan}"* ]]; then
+        echo "skip switching channel, already on ""${chan}"
+        return 0
+    fi
+    if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
+        echo >&2 "Failed to run oc get clusterversion version, received \"${SOURCE_VERSION}\", exiting" && return 1
+    fi
+    SOURCE_XY_VERSION="$(cut -f1,2 -d. <<< "${SOURCE_VERSION}")"
+    if [[ -z "${SOURCE_XY_VERSION}" ]]; then
+        echo >&2 "Failed to get version, exiting" && return 1
+    fi
+    echo "Switch upgrade channel to ""${chan}""-""${SOURCE_XY_VERSION}""..."
+    oc adm upgrade channel --allow-explicit-channel "${chan}-${SOURCE_XY_VERSION}"
+    ret="$(oc get clusterversion version -o jsonpath='{.spec.channel}')"
+    if [[ "${ret}" != "${chan}-${SOURCE_XY_VERSION}" ]]; then
+        echo >&2 "Failed to switch channel, received ""${ret}"", exiting" && return 1
+    fi
+    return 0
+}
+
+function preserve_graph(){
+    if ! upstream=$(oc get clusterversion version -o jsonpath='{.spec.upstream}'); then
+        echo >&2 "Failed to execute get spec upstream, exiting" && return 1
+    fi
+    if [[ -z "${upstream}" ]]; then
+        upstream="empty"
+    else
+        # # retcode=$(curl --head --silent --write-out "%{http_code}" --output /dev/null "${upstream}")
+        # # if [[ $retcode -ne 200 ]]; then
+        # #     echo >&2 "Failed get valid accessable upstream graph, received: \"${retcode}\" for \"${upstream}\", exiting" && return 1
+        # relaxing upstream url to check just for sane url
+        if [[ "${upstream}" != "https"* ]]; then
+            echo "failed to get valid upstream. expecting https... in \"${upstream}\"" && return 1
+        else
+            echo "found a valid upstream \"${upstream}\""
+        fi
+    fi
+    export upstream
+    return 0
+}
+
+function set_upstream_graph(){
+    if [[ "${1}" == "empty" ]]; then
+        verify_output \
+        "set default upstream graph by removing spec upstream" \
+        "oc patch clusterversion/version --type=json --patch='[{\"op\": \"remove\", \"path\": \"/spec/upstream\"}]'" \
+        "clusterversion.config.openshift.io/version patched" \
+        || return 1
+    else
+        verify_output \
+        "set upstream graph to ${1}" \
+        "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"upstream\":\"${1}\"}}'" \
+        "clusterversion.config.openshift.io/version patched" \
+        || return 1
+    fi
+    return 0
+}
+
+function verify_nonhetero(){
+    # return not required for single command, its the return by default
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json"
+}
+
+function verify_retrieved_updates(){
+    verify_output \
+    "RetrievedUpdates condition is True" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"RetrievedUpdates\")].status}'" \
+    "True"
+}
+
 # Define the checkpoints/steps needed for the specific case
 function pre-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -107,7 +202,7 @@ function pre-OCP-66839(){
 
     # There should be only enabled cap annotaion in all extracted manifests
     curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    expectedCap=$(echo ${EXPECTED_CAPABILITIES_IN_MANIFEST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${curCap}" != "${expectedCap}" ]]; then
         echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
@@ -137,17 +232,11 @@ function pre-OCP-66839(){
         return 1
     fi
 
-    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-        curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
-            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
-            return 1
-        fi
-    else
-        if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
-            echo "Extracted CRs has cap annotation, but expected nothing"
-            return 1
-        fi
+    curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+    expectedCapCRPre=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${curCapInCR}" != "${expectedCapCRPre}" ]]; then
+        echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCapCRPre}"
+        return 1
     fi
 
     # Extract all CRs from tobe upgrade release payload with --included
@@ -156,9 +245,9 @@ function pre-OCP-66839(){
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
-    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
-        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
+    expectedCapCRPost=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCRPost}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCRPost}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
@@ -286,46 +375,6 @@ function pre-OCP-53907(){
     return 0
 }
 
-function pre-OCP-69968(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec testurl="http://examplefortest.com"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${testurl}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${testurl}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
-        return 1
-    fi
-    return 0
-}
-
-function pre-OCP-69948(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec teststore="https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${teststore}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${teststore}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
-        return 1
-    fi
-    return 0
-}
-
 function pre-OCP-56083(){
     echo "Pre Test Start: OCP-56083"
     echo "Unset the upgrade channel"
@@ -341,6 +390,143 @@ function pre-OCP-56083(){
     cat "${tmp_log}" 
     return 1
 }
+
+function pre-OCP-60396(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    # verify cvo image non-hetero
+    verify_nonhetero || return 1
+
+    # set chan candidate
+    switch_channel "candidate" || return 1
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates || return 1
+
+    # --to-image <some pullspec> --to-multi-arch - error
+    verify_output \
+    "proper error trying --to-image with to multi arch" \
+    "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
+    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    || return 1
+
+
+    # --to <some version> --to-multi-arch -error
+    verify_output \
+    "proper error trying --to with to multi arch" \
+    "oc adm upgrade --to 4.10.0 --to-multi-arch" \
+    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    || return 1
+
+    # verify not progressing.
+    verify_output \
+    "Cluster Progressing is False" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
+    "False"  \
+    || return 1
+
+    # create Invalid=True by applying invalid .spec.desiredUpdate
+    verify_output \
+    "patching cvo for Invalid=True" \
+    "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"desiredUpdate\":{\"force\":true} }}'" \
+    "clusterversion.config.openshift.io/version patched"  \
+    || return 1
+
+    # wait for cvo condition
+    sleep 10s
+
+    # check cvo invalid=true 
+    verify_output \
+    "check cvo Invalid is True" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Invalid\")].status}'" \
+    "True"  \
+    || return 1
+
+    # apply to-multi-arch -error 
+    verify_output \
+    "to-multi-arch error is received mentioning Invalid condition" \
+    "oc adm upgrade --to-multi-arch" \
+    "InvalidClusterVersion" 1 \
+    || return 1
+
+    # verify not progressing.
+    verify_output \
+    "Cluster Progressing is False" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
+    "False" \
+    || return 1
+
+    return 0
+}
+
+function pre-OCP-60397(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    # verify cvo image non-hetero
+    verify_nonhetero || return 1
+
+    # preserve graph
+    preserve_graph  || return 1 # exports "upstream"
+
+    # set chan stable-xx
+    switch_channel "stable" || return 1
+
+    # set testing graph
+    set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates  || return 1
+
+    # apply to-multi-arch command
+    verify_output \
+    "try multiarch command while on a single-arch graph" \
+    "oc adm upgrade --to-multi-arch" \
+    "Requested update to multi cluster architecture" \
+    || return 1
+
+    # wait no more progressing
+    sleep 60
+
+    # check cluster architecture is still arm64
+    verify_output \
+    "cluster architecture is still arm64" \
+    "oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type==\"ReleaseAccepted\")].message}'" \
+    "architecture=\"arm64\"" \
+    || return 1
+
+    # verify cvo image still non-hetero
+    verify_nonhetero || return 1
+
+    # clear the upgrade
+    if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
+        echo >&2 "Failed to run oc get clusterversion version, received \"${SOURCE_VERSION}\", exiting" && return 1
+    fi
+    verify_output \
+    "clear to-multi-arch" \
+    "oc adm upgrade --clear" \
+    "${SOURCE_VERSION}" \
+    || return 1
+
+    # restore graph
+    set_upstream_graph "${upstream}" || return 1
+    
+    # set chan candidate-xx
+    switch_channel "candidate" || return 1
+
+    # wait no more progressing
+    sleep 60
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates || return 1
+
+    return 0
+}
+
+function defer-OCP-60397(){
+    echo "Defer Recovery: ${FUNCNAME[0]}"
+    oc adm upgrade --clear || true
+    set_upstream_graph "${upstream:-empty}"
+    switch_channel "candidate"
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
@@ -372,6 +558,10 @@ function run_ota_single_case(){
             echo "PASS: pre-${1}" >> "${report_file}"
         else
             echo "FAIL: pre-${1}" >> "${report_file}"
+            # case failed in the middle may leave the cluster in unusable state
+            if type defer-"${1}" &>/dev/null; then
+                defer-"${1}"
+            fi
         fi
     fi
 }

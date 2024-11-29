@@ -153,13 +153,13 @@ Manual steps: Those `yaml`s are applied automatically by `applyconfig`. We recor
 * *Generate the certificate by `cert-manager`
 
 ```bash
-$ oc --as system:admin apply -f clusters/build-clusters/02_cluster/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml
-$ oc --as system:admin apply -f clusters/build-clusters/02_cluster/openshift-ingress/apps-build02_certificate.yaml
+$ oc --as system:admin apply -f clusters/build-clusters/build02/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml
+$ oc --as system:admin apply -f clusters/build-clusters/build02/cert-manager//certificate.yaml
 
 
-$ oc get secret -n openshift-ingress apps-build02-tls
+$ oc get secret -n openshift-ingress apps-tls
 NAME               TYPE                DATA   AGE
-apps-build02-tls   kubernetes.io/tls   3      25m
+apps-tls   kubernetes.io/tls   3      25m
 ```
 
 * Use the secret in `openshift-ingress-operator`: manual step only for test, see [default_ingresscontroller.yaml](openshift-ingress-operator/default_ingresscontroller.yaml)
@@ -167,7 +167,7 @@ apps-build02-tls   kubernetes.io/tls   3      25m
 ```
 $ oc --as system:admin patch ingresscontroller.operator default \
      --type=merge -p \
-     '{"spec":{"defaultCertificate": {"name": "apps-build02-tls"}}}' \
+     '{"spec":{"defaultCertificate": {"name": "apps-tls"}}}' \
      -n openshift-ingress-operator
 
 ```
@@ -249,13 +249,13 @@ Manual steps: Those `yaml`s are applied automatically by `applyconfig`. We recor
 * Generate the certificate by cert-manager:
 
 ```
-$ oc --as system:admin --context build02 apply -f clusters/build-clusters/02_cluster/openshift-apiserver/apiserver-build02_certificate.yaml
+$ oc --as system:admin --context build02 apply -f clusters/build-clusters/build02/openshift-apiserver/certificate.yaml
 ```
 
 * Use the certificates in API server:
 
 ```
-oc --as system:admin patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build02.gcp.ci.openshift.org"], "servingCertificate": {"name": "apiserver-build02-tls"}}]}}}'
+oc --as system:admin patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build02.gcp.ci.openshift.org"], "servingCertificate": {"name": "apiserver-tls"}}]}}}'
 ```
 
 Verify if it works:

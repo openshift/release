@@ -7,14 +7,22 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.16"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.16"
     namespace: ocp
@@ -47,11 +55,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
     candidate:
@@ -75,14 +78,14 @@ resources:
 tests:
 - as: powervs-ipi-f7
   cluster: build01
-  cron: 0 22 * * 4
+  cron: 19 22 8,28 * *
   steps:
     cluster_profile: powervs-4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
       ARCH: ppc64le
-      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BASE_DOMAIN: ipi-ppc64le.cis.ibm.net
       BRANCH: "4.16"
     test:
     - ref: enable-qe-catalogsource
@@ -90,14 +93,14 @@ tests:
     workflow: ipi-powervs
 - as: powervs-ipi-f7-destructive
   cluster: build01
-  cron: 0 18 * * 3
+  cron: 58 17 10,21 * *
   steps:
     cluster_profile: powervs-4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
       ARCH: ppc64le
-      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BASE_DOMAIN: ipi-ppc64le.cis.ibm.net
       BRANCH: "4.16"
     test:
     - ref: enable-qe-catalogsource

@@ -33,21 +33,20 @@ fi
 
 oc label ns cilium security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite
 
-# apply isovalent cilium 1.14.5 CNI
-version="1.14.5"
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-03-cilium-ciliumconfigs-crd.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00000-cilium-namespace.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00001-cilium-olm-serviceaccount.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00002-cilium-olm-deployment.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00003-cilium-olm-service.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00004-cilium-olm-leader-election-role.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00005-cilium-olm-role.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00006-leader-election-rolebinding.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00007-cilium-olm-rolebinding.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00008-cilium-cilium-olm-clusterrole.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00009-cilium-cilium-clusterrole.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00010-cilium-cilium-olm-clusterrolebinding.yaml
-oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00011-cilium-cilium-clusterrolebinding.yaml
+# apply isovalent cilium CNI
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-03-cilium-ciliumconfigs-crd.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00000-cilium-namespace.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00001-cilium-olm-serviceaccount.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00002-cilium-olm-deployment.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00003-cilium-olm-service.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00004-cilium-olm-leader-election-role.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00005-cilium-olm-role.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00006-leader-election-rolebinding.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00007-cilium-olm-rolebinding.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00008-cilium-cilium-olm-clusterrole.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00009-cilium-cilium-clusterrole.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00010-cilium-cilium-olm-clusterrolebinding.yaml"
+oc apply -f "https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${CILIUM_VERSION}/cluster-network-06-cilium-00011-cilium-cilium-clusterrolebinding.yaml"
 
 PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
 HOSTPREFIX=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].hostPrefix}')

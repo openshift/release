@@ -1,9 +1,18 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   os-min9:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
+  build-topics
 build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
@@ -21,6 +30,8 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: numaresources-operator
+- dockerfile_path: bundle.Dockerfile
+  to: numaresources-operator-bundle
 - dockerfile_path: Dockerfile.openshift.rte
   from: os-min9
   inputs:
@@ -39,10 +50,11 @@ images:
   to: numaresources-operator-tests
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: tested-numaresources-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.16.999-snapshot
-    with: numaresources-operator
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.18.999-snapshot
+    with: pipeline:numaresources-operator
 promotion:
   to:
   - name: numaresources-operator
@@ -52,12 +64,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.18"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -71,12 +83,12 @@ tests:
 - as: ci-install-e2e
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: numaresources-operator
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -88,24 +100,21 @@ tests:
     - as: e2e-install-test
       cli: latest
       commands: make test-install-e2e
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -117,27 +126,22 @@ tests:
     - as: e2e-test
       cli: latest
       commands: make test-e2e
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-must-gather-e2e
   cron: 42 0 * * *
   steps:
     cluster_profile: aws-telco
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -154,7 +158,33 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: ci-e2e-install-hypershift
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
+      USE_HOSTED_KUBECONFIG: "true"
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: |-
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        make test-install-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: hypershift-optional-operators
 - as: security
   optional: true
   steps:

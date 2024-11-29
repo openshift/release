@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-openstack-e2e-execute
+  cli: latest
+  commands: hypershift-openstack-e2e-execute-commands.sh
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_LATEST
+      name: release:latest
+    - env: OCP_IMAGE_PREVIOUS
+      name: release:initial
+    - env: CI_HYPERSHIFT_OPERATOR
+      name: pipeline:hypershift-operator
+  env:
+    - default: "rhcos-latest-hcp-nodepool"
+      name: RHCOS_IMAGE_NAME
+    - default: 'false'
+      documentation: |-
+        Whether or not the Hypershift nodepools need to be configured for NFV (PerformanceProfile,
+        additional ports for SR-IOV, etc).
+      name: NFV_NODEPOOLS
+    - default: 'TestCreateCluster$|TestNodePool|TestAutoscaling'
+      documentation: |-
+        Regular expression to be used to filter hypershift e2e tests.
+      name: E2E_TESTS_REGEX
+  from: hypershift-tests
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 3h0m0s

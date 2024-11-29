@@ -1,4 +1,8 @@
 base_images:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-0.10.28
   openshift_release_golang-1.21:
     name: release
     namespace: openshift
@@ -34,26 +38,21 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 6000Mi
+test_binary_build_commands: echo 'Placeholder for building test-bin image'
 tests:
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   steps:
+    env:
+      OCP_VERSION: ocp/fast-4.15
     test:
-    - as: claim
-      cli: custom
+    - ref: ipi-install-rbac
+    - as: test
       commands: |
         if [ -x ".openshift-ci/tests/e2e.sh" ]; then
           ./.openshift-ci/tests/e2e.sh
@@ -74,7 +73,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 6000Mi
-    workflow: generic-claim
+    workflow: stackrox-automation-flavors-ocp-4-e2e
 zz_generated_metadata:
   branch: main
   org: stackrox

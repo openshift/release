@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-  source "${SHARED_DIR}/proxy-conf.sh"
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 pwd && ls -ltr
-cd frontend || exit 0
+cd frontend
 pwd && ls -ltr
 
 echo "Making sure that the console is installed"
@@ -41,38 +41,54 @@ export cli_client_id
 cli_client_id="$(cat /var/run/hypershift-ext-oidc-app-cli/client-id)"
 
 echo "Invoking console test script for external OIDC"
-ret=0
-./console-test-azure-external-oidc.sh || ret=$?
+./console-test-azure-external-oidc.sh
+ret=$?
 
-echo "Summarizing test results..."
-failures=0 errors=0 skipped=0 tests=0
-grep -r -E -h -o 'testsuite[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null | tr -d '[A-Za-z="_]' > /tmp/zzz-tmp.log
-while read -a row ; do
-    # if the last ARG of command `let` evaluates to 0, `let` returns 1
-    let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
-done < /tmp/zzz-tmp.log
+echo "Summarizing test results"
+set -x
+ls -lR "${ARTIFACT_DIR}"
+
+num_junit_files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+if (( num_junit_files == 0 )); then
+    echo "No JUnit files found"
+    exit $ret
+fi
+
+console_file="${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml"
+temp_file="/tmp/zzz-tmp.log"
+if ! grep -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "$console_file" > "$temp_file"; then
+    echo "No testsuite found in ${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml"
+    exit $ret
+fi
+
+declare -A results=([failures]=0 [errors]=0 [skipped]=0 [tests]=0)
+while read -r row; do
+    for ctype in "${!results[@]}"; do
+        count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< "$row")"
+        if [[ -n $count ]]; then
+            results[$ctype]=$(( results[$ctype] + count ))
+        fi
+    done
+done < "$temp_file"
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
 cat > "${TEST_RESULT_FILE}" <<- EOF
-cypress:
-  type: openshift-extended-web-tests
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+openshift-extended-web-tests-ext-oidc-cli-login:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
 
-if [ $((failures)) != 0 ] ; then
+if (( results[failures] != 0 )); then
     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
     readarray -t failingscenarios < <(find "${ARTIFACT_DIR}" -name 'cypress_report*.json' -exec yq '.results[].suites[].tests[] | select(.fail == true) | .fullTitle' {} \; | sort --unique)
-    for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
+    for (( i=0; i<${#failingscenarios[@]}; i++ )); do
         echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
     done
 fi
-cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
-echo "Checking if external OIDC login has succeeded or not"
-if (( ret != 0 )); then
-    echo "Failed to perform external OIDC login"
-    exit 1
-fi
+tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" < "${TEST_RESULT_FILE}"
+
+# Fail the step in case external OIDC login failed
+exit $ret

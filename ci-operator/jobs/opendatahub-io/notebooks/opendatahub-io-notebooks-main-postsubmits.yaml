@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -64,14 +64,14 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-amd-c9s-python-3-9-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-base-c9s-python-3-11-image-mirror
     spec:
       containers:
       - args:
@@ -79,7 +79,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-amd-c9s-python-3-9-image-mirror
+        - --target=notebook-base-c9s-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -122,65 +122,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-amd-jupyter-minimal-c9s-python-3-9-image-mirror
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-amd-jupyter-minimal-c9s-python-3-9-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -238,14 +180,14 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-base-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-base-ubi9-python-3-11-image-mirror
     spec:
       containers:
       - args:
@@ -253,7 +195,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-base-ubi8-python-3-8-image-mirror
+        - --target=notebook-base-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -296,7 +238,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -354,7 +296,81 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-codeserver-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-codeserver-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -362,6 +378,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-codeserver-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -412,7 +444,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-c9s-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-cuda-c9s-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -470,14 +560,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-ds-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-ds-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -485,7 +591,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-cuda-jupyter-ds-ubi8-python-3-8-image-mirror
+        - --target=notebook-cuda-jupyter-ds-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -528,7 +634,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -536,6 +642,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-ds-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -586,14 +708,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -601,7 +739,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
+        - --target=notebook-cuda-jupyter-minimal-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -644,7 +782,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -702,7 +840,81 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -710,6 +922,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -760,7 +988,81 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-rstudio-c9s-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-cuda-rstudio-c9s-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -768,6 +1070,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-rstudio-c9s-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -818,14 +1136,14 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-cuda-ubi9-python-3-11-image-mirror
     spec:
       containers:
       - args:
@@ -833,7 +1151,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-cuda-ubi8-python-3-8-image-mirror
+        - --target=notebook-cuda-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -876,7 +1194,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -934,14 +1252,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-datascience-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -949,7 +1283,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
+        - --target=notebook-jupyter-datascience-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -992,123 +1326,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-datascience-ubi8-python-3-8-image-mirror
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-jupyter-datascience-ubi8-python-3-8-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1166,7 +1384,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-intel-ml-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-jupyter-intel-ml-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1224,7 +1500,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-intel-pyt-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-jupyter-intel-pyt-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1282,7 +1616,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-intel-tf-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-jupyter-intel-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1340,14 +1732,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1355,7 +1763,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
+        - --target=notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1398,7 +1806,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1406,6 +1814,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-minimal-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1456,7 +1880,81 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1464,6 +1962,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1514,14 +2028,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1529,7 +2059,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
+        - --target=notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1572,7 +2102,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1580,6 +2110,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1630,7 +2176,593 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-minimal-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-minimal-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-pyt-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-pyt-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-jupyter-tf-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-jupyter-tf-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rocm-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rocm-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-notebook-rstudio-c9s-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-rstudio-c9s-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1638,6 +2770,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-notebook-rstudio-c9s-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1688,14 +2836,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1703,7 +2867,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
+        - --target=runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1746,7 +2910,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1754,6 +2918,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1804,14 +2984,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-runtime-datascience-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-datascience-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1819,7 +3015,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=runtime-datascience-ubi8-python-3-8-image-mirror
+        - --target=runtime-datascience-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1862,7 +3058,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1870,6 +3066,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-runtime-datascience-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -1920,7 +3132,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-intel-ml-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-intel-ml-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1978,7 +3248,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-intel-pyt-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-intel-pyt-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2036,7 +3364,65 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-intel-tf-ubi9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-intel-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2094,14 +3480,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-runtime-minimal-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -2109,7 +3511,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=runtime-minimal-ubi8-python-3-8-image-mirror
+        - --target=runtime-minimal-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2152,7 +3554,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2160,6 +3562,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-runtime-minimal-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -2210,14 +3628,30 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-notebooks-main-runtime-pytorch-ubi8-python-3-8-image-mirror
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -2225,7 +3659,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=runtime-pytorch-ubi8-python-3-8-image-mirror
+        - --target=runtime-pytorch-ubi9-python-3-11-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2268,7 +3702,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2276,6 +3710,22 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-opendatahub-io-notebooks-main-runtime-pytorch-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
@@ -2284,6 +3734,270 @@ postsubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-pytorch-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-rocm-pytorch-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-rocm-pytorch-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-notebooks-main-runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=runtime-rocm-tensorflow-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest

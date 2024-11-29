@@ -156,16 +156,14 @@ spec:
       containers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
-        - --wait=30
+        - --ref=master
+        - --period=30s
         - --root=/tmp/git-sync
-        - --max-sync-failures=3
+        - --max-failures=3
+        - --link=release
         command:
         - /git-sync
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
-        image: registry.k8s.io/git-sync/git-sync:v4.2.3
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         name: git-sync
         resources:
           requests:
@@ -189,7 +187,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.9
+        image: quay.io/openshift/origin-oauth-proxy:4.16
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -280,16 +278,14 @@ spec:
       initContainers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
+        - --ref=master
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
+        - --link=release
         command:
         - /git-sync
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
-        image: registry.k8s.io/git-sync/git-sync:v4.2.3
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         name: git-sync-init
         volumeMounts:
         - mountPath: /tmp/git-sync
@@ -398,7 +394,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.9
+        image: quay.io/openshift/origin-oauth-proxy:4.16
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -495,7 +491,7 @@ spec:
           secretName: jira-credentials-openshift-jira-robot
       - name: internal-tls
         secret:
-          secretName: release-controller-arm64-priv-tls
+          secretName: release-controller-api-arm64-priv-tls
       - name: session-secret
         secret:
           secretName: release-controller-session-secret
@@ -659,7 +655,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.9
+        image: quay.io/openshift/origin-oauth-proxy:4.16
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:

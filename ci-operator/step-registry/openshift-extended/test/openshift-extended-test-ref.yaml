@@ -5,6 +5,10 @@ ref:
   commands: openshift-extended-test-commands.sh
   cli: latest
   timeout: 8h0m0s
+  credentials:
+    - namespace: test-credentials
+      name: tests-private-account
+      mount_path: /var/run/vault/tests-private-account
   env:
   - name: KUBEADMIN_REMOVED
     default: "false"
@@ -13,8 +17,8 @@ ref:
     default: |
         MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
         Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK
-        Workloads|Image_Registry|Container_Engine_Tools
-        NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING|CFE
+        Workloads|Image_Registry|Container_Engine_Tools|INSTALLER_GENERAL
+        NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING|CFE|Network_Observability.*Critical
     documentation: |-
       Select the test case. It's a RE pattern and is passed to the 'grep -E'
   - name: TEST_ADDITIONAL
@@ -26,7 +30,7 @@ ref:
     documentation: |
       It is filters to select case based on some case attribution which is in case title.
   - name: FILTERS_ADDITIONAL
-    default: "~CPaasrunOnly&"
+    default: "~CPaasrunOnly&;~StressTest&"
     documentation: |
       It is additional filters to combine the TEST_FILTERS to make final filters.
   - name: MODULE_FILTERS
@@ -54,6 +58,11 @@ ref:
       run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements 
       to stop the job and trigger the deprovisioning steps. Default: yes.
       See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  - name: IS_ACTIVE_CLUSTER_OPENSHIFT
+    default: "true"
+    documentation: |-
+      Indicates if the active cluster is an OpenShift cluster or a derivative (e.g., Hypershift, Microshift).
+      A value of "true" means the cluster is OpenShift or a derivative, while "false" means it is not (e.g., AKS).
   resources:
     requests:
       cpu: "1"

@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -25,21 +25,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tempo-stage-tests
-  cron: 0 6 1 10 *
+- always_run: false
+  as: tempo-stage-tests
   steps:
     env:
-      DOWNSTREAM_TESTS_COMMIT: c19aa1cd60741748256d7f8c7c05a2f9c8e30239
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e-openshift/monitoring tests/e2e/generate
-        tests/e2e/gateway
+      SKIP_TESTS: tests/e2e/generate tests/e2e/gateway tests/e2e-openshift/monolithic-multitenancy-static
+        tests/e2e-openshift-ossm/*
     test:
     - ref: install-operators
-    - ref: distributed-tracing-tests-tempo
+    - ref: distributed-tracing-tests-tempo-downstream
     workflow: distributed-tracing-install-ibm-p
 zz_generated_metadata:
   branch: main

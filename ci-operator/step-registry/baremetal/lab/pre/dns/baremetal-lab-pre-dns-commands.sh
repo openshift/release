@@ -23,11 +23,29 @@ if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
   exit 1
 fi
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
-DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME
+DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
+
+if [ "${ipv4_enabled:-}" == "true" ]; then
+  DNS_FORWARD="${DNS_FORWARD}
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_vip}
 *.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
+fi
+
+if [ "${ipv6_enabled:-}" == "true" ]; then
+  # shellcheck disable=SC2154
+  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ]; then
+    echo "Unable to parse IPv6 VIPs"
+    exit 1
+  fi
+
+  DNS_FORWARD="${DNS_FORWARD}
+provisioner.${CLUSTER_NAME} IN AAAA ${INTERNAL_NET_IPV6}
+api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
+api-int.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
+*.apps.${CLUSTER_NAME} IN AAAA ${ingress_vip_v6}"
+fi
 
 DNS_REVERSE_INTERNAL=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
@@ -39,10 +57,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error when parsing the Bare Metal Host metadata"
     exit 1
   fi
-  DNS_FORWARD="${DNS_FORWARD}
+
+  if [ "${ipv4_enabled:-}" == "true" ]; then
+    DNS_FORWARD="${DNS_FORWARD}
 ${name}.${CLUSTER_NAME} IN A ${ip}"
-  DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
+    DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
+  fi
 
   if [ "${ipv6_enabled:-}" == "true" ]; then
     # shellcheck disable=SC2154

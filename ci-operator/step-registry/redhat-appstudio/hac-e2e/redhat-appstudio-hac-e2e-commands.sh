@@ -21,8 +21,9 @@ export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
 QONTRACT_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_username)
 QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
-CYPRESS_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password)
-export CYPRESS_USERNAME=user1
+KEYCLOAK_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password)
+CYPRESS_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password_2)
+export CYPRESS_USERNAME=e2e-hac-test
 export CYPRESS_PERIODIC_RUN=true
 CYPRESS_GH_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
 HAC_SA_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/c-rh-ceph_SA_bot)
@@ -51,6 +52,16 @@ EOF
 	  echo "Timed out waiting for login"
 	  exit 1
   fi
+
+# Register test user
+KEYCLOAK_URL='https://'$(oc get route keycloak -n dev-sso -o json | jq -r .spec.host)'/auth/'
+REGISTRATION_URL='https://'$(oc get route registration-service -n toolchain-host-operator -o json | jq -r .spec.host)'/'
+ENCODED_USERNAME=`echo -n ${CYPRESS_USERNAME} | base64 -w 0`
+ENCODED_PASSWORD=`echo -n ${CYPRESS_PASSWORD} | base64 -w 0`
+KEYCLOAK_USERNAME=user1
+
+curl -o keycloak.py https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/keycloak.py
+python3 keycloak.py $KEYCLOAK_URL $KEYCLOAK_USERNAME $KEYCLOAK_PASSWORD $ENCODED_USERNAME $ENCODED_PASSWORD $REGISTRATION_URL --no-verify
 
 # Install HAC in ephemeral cluster
 REF=main

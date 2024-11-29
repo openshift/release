@@ -1,24 +1,24 @@
 base_images:
   ocp_4.10_cli:
-    name: 4.17-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
+  ocp_4.18_base-rhel9:
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_4.17_installer-etcd-artifacts:
-    name: 4.17-priv
+  ocp_4.18_installer-etcd-artifacts:
+    name: 4.19-priv
     namespace: ocp-private
     tag: installer-etcd-artifacts
-  ocp_4.17_installer-kube-apiserver-artifacts:
-    name: 4.17-priv
+  ocp_4.18_installer-kube-apiserver-artifacts:
+    name: 4.19-priv
     namespace: ocp-private
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -28,18 +28,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_4.17_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.18_installer-etcd-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    ocp_4.17_installer-kube-apiserver-artifacts:
+      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
+    ocp_4.18_installer-kube-apiserver-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -62,24 +62,18 @@ promotion:
     excluded_images:
     - installer
     - src-oc
-    name: 4.17-priv
+    name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.17-priv
+      name: 4.19-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
+      name: 4.19-priv
       namespace: ocp-private
-  ppc64le-latest:
-    candidate:
-      architecture: ppc64le
-      product: ocp
-      stream: nightly
-      version: "4.16"
 resources:
   '*':
     requests:
@@ -96,7 +90,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
@@ -108,7 +101,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_TAGS: |
@@ -123,7 +115,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
@@ -142,7 +133,6 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
@@ -158,29 +148,11 @@ tests:
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-public-ipv4-pool
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
-    workflow: openshift-e2e-aws
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-aws-ovn-shared-vpc
   optional: true
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
@@ -191,7 +163,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
@@ -202,7 +173,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -214,7 +184,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -226,7 +195,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -238,7 +206,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -253,6 +220,16 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-capi-ovn
@@ -305,24 +282,6 @@ tests:
     workflow: openshift-e2e-ibmcloud
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-powervs-capi-ovn
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: powervs-5
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.16"
-      CLUSTER_NAME_MODIFIER: capi-416
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      INSTALLER: powervs
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-powervs-ipi
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-nutanix-capi-ovn
   cluster: build01
   optional: true
@@ -372,8 +331,6 @@ tests:
       CONFIG_TYPE: dualstack-v6primary
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
-      TEST_SKIPS: when FIPS is disabled the HAProxy router should serve routes when
-        configured with a 1024-bit RSA key\|should redirect on blob pull
     workflow: openshift-e2e-openstack-dualstack
   timeout: 6h0m0s
 - always_run: false
@@ -464,7 +421,7 @@ tests:
   as: e2e-vsphere-capi-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -474,7 +431,7 @@ tests:
   as: e2e-vsphere-capi-zones
   optional: true
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -484,7 +441,7 @@ tests:
   as: e2e-vsphere-capi-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -494,10 +451,11 @@ tests:
   as: e2e-vsphere-capi-multi-vcenter-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-multi-vcenter
+    cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["ClusterAPIInstall=true","VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 zz_generated_metadata:

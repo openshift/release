@@ -1,28 +1,23 @@
 base_images:
-  ci_nginx-unprivileged_stable:
-    name: nginx-unprivileged
-    namespace: ci
-    tag: stable
+  centos9:
+    name: centos
+    namespace: openshift
+    tag: stream9
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.54.2
+    tag: v1.59.0
   hypershift:
     name: hypershift-cli
     namespace: ci
     tag: latest
   os:
-    name: centos
-    namespace: origin
-    tag: stream8
-  ubi_minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 binary_build_commands: make production-install
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
 - context_dir: images/sprint-automation/
   from: os
@@ -64,14 +59,16 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
-- context_dir: images/gh-pull-through-cache/
+- context_dir: images/check-cluster-profiles-config/
+  from: os
   inputs:
-    ci_nginx-unprivileged_stable:
-      as:
-      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
-  to: gh-pull-through-cache
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-cluster-profiles-config
+  to: check-cluster-profiles-config
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
-  from: ubi_minimal
+  from: os
   inputs:
     bin:
       paths:
@@ -90,14 +87,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/cvp-trigger
   to: cvp-trigger
-- context_dir: images/template-deprecator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/template-deprecator
-  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -114,7 +103,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/result-aggregator
   to: result-aggregator
-- context_dir: images/ci-operator/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator/
   from: os
   inputs:
     bin:
@@ -124,7 +115,21 @@ images:
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
   to: ci-operator
-- context_dir: images/ci-operator-checkconfig/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-minimal/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
+  to: ci-operator-minimal
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-checkconfig/
   from: os
   inputs:
     bin:
@@ -140,7 +145,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/bugzilla-backporter
   to: bugzilla-backporter
-- context_dir: images/ci-operator-prowgen/
+- additional_architectures:
+  - arm64
+  context_dir: images/ci-operator-prowgen/
   from: os
   inputs:
     bin:
@@ -148,7 +155,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-operator-prowgen
   to: ci-operator-prowgen
-- context_dir: images/sanitize-prow-jobs/
+- additional_architectures:
+  - arm64
+  context_dir: images/sanitize-prow-jobs/
   from: os
   inputs:
     bin:
@@ -156,6 +165,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/sanitize-prow-jobs
   to: sanitize-prow-jobs
+- context_dir: images/multi-pr-prow-plugin/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/multi-pr-prow-plugin
+  to: multi-pr-prow-plugin
 - context_dir: images/pj-rehearse/
   from: os
   inputs:
@@ -174,7 +191,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/slack-bot
   to: slack-bot
-- context_dir: images/config-brancher/
+- additional_architectures:
+  - arm64
+  context_dir: images/config-brancher/
   from: os
   inputs:
     bin:
@@ -191,7 +210,7 @@ images:
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD dptp-pools-cm /usr/bin/dptp-pools-cm
     ENTRYPOINT ["dptp-pools-cm"]
   from: os
@@ -201,9 +220,11 @@ images:
       - destination_dir: .
         source_path: /go/bin/dptp-pools-cm
   to: dptp-pools-cm
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD promoted-image-governor /usr/bin/promoted-image-governor
     ENTRYPOINT ["promoted-image-governor"]
   from: os
@@ -214,8 +235,8 @@ images:
         source_path: /go/bin/promoted-image-governor
   to: promoted-image-governor
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD ci-images-mirror /usr/bin/ci-images-mirror
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["ci-images-mirror"]
@@ -229,8 +250,8 @@ images:
         source_path: /usr/local/bin/oc
   to: ci-images-mirror
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["prcreator"]
   from: os
@@ -260,8 +281,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
       - destination_dir: .
-        source_path: /go/bin/template-deprecator
-      - destination_dir: .
         source_path: /go/bin/determinize-prow-config
       - destination_dir: .
         source_path: /go/bin/registry-replacer
@@ -272,7 +291,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/promoted-image-governor
   to: auto-config-brancher
-- context_dir: images/prowjobdispatcher
+- additional_architectures:
+  - arm64
+  context_dir: images/prowjobdispatcher
   from: os
   inputs:
     bin:
@@ -300,7 +321,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/repo-brancher
   to: repo-brancher
-- context_dir: images/determinize-ci-operator/
+- additional_architectures:
+  - arm64
+  context_dir: images/determinize-ci-operator/
   from: os
   inputs:
     bin:
@@ -316,7 +339,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-peribolos
   to: determinize-peribolos
-- context_dir: images/applyconfig
+- additional_architectures:
+  - arm64
+  context_dir: images/applyconfig
   from: os
   inputs:
     bin:
@@ -350,7 +375,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/testgrid-config-generator
   to: testgrid-config-generator
-- context_dir: images/entrypoint-wrapper
+- additional_architectures:
+  - arm64
+  context_dir: images/entrypoint-wrapper
   from: os
   inputs:
     bin:
@@ -359,14 +386,16 @@ images:
         source_path: /go/bin/entrypoint-wrapper
   to: entrypoint-wrapper
 - context_dir: images/ci-operator-configresolver
-  from: os
+  from: centos9
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-operator-configresolver
   to: ci-operator-configresolver
-- context_dir: images/determinize-prow-config
+- additional_architectures:
+  - arm64
+  context_dir: images/determinize-prow-config
   from: os
   inputs:
     bin:
@@ -374,7 +403,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
   to: determinize-prow-config
-- context_dir: images/tide-config-manager
+- additional_architectures:
+  - arm64
+  context_dir: images/tide-config-manager
   from: os
   inputs:
     bin:
@@ -382,7 +413,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/tide-config-manager
   to: tide-config-manager
-- context_dir: images/repo-init
+- additional_architectures:
+  - arm64
+  context_dir: images/repo-init
   from: os
   inputs:
     bin:
@@ -472,7 +505,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/autopublicizeconfig
   to: autopublicizeconfig
-- context_dir: images/generate-registry-metadata/
+- additional_architectures:
+  - arm64
+  context_dir: images/generate-registry-metadata/
   from: os
   inputs:
     bin:
@@ -505,8 +540,8 @@ images:
         source_path: /go/bin/serviceaccount-secret-rotation-trigger
   to: serviceaccount-secret-rotation-trigger
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git diffutils && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git diffutils && microdnf clean all && rm -rf /var/cache/dnf
     ADD sippy-config-generator /usr/bin/sippy-config-generator
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["/usr/bin/sippy-config-generator"]
@@ -528,7 +563,7 @@ images:
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
     ENTRYPOINT ["/usr/bin/vault-subpath-proxy"]
   from: os
@@ -539,7 +574,7 @@ images:
         source_path: /go/bin/vault-subpath-proxy
   to: vault-subpath-proxy
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD cluster-display /usr/bin/cluster-display
     ENTRYPOINT ["/usr/bin/cluster-display"]
   from: os
@@ -549,7 +584,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/cluster-display
   to: cluster-display
-- context_dir: images/cluster-init/
+- additional_architectures:
+  - arm64
+  context_dir: images/cluster-init/
   from: os
   inputs:
     bin:
@@ -558,7 +595,7 @@ images:
         source_path: /go/bin/cluster-init
   to: cluster-init
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
     ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
   from: os
@@ -569,7 +606,7 @@ images:
         source_path: /go/bin/vault-secret-collection-manager
   to: vault-secret-collection-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD bugzilla-config-manager /usr/bin/bugzilla-config-manager
     ADD prcreator /usr/bin/prcreator
   from: os
@@ -582,8 +619,8 @@ images:
         source_path: /go/bin/prcreator
   to: bugzilla-config-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
     ENTRYPOINT ["ci-operator-yaml-creator"]
   from: os
@@ -602,7 +639,8 @@ images:
         source_path: /go/bin/clusterimageset-updater
   to: clusterimageset-updater
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y tar gzip
     ADD github-ldap-user-group-creator /usr/bin/github-ldap-user-group-creator
     ENTRYPOINT ["github-ldap-user-group-creator"]
   from: os
@@ -613,7 +651,7 @@ images:
         source_path: /go/bin/github-ldap-user-group-creator
   to: github-ldap-user-group-creator
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD qci-appci /usr/bin/qci-appci
     ENTRYPOINT ["qci-appci"]
   from: os
@@ -624,7 +662,7 @@ images:
         source_path: /go/bin/qci-appci
   to: qci-appci
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD payload-testing-prow-plugin /usr/bin/payload-testing-prow-plugin
     ENTRYPOINT ["/usr/bin/payload-testing-prow-plugin"]
   from: os
@@ -635,7 +673,7 @@ images:
         source_path: /go/bin/payload-testing-prow-plugin
   to: payload-testing-prow-plugin
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD job-trigger-controller-manager /usr/bin/job-trigger-controller-manager
     ENTRYPOINT ["/usr/bin/job-trigger-controller-manager"]
   from: os
@@ -660,10 +698,12 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
   to: job-run-aggregator
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y tar git && microdnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
@@ -677,8 +717,8 @@ images:
         source_path: /usr/local/bin/oc
   to: sync-rover-groups
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD retester /usr/bin/retester
     ENTRYPOINT ["/usr/bin/retester"]
   from: os
@@ -689,7 +729,7 @@ images:
         source_path: /go/bin/retester
   to: retester
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD image-graph-generator /usr/bin/image-graph-generator
     ENTRYPOINT ["/usr/bin/image-graph-generator"]
   from: os
@@ -712,7 +752,7 @@ images:
         source_path: /usr/local/bin/oc
   to: multi-arch-builder-controller
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD ci-scheduling-webhook /usr/bin/ci-scheduling-webhook
     ENTRYPOINT ["/usr/bin/ci-scheduling-webhook"]
   from: os
@@ -745,26 +785,34 @@ promotion:
 resources:
   '*':
     requests:
-      cpu: 500m
-      memory: 600Mi
+      cpu: "1"
+      memory: 1Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
+  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
+  node_architecture: arm64
 - as: codegen
+  cluster: build10
   commands: make verify-gen
   container:
     from: src
+  node_architecture: arm64
 - as: format
+  cluster: build10
   commands: make format
   container:
     from: src
+  node_architecture: arm64
 - as: integration
+  cluster: build10
   commands: make integration
   container:
     from: test-bin
+  node_architecture: arm64
 - always_run: false
   as: e2e
   steps:
@@ -837,7 +885,7 @@ tests:
     test:
     - as: e2e-oo-post
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -854,28 +902,52 @@ tests:
       - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        namespace: test-credentials
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
+  cluster: build10
+  node_architecture: arm64
   optional: true
+  steps:
+    test:
+    - as: breaking-changes
+      commands: |
+        export KUBECONFIG_DIR=/etc/kubeconfigs
+        export KUBECONFIG_SUFFIX=config
+        make check-breaking-changes
+      credentials:
+      - mount_path: /etc/kubeconfigs
+        name: cluster-init
+        namespace: ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
+  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
+  node_architecture: arm64
 - as: validate-vendor
+  cluster: build10
   commands: make validate-vendor
   container:
     from: src
+  node_architecture: arm64
 - as: frontend-checks
+  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
+  node_architecture: arm64
 - as: lint
   commands: make lint
   container:

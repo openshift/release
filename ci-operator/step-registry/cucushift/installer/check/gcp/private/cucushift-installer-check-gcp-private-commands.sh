@@ -38,14 +38,18 @@ else
 fi
 
 echo "INFO: (2/4) Checking if any dns record-sets in the base domain (public zone)..."
-base_domain_zone_name=$(gcloud dns managed-zones list --filter="dnsName=${GCP_BASE_DOMAIN}." --format="table(name)" | grep -v NAME)
-echo "INFO: base domain zone name '${base_domain_zone_name}'"
-# In case of a disconnected network, it's possible to configure record-sets for the mirror registry (within the VPC), so exclude it. 
-gcloud dns record-sets list --zone "${base_domain_zone_name}" | grep -v mirror-registry | grep "${CLUSTER_NAME}" && ret=$(( $ret | 2 ))
-if [ ${ret} -ge 2 ]; then
-    echo "ERROR: Base domain record-sets check failed."
+base_domain_zone_name=$(gcloud dns managed-zones list --filter="visibility=public AND dnsName=${GCP_BASE_DOMAIN}." --format="value(name)")
+if [[ -n "${base_domain_zone_name}" ]]; then
+    echo "INFO: base domain zone name '${base_domain_zone_name}'"
+    # In case of a disconnected network, it's possible to configure record-sets for the mirror registry (within the VPC), so exclude it. 
+    gcloud dns record-sets list --zone "${base_domain_zone_name}" | grep -v mirror-registry | grep "${CLUSTER_NAME}" && ret=$(( $ret | 2 ))
+    if [ ${ret} -ge 2 ]; then
+        echo "ERROR: Base domain record-sets check failed."
+    else
+        echo "INFO: Base domain record-sets check passed."
+    fi
 else
-    echo "INFO: Base domain record-sets check passed."
+    echo "INFO: The base domain seems not existing, skip the check."
 fi
 
 echo "INFO: (3/4) Checking if any external address..."

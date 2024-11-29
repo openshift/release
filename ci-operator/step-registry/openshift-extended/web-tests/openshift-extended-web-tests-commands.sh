@@ -32,7 +32,7 @@ else
   # or else, we run smoke tests to balance coverage and cost
   elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
     echo "Testing on normal cluster"
-    ./console-test-frontend.sh || true
+    ./console-test-frontend.sh --tags @userinterface+@e2e || true
   elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
@@ -44,6 +44,15 @@ else
   elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
     echo 'Running destructive tests'
     ./console-test-frontend.sh --tags @destructive || true
+  elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
+    echo "run all compliance-operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
+  elif [[ $E2E_RUN_TAGS =~ @fio ]]; then
+    echo "run all file-integrity-operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/file-integirty-operator.cy.ts || true
+  elif [[ $E2E_RUN_TAGS =~ @spo ]]; then
+    echo "run all security profiles operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/security-profiles-operator.cy.ts || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true
@@ -52,24 +61,39 @@ fi
 
 # summarize test results
 echo "Summarizing test results..."
-failures=0 errors=0 skipped=0 tests=0
-grep -r -E -h -o 'testsuite[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null | tr -d '[A-Za-z="_]' > /tmp/zzz-tmp.log
-while read -a row ; do
-    # if the last ARG of command `let` evaluates to 0, `let` returns 1
-    let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
+    echo "Artifact dir '${ARTIFACT_DIR}' not exist"
+    exit 0
+else
+    echo "Artifact dir '${ARTIFACT_DIR}' exist"
+    ls -lR "${ARTIFACT_DIR}"
+    files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
+    if [[ "$files" -eq 0 ]] ; then
+        echo "There are no JUnit files"
+        exit 0
+    fi
+fi
+declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null > /tmp/zzz-tmp.log || exit 0
+while read row ; do
+    for ctype in "${!results[@]}" ; do
+        count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+        if [[ -n $count ]] ; then
+            let results[$ctype]+=count || true
+        fi
+    done
 done < /tmp/zzz-tmp.log
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
 cat > "${TEST_RESULT_FILE}" <<- EOF
-cypress:
-  type: openshift-extended-web-tests
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+openshift-extended-web-tests:
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
 
-if [ $((failures)) != 0 ] ; then
+if [ ${results[failures]} != 0 ] ; then
     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
     readarray -t failingscenarios < <(find "${ARTIFACT_DIR}" -name 'cypress_report*.json' -exec yq '.results[].suites[].tests[] | select(.fail == true) | .fullTitle' {} \; | sort --unique)
     for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do

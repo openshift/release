@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -37,7 +45,7 @@ function create_disk_encryption_set() {
     
     echo "Creating keyvault ${kv_name} in ${rg}"
     kv_output=$(mktemp)
-    run_command "az keyvault create -n ${kv_name} -g ${rg} --enable-purge-protection true | tee '${kv_output}'" || return 1
+    run_command "az keyvault create -n ${kv_name} -g ${rg} --enable-purge-protection true --retention-days 7 | tee '${kv_output}'" || return 1
     kv_key_output=$(mktemp)
     run_command "az keyvault key create --vault-name ${kv_name} -n ${kv_key_name} --protection software | tee '${kv_key_output}'" || return 1
     #sleep for a while to wait for azure api return correct id
@@ -91,7 +99,7 @@ if [ X"$ret" != X"0" ]; then
 fi
 
 # create disk encryption set
-# We must randomize the name of the keyvault as they do not get fully deleted for 90 days.
+# The Key Vault name must be randomized because deleted Key Vaults remain in a soft-deleted state for 7 days.
 # A vault's name must be between 3-24 alphanumeric characters
 # The vault name must begin with a letter, end with a letter or digit, and not contain consecutive hyphens.
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")
@@ -103,6 +111,7 @@ if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
     fi
 fi
 azure_des_json="{}"
+des_id=""
 kv_prefix="ci-${NAMESPACE: -6}-${UNIQUE_HASH}"
 if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for defaultMachinePlatform"
@@ -113,6 +122,7 @@ if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_default}"
     des_default_id=$(az disk-encryption-set show -n "${des_default}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_default_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_default_id} -o jsonc" 5
 
     #save default des information to ${SHARED_DIR} for reference
@@ -128,6 +138,7 @@ if [[ "${ENABLE_DES_CONTROL_PLANE}" == "true" ]]; then
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_master}"
     des_master_id=$(az disk-encryption-set show -n "${des_master}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_master_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_master_id} -o jsonc" 5
 
     #save control plane des information to ${SHARED_DIR} for reference
@@ -143,6 +154,7 @@ if [[ "${ENABLE_DES_COMPUTE}" == "true" ]]; then
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_worker}"
     des_worker_id=$(az disk-encryption-set show -n "${des_worker}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_worker_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_worker_id} -o jsonc" 5
 
     #save compute des information to ${SHARED_DIR} for reference
@@ -151,6 +163,7 @@ fi
 
 # save disk encryption set information to ${SHARED_DIR} for reference
 echo "${azure_des_json}" > "${SHARED_DIR}/azure_des.json"
+echo "${des_id}" > "${SHARED_DIR}/azure_des_id"
 
 #for debug
 cat "${SHARED_DIR}/azure_des.json"

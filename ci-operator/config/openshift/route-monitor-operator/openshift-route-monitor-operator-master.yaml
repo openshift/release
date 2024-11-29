@@ -17,6 +17,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-harness-build
+  container:
+    from: src
+  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
 - as: generate
   commands: make generate --always-make && git diff --exit-code
   container:
@@ -25,27 +31,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: test-integration
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.12"
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export NAMESPACE=${NAMESPACE}-test
-        oc new-project $NAMESPACE
-        make test-integration
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

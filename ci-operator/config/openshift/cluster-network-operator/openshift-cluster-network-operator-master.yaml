@@ -6,45 +6,45 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.59.0
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
-  ocp_4.16_base-rhel9:
-    name: "4.17"
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  ocp_4.17_base-rhel9:
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-network-operator
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -138,12 +138,12 @@ tests:
 - as: e2e-vsphere-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for pod-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for node-Service\|
@@ -154,7 +154,7 @@ tests:
 - as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     workflow: openshift-e2e-vsphere-ovn-dualstack
@@ -186,13 +186,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-gcp-ovn-techpreview
-  optional: true
   steps:
     cluster_profile: gcp
     env:
@@ -210,7 +210,7 @@ tests:
   as: e2e-vsphere-ovn-windows
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
@@ -362,6 +362,21 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: frrk8s-e2e
+  cluster: build05
+  optional: true
+  run_if_changed: ^bindata\/network\/frr-k8s.*$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
+        RUN_FRR_K8S_TESTS=true
+    workflow: baremetalds-metallb-e2e
 - as: security
   optional: true
   steps:

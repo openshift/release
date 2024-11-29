@@ -191,11 +191,29 @@ function approve_csrs() {
 }
 
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -216,8 +234,8 @@ oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
+# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
@@ -280,6 +298,7 @@ cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
@@ -317,7 +336,6 @@ fi
 
 destroy_bootstrap &
 approve_csrs &
-update_image_registry &
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
@@ -336,6 +354,7 @@ fi
 # mixed arch nodes.
 echo -e "\nWaiting for all the nodes to be ready..."
 wait_for_nodes_readiness ${EXPECTED_NODES}
+update_image_registry
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch  "${SHARED_DIR}/success"

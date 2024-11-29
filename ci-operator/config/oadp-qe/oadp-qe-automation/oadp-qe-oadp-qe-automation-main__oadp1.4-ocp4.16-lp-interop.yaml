@@ -1,0 +1,129 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  mtc-python-client:
+    name: mtc-python-client
+    namespace: mtc-qe
+    tag: master
+  oadp-apps-deployer:
+    name: oadp-apps-deployer
+    namespace: oadp-qe
+    tag: master
+  oadp-e2e-qe:
+    name: oadp-e2e-qe
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/testing/interop/Dockerfile
+  inputs:
+    mtc-python-client:
+      paths:
+      - destination_dir: mtc-python-client.tar.gz
+        source_path: /mtc-python-client.tar.gz
+    oadp-apps-deployer:
+      paths:
+      - destination_dir: oadp-apps-deployer.tar.gz
+        source_path: /oadp-apps-deployer.tar.gz
+    oadp-e2e-qe:
+      paths:
+      - destination_dir: oadp-e2e-qe.tar.gz
+        source_path: /oadp-e2e-qe.tar.gz
+  to: oadp-runner
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: oadp-interop-aws
+  cron: 0 6 22 7 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      EXECUTE_KUBEVIRT_TESTS: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "interop-tests-deploy-*", "failure_type": "all", "classification": "CNV Install Failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-s3-*", "failure_type": "all", "classification":  "Infrastructure Provisioning - S3 Buckets", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-annotate-volsync", "failure_type": "all", "classification": "Infrastructure Provisioning - Misc.", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OADP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","oadp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_OPERATOR_CHANNEL: stable-4.15
+      ODF_VERSION_MAJOR_MINOR: "4.15"
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.4", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"},
+          {"name": "volsync-product", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group":"global-operators"}
+        ]
+      USER_TAGS: |
+        scenario oadp
+    test:
+    - ref: install-operators
+    - ref: interop-tests-deploy-cnv
+    - ref: interop-tests-deploy-odf
+    - ref: oadp-annotate-volsync
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws
+- as: oadp-interop-ibmcloud
+  cron: 0 6 22 7 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "interop-tests-deploy-*", "failure_type": "all", "classification": "CNV Install Failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-s3-*", "failure_type": "all", "classification":  "Infrastructure Provisioning - S3 Buckets", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-annotate-volsync", "failure_type": "all", "classification": "Infrastructure Provisioning - Misc.", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OADP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","oadp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OADP_CLOUD_PROVIDER: ibmcloud
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.4", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"},
+          {"name": "volsync-product", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group":"global-operators"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: oadp-annotate-volsync
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-ibmcloud
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation
+  variant: oadp1.4-ocp4.16-lp-interop

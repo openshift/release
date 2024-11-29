@@ -44,8 +44,7 @@ images:
   to: custom-src
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -69,17 +68,25 @@ tests:
   commands: HOME=/tmp make fmt-check
   container:
     from: custom-src
+- as: make-generate-check
+  commands: HOME=/tmp make generate-check
+  container:
+    from: custom-src
+- as: make-prow-ci-manifests-check
+  commands: HOME=/tmp make prow-ci-manifests-check
+  container:
+    from: custom-src
 - as: make-test
   cluster: build05
   steps:
     workflow: dpu-operator-tests-workflow
   timeout: 1h0m0s
 - always_run: false
-  as: e2e-dpu-operator-tests
+  as: make-e2e-test
   cluster: build05
   steps:
     workflow: dpu-operator-e2e-tests-workflow
-  timeout: 6h0m0s
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

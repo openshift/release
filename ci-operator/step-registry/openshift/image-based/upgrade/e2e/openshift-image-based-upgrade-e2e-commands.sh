@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -16,26 +15,26 @@ remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
-PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
-PULL_SECRET=$(cat ${PULL_SECRET_FILE})
+PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 
-TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
-target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
+if [[ "$TEST_CLUSTER" != "seed" && "$TEST_CLUSTER" != "target" ]]; then
+  echo "TEST_CLUSTER is an invalid value: '${TEST_CLUSTER}'"
+  exit 1
+fi
+
+TEST_VM_NAME="$(cat ${SHARED_DIR}/${TEST_CLUSTER}_vm_name)"
+
+test_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TEST_VM_NAME}/auth/kubeconfig
 remote_artifacts_dir=${remote_workdir}/artifacts
 
 cat <<EOF > ${SHARED_DIR}/e2e_test.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
-export KUBECONFIG='${target_kubeconfig}'
-export PULL_SECRET='${PULL_SECRET}'
+export KUBECONFIG='${test_kubeconfig}'
+export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export TESTS_PULL_REF='${TESTS_PULL_REF}'
-
-echo '${PULL_SECRET}' > ${remote_workdir}/.dockerconfig.json
-export REGISTRY_AUTH_FILE='${remote_workdir}/.dockerconfig.json'
-
-# Configure the local image registry since the tests need it
-oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed", "storage":{"emptyDir":{}}}}'
+export REGISTRY_AUTH_FILE='${PULL_SECRET_FILE}'
 
 mkdir tmp
 
@@ -46,11 +45,20 @@ rm -rf tmp
 
 mkdir ${remote_artifacts_dir}
 
-# Run the conformance suite
-openshift-tests run ${CONFORMANCE_SUITE} \
-  -o "${remote_artifacts_dir}/e2e.log" \
-  --junit-dir "${remote_artifacts_dir}/junit" &
-wait "\$!"
+if [[ -n "${TEST_SKIPS}" ]]; then
+    TESTS="\$(openshift-tests run --dry-run "${CONFORMANCE_SUITE}")" &&
+    echo "\${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+    echo "Skipping tests:" &&
+    echo "\${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return \$exit_code; } &&
+    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+fi &&
+
+set -x &&
+openshift-tests run "${CONFORMANCE_SUITE}" \${TEST_ARGS:-} \
+    -o "${remote_artifacts_dir}/e2e.log" \
+    --junit-dir "${remote_artifacts_dir}/junit" &
+wait "\$!" &&
+set +x
 EOF
 
 chmod +x ${SHARED_DIR}/e2e_test.sh

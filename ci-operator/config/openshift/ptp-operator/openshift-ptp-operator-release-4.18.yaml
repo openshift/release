@@ -1,30 +1,36 @@
 base_images:
-  ocp_4.16_base-rhel9:
+  linuxptp-daemon:
+    name: "4.18"
+    namespace: ocp
+    tag: ptp
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: ptp-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-ptp-operator:4.16
+  - pullspec: quay.io/openshift/origin-ptp-operator:.*
     with: pipeline:ptp-operator
+  - pullspec: quay.io/openshift/origin-ptp:.*
+    with: pipeline:linuxptp-daemon
 promotion:
   to:
   - name: "4.18"
@@ -51,6 +57,12 @@ tests:
     from: src
 - as: govet
   commands: make vet
+  container:
+    from: src
+- as: bundle-check
+  commands: |
+    unset VERSION
+    make bundle-check
   container:
     from: src
 - as: e2e-aws-ovn

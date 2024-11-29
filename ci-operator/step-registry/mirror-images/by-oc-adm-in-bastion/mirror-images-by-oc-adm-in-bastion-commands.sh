@@ -5,18 +5,31 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
 mirror_output="${SHARED_DIR}/mirror_output"
 pull_secret_filename="new_pull_secret"
 new_pull_secret="${SHARED_DIR}/${pull_secret_filename}"
 remote_pull_secret="/tmp/${pull_secret_filename}"
-install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
+install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
+cluster_mirror_conf_file="${SHARED_DIR}/local_registry_mirror_file.yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
@@ -71,27 +84,52 @@ ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH
 # shellcheck disable=SC2090
 scp ${ssh_options} "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
 
-mirror_options="--insecure=true"
-# check whether the oc command supports the --keep-manifest-list and add it to the args array.
+mirror_crd_type='icsp'
+regex_keyword_1="imageContentSources"
+if [[ "${ENABLE_IDMS}" == "yes" ]]; then
+    mirror_crd_type='idms'
+    regex_keyword_1="imageDigestSources"
+fi
+
+# set the release mirror args
+args=(
+    --from="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+    --to-release-image="${target_release_image}"
+    --to="${target_release_image_repo}"
+    --insecure=true
+)
+
+# shellcheck disable=SC2090
+ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "which oc && oc version --client"
+
+# check whether the oc command supports the extra options and add them to the args array.
 # shellcheck disable=SC2090
 if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release mirror -h | grep -q -- --keep-manifest-list"; then
     echo "Adding --keep-manifest-list to the mirror command."
-    mirror_options="${mirror_options} --keep-manifest-list=true"
+    args+=(--keep-manifest-list=true)
 else
     echo "This oc version does not support --keep-manifest-list, skip it."
 fi
 
+# shellcheck disable=SC2090
+if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release mirror -h | grep -q -- --print-mirror-instructions"; then
+    echo "Adding --print-mirror-instructions to the mirror command."
+    args+=(--print-mirror-instructions="${mirror_crd_type}")
+else
+    echo "This oc version does not support --print-mirror-instructions, skip it."
+fi
+
 # mirror images in bastion host, which will increase mirror upload speed
+cmd="oc adm release -a '${remote_pull_secret}' mirror ${args[*]}"
 # shellcheck disable=SC2090
 ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
-"oc adm release -a ${remote_pull_secret} mirror ${mirror_options} \
- --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
- --to=${target_release_image_repo} \
- --to-release-image=${target_release_image}" | tee "${mirror_output}"
+"${cmd}" | tee "${mirror_output}"
 
-grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
-grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
+line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+install_end_line_num=$(expr ${line_num} - 3) &&
+upgrade_start_line_num=$(expr ${line_num} + 2) &&
+sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
+sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
 
-echo "${install_config_icsp_patch}:"
-cat "${install_config_icsp_patch}"
+run_command "cat '${install_config_mirror_patch}'"
 rm -f "${new_pull_secret}"

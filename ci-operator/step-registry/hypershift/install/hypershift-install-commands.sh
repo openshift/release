@@ -14,6 +14,10 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
+fi
+
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
@@ -24,6 +28,16 @@ fi
 
 if [ "${ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --cert-rotation-scale=20m"
+fi
+
+AZURE_EXTERNAL_DNS_DOMAIN="service.hypershift.azure.devcluster.openshift.com"
+if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
+  AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
+if [ "${AUTH_THROUGH_CERTS}" == "true" ]; then
+  KEYVAULT_CLIENT_ID="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")"
+  EXTRA_ARGS="${EXTRA_ARGS} --aro-hcp-key-vault-users-client-id ${KEYVAULT_CLIENT_ID}"
 fi
 
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
@@ -41,10 +55,36 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
   --wait-until-available \
   ${EXTRA_ARGS}
-else
+fi
+
+if [ "${AKS}" == "true" ]; then
+  oc delete secret azure-config-file --namespace "default" --ignore-not-found=true
+  oc create secret generic azure-config-file --namespace "default" --from-file=etc/hypershift-aks-e2e-dns-credentials/credentials.json
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+  oc apply -f https://raw.githubusercontent.com/openshift/api/master/route/v1/zz_generated.crd-manifests/routes-Default.crd.yaml
+fi
+
+if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
+  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
+  --enable-conversion-webhook=false \
+  --managed-service=ARO-HCP \
+  --external-dns-provider=azure \
+  --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
+  --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
+  --platform-monitoring=All \
+  --enable-ci-debug-output \
+  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+  --wait-until-available \
+  ${EXTRA_ARGS}
+fi
+
+if [ "${CLOUD_PROVIDER}" != "Azure" ] && [ "${CLOUD_PROVIDER}" != "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --platform-monitoring=All \
   --enable-ci-debug-output \
+  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
   --wait-until-available \
   ${EXTRA_ARGS}
 fi

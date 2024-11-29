@@ -5,35 +5,41 @@ base_images:
     tag: "8"
 binary_build_commands: |-
   export HOME=/tmp
-  export TEST_IMAGES_DIR=/usr/bin
+  export TEST_IMAGES_DIR=/var/build/bin
   ./mage build
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
 - dockerfile_path: openshift/ci-operator/images/kn-event-sender/Dockerfile
-  from: base
   inputs:
+    base:
+      as:
+      - base
     bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/kn-event-sender
+        source_path: /var/build/bin/.
   to: client-plugin-event-sender
 - dockerfile_path: openshift/ci-operator/test-images/eventshub/Dockerfile
-  from: base
   inputs:
+    base:
+      as:
+      - base
     bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/eventshub
+        source_path: /var/build/bin/.
   to: client-plugin-event-test-eventshub
 - dockerfile_path: openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
-  from: base
   inputs:
+    base:
+      as:
+      - base
     bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/wathola-forwarder
+        source_path: /var/build/bin/.
   to: client-plugin-event-test-wathola-forwarder
 promotion:
   to:

@@ -2,52 +2,52 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.21-linux:
+    tag: "9"
+  stolostron_builder_go1.22-linux:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.22-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.22-linux
 images:
 - dockerfile_path: operator/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.22-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: multicluster-global-hub-operator
 - dockerfile_path: manager/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.22-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: multicluster-global-hub-manager
 - dockerfile_path: agent/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.22-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: multicluster-global-hub-agent
 promotion:
   to:
   - disabled: true
-    name: "2.11"
+    name: "2.13"
     namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -73,12 +73,20 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+- as: test-integration
+  commands: |
+    export SELF="make"
+    export HOME="/tmp"
+    make integration-test
+  container:
+    from: src
+  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
 - as: test-e2e
   skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
-      AWS_INSTANCE_TYPE: m5ad.xlarge
+      AWS_INSTANCE_TYPE: c5ad.2xlarge
     post:
     - ref: ocm-e2e-kind-destroy
     pre:
@@ -118,7 +126,7 @@ tests:
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/..."
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/... ./test/integration/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -136,7 +144,7 @@ tests:
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/..."
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/... ./test/integration/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -179,7 +187,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.11
+      DESTINATION_BRANCH: release-2.13
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

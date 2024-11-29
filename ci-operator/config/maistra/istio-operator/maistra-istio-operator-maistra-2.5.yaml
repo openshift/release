@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: cli
 build_root:
@@ -13,7 +13,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -22,7 +22,7 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: operator-unit-2-5
+- as: unit
   commands: |
     make compile test \
     GOBIN="/gobin" \
@@ -33,7 +33,7 @@ tests:
   container:
     from: src
   timeout: 1h0m0s
-- as: operator-gencheck-2-5
+- as: gencheck
   commands: |
     make gen-check \
     GOBIN="/gobin" \
@@ -43,7 +43,7 @@ tests:
   container:
     from: src
   timeout: 30m0s
-- as: operator-lint-2-5
+- as: lint
   commands: |
     make lint \
     GOBIN="/gobin" \
@@ -62,7 +62,7 @@ tests:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.5
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.5
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -111,6 +111,30 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
+- as: update-charts-in-2-6
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -b maistra-2.6 \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.4 update-charts-2.5 \
+      '-t [maistra-2.6] Automator: Update charts from previous versions' \
+      -m update_charts_from_previous_versions_2.4_2.5
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
 zz_generated_metadata:
   branch: maistra-2.5
   org: maistra

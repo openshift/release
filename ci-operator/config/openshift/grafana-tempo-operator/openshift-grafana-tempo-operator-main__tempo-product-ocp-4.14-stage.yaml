@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -25,28 +25,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tempo-stage-tests
+- always_run: false
+  as: tempo-stage-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-tracing
     product: ocp
-    timeout: 3h0m0s
+    timeout: 1h0m0s
     version: "4.14"
-  cron: 0 6 1 10 *
   steps:
     env:
-      DOWNSTREAM_TESTS_COMMIT: c19aa1cd60741748256d7f8c7c05a2f9c8e30239
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e-openshift/monitoring
     test:
     - ref: enable-stage-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-tempo
+    - ref: distributed-tracing-tests-tempo-downstream
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

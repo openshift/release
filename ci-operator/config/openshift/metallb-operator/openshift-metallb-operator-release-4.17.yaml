@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  kube-rbac-proxy:
+    name: "4.17"
+    namespace: ocp
+    tag: kube-rbac-proxy
   metallb:
     name: "4.17"
     namespace: ocp
@@ -11,14 +15,14 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: metallb-frr
-  ocp_builder_rhel-9-base-openshift-4.16:
+  ocp_builder_rhel-9-base-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: rhel-9-base-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   operator-sdk:
     name: "4.17"
     namespace: origin
@@ -28,12 +32,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.16:
+    ocp_builder_rhel-9-base-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: metallb-operator
 - dockerfile_path: bundleci.Dockerfile
   to: metallb-operator-bundle
@@ -43,16 +47,17 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.16
+  - pullspec: quay.io/openshift/origin-metallb:4.17
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.16
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.17
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.16
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.17
     with: pipeline:metallb-frr
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.17
+    with: pipeline:kube-rbac-proxy
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -79,13 +84,14 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.17"
   steps:
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
         operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server

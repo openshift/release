@@ -24,32 +24,7 @@ tests:
     make check
   container:
     from: src
-- as: rosa-pr-check
-  commands: |
-    export GOFLAGS=""
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,pr-check"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export SKIP_MUST_GATHER="true"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.15"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-dev"
-
-    go mod tidy
-    make build
-
-    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    from: src
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-dev
-    name: osde2e-dev
-  skip_if_only_changed: ^(?:docs|\.github|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: hypershift-pr-check
   commands: |
     export GOFLAGS=""
@@ -58,7 +33,7 @@ tests:
     export CHANNEL="candidate"
     export INSTALL_LATEST_XY="4.15"
     export SKIP_MUST_GATHER="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
     go mod tidy
     make build
@@ -72,9 +47,9 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-hypershift-byovpc
-    name: osde2e-hypershift-byovpc
-  skip_if_only_changed: ^(?:docs|\.github|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+  - mount_path: /usr/local/osde2e-hypershift-credentials
+    name: osde2e-hypershift-credentials
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: rosa-stage-e2e-byo-vpc-proxy-install
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -154,7 +129,7 @@ tests:
     export CONFIGS="stage"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -170,7 +145,7 @@ tests:
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -255,33 +230,11 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: rosa-stage-complete-e2e
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,sts,stage,complete-e2e"
-    export CHANNEL="stable"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-informing"
-    export HARNESS_TIMEOUT="600"
-    export POLLING_TIMEOUT="7200"
-    export ROSA_AWS_REGION="random"
-
-    osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 8 * * 0
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-informing
-    name: osde2e-informing
 - as: cleanup-tekton-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-tekton-copy"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -289,11 +242,13 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-tekton-copy
     name: osde2e-tekton-copy
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 - as: cleanup-dev-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -301,11 +256,13 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-dev
     name: osde2e-dev
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 - as: cleanup-hypershift-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -313,11 +270,13 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 - as: cleanup-trt-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -325,11 +284,13 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-trt-credentials
     name: osde2e-trt-credentials
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 - as: cleanup-informing-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -337,6 +298,8 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-informing
     name: osde2e-informing
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 zz_generated_metadata:
   branch: main
   org: openshift

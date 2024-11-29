@@ -4,23 +4,36 @@ ref:
     namespace: ci
     name: ocp-qe-perfscale-ci
     tag: latest
+  cli: latest
   commands: openshift-qe-network-smoke-commands.sh
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
     mount_path: /secret
+  - namespace: test-credentials
+    name: perfscale-metal-bastion
+    mount_path: /bm
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
+  timeout: 4h
   env:
   - name: E2E_VERSION
-    default: "v2.1.7"
+    default: "v2.2.5"
     documentation: |-
       Override the e2e version
   - name: NETPERF_VERSION
     default: "default"
     documentation: |-
       Override the netperf version
+  - name: BAREMETAL
+    default: "false"
+    documentation: |-
+      Run on baremetal
+  - name: TOLERANCE
+    default: "90"
+    documentation: |-
+      Tolerance of delta from hostNetwork to podNetwork - single stream
   documentation: >-
     This step runs the perfscale network-perf smoke workload in the deployed cluster

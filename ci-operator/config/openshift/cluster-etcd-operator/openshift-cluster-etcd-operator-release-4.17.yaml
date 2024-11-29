@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -35,15 +35,11 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.16"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.ocp
   inputs:
     ocp_4.17_base-rhel9:
       as:
@@ -54,8 +50,7 @@ images:
   to: cluster-etcd-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -212,24 +207,88 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-etcd-recovery
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
-- as: e2e-gcp-qe-no-capabilities
+- as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-certrotation
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown
+  optional: true
+  steps:
+    cluster_profile: packet-sno
     env:
-      BASELINE_CAPABILITY_SET: None
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-upi
+      CLUSTER_AGE_DAYS: "1800"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- as: e2e-metal-ovn-ha-cert-rotation-shutdown
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      CLUSTER_AGE_DAYS: "1800"
+      CLUSTER_AGE_STEP: "300"
+      PACKET_OS: rocky_9
+    workflow: openshift-e2e-cert-rotation-shutdown
+- as: e2e-metal-assisted-four-node-serial
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/conformance/serial
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-parallel
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/conformance/parallel
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-recovery
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/etcd/recovery
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-four-node-scaling
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.17
+        NUM_DAY2_MASTERS=1
+        WORKERS_COUNT=1
+        TEST_FUNC=test_ctlplane_scaleup
+      TEST_SUITE: openshift/etcd/scaling
+      TEST_TYPE: suite
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -78,9 +86,9 @@ master_lists=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.k
 worker_lists=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
 node_lists="${master_lists} ${worker_lists}"
 
-# Enable property diskEncryptionSet on each node
+# Enable property encryptionAtHost on each node
 for node in ${node_lists}; do
-    echo -e "\n********** Enable diskEncryptionSet on node $node **********"
+    echo -e "\n********** Enable encryptionAtHost on node $node **********"
 
     echo "mark node as unschedulable"
     run_command "oc adm cordon ${node}"
@@ -109,15 +117,15 @@ for node in ${node_lists}; do
     wait_for_co_healthy
 done
 
-# Check property diskEncryptionSet is enabled on each node
+# Check property encryptionAtHost is enabled on each node
 check_result=0
 echo -e "\n********** Check property diskEncryptionSet is enabled on each node **********"
 for node in ${node_lists}; do
-    des_status=$(az vm show -n "${node}" -g "${RESOURCE_GROUP}" -ojson | jq -r  '.securityProfile.encryptionAtHost')
-    if [[ "${des_status}" == "true" ]]; then
-        echo "diskEncryptionSet is set to true, check passed on node ${node}!"
+    status=$(az vm show -n "${node}" -g "${RESOURCE_GROUP}" -ojson | jq -r  '.securityProfile.encryptionAtHost')
+    if [[ "${status}" == "true" ]]; then
+        echo "encryptionAtHost is set to true, check passed on node ${node}!"
     else
-        echo "diskEncryptionSet is set to ${des_status}, check failed on node ${node}!"
+        echo "encryptionAtHost is set to ${status}, check failed on node ${node}!"
         check_result=1
     fi
 done

@@ -191,7 +191,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',
                      '-tls-key=/etc/tls/private/tls.key'],
-            'image': 'quay.io/openshift/origin-oauth-proxy:4.9',
+            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
             'imagePullPolicy': 'IfNotPresent',
             'name': 'oauth-proxy',
             'ports': [{
@@ -275,7 +275,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build02,build03,build04,build05')
+        extra_rc_args.append('--cluster-group=build01,build02,build03,build05')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -308,18 +308,13 @@ def _add_osd_rc_deployment(gendoc):
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
-                                "--branch=master",
+                                "--ref=master",
                                 "--root=/tmp/git-sync",
                                 "--one-time=true",
-                                "--depth=1"
+                                "--depth=1",
+                                "--link=release"
                             ],
-                            "env": [
-                                {
-                                    "name": "GIT_SYNC_DEST",
-                                    "value": "release"
-                                }
-                            ],
-                            "image": "registry.k8s.io/git-sync/git-sync:v4.2.3",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                             "volumeMounts": [
                                 {
                                     "name": "release",
@@ -333,18 +328,13 @@ def _add_osd_rc_deployment(gendoc):
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
-                                "--branch=master",
-                                "--wait=30",
+                                "--ref=master",
+                                "--period=30s",
                                 "--root=/tmp/git-sync",
-                                "--max-sync-failures=3"
+                                "--max-failures=3",
+                                "--link=release"
                             ],
-                            "env": [
-                                {
-                                    "name": "GIT_SYNC_DEST",
-                                    "value": "release"
-                                }
-                            ],
-                            "image": "registry.k8s.io/git-sync/git-sync:v4.2.3",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                             "volumeMounts": [
                                 {
                                     "name": "release",

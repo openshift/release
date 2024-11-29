@@ -3,10 +3,15 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
-    release:
-      channel: candidate
+    candidate:
+      product: ocp
+      stream: ci
       version: "4.15"
   latest:
     candidate:
@@ -59,7 +64,7 @@ tests:
 - as: e2e-vsphere-ovn-upgrade
   interval: 168h
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
@@ -67,7 +72,7 @@ tests:
 - as: e2e-vsphere-ovn-upgrade-storage-data
   interval: 168h
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
@@ -88,7 +93,7 @@ tests:
   cluster: build02
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -112,7 +117,7 @@ tests:
   cluster: build02
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp
     env:
       TEST_TYPE: upgrade-rt
     observers:
@@ -132,6 +137,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
 - as: e2e-aws-ovn-uwm
   interval: 168h
   steps:

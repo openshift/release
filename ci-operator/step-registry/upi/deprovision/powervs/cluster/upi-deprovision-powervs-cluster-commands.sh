@@ -2,48 +2,42 @@
 
 set -o nounset
 
-error_handler() {
-  echo "Error: ($1) occurred on $2"
-}
-
-trap 'error_handler $? $LINENO' ERR
-
-IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
-echo "Invoking upi deprovision powervs cluster"
-echo "BUILD ID - ${BUILD_ID}"
-TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
-echo "TRIMMED BUILD ID - ${TRIM_BID}"
-
-if [ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]; then
-  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
-  exit 1
-fi
-
-OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
-CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-WORKSPACE_NAME=$(< "${SHARED_DIR}/WORKSPACE_NAME")
-VPC_NAME="${WORKSPACE_NAME}"-vpc
-if [ ! -f "${SHARED_DIR}/RESOURCE_GROUP" ]
-then
-  echo "RESOURCE_GROUP is not set, exiting cleanly"
-  exit 0
-fi
-RESOURCE_GROUP=$(< "${SHARED_DIR}/RESOURCE_GROUP")
+# Variables
+IBMCLOUD_HOME=/tmp/ibmcloud
+export IBMCLOUD_HOME
+NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
-echo "VPC_REGION:- ${VPC_REGION}"
 export VPC_REGION
 
-NO_OF_RETRY=${NO_OF_RETRY:-"5"}
+# PATH Override
+export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
 
+############################################################
+# Functions
+
+# Reports the error and where the line it occurs.
+function error_handler() {
+  echo "Error: (${1}) occurred on (${2})"
+}
+
+# setup home folder
+function setup_home() {
+    mkdir -p "${IBMCLOUD_HOME}"/ocp-install-dir
+}
+
+# Retry an input a set number of times
 function retry {
   cmd=$1
-  for retry in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $retry/$NO_OF_RETRY"
+  for retry in $(seq 1 "${NO_OF_RETRY}")
+  do
+    echo "Attempt: $retry/${NO_OF_RETRY}"
     ret_code=0
     $cmd || ret_code=$?
-    if [ $ret_code = 0 ]; then
+    if [ $ret_code = 0 ]
+    then
       break
-    elif [ "$retry" == "$NO_OF_RETRY" ]; then
+    elif [ "$retry" == "${NO_OF_RETRY}" ]
+    then
       error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
@@ -51,237 +45,197 @@ function retry {
   done
 }
 
-function ic() {
-  HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
+# Report on builds and save the OCP VERSION
+function report_build(){
+    echo "Invoking installation of UPI based PowerVS cluster"
+    echo "BUILD ID - ${BUILD_ID}"
+    TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
+    echo "TRIMMED BUILD ID - ${TRIM_BID}"
+
+    # Saving the OCP VERSION so we can use in a subsequent deprovision
+    echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+    echo "OCP_VERSION: ${OCP_VERSION}"
 }
 
-function setup_jq() {
-  if [ -z "$(command -v jq)" ]
-  then
-    echo "jq is not installed, proceed to installing jq"
-    curl -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux64" -o /tmp/jq && chmod +x /tmp/jq
-  fi
-}
-
+# setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
-  if [ -z "$(command -v ibmcloud)" ]
-  then
-    echo "ibmcloud CLI doesn't exist, installing"
-    curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
-  fi
-
-  retry "ic config --check-version=false"
-  retry "ic version"
-}
-
-function setup_upi_workspace(){
-  # Before the workspace is deleted, download the automation code
-  mkdir -p "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir || true
-  curl -sL https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/"${UPI_AUTOMATION_VERSION}"/openshift-install-powervs -o ./openshift-install-powervs
-  chmod +x ./openshift-install-powervs
-  ./openshift-install-powervs setup -ignore-os-checks
-}
-
-function clone_upi_artifacts(){
-  export PRIVATE_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-privatekey
-  export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-publickey
-
-  if [ -z "${PUBLIC_KEY_FILE}" ]
-  then
-    echo "ERROR: PUBLIC KEY FILE is not set"
-    return
-  fi
-  if [ -z "${PRIVATE_KEY_FILE}" ]
-  then
-    echo "ERROR: PRIVATE KEY FILE is not set"
-    return
-  fi
-
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa.pub
-  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa
-  PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  echo "${PULL_SECRET}" > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/pull-secret.txt
-
-  if [ -f "${SHARED_DIR}"/var-mac-upi.tfvars ]
-  then
-    cp "${SHARED_DIR}"/var-mac-upi.tfvars "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
-    cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars
-  fi
-
-  if [ -f "${SHARED_DIR}"/terraform-mac-upi.tfstate ]
-  then
-    cp "${SHARED_DIR}"/terraform-mac-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
-  fi
-}
-
-function destroy_upi_powervs_cluster() {
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-mac-upi.tfvars -force-destroy || true
-}
-
-function cleanup_ibmcloud_powervs() {
-  local version="${1}"
-  local workspace_name="${2}"
-  local vpc_name="${3}"
-
-  echo "Cleaning up the Transit Gateways"
-  for GW in $(ic tg gateways --output json | jq -r '.[].id')
-  do
-    echo "Checking the resource_group and location for the transit gateways ${GW}"
-    VALID_GW=$(ic tg gw "${GW}" --output json | jq -r '. | select(.name | contains("'${WORKSPACE_NAME}'"))')
-    if [ -n "${VALID_GW}" ]
+    if [ -z "$(command -v ibmcloud)" ]
     then
-      for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
-      do 
-        retry "ic tg connection-delete ${GW} ${CS} --force"
-        sleep 30
-      done
-      retry "ic tg gwd ${GW} --force"
-      echo "waiting up a minute while the Transit Gateways are removed"
-      sleep 60
+        echo "ibmcloud CLI doesn't exist, installing"
+        curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
     fi
-  done
 
-  echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
+    retry "ibmcloud config --check-version=false"
+    retry "ibmcloud version"
 
-  echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
-  do
-    echo "Targetting power cloud instance"
-    retry "ic pi workspace target ${CRN}"
+    # Servibmcloudes/Plugins installed are for PowerVS, Transit Gateway, VPC, CIS
+    retry "ibmcloud plugin install -f power-iaas tg-cli vpc-infrastructure cis"
+}
 
-    echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
+# login to the ibmcloud
+function login_ibmcloud() {
+    echo "IC: Logging into the cloud"
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+}
+
+# Download automation code
+function download_automation_code() {
+    echo "Downloading the head for ocp-upi-powervs"
+    cd "${IBMCLOUD_HOME}" \
+        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+            -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
+        && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+    echo "Down ... Downloading the head for ocp-upi-powervs"
+}
+
+# Downloads the terraform binary and puts into the path
+function download_terraform_binary() {
+    echo "Attempting to install terraform using gzip"
+    curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+        && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
+        && chmod +x "${IBMCLOUD_HOME}"/ocp-install-dir/terraform
+    echo "Terraform installed. expect to see version"
+    terraform version
+}
+
+# Cleanup prior runs
+# VPC: Load Balancers, images, vm instances
+# PowerVS: images, pvm instances
+# Not Covered:
+#   COS: bucket, objects
+function cleanup_prior() {
+    echo "Cleaning up prior runs for lease"
+    WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    export VPC_NAME
+
+    # PowerVS Instances
+    echo "Cleaning up target PowerVS workspace"
+    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
-      echo "Deleting PVM Instance ${INSTANCE_ID}"
-      retry "ic pi instance delete ${INSTANCE_ID} --delete-data-volumes"
-      sleep 60
-    done
+        echo "Targetting power cloud instance"
+        ibmcloud pi workspace target "${CRN}"
 
-    echo "Deleting the Images"
-    for IMAGE_ID in $(ic pi image ls --json | jq -r '.images[].imageID')
-    do
-      echo "Deleting Images ${IMAGE_ID}"
-      retry "ic pi image delete ${IMAGE_ID}"
-      sleep 60
-    done
-
-    echo "Deleting the Network"
-    for NETWORK_ID in $(ic pi subnet ls --json | jq -r '.networks[].networkID')
-    do
-      echo "Deleting network ${NETWORK_ID}"
-      retry "ic pi subnet delete ${NETWORK_ID}"
-      sleep 60
-    done
-
-    retry "ic resource service-instance-update ${CRN} --allow-cleanup true"
-    sleep 60
-    retry "ic resource service-instance-delete ${CRN} --force --recursive"
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ic pi workspace ls 2> /dev/null | grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
-    echo "Done Deleting the ${CRN}"
-  done
-
-  echo "Cleaning up the VPC Instances"
-  for RESOURCE_TGT in $(ic is subnets --output json | jq -r '.[].id')
-  do
-    VALID_SUB=$(ic is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-    if [ -n "${VALID_SUB}" ]
-    then
-        # Searches the VSIs and LBs to delete them
-        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+        echo "Deleting the PVM Instances"
+        for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[].id')
         do
-            ic is instance-delete "${VSI}" --force || true
-        done
-
-        for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-        do
-            ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+            echo "Deleting PVM Instance ${INSTANCE_ID}"
+            retry "ibmcloud pi instance delete ${INSTANCE_ID} --delete-data-volumes"
+            sleep 5
         done
         sleep 60
-    fi
-  done
 
-  echo "Cleaning up the Subnets"
-  for SUB in $(ic is subnets --output json | jq -r '.[].id')
-  do
-    VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-    if [ -n "${VALID_SUB}" ]
-    then
-      # Load Balancers might be still attached from PowerVS UPI cluster setup.
-      ic is subnetd "${SUB}" --force || true
-      echo "waiting up a minute while the Subnets are removed"
-      sleep 60
-    fi
-  done
+        echo "Deleting the Images"
+        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | select(.name | contains("CentOS-Stream-9")| not).imageID')
+        do
+            echo "Deleting Images ${IMAGE_ID}"
+            retry "ibmcloud pi image delete ${IMAGE_ID}"
+            sleep 5
+        done
+        sleep 60
 
-  echo "Cleaning up the Public Gateways"
-  for PGW in $(ic is pubgws --output json | jq -r '.[].id')
-  do
-    VALID_PGW=$(ic is pubgw "${PGW}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
-    if [ -n "${VALID_PGW}" ]
-    then
-      retry "ic is pubgwd ${PGW} --force"
-      echo "waiting up a minute while the Public Gateways are removed"
-    fi
-  done
+        # Dev: functions don't work inline with xargs
+        echo "Delete network non-'ocp-net' on PowerVS region"
+        ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
+        echo "Done deleting non-'ocp-net' on PowerVS"
 
-  echo "Delete the VPC Instance"
-  VALID_VPC=$(ic is vpcs 2> /dev/null | grep "${vpc_name}" || true)
-  if [ -n "${VALID_VPC}" ]
-  then
-    retry "ic is vpc-delete ${vpc_name} --force"
-    echo "waiting up a minute while the vpc is deleted"
-  fi
+        echo "[STATUS:Done] Deleting the contents in ${CRN}"
+    done
 
-  echo "Done cleaning up prior runs"
+    # VPC Instances
+    # VPC LBs
+        # VPC Instances
+    # VPC LBs 
+    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    VPC_NAME="${WORKSPACE_NAME}-vpc"
+
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+
+    echo "Cleaning up the VPC Load Balancers"
+    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
+    do
+        echo "Subnet: ${SUB}"
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
+        do
+            ibmcloud is instance-delete "${VSI}" --force || true
+        done
+
+        echo "Deleting LB in ${SUB}"
+        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 120
+    done
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
+
+    # VPC Images
+    # TODO: FIXME add filtering by date.... ?
+    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
+    do
+        ibmcloud is image-delete "${RESOURCE_TGT}" -f
+    done
+
+    echo "Done cleaning up prior runs"
 }
 
-echo "Invoking upi deprovision heterogeneous powervs for ${WORKSPACE_NAME}"
+# Destroy the cluster based on the set configuration / tfvars
+function destroy_upi_cluster() {
+    echo "destroy terraform to build PowerVS UPI cluster"
 
-PATH=${PATH}:/tmp
-mkdir -p "${IBMCLOUD_HOME_FOLDER}"
-export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
+    cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
+    chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
-setup_jq
+    # Loads the tfvars if it exists in the shared directory
+    if [ ! -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
+    then
+        echo "No tfvars provided. exiting..."
+        exit 0
+    fi
+
+    cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars 
+    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars
+
+    # Loads the tfstate if it exists in the shared directory
+    if [ ! -f "${SHARED_DIR}"/terraform.tfstate ]
+    then
+        echo "No tfstate file provided"
+        exit 0
+    fi
+
+    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+
+    # Destroys the current installation for this run
+    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
+        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
+        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
+            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
+            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+}
+
+############################################################
+# Execution Path
+
+trap 'error_handler $? $LINENO' ERR
+
+echo "Invoking upi deprovision heterogeneous powervs"
+
+setup_home
 setup_ibmcloud_cli
-
-IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
-export IBMCLOUD_API_KEY
-
-setup_upi_workspace
-clone_upi_artifacts
-
-echo "Logging into IBMCLOUD"
-ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
-
-# Delete the UPI PowerVS cluster created
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars ]
-then
-  echo "Starting the delete on the UPI PowerVS cluster resources"
-  destroy_upi_powervs_cluster
-  rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir
-fi
-
-# Delete the workspace created
-if [ -f "${SHARED_DIR}/POWERVS_SERVICE_CRN" ]
-then
-  echo "Starting the delete on the PowerVS resources"
-  cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${VPC_NAME}"
-fi
+download_terraform_binary
+download_automation_code
+login_ibmcloud
+cleanup_prior
+destroy_upi_cluster
 
 echo "IBM Cloud PowerVS resources destroyed successfully $(date)"
 

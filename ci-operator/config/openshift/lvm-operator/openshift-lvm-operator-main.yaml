@@ -4,31 +4,39 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: must-gather
-  ubi_minimal:
-    name: ubi-minimal
+  ocp_4.18_base-rhel9:
+    name: "4.18"
     namespace: ocp
-    tag: "9"
+    tag: base-rhel9
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 images:
 - dockerfile_literal: |-
-    FROM ubi_minimal
-    RUN microdnf install -y make git python3 python3-pip
+    FROM ocp_4.18_base-rhel9
+    RUN dnf install -y make git python3 python3-pip patch
     RUN pip3 install pre-commit
 
     COPY --from=root:current /usr/lib/golang /usr/local/go
     ENV PATH=$PATH:/usr/local/go/bin
 
     ENV GOPATH=/tmp/go
+    ENV GOTOOLCHAIN=auto
+    ENV GOTOOLDIR=/tmp/gotools
+
     RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
     RUN mkdir /.local && chmod 777 /.local
+    RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
 
     ENV PRE_COMMIT_HOME=/.cache/precommit
     ENV GOLANGCI_LINT_CACHE=/.cache/golangci
@@ -39,13 +47,17 @@ images:
     RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
     RUN chmod +x ${SNYK_DIR}/snyk
     ENV PATH=$PATH:${SNYK_DIR}
-  from: ubi_minimal
+  from: ocp_4.18_base-rhel9
   inputs:
     root:
       as:
       - root:current
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - fedora:latest
   to: lvm-operator
 - context_dir: must-gather/
   dockerfile_path: Dockerfile
@@ -60,7 +72,9 @@ operator:
     with: pipeline:lvm-operator
 promotion:
   to:
-  - excluded_images:
+  - additional_images:
+      lvm-operator-bundle: lvm-operator-bundle
+    excluded_images:
     - lvms-pre-commit
     namespace: lvms
     tag: latest
@@ -68,13 +82,19 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -133,7 +153,9 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
-- as: lvm-operator-e2e-aws-sno
+- as: e2e-aws-single-node
+  cron: '@daily'
+  presubmit: true
   steps:
     cluster_profile: aws
     dependencies:
@@ -151,7 +173,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
-- as: lvm-operator-e2e-aws
+- as: e2e-aws
+  cron: '@daily'
+  presubmit: true
   steps:
     cluster_profile: aws
     dependencies:
@@ -169,6 +193,25 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-aws-hypershift
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: main
   org: openshift

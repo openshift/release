@@ -16,6 +16,20 @@ then
 fi
 
 cat /etc/os-release
+
+if [ ${BAREMETAL} == "true" ]; then
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+  bastion="$(cat /bm/address)"
+  # Copy over the kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
+  # Setup socks proxy
+  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
+  export KUBECONFIG=/tmp/kubeconfig
+  export https_proxy=socks5://localhost:12345
+  export http_proxy=socks5://localhost:12345
+  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
+  cd /tmp
+fi
 oc config view
 oc projects
 python --version
@@ -44,3 +58,8 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+
+if [ ${BAREMETAL} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
+fi

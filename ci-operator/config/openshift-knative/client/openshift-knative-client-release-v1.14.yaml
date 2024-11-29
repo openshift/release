@@ -1,0 +1,131 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: |
+  TAG=v1.14.0 make install
+  TAG=v1.14.0 make build-cross
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/client
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kn
+  to: knative-client
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile.cliartifacts
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-ppc64le
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-s390x
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-arm64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-darwin-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-darwin-arm64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-windows-amd64.exe
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/LICENSE
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/package_cliartifacts.sh
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+  to: kn-cli-artifacts
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: knative-client-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/grpc-ping
+  to: knative-client-test-grpc-ping
+- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/servingcontainer
+  to: knative-client-test-servingcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sidecarcontainer
+  to: knative-client-test-sidecarcontainer
+promotion:
+  to:
+  - name: knative-v1.14.0
+    namespace: openshift
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      memory: 2Gi
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.15"
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: KNATIVE_CLIENT_TEST_HELLOWORLD
+        name: knative-client-test-helloworld
+      - env: KNATIVE_CLIENT_TEST_GRPC_PING
+        name: knative-client-test-grpc-ping
+      - env: KNATIVE_CLIENT_TEST_SERVINGCONTAINER
+        name: knative-client-test-servingcontainer
+      - env: KNATIVE_CLIENT_TEST_SIDECARCONTAINER
+        name: knative-client-test-sidecarcontainer
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-v1.14
+  org: openshift-knative
+  repo: client

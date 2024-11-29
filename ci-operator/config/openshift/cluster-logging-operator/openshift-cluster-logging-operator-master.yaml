@@ -2,7 +2,7 @@ base_images:
   base:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
@@ -12,13 +12,25 @@ base_images:
     namespace: logging
     tag: log-file-metric-exporter
   logging-eventrouter:
-    name: 5.y
+    name: 6.y
     namespace: logging
     tag: logging-eventrouter
   logging-vector:
-    name: "6.0"
+    name: "6.1"
     namespace: logging
     tag: vector
+  loki-operator:
+    name: 5.y
+    namespace: logging
+    tag: loki-operator
+  loki-operator-src:
+    name: 5.y
+    namespace: logging
+    tag: loki-operator-src
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -27,24 +39,31 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - from: ubi9-minimal
   inputs:
     base:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
+    FROM loki-operator-src AS lo-src
     FROM registry.redhat.io/ubi9/go-toolset:latest
     ADD . /go/src/github.com/openshift/cluster-logging-operator
     COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
+    COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
+    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+      && chmod 755 kubectl && mv kubectl /go/bin
     RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
     RUN go mod download
     RUN make tools
@@ -57,6 +76,9 @@ images:
     elasticsearch-operator-src:
       as:
       - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
+    loki-operator-src:
+      as:
+      - loki-operator-src
   to: cluster-logging-operator-e2e
 operator:
   bundles:
@@ -71,17 +93,14 @@ operator:
     with: pipeline:log-file-metric-exporter
 promotion:
   to:
-  - name: "6.0"
+  - name: 6.y
     namespace: logging
 releases:
-  initial:
-    integration:
-      name: "4.14"
-      namespace: ocp
   latest:
-    release:
-      channel: stable
-      version: "4.15"
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -102,18 +121,91 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-east-1
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.17"
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; pushd /go/src/github.com/openshift/loki/operator
+        && make deploy IMG=${IMAGE_LOKI_OPERATOR} && popd && FAKE_HOME_DIR=/tmp/home
+        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      - env: IMAGE_LOKI_OPERATOR
+        name: pipeline:loki-operator
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: functional-target
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs make
+        test-functional ARTIFACT_DIR=${ARTIFACT_DIR}
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
     - as: test
       cli: latest
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e
+        make test-upgrade
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -132,39 +224,6 @@ tests:
       timeout: 3h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: functional-target
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-logging
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
-  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-functional
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:logging-vector
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

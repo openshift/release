@@ -12,6 +12,19 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+# Terraform Params
+# move to new ENV value with auto load
+export CI_CREDENTIALS_DIR=/var/run/vault/assisted-ci-vault
+
+ls $CI_CREDENTIALS_DIR
+
+for file in $CI_CREDENTIALS_DIR/TF_VAR_* ; do
+  if ! [[ "$file" == "$CI_CREDENTIALS_DIR/TF_VAR_*" ]]; then
+    key=$(basename -- $file)
+    echo "export $key=\"$(cat $file)\"" >> $SHARED_DIR/nutanix_context.sh
+  fi
+done
+
 # shellcheck source=/dev/random
 source $SHARED_DIR/nutanix_context.sh
 
@@ -59,10 +72,10 @@ nutanix_endpoint = "${NUTANIX_ENDPOINT}"
 nutanix_port = "${NUTANIX_PORT}"
 nutanix_cluster = "${NUTANIX_CLUSTER_NAME}"
 nutanix_subnet = "${NUTANIX_SUBNET_NAME}"
-centos_iso_image_name = "CentOS-Stream-8-x86_64-20230830"
+centos_iso_image_name = "$(cat /var/run/vault/assisted-ci-vault/centos_iso_image_name)"
 image_name = "assisted-test-infra-machine-template"
-ssh_public_key = "/var/run/vault/sshkeys/ssh_public_key"
-ssh_private_key_file = "/var/run/vault/sshkeys/ssh_private_key"
+ssh_public_key = "/var/run/vault/assisted-ci-vault/ssh_public_key"
+ssh_private_key_file = "/var/run/vault/assisted-ci-vault/ssh_private_key"
 EOF
 
 
@@ -72,5 +85,8 @@ cat nutanix-params.hcl
 
 export PACKER_CONFIG_DIR=/home/assisted-test-infra/build/packer/config
 export PACKER_CACHE_DIR=$PACKER_CONFIG_DIR/cache
+
+sed -i "s#SSH_PUBLIC_KEY_PLACEHOLDER#$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)#g" centos-config/ks.cfg
+
 packer.io init .
 packer.io build -on-error=cleanup -var-file=nutanix-params.hcl .

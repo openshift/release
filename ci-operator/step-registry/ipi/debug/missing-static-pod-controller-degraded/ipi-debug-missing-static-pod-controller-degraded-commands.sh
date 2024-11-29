@@ -6,6 +6,7 @@ set -o pipefail
 
 if [[ "${STATIC_POD_CHECK_WORKAROUND:=false}" == "true" ]]; then
 
+echo "Creating the manifest_static-pod-check-workaround-master-mc.yml file..."
 #
 # This is taken from https://github.com/redhat-ztp/dev-utils/tree/static-pod-check/static-pod-check
 # Which was the answer for https://issues.redhat.com/browse/OCPBUGS-2474

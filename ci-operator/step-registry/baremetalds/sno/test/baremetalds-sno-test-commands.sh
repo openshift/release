@@ -17,9 +17,6 @@ collect_artifacts() {
 }
 trap collect_artifacts EXIT TERM
 
-# Copy test binaries on packet server
-echo "### Copying test binaries"
-scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
 
 # Tests execution
 set +e
@@ -41,32 +38,34 @@ if [[ -s "${SHARED_DIR}/test-list" ]]; then
 fi
 
 echo "### Running tests"
-${TIMEOUT_COMMAND} \
-ssh \
-    "${SSHOPTS[@]}" \
-    "root@${IP}" \
-    bash - << EOF
-    stderr=\$( { openshift-tests run "openshift/conformance/parallel" --dry-run |\
-        grep ${GREP_FLAGS} ${GREP_ARGS} |\
-        openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/reports -f - ;} 2>&1)
-    exit_code=\$?
+${TIMEOUT_COMMAND} ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_IMAGE}" "${GREP_FLAGS}" "${GREP_ARGS}" << "EOF"
 
-    echo "\${stderr}"
+    set -x
 
-    # TODO: remove this part once we fully handle the problem described at
-    # https://issues.redhat.com/browse/MGMT-15555.
-    # After 'openshift-tests' finishes validating the tests, it checks
-    # the extra monitoring tests, so the following line only excludes those
-    # kind of failures (rather than excluding all runs where the monitoring
-    # tests have failed).
-    if [[ "\${stderr}" == *"failed due to a MonitorTest failure" ]]; then
-        echo "Overriding exit code because of MonitorTest failure"
-        exit 0
-    fi
+    function get_test_list() {
+        podman run --network host --rm -i -e KUBECONFIG=/tmp/kubeconfig -v ${KUBECONFIG}:/tmp/kubeconfig $1 \
+            openshift-tests run "openshift/conformance/parallel" --dry-run | \
+            grep $2 $3
+    }
 
-    if [[ \${exit_code} -ne 0 ]]; then
-        exit \${exit_code}
-    fi
+    function run_tests() {
+        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v ${kubeconfig}:/tmp/kubeconfig $1 \
+            openshift-tests run -o /tmp/artifacts/e2e_${name}.log --junit-dir /tmp/artifacts/reports -f -
+    }
+
+    for kubeconfig in $(find ${KUBECONFIG} -type f); do
+        export KUBECONFIG=${kubeconfig}
+        name=$(basename ${kubeconfig})
+
+        stderr=$( { get_test_list $1 $2 $3 | run_tests $1; } 2>&1)
+        exit_code=\$?
+
+        echo "\${stderr}"
+
+        if [[ \${exit_code} -ne 0 ]]; then
+            exit \${exit_code}
+        fi
+    done
 EOF
 
 exit_code=$?

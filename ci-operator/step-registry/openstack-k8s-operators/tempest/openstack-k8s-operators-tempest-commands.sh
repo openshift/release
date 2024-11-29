@@ -88,7 +88,7 @@ if [ "$TEMPEST_CONCURRENCY" ]; then
 fi
 
 if [ "$TEMPEST_REGEX" ]; then
-    tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}"
+    tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}" | sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g'
 else
     curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_allowed.yml
     curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_skipped.yml
@@ -101,13 +101,19 @@ else
     else
         TEMPEST_ARGS+=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
     fi
-    tempest run "${TEMPEST_ARGS[@]}"
+    tempest run "${TEMPEST_ARGS[@]}" | sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g'
 fi
 EXIT_CODE=$?
 set -e
 
 # Generate subunit
 stestr last --subunit > testrepository.subunit || true
+
+# Remove sensitive keys
+files=("testrepository.subunit" "tempest.log")
+for file in "${files[@]}"; do
+    sed 's/-----BEGIN EC PRIVATE KEY-----.*-----END EC PRIVATE KEY-----/private key removed/g' -i $file
+done
 
 # Generate html
 subunit2html testrepository.subunit stestr_results.html || true

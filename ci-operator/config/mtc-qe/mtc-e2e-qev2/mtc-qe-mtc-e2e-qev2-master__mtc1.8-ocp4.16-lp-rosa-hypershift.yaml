@@ -1,0 +1,96 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  mtc-apps-deployer:
+    name: mtc-apps-deployer
+    namespace: mtc-qe
+    tag: master
+  mtc-python-client:
+    name: mtc-python-client
+    namespace: mtc-qe
+    tag: master
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/interop/Dockerfile
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    mtc-apps-deployer:
+      paths:
+      - destination_dir: .
+        source_path: /mtc-apps-deployer.tar.gz
+    mtc-python-client:
+      paths:
+      - destination_dir: .
+        source_path: /mtc-python-client.tar.gz
+  to: mtc-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mtc-interop-aws-rosa
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name-prefix=mtc-source;platform=hypershift;region=us-west-2;version=4.15;channel-group=stable;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
+      CLUSTER2_CONFIG: name-prefix=mtc-target;platform=hypershift;region=us-west-2;version=4.16;channel-group=nightly;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "cluster-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "mtc-prepare-clusters", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster Configuration", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "cluster-uninstall", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+          {"step": "mtc-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default", "interop-tests"]},
+          {"step": "mtc-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MIG", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default", "interop-tests"]}
+        ],
+        "success_rules":
+        [
+          {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+        ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","rosa-hypershift-lp","mtc-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MTC_VERSION: "1.8"
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer-cspi-interop
+      S3_BUCKET_PATH: openshift-ci
+      TEST_PLATFORM: hypershift
+    test:
+    - ref: mtc-prepare-clusters
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: mtc-execute-tests
+    workflow: firewatch-cluster
+zz_generated_metadata:
+  branch: master
+  org: mtc-qe
+  repo: mtc-e2e-qev2
+  variant: mtc1.8-ocp4.16-lp-rosa-hypershift

@@ -3,10 +3,10 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   operand:
     name: 4.17-priv
     namespace: ocp-private
@@ -32,9 +32,9 @@ images:
     cli:
       as:
       - registry.redhat.io/openshift4/ose-cli:latest
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: custom-metrics-autoscaler-operator
 operator:
   bundles:
@@ -53,8 +53,7 @@ operator:
     with: pipeline:operand-webhook
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -76,27 +75,30 @@ tests:
   commands: env && GOFLAGS="" make fmt
   container:
     from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: govet
   commands: env && GOFLAGS="" make vet
   container:
     from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: cma-check-all-csv
   commands: env && GOFLAGS="" make cma-check-all-csv
   container:
     from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: cma-verify-history
   commands: env && GOFLAGS="" hack/cma-verify-history.sh
   container:
     from: src
 - as: security
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: custom-metrics-autoscaler-operator
     workflow: openshift-ci-security
 - as: cma-e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     post:

@@ -15,6 +15,10 @@ source "${SHARED_DIR}/vsphere_context.sh"
 # Ensures that the vsphere template exists.
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 mkdir -p build/govc
 export GOVMOMI_HOME=/home/assisted-test-infra/build/govc/
 govc object.collect "/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template" || { echo 'Assisted service ci template does not exist' ; exit 1; }
@@ -48,5 +52,5 @@ cp terraform.tgz ${SHARED_DIR}
 
 cat >> "${SHARED_DIR}/ci-machine-config.sh" << EOF
 export IP="${IP}"
-export SSH_KEY_FILE=/var/run/vault/sshkeys/ssh_private_key
+export SSH_KEY_FILE=/var/run/vault/assisted-ci-vault/ssh_private_key
 EOF

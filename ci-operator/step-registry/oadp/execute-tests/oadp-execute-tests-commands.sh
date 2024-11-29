@@ -15,7 +15,6 @@ export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
 LOGS_FOLDER="/alabama/cspi/e2e/logs"
 
 # Extract additional repository archives
@@ -48,14 +47,6 @@ else
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
-#Setup junit path for ROSA
-IS_OIDC=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
-
-if [ ! -z $IS_OIDC ]
-then
-  RESULTS_FILE="/alabama/cspi/e2e/cloudstorage/junit_report.xml"
-fi
-
 # Setup Python Virtual Environment
 echo "Create virtual environment and install required packages..."
 python3 -m venv /alabama/venv
@@ -64,22 +55,35 @@ python3 -m pip install ansible_runner
 python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
 python3 -m pip install "${PYCLIENT_DIR}"
 
-# Archive results function
-function archive-results() {
-    if [[ -f "${RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_oadp_interop_results.xml" ]]; then
-        echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
-        cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
-
-        
-        if [ -d "${LOGS_FOLDER}" ]; then
-            echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
-            cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
-        fi
-    fi
-}
-
-# Execute tests
-echo "Executing tests..."
-trap archive-results SIGINT SIGTERM ERR EXIT
+# Install go modules
 cd $OADP_GIT_DIR
-EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
+go mod tidy
+
+
+# Run OADP Kubevirt tests if configured
+if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
+  oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
+  oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true &&\
+  export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
+  export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
+  export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
+  (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+fi
+
+# Run OADP tests with the focus
+export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
+export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
+(/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+
+sleep 30
+
+oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
+
+# Copy logs into artifact directory if they exist
+echo "Checking for additional logs in ${LOGS_FOLDER}"
+if [ -d "${LOGS_FOLDER}" ]; then
+    echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
+    ls $LOGS_FOLDER
+    cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
+fi

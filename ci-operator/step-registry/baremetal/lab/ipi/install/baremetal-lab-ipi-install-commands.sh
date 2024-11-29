@@ -33,11 +33,29 @@ function oinst() {
 }
 
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 echo "[INFO] Initializing..."
 
@@ -58,8 +76,8 @@ oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
+# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install
@@ -72,9 +90,6 @@ yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -88,14 +103,15 @@ compute:
 platform:
   baremetal:
     libvirtURI: >-
-      qemu+ssh://root@${AUX_HOST}:$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
-    apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
-    ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
+      qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
     externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
     hosts: []
 "
+
+# Copy provisioning-host-ssh-port-${architecture} to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
 # shellcheck disable=SC2154
@@ -119,11 +135,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       type: ethernet
       state: up
       ipv4:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv4_enabled}
+        dhcp: ${ipv4_enabled}
       ipv6:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}
+        autoconf: ${ipv6_enabled}
+        auto-gateway: ${ipv6_enabled}
+        auto-routes: ${ipv6_enabled}
+        auto-dns: ${ipv6_enabled}
 "
   # split the ipi_disabled_ifaces semi-comma separated list into an array
   IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
@@ -157,10 +177,20 @@ do
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
 done
 
+for f in "${SHARED_DIR}"/*_append.patch_install_config.yaml;
+do
+  echo "[INFO] Appending patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) *+ select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
+
 mkdir -p "${INSTALL_DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
@@ -187,6 +217,7 @@ echo -e "\n[INFO] Preparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
@@ -202,13 +233,13 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-update_image_registry &
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+update_image_registry
 
 touch  "${SHARED_DIR}/success"
 touch /tmp/install-complete
