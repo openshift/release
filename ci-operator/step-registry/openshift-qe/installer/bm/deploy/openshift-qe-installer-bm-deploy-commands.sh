@@ -65,7 +65,12 @@ cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
-HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:][].pm_addr")
+if [[ "$TYPE" == "mno" ]]; then
+  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
+elif [[ "$TYPE" == "sno" ]]; then
+  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
+fi
+echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
 if [[ "$RESET_IDRAC" == "true" ]]; then
   echo "Resetting IDRACs ..."
@@ -83,19 +88,21 @@ if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
     podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --clear-jobs --force
   done
 fi
-echo "Cheking boot order ..."
-for i in $HOSTS; do
-  # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
-  #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
-  command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/badfish_interfaces.yml -t foreman 2>&1)
-  desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
-  echo "Cheking boot order of server $i ..."
-  echo $command_output
-  if [[ "$command_output" != "$desired_output" ]]; then
-    WAIT=true
-    echo "Boot order changed in server $i"
-  fi
-done
+if [[ "$PRE_BOOT_ORDER" == "true" ]]; then
+  echo "Cheking boot order ..."
+  for i in $HOSTS; do
+    # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
+    #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+    command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/badfish_interfaces.yml -t foreman 2>&1)
+    desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
+    echo "Cheking boot order of server $i ..."
+    echo $command_output
+    if [[ "$command_output" != "$desired_output" ]]; then
+      WAIT=true
+      echo "Boot order changed in server $i"
+    fi
+  done
+fi
 if [ $WAIT ]; then
   echo "Waiting after boot order changes ..."
   sleep 300
