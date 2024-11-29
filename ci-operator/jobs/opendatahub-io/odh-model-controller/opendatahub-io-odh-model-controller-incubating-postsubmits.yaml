@@ -3,15 +3,15 @@ postsubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-0\.12\.0$
-    cluster: build10
+    - ^incubating$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-odh-model-controller-release-0.12.0-branch-image-mirror
+    name: branch-ci-opendatahub-io-odh-model-controller-incubating-fast-image-mirror
     skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
     spec:
       containers:
@@ -20,7 +20,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=branch-image-mirror
+        - --target=fast-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -62,8 +62,8 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.12\.0$
-    cluster: build10
+    - ^incubating$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -71,7 +71,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-odh-model-controller-release-0.12.0-images
+    name: branch-ci-opendatahub-io-odh-model-controller-incubating-images
     spec:
       containers:
       - args:
@@ -116,65 +116,6 @@ postsubmits:
       - name: push-secret
         secret:
           secretName: registry-push-credentials-ci-central
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-0\.12\.0$
-    cluster: build10
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-opendatahub-io-odh-model-controller-release-0.12.0-stable-image-mirror
-    skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=stable-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
