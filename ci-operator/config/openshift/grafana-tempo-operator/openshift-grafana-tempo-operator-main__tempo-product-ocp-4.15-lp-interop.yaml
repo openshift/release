@@ -28,7 +28,7 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-interop-aws
-  cron: 0 6 25 10 *
+  cron: 0 6 11 7 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -37,28 +37,21 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure provisioning", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "distributed-tracing-install-*", "failure_type": "pod_failure", "classification": "Distributed tracing operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "distributed-tracing-install-*", "failure_type": "test_failure", "classification": "Distributed tracing operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operatorhub-subscribe-*", "failure_type": "pod_failure", "classification": "Distributed tracing dependency operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operatorhub-subscribe-*", "failure_type": "test_failure", "classification": "Distributed tracing dependency operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "gather-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "distributed-tracing-tests-*", "failure_type": "pod_failure", "classification": "Tempo e2e tests", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "distributed-tracing-tests-*", "failure_type": "test_failure", "classification": "Tempo e2e tests", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","tempo-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_PRIVATE_DECK: "true"
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
-            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       USER_TAGS: |
         scenario tempo
@@ -67,37 +60,31 @@ tests:
     - ref: distributed-tracing-tests-tempo-interop
     workflow: firewatch-ipi-aws
 - as: tempo-interop-ibmcloud
-  cron: 0 6 2 5 *
+  cron: 0 6 11 7 *
   steps:
     cluster_profile: ibmcloud-cspi-qe
     env:
       BASE_DOMAIN: zstream.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: bx2-8x32
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure provisioning", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "distributed-tracing-install-*", "failure_type": "pod_failure", "classification": "Distributed tracing operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "distributed-tracing-install-*", "failure_type": "test_failure", "classification": "Distributed tracing operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operatorhub-subscribe-*", "failure_type": "pod_failure", "classification": "Distributed tracing dependency operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operatorhub-subscribe-*", "failure_type": "test_failure", "classification": "Distributed tracing dependency operators", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "gather-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "distributed-tracing-tests-*", "failure_type": "pod_failure", "classification": "Tempo e2e tests", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "distributed-tracing-tests-*", "failure_type": "test_failure", "classification": "Tempo e2e tests", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
-            ],
-          "success_rules":
-            [
-              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","tempo-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_PRIVATE_DECK: "true"
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
-            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
     test:
     - ref: install-operators

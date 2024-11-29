@@ -32,7 +32,7 @@ else
   # or else, we run smoke tests to balance coverage and cost
   elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
     echo "Testing on normal cluster"
-    ./console-test-frontend.sh || true
+    ./console-test-frontend.sh --tags @userinterface+@e2e || true
   elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
@@ -44,6 +44,15 @@ else
   elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
     echo 'Running destructive tests'
     ./console-test-frontend.sh --tags @destructive || true
+  elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
+    echo "run all compliance-operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
+  elif [[ $E2E_RUN_TAGS =~ @fio ]]; then
+    echo "run all file-integrity-operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/file-integirty-operator.cy.ts || true
+  elif [[ $E2E_RUN_TAGS =~ @spo ]]; then
+    echo "run all security profiles operator scenarios"
+    ./console-test-frontend.sh --spec tests/securityandcompliance/security-profiles-operator.cy.ts || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true

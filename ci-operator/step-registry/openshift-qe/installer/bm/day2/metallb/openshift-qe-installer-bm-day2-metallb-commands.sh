@@ -6,11 +6,12 @@ set -x
 cat /etc/os-release
 
 if [ ${BAREMETAL} == "true" ]; then
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
@@ -21,8 +22,7 @@ oc config view
 oc projects
 
 # Install the MetalLB operator
-if [ ${METALLB} == "true" ]; then
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -31,7 +31,7 @@ metadata:
     openshift.io/cluster-monitoring: "true"
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -39,7 +39,7 @@ metadata:
   namespace: metallb-system
 EOF
 
-  cat << EOF| oc apply -f -
+cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -53,21 +53,20 @@ spec:
 EOF
 
 # Wait for the operator to be ready
-  until [ "$(kubectl get csv -n metallb-system | grep metallb-operator > /dev/null; echo $?)" == 0 ];
-    do echo "Waiting for MetalLB operator"
-    sleep 5
-  done
-  kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n metallb-system "$(kubectl get csv -n metallb-system -oname)"
-  sleep 60
+until [ "$(kubectl get csv -n metallb-system | grep metallb-operator > /dev/null; echo $?)" == 0 ];
+  do echo "Waiting for MetalLB operator"
+  sleep 5
+done
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n metallb-system "$(kubectl get csv -n metallb-system -oname)"
+sleep 60
 
-  cat << EOF | oc apply -f -
+cat << EOF | oc apply -f -
 apiVersion: metallb.io/v1beta1
 kind: MetalLB
 metadata:
   name: metallb
   namespace: metallb-system
 EOF
-fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

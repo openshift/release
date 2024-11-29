@@ -1,4 +1,12 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.15_base-rhel9:
     name: "4.15"
     namespace: ocp
@@ -47,9 +55,15 @@ tests:
   container:
     from: src
 - as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - always_run: false
   as: e2e-aws-ovn
   optional: true

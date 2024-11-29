@@ -27,22 +27,14 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.15"
-    namespace: ocp
-    tag: hypershift-operator
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -51,11 +43,6 @@ build_root:
     tag: golang-1.20
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: cluster-api-provider-agent
 promotion:
   to:
@@ -116,7 +103,7 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 20 * * 1,4
+  cron: 00 22 * * 2
   steps:
     cluster_profile: packet-assisted
     dependencies:

@@ -49,6 +49,13 @@ function update_image_registry() {
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 echo "[INFO] Initializing..."
 
@@ -83,9 +90,6 @@ yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -100,8 +104,6 @@ platform:
   baremetal:
     libvirtURI: >-
       qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
-    apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
-    ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
     externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
@@ -133,11 +135,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       type: ethernet
       state: up
       ipv4:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv4_enabled}
+        dhcp: ${ipv4_enabled}
       ipv6:
-        enabled: true
-        dhcp: true
+        enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}
+        autoconf: ${ipv6_enabled}
+        auto-gateway: ${ipv6_enabled}
+        auto-routes: ${ipv6_enabled}
+        auto-dns: ${ipv6_enabled}
 "
   # split the ipi_disabled_ifaces semi-comma separated list into an array
   IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
@@ -169,6 +175,12 @@ for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
 do
   echo "[INFO] Applying patch file: $f"
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
+
+for f in "${SHARED_DIR}"/*_append.patch_install_config.yaml;
+do
+  echo "[INFO] Appending patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) *+ select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
 done
 
 mkdir -p "${INSTALL_DIR}"
@@ -205,6 +217,7 @@ echo -e "\n[INFO] Preparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
@@ -220,13 +233,13 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-update_image_registry &
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+update_image_registry
 
 touch  "${SHARED_DIR}/success"
 touch /tmp/install-complete

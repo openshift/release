@@ -25,7 +25,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/root/.krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
@@ -70,6 +70,12 @@ if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-file
     mkdir -p "$token_cache_dir"
     cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
     oc whoami
+fi
+
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
 fi
 
 # setup bastion
@@ -190,6 +196,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
@@ -229,8 +236,10 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
-oc get clusterversion version -o yaml || true
+if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    oc get clusterversion version -o yaml || true
+fi
 
 # execute the cases
 function run {

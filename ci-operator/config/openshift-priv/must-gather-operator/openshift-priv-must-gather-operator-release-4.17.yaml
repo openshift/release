@@ -3,8 +3,7 @@ build_root:
 canonical_go_repository: github.com/openshift/must-gather-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 resources:
   '*':
@@ -14,6 +13,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-harness-build
+  container:
+    from: src
+  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)

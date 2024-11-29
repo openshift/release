@@ -1,12 +1,12 @@
 base_images:
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -34,19 +38,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.rhel
+  dockerfile_path: Dockerfile.openshift
   inputs:
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: vertical-pod-autoscaler
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:

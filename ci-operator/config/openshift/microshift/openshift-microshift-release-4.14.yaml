@@ -14,6 +14,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/microshift
+  optional: true
   to: microshift-test-rpm
 promotion:
   to:
@@ -22,6 +23,11 @@ promotion:
     name: "4.14"
     namespace: ocp
 releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
   nightly-amd64:
     candidate:
       product: ocp
@@ -40,9 +46,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.14"
-  namespace: ocp
 tests:
 - as: verify
   steps:
@@ -83,7 +86,7 @@ tests:
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
-  cron: 14 7 12 * *
+  cron: 0 4 * * 1,4
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
@@ -95,7 +98,7 @@ tests:
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
-  cron: 46 8 1 * *
+  cron: 0 4 * * *
   steps:
     cluster_profile: aws
     env:
@@ -103,7 +106,7 @@ tests:
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-nightly
-  cron: 57 16 8 * *
+  cron: 0 13 * * *
   steps:
     cluster_profile: aws
     env:
@@ -111,7 +114,7 @@ tests:
       EC2_AMI: ami-0d5b3039c1132e1b2
     workflow: openshift-microshift-e2e-conformance-from-source
 - as: clusterbot
-  cron: 27 17 10 * *
+  cron: 0 3 * * *
   steps:
     cluster_profile: aws
     env:

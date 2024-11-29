@@ -92,6 +92,9 @@ if [ -n "${is_dev_version:-}" ]; then
     export SRIOV_NETWORK_CONFIG_DAEMON_IMAGE=quay.io/openshift/origin-sriov-network-config-daemon:${oc_version}
     export SRIOV_NETWORK_WEBHOOK_IMAGE=quay.io/openshift/origin-sriov-network-webhook:${oc_version}
     export SRIOV_NETWORK_OPERATOR_IMAGE=quay.io/openshift/origin-sriov-network-operator:${oc_version}
+    export METRICS_EXPORTER_IMAGE=quay.io/openshift/origin-sriov-network-metrics-exporter:${oc_version}
+    export METRICS_EXPORTER_KUBE_RBAC_PROXY_IMAGE=quay.io/openshift/origin-kube-rbac-proxy:${oc_version}
+    export RDMA_CNI_IMAGE=quay.io/openshift/origin-rdma-cni:${oc_version}
     export OVS_CNI_IMAGE=""
     unset NAMESPACE
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
@@ -177,6 +180,26 @@ EOF
         echo "Waiting for sriov-network-operator to be installed"
         sleep 10
     done
+
+    # This is only needed on ocp 4.16+
+    # introduced https://github.com/openshift/sriov-network-operator/pull/887
+    # u/s https://github.com/k8snetworkplumbingwg/sriov-network-operator/pull/617
+    if (( $(echo "$oc_version >= 4.16" | bc -l) )); then
+        SRIOV_OPERATOR_CONFIG=$(
+            oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+    apiVersion: sriovnetwork.openshift.io/v1
+    kind: SriovOperatorConfig
+    metadata:
+      name: default
+      namespace: openshift-sriov-network-operator
+    spec:
+      enableInjector: true
+      enableOperatorWebhook: true
+      logLevel: 2
+EOF
+        )
+        echo "Created \"$SRIOV_OPERATOR_CONFIG\" SriovOperatorConfig"
+    fi
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         wait_for_sriov_pods

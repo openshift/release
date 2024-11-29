@@ -39,7 +39,6 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    disabled: true
     name: "4.17"
     namespace: ocp
 releases:
@@ -72,25 +71,26 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: build
   commands: make build
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
     workflow: openshift-ci-security
 - always_run: false
   as: aws-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -98,6 +98,7 @@ tests:
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: vsphere-disconnected-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-dis-2
     leases:
@@ -108,6 +109,7 @@ tests:
     workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:
@@ -117,6 +119,7 @@ tests:
     workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: gcp-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -126,13 +129,22 @@ tests:
     workflow: ipi-gcp-ovn-hybrid
 - always_run: false
   as: vsphere-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
@@ -146,7 +158,7 @@ tests:
         # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
         # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
         # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
         || oc get csv -n $WMCO_NS |awk {'print $1'} | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
         -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
         sleep 10
@@ -191,7 +203,7 @@ tests:
       cli: latest
       commands: |
         export WMCO_NS=openshift-windows-machine-config-operator
-        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
         sleep 5m
         oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
       dependencies:
@@ -215,8 +227,10 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: platform-none-vsphere-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -224,6 +238,7 @@ tests:
     workflow: windows-e2e-operator-test-platform-none-vsphere
 - always_run: false
   as: vsphere-proxy-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -231,6 +246,7 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     post:
@@ -255,6 +271,7 @@ tests:
 - always_run: false
   as: nutanix-e2e-operator
   cluster: build01
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: nutanix
     test:

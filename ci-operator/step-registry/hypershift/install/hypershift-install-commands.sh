@@ -14,6 +14,10 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
+fi
+
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
@@ -29,6 +33,11 @@ fi
 AZURE_EXTERNAL_DNS_DOMAIN="service.hypershift.azure.devcluster.openshift.com"
 if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
   AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
+if [ "${AUTH_THROUGH_CERTS}" == "true" ]; then
+  KEYVAULT_CLIENT_ID="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")"
+  EXTRA_ARGS="${EXTRA_ARGS} --aro-hcp-key-vault-users-client-id ${KEYVAULT_CLIENT_ID}"
 fi
 
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then

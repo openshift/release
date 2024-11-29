@@ -1,0 +1,137 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: publish-release-notes
+  cron: 0 5 * * 1-5
+  steps:
+    workflow: openshift-microshift-publish-release-notes
+- as: e2e-aws-tests-cache-nightly
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-cache-nightly-arm
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-bootc-nightly
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-nightly
+  cron: 30 2 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-nightly
+  cron: 30 2 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-ovn-ocp-conformance
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-serial
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-optional-components
+  cron: 30 8 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
+      TEST_SUITE: openshift/conformance
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-optional-components-arm
+  cron: 30 8 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+      OPTIONAL_RPMS: "true"
+      TEST_SUITE: openshift/conformance
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: clusterbot-nightly
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_ARCH: arm64
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-clusterbot
+- as: e2e-aws-footprint-and-performance-nightly
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-footprint-and-performance
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: microshift
+  variant: periodics

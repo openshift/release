@@ -81,7 +81,7 @@ items:
 - kind: ClusterRole
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: cluster-image-tagger
+    name: cluster-image-manager
   rules:
   - apiGroups:
     - ""
@@ -89,20 +89,24 @@ items:
     resources:
     - imagestreamtags
     - imagestreams
+    - imagestreams/layers
     verbs:
+    - get
+    - list
+    - watch
+    - create
     - update
     - patch
-    - get
-    - create
+    - delete
 
 - kind: ClusterRoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: cluster-image-tagger-ci-operator
+    name: cluster-image-manager-ci-operator
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    name: cluster-image-tagger
+    name: cluster-image-manager
   subjects:
   - kind: ServiceAccount
     name: ci-operator
@@ -305,6 +309,34 @@ items:
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
+    name: ci-secret-getter
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    verbs:
+    - get
+    - list
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ci-secret-getter-ci-operator
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: ci-secret-getter
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
     name: route-getter
     namespace: openshift-image-registry
   rules:
@@ -325,6 +357,33 @@ items:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
     name: route-getter
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: firewall-manager
+  rules:
+  - apiGroups:
+    - k8s.ovn.org
+    resources:
+    - egressfirewalls
+    verbs:
+    - list
+    - create
+    - delete
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: firewall-manager-ci-operator
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: firewall-manager
   subjects:
   - kind: ServiceAccount
     name: ci-operator

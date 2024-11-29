@@ -14,7 +14,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-disconnected-capi-periodic
   spec:
@@ -25,7 +25,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-disconnected-capi-periodic-cluster-profile
       - --target=e2e-ai-operator-disconnected-capi-periodic
       - --variant=edge
       command:
@@ -43,8 +42,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-disconnected-capi-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -68,9 +65,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -95,7 +89,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-3masters-periodic
   spec:
@@ -106,7 +100,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-3masters-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-3masters-periodic
       - --variant=edge
       command:
@@ -124,8 +117,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-3masters-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -149,9 +140,79 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: manifest-tool-local-pusher
       secret:
-        secretName: cluster-secrets-packet-assisted
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 00 20 * * 0-5
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-service
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-4masters-periodic
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-ai-operator-ztp-4masters-periodic
+      - --variant=edge
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -176,7 +237,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-capi-periodic
   spec:
@@ -187,7 +248,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-capi-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-capi-periodic
       - --variant=edge
       command:
@@ -205,8 +265,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-capi-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -230,9 +288,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -257,7 +312,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-disconnected-periodic
   spec:
@@ -268,7 +323,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-disconnected-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-disconnected-periodic
       - --variant=edge
       command:
@@ -286,8 +340,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-disconnected-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -311,9 +363,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -338,7 +387,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-node-labels-periodic
   spec:
@@ -349,7 +398,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-node-labels-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-node-labels-periodic
       - --variant=edge
       command:
@@ -367,8 +415,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-node-labels-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -392,9 +438,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -419,7 +462,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-periodic
   spec:
@@ -430,7 +473,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-periodic
       - --variant=edge
       command:
@@ -448,8 +490,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -473,9 +513,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -500,7 +537,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-remove-node-periodic
   spec:
@@ -511,7 +548,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-remove-node-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-remove-node-periodic
       - --variant=edge
       command:
@@ -529,8 +565,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-remove-node-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -554,9 +588,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -581,7 +612,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
   spec:
@@ -592,7 +623,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
       - --variant=edge
       command:
@@ -610,8 +640,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -635,9 +663,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -662,7 +687,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-periodic
   spec:
@@ -673,7 +698,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-workers-periodic-cluster-profile
       - --target=e2e-ai-operator-ztp-sno-day2-workers-periodic
       - --variant=edge
       command:
@@ -691,8 +715,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-workers-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -716,9 +738,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -743,7 +762,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-binding-single-node-periodic
   spec:
@@ -754,7 +773,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-periodic-cluster-profile
       - --target=e2e-metal-assisted-kube-api-late-binding-single-node-periodic
       - --variant=edge
       command:
@@ -772,8 +790,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-periodic-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -797,9 +813,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -820,7 +833,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-mirror-nightly-image
   spec:
@@ -881,7 +894,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-mirror-nightly-image-el8
   spec:
@@ -942,7 +955,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-subsystem-aws-periodic
   spec:
@@ -1010,7 +1023,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-subsystem-kubeapi-aws-periodic
   spec:

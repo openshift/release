@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
@@ -22,8 +26,7 @@ images:
   to: cluster-control-plane-machine-set-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   arm64-latest:
@@ -202,6 +205,25 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-multi-vcenter-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-multi-vcenter
 - as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
@@ -271,6 +293,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: regression-clusterinfra-aws-ipi-cpms-allcases
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h45m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

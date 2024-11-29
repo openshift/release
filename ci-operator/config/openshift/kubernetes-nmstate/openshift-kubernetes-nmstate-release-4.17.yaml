@@ -49,8 +49,7 @@ images:
   to: src-with-oc-and-kubectl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - kubernetes-nmstate-handler
     - kubernetes-nmstate-operator
     - src-with-oc-and-kubectl
@@ -107,8 +106,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
   cluster: build05
@@ -119,8 +116,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
-      HANDLER_NAMESPACE: openshift-nmstate
-      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator
 - always_run: false
   as: e2e-operator-azure
@@ -128,10 +123,22 @@ tests:
   optional: true
   steps:
     cluster_profile: azure4
+    workflow: kubernetes-nmstate-e2e-azure
+- as: e2e-handler-ovn-ipv4-nightly-periodic
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
       HANDLER_NAMESPACE: openshift-nmstate
       OPERATOR_NAMESPACE: openshift-nmstate
-    workflow: kubernetes-nmstate-e2e-azure
+    workflow: kubernetes-nmstate-e2e-handler
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

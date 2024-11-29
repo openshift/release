@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: camel-k-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: camel-k-interop-aws-rosa-sts
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp", "rosa-classic-lp", "camel-k-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OCM_LOGIN_ENV: staging
+      OPERATORS: |
+        [
+            {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
+    test:
+    - chain: install-operators
+    - ref: camel-k-interop-tests
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: jboss-fuse
+  repo: camel-k-test-container
+  variant: camel-k-ocp4.17-lp-rosa-classic

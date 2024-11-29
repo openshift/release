@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.17"
   ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
@@ -22,8 +26,7 @@ images:
   to: azure-storage-azcopy-base
 promotion:
   to:
-  - disabled: true
-    name: 4.17-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -42,6 +45,16 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

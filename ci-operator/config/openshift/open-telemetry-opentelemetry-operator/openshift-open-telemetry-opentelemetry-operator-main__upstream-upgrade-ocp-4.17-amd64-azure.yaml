@@ -32,6 +32,9 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
+- context_dir: ./tests/test-e2e-apps/bridge-server
+  dockerfile_path: Dockerfile
+  to: opamp-bridge-server
 - context_dir: ./cmd/otel-allocator/
   dockerfile_path: Dockerfile
   from: src
@@ -70,8 +73,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: opentelemetry-operator-upgrade
-  cron: 0 4 * * 4
+- always_run: false
+  as: opentelemetry-operator-upgrade
   steps:
     cluster_profile: azure-qe
     env:
@@ -79,16 +82,19 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4s_v3
       OPERATORS: |
         [
-            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
-            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
+      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
+        tests/e2e/smoke-ip-families tests/e2e-openshift/export-to-cluster-logging-lokistack
     test:
     - ref: install-operators
     - as: install
       cli: latest
       commands: |
         oc create namespace opentelemetry-operator
+        oc label namespace opentelemetry-operator openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE_OLD"
         oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
       dependencies:

@@ -1,0 +1,162 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: control-plane-24nodes
+  cron: 0 9 2,9,16,23 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.18"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+- as: node-density-heavy-24nodes
+  cron: 0 5 5,12,19,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.18"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.18"
+      PODS_PER_NODE: "245"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-hypershift-infra
+    - chain: openshift-qe-node-density
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-cni-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.18"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+- as: data-path-9nodes
+  cron: 0 1 1,8,15,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: c5.4xlarge
+      MP_REPLICAS: "1"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.18"
+      REPLICAS: "9"
+    test:
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts-hcp-mp
+  timeout: 5h0m0s
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.18"
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts-hcp
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa_hcp-4.18-nightly-x86

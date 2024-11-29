@@ -28,6 +28,9 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
+- context_dir: ./tests/test-e2e-apps/bridge-server
+  dockerfile_path: Dockerfile
+  to: opamp-bridge-server
 - context_dir: ./cmd/otel-allocator/
   dockerfile_path: Dockerfile
   from: src
@@ -66,8 +69,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: security
-  cron: 0 3 * * 0
+- always_run: false
+  as: security
   steps:
     env:
       PROJECT_NAME: opentelemetry-operator
@@ -87,15 +90,19 @@ tests:
     env:
       OPERATORS: |
         [
-            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
-            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
         ]
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace opentelemetry-operator
+        oc label namespace opentelemetry-operator openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
       dependencies:

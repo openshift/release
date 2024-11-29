@@ -1,12 +1,20 @@
 base_images:
-  ocp_4.17_base-rhel9:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -14,12 +22,12 @@ canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: openstack-cluster-api-controllers
 promotion:
   to:
@@ -55,6 +63,20 @@ tests:
     verify test
   container:
     from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vexxhost-quota-slice
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-external
 - as: e2e-techpreview
   steps:
     cluster_profile: openstack-vexxhost

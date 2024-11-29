@@ -2,9 +2,10 @@ ref:
   as: ibmcloud-provision-vpc
   from_image:
     namespace: ocp
-    name: "4.13"
+    name: "4.18"
     tag: upi-installer
   commands: ibmcloud-provision-vpc-commands.sh
+  grace_period: 10m
   resources:
     requests:
       cpu: 10m
@@ -17,5 +18,19 @@ ref:
       default:  "no"
       documentation: |-
         This field represents the VPC would be a disconnected network (without NAT gateway), or not.
+    - name: NUMBER_SUBNETS_PAIR_PER_ZONE
+      default:  "1"
+      documentation: |-
+        How many pairs of subnets (control plane and compute) will be created in a zone. This need to be caculated according to the cidr assignment per vpc zone. Generally the max value is 32.
+    - name: APPLY_ALL_SUBNETS
+      default:  "yes"
+      documentation: |-
+        Whether apply all created subnets to cluster installation, by default, it is "yes", if "no", will pick up one pair of subnets from every zone to apply.
+    - name: PICKUP_SUBNETS_ORDER
+      default:  "ascending"
+      documentation: |-
+        Determinate how to pick up the created subnets when APPLY_ALL_SUBNETS is "no", especially when NUMBER_SUBNETS_PAIR_PER_ZONE > 1. Other supported value: "descending", "random" and "2Paging".
+        "2Paging": at least has one control plane subnet at the second page, at least has one compute subnet at the second page.
+
   documentation: |-
     The IBMCloud step creates VPC network/subnets/etc. resources, and write the info in "${SHARED_DIR}/customer_vpc_subnets.yaml" for subsequent consumers. 

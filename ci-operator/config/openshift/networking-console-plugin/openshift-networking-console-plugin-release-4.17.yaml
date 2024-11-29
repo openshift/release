@@ -1,4 +1,8 @@
 base_images:
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-8-base-nodejs-openshift-4.15:
     name: builder
     namespace: ocp
@@ -11,14 +15,16 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-8-base-nodejs-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.15
   to: networking-console-plugin
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -35,8 +41,8 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 1000m
+      memory: 4Gi
 tests:
 - as: lint
   steps:
@@ -46,8 +52,8 @@ tests:
       from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 200m
+          memory: 300Mi
     - as: i18n
       commands: |
         yarn install && yarn i18n
@@ -60,8 +66,8 @@ tests:
       from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 200m
+          memory: 300Mi
 - as: e2e
   steps:
     cluster_profile: aws
@@ -76,7 +82,8 @@ tests:
       grace_period: 30m0s
       resources:
         requests:
-          cpu: 100m
+          cpu: 1000m
+          memory: 1Gi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
 zz_generated_metadata:

@@ -1,12 +1,12 @@
 base_images:
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -29,8 +29,7 @@ images:
   to: cluster-image-registry-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.17"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -169,6 +168,15 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: hypershift-e2e-aks
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-e2e
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

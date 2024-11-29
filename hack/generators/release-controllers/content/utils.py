@@ -118,7 +118,7 @@ def get_rcapi_volumes(context, secret_name=None):
                 'secretName': 'jira-credentials-openshift-jira-robot'
             }
         }
-    ] + get_kubeconfig_volumes(context, secret_name=context.secret_name_tls) + get_oc_volumes()
+    ] + get_kubeconfig_volumes(context, secret_name) + get_oc_volumes()
 
 def get_rc_volumes(context):
     return [

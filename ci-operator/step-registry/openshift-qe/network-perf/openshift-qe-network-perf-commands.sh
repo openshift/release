@@ -12,11 +12,12 @@ cat /etc/os-release
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 if [ ${BAREMETAL} == "true" ]; then
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
   # Setup socks proxy
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
@@ -49,14 +50,12 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 # Only store the results from the full run versus the smoke test.
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-export TOLERANCE=90
-
 rm -f ${SHARED_DIR}/index.json
 
 WORKLOAD=full-run.yaml ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

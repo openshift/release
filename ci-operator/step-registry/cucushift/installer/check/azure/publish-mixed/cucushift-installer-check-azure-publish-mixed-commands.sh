@@ -147,6 +147,17 @@ else
             echo "ERROR: not found public ip address for load balancer rule ${api_pubilc_lb_rule_id} in public lb ${PUBLIC_LB_NAME}"
             check_result=1
         fi
+
+        echo "(*) check master nodes are added into API lb rule's backendpool"
+        master_node_list=$(az vm list -g ${RESOURCE_GROUP} | jq -r '.[] | select(.name | contains("master")) | .name')
+        api_backendpool_id=$(cat ${public_lb_rules} | jq -r ".[] | select(.id==\"${api_pubilc_lb_rule_id}\") | .backendAddressPool.id")
+        api_backendpool=$(az network lb address-pool list -g ${RESOURCE_GROUP} --lb-name ${PUBLIC_LB_NAME} | jq -r ".[] | select(.id==\"${api_backendpool_id}\") | .loadBalancerBackendAddresses[].name")
+        for master_node in $master_node_list; do
+            if ! echo ${api_backendpool} | grep -q ${master_node}; then
+                echo -e "ERROR: could not find node ${master_node} nic ipconfig in API lb rule's backendpool!\napi_backendpool: ${api_backendpool}"
+                check_result=1
+            fi
+        done
     fi
 
     echo "(*) check that LB rule on port ${API_SERVER_PORT} is created in internal LB..."

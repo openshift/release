@@ -113,6 +113,8 @@ fi
 PLATFORM_ARGS_COMPUTE=( )
 PLATFORM_ARGS_WORKER=( )
 POWERVS_ZONE=${LEASED_RESOURCE}
+PERSISTENT_TG=""
+PERSISTENT_VPC=""
 case "${LEASED_RESOURCE}" in
    "dal10")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10")
@@ -148,24 +150,32 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=lon
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-0"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-0"
    ;;
    "lon06-powervs-7-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-1")
       POWERVS_REGION=lon
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-1"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-1"
    ;;
    "lon06-powervs-7-quota-slice-2")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-2")
       POWERVS_REGION=lon
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-2"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-2"
    ;;
    "lon06-powervs-7-quota-slice-3")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-3")
       POWERVS_REGION=lon
       POWERVS_ZONE=lon06
       VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-3"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-3"
    ;;
    "mad02-powervs-5-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-0")
@@ -200,8 +210,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
-      PLATFORM_ARGS_COMPUTE+=( "sysType" "e980" )
-      PLATFORM_ARGS_WORKER+=( "sysType" "e980" )
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -232,6 +240,8 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC06")
       POWERVS_REGION=wdc
       VPCREGION=us-east
+      PERSISTENT_TG="tg-wdc06-powervs-4-0"
+      PERSISTENT_VPC="vpc-wdc06-powervs-4-0"
    ;;
    *)
       # Default Region & Zone
@@ -245,6 +255,8 @@ echo "POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}"
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
 echo "VPCREGION=${VPCREGION}"
+echo "PERSISTENT_TG=${PERSISTENT_TG}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
 
 echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
 echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
@@ -253,6 +265,17 @@ if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
   PLATFORM_ARGS_COMPUTE+=( "procType" "Dedicated" )
   PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
 fi
+
+#
+# Find out the largest system pool type
+#
+curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.2.1/PowerVS-get-largest-system-pool-v0.2.1-linux-amd64.tar.gz
+tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
+chmod u+x /tmp/PowerVS-get-largest-system-pool
+POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -serviceGUID "${POWERVS_SERVICE_INSTANCE_ID}" -limitTypes "release-${BRANCH}" -zone "${POWERVS_REGION}")
+echo "POOL_TYPE=${POOL_TYPE}"
+PLATFORM_ARGS_COMPUTE+=( "sysType" "${POOL_TYPE}" )
+PLATFORM_ARGS_WORKER+=( "sysType" "${POOL_TYPE}" )
 
 FILE=$(mktemp)
 
@@ -308,6 +331,18 @@ POWERVS_ZONE: ${POWERVS_ZONE}
 VPCREGION: ${VPCREGION}
 EOF
 
+if [ -n "${PERSISTENT_TG}" ]; then
+cat >> "${SHARED_DIR}/powervs-conf.yaml" << EOF
+TGNAME: ${PERSISTENT_TG}
+EOF
+fi
+
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${SHARED_DIR}/powervs-conf.yaml" << EOF
+VPCNAME: ${PERSISTENT_VPC}
+EOF
+fi
+
 export POWERVS_SHARED_CREDENTIALS_FILE
 
 if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 <= 14) { exit 0 } else { exit 1 } }'; then
@@ -355,6 +390,21 @@ platform:
     userID: ${POWERVS_USER_ID}
     zone: ${POWERVS_ZONE}
     vpcRegion: ${VPCREGION}
+EOF
+
+if [ -n "${PERSISTENT_TG}" ]; then
+cat >> "${CONFIG}" << EOF
+    tgName: ${PERSISTENT_TG}
+EOF
+fi
+
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${CONFIG}" << EOF
+    vpcName: ${PERSISTENT_VPC}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
 publish: External
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
@@ -386,3 +436,8 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+echo "tgName in ${CONFIG}:"
+grep tgName "${CONFIG}" || true
+echo "vpcName in ${CONFIG}:"
+grep vpcName "${CONFIG}" || true

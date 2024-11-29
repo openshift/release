@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-azure-415
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -72,18 +65,20 @@ tests:
     - ref: openshift-qe-perfscale-azu-data-path-nsg
     - chain: openshift-qe-data-path-tests
   timeout: 7h0m0s
-- as: data-path-ipsec-9nodes
-  cron: 0 20 8,22 * *
+- always_run: false
+  as: data-path-ipsec-9nodes
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CUSTOM_AZURE_REGION: centralus
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
-      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
+      SET_ENV_BY_PLATFORM: custom
     test:
-    - chain: openshift-qe-data-path-tests
     - ref: openshift-qe-perfscale-azu-data-path-nsg
+    - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 7h0m0s
 zz_generated_metadata:

@@ -1,11 +1,11 @@
 presubmits:
   openshift-priv/kedacore-keda:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/clientset-verify
     decorate: true
     decoration_config:
@@ -19,6 +19,7 @@ presubmits:
     name: pull-ci-openshift-priv-kedacore-keda-release-4.17-clientset-verify
     path_alias: github.com/openshift/kedacore-keda
     rerun_command: /test clientset-verify
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -68,7 +69,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/cma-verify-history
     decorate: true
     decoration_config:
@@ -127,11 +128,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cma-verify-history,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -145,6 +146,7 @@ presubmits:
     name: pull-ci-openshift-priv-kedacore-keda-release-4.17-gofmt
     path_alias: github.com/openshift/kedacore-keda
     rerun_command: /test gofmt
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -190,11 +192,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -208,6 +210,7 @@ presubmits:
     name: pull-ci-openshift-priv-kedacore-keda-release-4.17-govet
     path_alias: github.com/openshift/kedacore-keda
     rerun_command: /test govet
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -257,7 +260,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -320,7 +323,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build06
     context: ci/prow/keda-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -336,7 +339,7 @@ presubmits:
     name: pull-ci-openshift-priv-kedacore-keda-release-4.17-keda-e2e-aws-ovn
     path_alias: github.com/openshift/kedacore-keda
     rerun_command: /test keda-e2e-aws-ovn
-    skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -346,7 +349,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/keda-e2e-aws-ovn-cluster-profile
         - --target=keda-e2e-aws-ovn
         command:
         - ci-operator
@@ -363,8 +365,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/keda-e2e-aws-ovn-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -391,9 +391,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -409,7 +406,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build05
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -424,7 +421,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/kedacore-keda
     rerun_command: /test security
-    skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
