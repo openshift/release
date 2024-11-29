@@ -185,30 +185,74 @@ create_linux_workloads() {
   log_message "Creating Linux workloads..."
   create_or_switch_to_namespace
 
+  # First deployment using ubi-minimal
   cat <<EOF | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: linux-webserver
+  name: linux-webserver-ubi
   namespace: ${NAMESPACE}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: linux-webserver
+      app: linux-webserver-ubi
   template:
     metadata:
       labels:
-        app: linux-webserver
+        app: linux-webserver-ubi
     spec:
       nodeSelector:
         kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: webserver
-        image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+        image: ${DISCONNECTED_REGISTRY}/ubi8/ubi-minimal:latest
         command: ["sleep"]
         args: ["infinity"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
 EOF
+
+  # Second deployment using hello-openshift multiarch
+  cat <<EOF | oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linux-webserver-hello
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: linux-webserver-hello
+  template:
+    metadata:
+      labels:
+        app: linux-webserver-hello
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: webserver
+        image: ${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+EOF
+}
 
   # Wait for Linux workload to be ready
   loops=0

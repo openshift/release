@@ -70,6 +70,7 @@ mcr.microsoft.com/k8s/csi/azurefile-csi:latest=MIRROR_REGISTRY_PLACEHOLDER/k8s/c
 mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0=MIRROR_REGISTRY_PLACEHOLDER/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0
 registry.redhat.io/rhel8/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/support-tools:latest
 registry.redhat.io/rhel9/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel9/support-tools:latest
+quay.io/openshifttest/hello-openshift:multiarch-winc=MIRROR_REGISTRY_PLACEHOLDER/hello-openshift:multiarch-winc
 EOF
 
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml"
