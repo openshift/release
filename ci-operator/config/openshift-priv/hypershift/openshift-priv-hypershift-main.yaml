@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
     name: 4.19-priv
     namespace: ocp-private
@@ -73,32 +77,32 @@ releases:
       product: ocp
       stream: ci
       version: "4.19"
-  initial-417:
+  initial-418:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.19"
+      version: "4.18"
   latest:
     integration:
       include_built_images: true
       name: 4.19-priv
       namespace: ocp-private
-  latest-417:
+  latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.18"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.18"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -123,7 +127,9 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-- as: e2e-aks
+- always_run: false
+  as: e2e-aks
+  optional: true
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
@@ -146,15 +152,26 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-17
+- as: e2e-aws-upgrade-hypershift-operator
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
+      INSTALL_FROM_LATEST: "true"
+      RUN_UPGRADE_TEST: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-4-18
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-417
-      OCP_IMAGE_N1: release:latest-417
-      OCP_IMAGE_N2: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-417
+      OCP_IMAGE_LATEST: release:latest-418
+      OCP_IMAGE_N1: release:latest-418
+      OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-418
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
