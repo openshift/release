@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
     name: "4.19"
     namespace: ocp
@@ -143,6 +147,17 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-upgrade-hypershift-operator
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
+      INSTALL_FROM_LATEST: "true"
+      RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-4-18
   run_if_changed: ^(test/e2e|hypershift-operator)
