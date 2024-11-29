@@ -35,8 +35,9 @@ function cleanup_ibmcloud_powervs() {
       sleep 120
       echo "Done Cleaning up GW VPC Connection"
     else
-      echo "no vpc-conn needed"
+      echo "GW VPC Connection not found. VPC Cleanup not needed."
     fi
+    break
   done
   
   for GW in $(ic tg gateways --output json | jq -r '.[].id')
@@ -226,18 +227,6 @@ then
   cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/id_rsa.pub"
   cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/id_rsa"
   cp "${KUBECONFIG}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/kubeconfig"
-
-  #Create the VPC Connections for the TG
-  for GW in $(ic tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
-  do
-    for CS in $(ic is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
-    do
-      VPC_CONN_NAME=$(ic is vpc "${CS}" --output json | jq -r .name)
-      VPC_NW_ID=$(ic is vpc "${CS}" --output json | jq -r .crn)
-      echo "Creating new VPC connection for gateway now."
-      ic tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
-    done
-  done
 
   # Invoke the destroy command
   cd "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs" \
