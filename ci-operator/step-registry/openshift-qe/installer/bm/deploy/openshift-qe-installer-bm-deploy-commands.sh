@@ -72,7 +72,7 @@ elif [[ "$TYPE" == "sno" ]]; then
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
-if [[ "$RESET_IDRAC" == "true" ]]; then
+if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
   echo "Resetting IDRACs ..."
   for i in $HOSTS; do
     echo "Resetting IDRAC of server $i ..."
@@ -80,7 +80,6 @@ if [[ "$RESET_IDRAC" == "true" ]]; then
   done
   sleep 300
 fi
-echo "Clearing job queue ..."
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
   echo "Clearing job queue ..."
   for i in $HOSTS; do
@@ -125,7 +124,7 @@ if [[ $LAB == "performancelab" ]]; then
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
 fi
-envsubst '${QUADS_INSTANCE},${LAB_CLOUD},${PRE_RESET_IDRAC},${PRE_CLEAR_JOB_QUEUE},${PRE_UEFI}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${LAB_CLOUD},${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
