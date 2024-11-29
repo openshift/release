@@ -30,6 +30,7 @@ FRRK8S_REPO=${FRRK8S_REPO:-"https://github.com/openshift/frr.git"}
 METALLB_BRANCH="${OC_BRANCH}"
 FRRK8S_BRANCH="${OC_BRANCH}"
 DONT_DEPLOY_OPERATOR=${DONT_DEPLOY_OPERATOR:-}
+DEPLOY_FRRK8S_FROM_CNO=${DEPLOY_FRRK8S_FROM_CNO:-""}
 
 if [ -d "${METALLB_SRC_DIR}" ]; then
   echo "### Copying metallb directory"
@@ -63,11 +64,14 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
   done
 fi
 
-if [[ -z $DONT_DEPLOY_OPERATOR ]]; then
+
+
+if ! echo "$vars" | grep -q "DONT_DEPLOY_OPERATOR=true"; then
   echo "### deploying metallb through operator"
   ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_metallb.sh"
 fi
-if [[ "$DEPLOY_FRRK8S_FROM_CNO" == "true" ]]; then
+if echo "$vars" | grep -q "DEPLOY_FRRK8S_FROM_CNO=true"; then
+  echo "### deploying frrk8s from CNO"
   ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_frr_k8s_from_cno.sh"
 fi
 
