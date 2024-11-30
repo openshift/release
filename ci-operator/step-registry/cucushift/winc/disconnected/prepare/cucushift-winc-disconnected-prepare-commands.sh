@@ -1,21 +1,21 @@
 #!/bin/bash
 
 # Namespace protection and validation
-
 WINCNAMESPACE="winc-test"
 
 # Enable strict error handling and debug mode
-set -o nounset    
-set -o pipefail   
-set -x            
+set -o nounset
+set -o pipefail
+set -x
 
 script_dir=$(dirname "$0")
 
+# Registry configuration
 MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
 if [ -f $MIRROR_REGISTRY_FILE ]; then
-  DISCONNECTED_REGISTRY=$(head -n 1 $MIRROR_REGISTRY_FILE)
-  export DISCONNECTED_REGISTRY
-  echo "Using mirror registry: $DISCONNECTED_REGISTRY"
+    DISCONNECTED_REGISTRY=$(head -n 1 $MIRROR_REGISTRY_FILE)
+    export DISCONNECTED_REGISTRY
+    echo "Using mirror registry: $DISCONNECTED_REGISTRY"
 fi
 
 # Define image paths
@@ -31,7 +31,7 @@ log_message() {
 # Function to verify cluster access
 verify_cluster_access() {
     if ! oc whoami &>/dev/null; then
-        echo "ERROR: Not logged into OpenShift cluster"
+        log_message "ERROR: Not logged into OpenShift cluster"
         exit 1
     fi
     log_message "Successfully verified cluster access"
@@ -39,32 +39,51 @@ verify_cluster_access() {
 
 # Function to create or switch to namespace with error handling
 create_or_switch_to_namespace() {
-    echo "Ensuring the ${WINCNAMESPACE} namespace exists..."
+    log_message "Ensuring the ${WINCNAMESPACE} namespace exists..."
     if ! oc get namespace ${WINCNAMESPACE} &>/dev/null; then
-        echo "Namespace ${WINCNAMESPACE} does not exist. Creating it..."
+        log_message "Creating namespace ${WINCNAMESPACE}..."
         if ! oc new-project ${WINCNAMESPACE}; then
-            echo "WARNING: Failed to create the ${WINCNAMESPACE} project"
+            log_message "WARNING: Failed to create the ${WINCNAMESPACE} project"
             return 1
         fi
     else
-        echo "Namespace ${WINCNAMESPACE} already exists. Switching to it..."
+        log_message "Switching to namespace ${WINCNAMESPACE}..."
         if ! oc project ${WINCNAMESPACE}; then
-            echo "WARNING: Failed to switch to the ${WINCNAMESPACE} project"
+            log_message "WARNING: Failed to switch to the ${WINCNAMESPACE} project"
             return 1
         fi
     fi
     
     # Set pod security configuration
     oc label namespace ${WINCNAMESPACE} security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged --overwrite || true
-    echo "Namespace ${WINCNAMESPACE} is ready."
+    log_message "Namespace ${WINCNAMESPACE} is ready"
+}
+
+# Function to create Windows config map
+create_winc_test_configmap() {
+    log_message "Creating configmap with Windows image information..."
+    if ! oc create configmap winc-test-config -n ${WINCNAMESPACE} \
+        --from-literal=primary_windows_image="${1}" \
+        --from-literal=primary_windows_container_image="${2}"; then
+        log_message "WARNING: Failed to create configmap"
+        return 1
+    fi
+
+    # Display pods and configmap for verification
+    log_message "Verifying deployment status:"
+    oc get pod -owide -n ${WINCNAMESPACE}
+    oc get cm winc-test-config -oyaml -n ${WINCNAMESPACE}
 }
 
 # Function to create Windows workloads
 create_windows_workloads() {
-  log_message "Creating Windows workloads..."
-  create_or_switch_to_namespace
+    log_message "Creating Windows workloads..."
+    create_or_switch_to_namespace
 
-  cat <<EOF | oc apply -f -
+    # Create configmap before deployment
+    create_winc_test_configmap "${PRIMARY_WINDOWS_IMAGE}" "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
+
+    cat <<EOF | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -104,31 +123,30 @@ spec:
           name: winc-test-config
 EOF
 
-  # Wait for Windows workload to be ready
-  loops=0
-  max_loops=15
-  sleep_seconds=20
-  while true; do
-    if [ X$(oc get deployment win-webserver -n ${WINCNAMESPACE} -o jsonpath='{.status.availableReplicas}') == X"5" ]; then
-      echo "Windows workload is READY"
-      break
-    fi
-    if [ "$loops" -ge "$max_loops" ]; then
-      echo "Timeout: Windows workload is not READY"
-      exit 1
-    fi
-    loops=$((loops + 1))
-    echo "Waiting for Windows workload to be ready... (${loops}/${max_loops})"
-    sleep $sleep_seconds
-  done
+    # Wait for Windows workload to be ready
+    loops=0
+    max_loops=15
+    sleep_seconds=20
+    while true; do
+        if [ X$(oc get deployment win-webserver -n ${WINCNAMESPACE} -o jsonpath='{.status.availableReplicas}') == X"5" ]; then
+            log_message "Windows workload is READY"
+            break
+        fi
+        if [ "$loops" -ge "$max_loops" ]; then
+            log_message "Timeout: Windows workload is not READY"
+            exit 1
+        fi
+        loops=$((loops + 1))
+        log_message "Waiting for Windows workload to be ready... (${loops}/${max_loops})"
+        sleep $sleep_seconds
+    done
 }
 
-# Modified Linux workloads function with error handling
+# Function to create Linux workloads
 create_linux_workloads() {
     log_message "Creating Linux workloads..."
     create_or_switch_to_namespace || true
 
-    # Apply deployments with error handling
     if ! oc apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -166,7 +184,7 @@ EOF
         log_message "WARNING: Failed to create linux-webserver deployment"
     fi
 
-    # Wait for Linux workload with timeout but don't fail the script
+    # Wait for Linux workload with timeout
     loops=0
     max_loops=15
     sleep_seconds=20
@@ -187,13 +205,8 @@ EOF
 }
 
 # Main execution
-    log_message "Starting script execution..."
-    verify_cluster_access
-    
-    # Execute functions with error handling
-    create_or_switch_to_namespace
-
+log_message "Starting script execution..."
+verify_cluster_access
+create_or_switch_to_namespace
 create_linux_workloads
-
-
 create_windows_workloads
