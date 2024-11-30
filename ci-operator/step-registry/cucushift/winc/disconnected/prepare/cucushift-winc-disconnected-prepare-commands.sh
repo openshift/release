@@ -1,13 +1,8 @@
 #!/bin/bash
 
 # Namespace protection and validation
-if [[ -n "${NAMESPACE:-}" ]]; then
-    echo "WARNING: NAMESPACE is already set to '${NAMESPACE}'"
-    echo "Script requires NAMESPACE=winc-test"
-    echo "Current environment may interfere with script execution"
-    exit 1
-fi
-NAMESPACE="winc-test"
+
+WINCNAMESPACE="winc-test"
 
 # Enable strict error handling and debug mode
 set -o errexit    
@@ -16,16 +11,40 @@ set -o pipefail
 set -x            
 
 script_dir=$(dirname "$0")
+echo "📂 Script directory: $script_dir"
+
 work_dir=$PWD
+echo "💼 Working directory: $work_dir"
 
 # Get registry hostname from environment variable or use default value
-DISCONNECTED_REGISTRY=${REGISTRY_HOST:-"bastion.mirror-registry.qe.devcluster.openshift.com:5000"}
+echo "🔍 Checking for registry hostname..."
+####DISCONNECTED_REGISTRY_OLD=${REGISTRY_HOST:-"bastion.mirror-registry.qe.devcluster.openshift.com:5000"}
+
+#echo "🏢 Initial DISCONNECTED_REGISTRY set to: $DISCONNECTED_REGISTRY_OLD"
 
 # Or directly get from existing configmap if it exists
-if oc get configmap winc-test-config -n ${NAMESPACE} &>/dev/null; then
-    DISCONNECTED_REGISTRY=$(oc get configmap winc-test-config -n ${NAMESPACE} -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
+echo "🔄 Attempting to get registry from configmap in namespace ${WINCNAMESPACE}..."
+if oc get configmap winc-test-config -n ${WINCNAMESPACE} &>/dev/null; then
+    echo "✅ Configmap found! Extracting registry information..."
+    DISCONNECTED_REGISTRY=$(oc get configmap winc-test-config -n ${WINCNAMESPACE} -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
+    echo "🔄 DISCONNECTED_REGISTRY updated to: $DISCONNECTED_REGISTRY"
+else
+    echo "ℹ️  Configmap not found, using default registry value"
 fi
 
+echo "🎯 Final DISCONNECTED_REGISTRY value: $DISCONNECTED_REGISTRY"
+MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+if [ -f $MIRROR_REGISTRY_FILE ]; then
+  DISCONNECTED_REGISTRY=$(head -n 1 $MIRROR_REGISTRY_FILE)
+  export DISCONNECTED_REGISTRY
+  echo "Using mirror registry: $DISCONNECTED_REGISTRY"
+fi
+
+if [ -f $MIRROR_REGISTRY_FILE ]; then
+  MIRROR_REGISTRY_HOST=$(head -n 1 $MIRROR_REGISTRY_FILE)
+  export MIRROR_REGISTRY_HOST
+  echo "Using mirror registry: $MIRROR_REGISTRY_HOST"
+fi
 # Define image paths
 PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
 PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
@@ -47,24 +66,88 @@ verify_cluster_access() {
 
 # Function to create or switch to namespace with error handling
 create_or_switch_to_namespace() {
-    echo "Ensuring the ${NAMESPACE} namespace exists..."
-    if ! oc get namespace ${NAMESPACE} &>/dev/null; then
-        echo "Namespace ${NAMESPACE} does not exist. Creating it..."
-        if ! oc new-project ${NAMESPACE}; then
-            echo "WARNING: Failed to create the ${NAMESPACE} project"
+    echo "Ensuring the ${WINCNAMESPACE} namespace exists..."
+    if ! oc get namespace ${WINCNAMESPACE} &>/dev/null; then
+        echo "Namespace ${WINCNAMESPACE} does not exist. Creating it..."
+        if ! oc new-project ${WINCNAMESPACE}; then
+            echo "WARNING: Failed to create the ${WINCNAMESPACE} project"
             return 1
         fi
     else
-        echo "Namespace ${NAMESPACE} already exists. Switching to it..."
-        if ! oc project ${NAMESPACE}; then
-            echo "WARNING: Failed to switch to the ${NAMESPACE} project"
+        echo "Namespace ${WINCNAMESPACE} already exists. Switching to it..."
+        if ! oc project ${WINCNAMESPACE}; then
+            echo "WARNING: Failed to switch to the ${WINCNAMESPACE} project"
             return 1
         fi
     fi
     
     # Set pod security configuration
-    oc label namespace ${NAMESPACE} security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged --overwrite || true
-    echo "Namespace ${NAMESPACE} is ready."
+    oc label namespace ${WINCNAMESPACE} security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged --overwrite || true
+    echo "Namespace ${WINCNAMESPACE} is ready."
+}
+
+# Function to create Windows workloads
+create_windows_workloads() {
+  log_message "Creating Windows workloads..."
+  create_or_switch_to_namespace
+
+  cat <<EOF | oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: win-webserver
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: win-webserver
+  template:
+    metadata:
+      labels:
+        app: win-webserver
+    spec:
+      nodeSelector:
+        kubernetes.io/os: windows
+      tolerations:
+      - key: "os"
+        value: "Windows"
+        effect: "NoSchedule"
+      imagePullSecrets:
+      - name: local-registry-secret
+      containers:
+      - name: win-webserver
+        image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}
+        command: ["pwsh.exe"]
+        args: ["-Command", "while(\$true) { Write-Host 'Windows container is running...'; Start-Sleep -Seconds 30 }"]
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: winc-test-config
+EOF
+
+  # Wait for Windows workload to be ready
+  loops=0
+  max_loops=15
+  sleep_seconds=20
+  while true; do
+    if [ X$(oc get deployment win-webserver -o=jsonpath={.status.readyReplicas}) == X"5" ]; then
+      echo "Windows workload is READY"
+      break
+    fi
+    if [ "$loops" -ge "$max_loops" ]; then
+      echo "Timeout: Windows workload is not READY"
+      exit 1
+    fi
+    loops=$((loops + 1))
+    echo "Waiting for Windows workload to be ready... (${loops}/${max_loops})"
+    sleep $sleep_seconds
+  done
 }
 
 # Modified Linux workloads function with error handling
@@ -78,7 +161,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: linux-webserver-ubi
-  namespace: ${NAMESPACE}
+  namespace: ${WINCNAMESPACE}
 spec:
   replicas: 1
   selector:
@@ -97,7 +180,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: webserver
-        image: ${DISCONNECTED_REGISTRY}/ubi8/ubi-minimal:latest
+        image: ${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc
         command: ["sleep"]
         args: ["infinity"]
         securityContext:
@@ -115,7 +198,7 @@ EOF
     max_loops=15
     sleep_seconds=20
     while true; do
-        ready_replicas=$(oc get deployment linux-webserver-ubi -n ${NAMESPACE} -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        ready_replicas=$(oc get deployment linux-webserver-ubi -n ${WINCNAMESPACE} -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
         if [ "X${ready_replicas}" == "X1" ]; then
             log_message "Linux workload is READY"
             break
@@ -131,16 +214,27 @@ EOF
 }
 
 # Main execution
-main() {
     log_message "Starting script execution..."
     verify_cluster_access
     
     # Execute functions with error handling
-    create_or_switch_to_namespace || true
-    create_linux_workloads || true
-    
-    log_message "Script execution completed"
-}
+    create_or_switch_to_namespace
 
-# Execute main function
-main
+create_linux_workloads
+LINUX_STATUS=$?
+if [ $LINUX_STATUS -ne 0 ]; then
+    echo "Warning: Linux workloads creation failed with status $LINUX_STATUS"
+fi
+
+create_windows_workloads
+WINDOWS_STATUS=$?
+if [ $WINDOWS_STATUS -ne 0 ]; then
+    echo "Warning: Windows workloads creation failed with status $WINDOWS_STATUS"
+fi
+
+if [ $LINUX_STATUS -ne 0 ] && [ $WINDOWS_STATUS -ne 0 ]; then
+    echo "Both workload creations failed"
+    exit 1
+fi
+    log_message "Script execution completed"
+
