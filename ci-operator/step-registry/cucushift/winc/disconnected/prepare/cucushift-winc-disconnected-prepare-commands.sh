@@ -13,26 +13,6 @@ set -x
 script_dir=$(dirname "$0")
 echo "📂 Script directory: $script_dir"
 
-work_dir=$PWD
-echo "💼 Working directory: $work_dir"
-
-# Get registry hostname from environment variable or use default value
-echo "🔍 Checking for registry hostname..."
-####DISCONNECTED_REGISTRY_OLD=${REGISTRY_HOST:-"bastion.mirror-registry.qe.devcluster.openshift.com:5000"}
-
-#echo "🏢 Initial DISCONNECTED_REGISTRY set to: $DISCONNECTED_REGISTRY_OLD"
-
-# Or directly get from existing configmap if it exists
-echo "🔄 Attempting to get registry from configmap in namespace ${WINCNAMESPACE}..."
-if oc get configmap winc-test-config -n ${WINCNAMESPACE} &>/dev/null; then
-    echo "✅ Configmap found! Extracting registry information..."
-    DISCONNECTED_REGISTRY=$(oc get configmap winc-test-config -n ${WINCNAMESPACE} -o jsonpath='{.data.primary_windows_container_disconnected_image}' | awk -F/ '{print $1}')
-    echo "🔄 DISCONNECTED_REGISTRY updated to: $DISCONNECTED_REGISTRY"
-else
-    echo "ℹ️  Configmap not found, using default registry value"
-fi
-
-echo "🎯 Final DISCONNECTED_REGISTRY value: $DISCONNECTED_REGISTRY"
 MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
 if [ -f $MIRROR_REGISTRY_FILE ]; then
   DISCONNECTED_REGISTRY=$(head -n 1 $MIRROR_REGISTRY_FILE)
@@ -40,11 +20,6 @@ if [ -f $MIRROR_REGISTRY_FILE ]; then
   echo "Using mirror registry: $DISCONNECTED_REGISTRY"
 fi
 
-if [ -f $MIRROR_REGISTRY_FILE ]; then
-  MIRROR_REGISTRY_HOST=$(head -n 1 $MIRROR_REGISTRY_FILE)
-  export MIRROR_REGISTRY_HOST
-  echo "Using mirror registry: $MIRROR_REGISTRY_HOST"
-fi
 # Define image paths
 PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
 PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
@@ -96,7 +71,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: win-webserver
-  namespace: ${NAMESPACE}
+  namespace: ${WINCNAMESPACE}
 spec:
   replicas: 5
   selector:
