@@ -1,0 +1,25 @@
+workflow:
+  as: osd-ccs-gcp-wif
+  steps:
+    env:
+      COMPUTE_MACHINE_TYPE: "custom-4-16384"
+      COMPUTE_NODES: "3"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_SHARED_VPC: "yes"
+      ETCD_ENCRYPTION: "true"
+      MULTI_AZ: "true"
+      REGION: "us-central1"
+      SECURE_BOOT_FOR_SHIELDED_VMS: "true"
+      USE_WIF_CONFIG: "true"
+    pre:
+    - ref: upi-conf-gcp-xpn
+    - ref: osd-ccs-cluster-provision-gcp
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
+    post:
+    - chain: gather
+    - ref: osd-ccs-cluster-deprovision
+  documentation: |-
+    This workflow installs an OSD CCS GCP cluster, using WIF config as the authentication method.
+    After the test is completed, the cluster will be deprovisioned.

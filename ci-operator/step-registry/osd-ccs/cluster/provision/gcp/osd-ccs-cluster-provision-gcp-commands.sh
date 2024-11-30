@@ -210,6 +210,13 @@ if [[ "${PRIVATE}" == "yes" ]]; then
   PRIVATE_SWITCH="--private"
 fi
 
+WIF_CONFIG_SWITCH=""
+if [ "${USE_WIF_CONFIG}" == "true" ]; then
+  WIF_CONFIG_SWITCH="--wif-config wif-config-for-auto-do-not-delete"
+else
+  GCP_SERVICE_ACCOUNT_SWITCH="--service-account-file ${GCP_CREDENTIALS_FILE}"
+fi
+
 # Cluster parameters
 logger "INFO" "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
@@ -225,6 +232,7 @@ echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
 echo "  Secure boot for shielded VMs: ${SECURE_BOOT_FOR_SHIELDED_VMS}"
 echo "  Private: ${PRIVATE}"
+echo "  WIF config: ${USE_WIF_CONFIG}"
 if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   echo "  VPC project id: ${VPC_PROJECT_ID}"
   echo "  VPC name: ${VPC_NAME}"
@@ -236,12 +244,13 @@ cmd="ocm create cluster ${CLUSTER_NAME} \
 --ccs \
 --provider=gcp \
 --region ${REGION} \
---service-account-file ${GCP_CREDENTIALS_FILE} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 --compute-nodes ${COMPUTE_NODES} \
 --subscription-type ${SUBSCRIPTION_TYPE} \
+${WIF_CONFIG_SWITCH} \
+${GCP_SERVICE_ACCOUNT_SWITCH:-} \
 ${MULTI_AZ_SWITCH} \
 ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
