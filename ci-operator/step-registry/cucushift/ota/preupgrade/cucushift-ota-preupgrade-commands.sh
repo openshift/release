@@ -391,6 +391,32 @@ function pre-OCP-56083(){
     return 1
 }
 
+function pre-OCP-56173(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local version image
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    image="$(oc get clusterversion version -ojson | jq -r ".status.history[0].image")"
+    if [ -z "${image}" ] ; then
+        echo "Fail to get cluster image!"
+        return 1
+    fi
+    
+    cd ${SHARED_DIR}/ota_test_repo || return
+    python cucushift-ota-preupgrade-commands.py -e '[
+      {
+        "version": "'${version}'",
+        "payload": "'${image}'"
+      }
+    ]' -o "56173.json"
+    git add 56173.json
+    git commit -m 'Prepare test data for OCP-56173'
+    cd - || return
+}
+
 function pre-OCP-60396(){
     echo "Test Start: ${FUNCNAME[0]}"
     # verify cvo image non-hetero
