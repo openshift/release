@@ -1,22 +1,34 @@
 base_images:
   cli:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
+  ocp_4.18_base-rhel9:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.18
   openstack-cinder-csi-driver-operator-test:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
@@ -30,6 +42,13 @@ images:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   inputs:
@@ -42,7 +61,7 @@ promotion:
   - excluded_images:
     - hypershift-operator
     - hypershift-tests
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
   - additional_images:
       hypershift-operator: hypershift-operator
@@ -57,33 +76,33 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
-  initial-417:
+      version: "4.19"
+  initial-418:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.17"
+      version: "4.18"
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
-  latest-417:
+  latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.17"
+      version: "4.18"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.17"
+      version: "4.18"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -108,7 +127,9 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-- as: e2e-aks
+- always_run: false
+  as: e2e-aks
+  optional: true
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
@@ -131,15 +152,26 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-17
+- as: e2e-aws-upgrade-hypershift-operator
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
+      INSTALL_FROM_LATEST: "true"
+      RUN_UPGRADE_TEST: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-4-18
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-417
-      OCP_IMAGE_N1: release:latest-417
-      OCP_IMAGE_N2: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-417
+      OCP_IMAGE_LATEST: release:latest-418
+      OCP_IMAGE_N1: release:latest-418
+      OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-418
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -217,7 +249,6 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
@@ -248,7 +279,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: experimental/reliability/minimal
     leases:
@@ -262,7 +292,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
       TEST_SUITE: openshift/csi
@@ -277,7 +306,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
       TEST_SUITE: openshift/csi
