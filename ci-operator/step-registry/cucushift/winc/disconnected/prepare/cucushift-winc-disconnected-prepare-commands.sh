@@ -31,16 +31,6 @@ PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-lts
 PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
 INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 
-# Error handling function
-handle_error() {
-    local exit_code=$?
-    local line_no=$1
-    echo "Error on line ${line_no}: Exit code ${exit_code}"
-    # Continue execution despite errors
-    return 0
-}
-trap 'handle_error ${LINENO}' ERR
-
 # Function to print log messages with timestamp
 log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
