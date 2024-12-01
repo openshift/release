@@ -215,9 +215,30 @@ case $CLUSTER_TYPE in
 
   echo "Updating the machineset with ${ADDITIONAL_WORKER_VM_TYPE} and ami ${amiid_workers_additional} ..."
 
-  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.ami.id = \"${amiid_workers_additional}\"
-                     | .spec.template.spec.providerSpec.value.instanceType = \"${ADDITIONAL_WORKER_VM_TYPE}\"
-              " <<< "${MACHINE_SET}")
+  MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+    .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
+    | .metadata.name += "-additional"
+    | .spec.template.spec.providerSpec.value.ami.id = "${amiid_workers_additional}"
+    | .spec.template.spec.providerSpec.value.instanceType = "${ADDITIONAL_WORKER_VM_TYPE}"
+    | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
+    | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
+    )
+EOF
+)")
+  echo "Duplicate all the machine sets and distribute the number of ADDITIONAL_WORKERS"
+  machineset_nums=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 '.items | length')
+  base_replicas=$(( ADDITIONAL_WORKERS / machineset_nums ))
+  remainder=$(( ADDITIONAL_WORKERS % machineset_nums ))
+  for i in $(seq 0 $(( machineset_nums - 1 ))); do
+      if [ $i -lt $remainder ]; then
+        replicas=$(( base_replicas + 1 ))
+      else
+        replicas=$base_replicas
+      fi
+      MACHINE_SET=$(yq-v4 ".items[$i].spec.replicas = ${replicas}" <<< "$MACHINE_SET")
+  done
 ;;
 *azure*)
   echo "az version:"
