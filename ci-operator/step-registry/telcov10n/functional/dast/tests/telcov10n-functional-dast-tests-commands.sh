@@ -18,5 +18,4 @@ chainsaw test \
 --report-name "junit_telco_tests_dast" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
---test-dir \
-$dastdir
+--test-dir $dastdir
