@@ -14,7 +14,7 @@ log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /tmp/winc-test-debug.log
 }
 
-# Verify cluster access function - was missing in original
+# Verify cluster access function
 verify_cluster_access() {
     log_message "Verifying cluster access..."
     if ! oc whoami &>/dev/null; then
@@ -23,7 +23,7 @@ verify_cluster_access() {
     fi
 }
 
-# Create or switch to namespace function - was missing in original
+# Create or switch to namespace function
 create_or_switch_to_namespace() {
     log_message "Creating/switching to namespace ${WINCNAMESPACE}..."
     if ! oc get namespace "${WINCNAMESPACE}" &>/dev/null; then
@@ -39,7 +39,7 @@ create_or_switch_to_namespace() {
     return 0
 }
 
-# Create ConfigMap function - was missing in original
+# Create ConfigMap function
 create_winc_test_configmap() {
     local windows_image="$1"
     local container_image="$2"
@@ -102,7 +102,7 @@ dump_deployment_details() {
     done
 }
 
-# Modified create_windows_workloads function
+# Create Windows workloads function
 create_windows_workloads() {
     log_message "Creating Windows workloads..."
     create_or_switch_to_namespace || return 1
@@ -194,7 +194,7 @@ EOF
     done
 }
 
-# Modified create_linux_workloads function
+# Create Linux workloads function
 create_linux_workloads() {
     log_message "Creating Linux workloads..."
     log_message "Using DISCONNECTED_REGISTRY: ${DISCONNECTED_REGISTRY:-not_set}"
@@ -207,7 +207,7 @@ create_linux_workloads() {
     if [ -z "${DISCONNECTED_REGISTRY:-}" ]; then
         log_message "ERROR: DISCONNECTED_REGISTRY is not set"
         return 1
-    }
+    fi
 
     log_message "Deploying Linux webserver..."
     if ! oc apply -f - <<EOF
@@ -277,8 +277,8 @@ EOF
     done
 }
 
-# Main execution with enhanced debugging
-{
+# Main execution function
+main() {
     log_message "Starting script execution..."
     log_message "Script directory: ${script_dir}"
     debug_registry_info
@@ -293,4 +293,7 @@ EOF
     oc get deployments -n "${WINCNAMESPACE}" -o wide
     oc get pods -n "${WINCNAMESPACE}" -o wide
     log_message "Script completed successfully"
-} 2>&1 | tee -a /tmp/winc-test-debug.log
+}
+
+# Execute main function with logging
+main 2>&1 | tee -a /tmp/winc-test-debug.log
