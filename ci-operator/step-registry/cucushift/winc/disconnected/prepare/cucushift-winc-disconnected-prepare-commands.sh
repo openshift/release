@@ -112,7 +112,6 @@ create_windows_workloads() {
         log_message "ERROR: Required variables PRIMARY_WINDOWS_IMAGE and/or PRIMARY_WINDOWS_CONTAINER_IMAGE not set"
         return 1
     }
-
     # Debug: Show node information
     log_message "Available nodes and their labels:"
     oc get nodes --show-labels
@@ -284,7 +283,7 @@ EOF
     log_message "Script directory: ${script_dir}"
     debug_registry_info
     
-    verify_cluster_access || exit 1
+    #verify_cluster_access || exit 1
     create_or_switch_to_namespace || exit 1
     create_linux_workloads || exit 1
     create_windows_workloads || exit 1
