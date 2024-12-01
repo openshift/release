@@ -149,12 +149,20 @@ chain:
       if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
         export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       fi
-      
+
       if [[ -n "${TEST_SKIPS}" ]]; then
-          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          TESTS="$(./openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          if [[ "${CLUSTER_TYPE}" == "kubevirt" ]]; then
+            KUBEVIRT_SKIPPED_TESTS=$(echo "$TEST_SKIPS" | sed 's/\\\[Suite:openshift\/conformance\/parallel\\\]$//')
+            if [[ -n "${KUBEVIRT_SKIPPED_TESTS}" ]]; then
+              KUBEVIRT_SKIPPED_TESTS="${KUBEVIRT_SKIPPED_TESTS%\\|}"
+              KUBEVIRT_SKIPPED_TESTS=$(echo "$KUBEVIRT_SKIPPED_TESTS" | sed 's/\\//g')
+            fi      
+            echo "${TESTS}" | grep "\[sig-kubevirt\]" | grep -P -v "${KUBEVIRT_SKIPPED_TESTS:-placeholder_no_such_string}" >>/tmp/tests
+          fi
           echo "Skipping tests:"
-          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          echo "${TESTS}" | grep -vxFf /tmp/tests || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
