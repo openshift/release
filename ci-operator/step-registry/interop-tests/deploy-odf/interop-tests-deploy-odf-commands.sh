@@ -163,6 +163,16 @@ spec:
   name: ${ODF_SUBSCRIPTION_NAME}
   source: ${ODF_CATALOG_NAME}
   sourceNamespace: openshift-marketplace
+  config:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+              - amd64
 EOF
 )
 
