@@ -437,9 +437,10 @@ wait "$!"
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Sleep between destroy and undefine to allow for a slight destroy lag
   echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
-  ${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
+  echo "Amrut - not deleting for testing purpose of httpcheck"
+  #${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
   sleep 1s
-  ${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
+  #${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
 
   echo "Approving pending CSRs..."
   approve_csrs () {
