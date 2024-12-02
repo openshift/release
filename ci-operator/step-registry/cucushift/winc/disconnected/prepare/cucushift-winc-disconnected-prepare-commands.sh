@@ -1,12 +1,17 @@
 #!/bin/bash
 
-# Namespace for Windows Container tests
-WINCNAMESPACE="winc-test"
-
 # Enable debug mode and disable immediate exit on error
 set -x
 set +e  
 
+# Namespace for Windows Container tests
+WINCNAMESPACE="winc-test"
+
+# Define image paths
+PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
+PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
+export PRIMARY_WINDOWS_CONTAINER_IMAGE
+export PRIMARY_WINDOWS_IMAGE
 script_dir=$(dirname "$0")
 
 # Function for logging messages with timestamp
@@ -55,10 +60,20 @@ data:
   windows_image: "${windows_image}"
   container_image: "${container_image}"
 EOF
+
+    # Verify ConfigMap creation
+    if ! oc get configmap winc-test-config -n "${WINCNAMESPACE}" &>/dev/null; then
+        log_message "ERROR: Failed to create ConfigMap winc-test-config"
+        return 1
+    fi
+    
+    log_message "ConfigMap winc-test-config created successfully"
+    return 0
 }
 
 # Read and validate mirror registry URL
 MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+#MIRROR_REGISTRY_FILE="/var/run/secrets/ci.openshift.io/multi-stage/mirror_registry_url"
 if [ -f "$MIRROR_REGISTRY_FILE" ]; then
     DISCONNECTED_REGISTRY=$(head -n 1 "$MIRROR_REGISTRY_FILE" | tr -d '[:space:]')
     if [ -n "$DISCONNECTED_REGISTRY" ]; then
@@ -79,7 +94,7 @@ debug_registry_info() {
     log_message "DISCONNECTED_REGISTRY=${DISCONNECTED_REGISTRY:-not_set}"
     if [ -n "${DISCONNECTED_REGISTRY:-}" ]; then
         log_message "Testing registry connectivity..."
-        if curl -k -s "${DISCONNECTED_REGISTRY}" > /dev/null; then
+        if curl -k -s "https://${DISCONNECTED_REGISTRY}/v2/" > /dev/null 2>&1; then
             log_message "Registry is accessible"
         else
             log_message "WARNING: Registry might not be accessible"
@@ -90,13 +105,17 @@ debug_registry_info() {
 # Function to dump deployment details for debugging
 dump_deployment_details() {
     local deployment_name="$1"
+    
     log_message "Dumping full details for deployment: ${deployment_name}"
     log_message "--- Deployment YAML ---"
     oc get deployment "${deployment_name}" -n "${WINCNAMESPACE}" -oyaml | tee -a /tmp/winc-test-debug.log
+    
     log_message "--- Deployment Events ---"
     oc get events -n "${WINCNAMESPACE}" --field-selector "involvedObject.name=${deployment_name}" | tee -a /tmp/winc-test-debug.log
+    
     log_message "--- Pod Details ---"
     oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -oyaml | tee -a /tmp/winc-test-debug.log
+    
     log_message "--- Pod Logs ---"
     local pods
     pods=$(oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -o jsonpath='{.items[*].metadata.name}')
@@ -110,27 +129,6 @@ dump_deployment_details() {
 create_windows_workloads() {
     log_message "Creating Windows workloads..."
     create_or_switch_to_namespace || return 1
-
-    # Validate required environment variables
-    local missing_vars=()
-    if [ -z "${PRIMARY_WINDOWS_IMAGE:-}" ]; then
-        missing_vars+=("PRIMARY_WINDOWS_IMAGE")
-    fi
-    if [ -z "${PRIMARY_WINDOWS_CONTAINER_IMAGE:-}" ]; then
-        missing_vars+=("PRIMARY_WINDOWS_CONTAINER_IMAGE")
-    fi
-    
-    if [ ${#missing_vars[@]} -ne 0 ]; then
-        log_message "ERROR: Required variables not set: ${missing_vars[*]}"
-        return 1
-    }
-
-    # Debug: Show node information
-    log_message "Available nodes and their labels:"
-    oc get nodes --show-labels
-    
-    # Create configmap before deployment
-    create_winc_test_configmap "${PRIMARY_WINDOWS_IMAGE}" "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
 
     log_message "Deploying Windows workload with image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
     
@@ -221,7 +219,7 @@ create_linux_workloads() {
     if [ -z "${DISCONNECTED_REGISTRY:-}" ]; then
         log_message "ERROR: DISCONNECTED_REGISTRY is not set"
         return 1
-    }
+    fi
 
     local linux_image="${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc"
     log_message "Using Linux image: ${linux_image}"
@@ -299,12 +297,29 @@ main() {
     log_message "Starting script execution..."
     log_message "Script directory: ${script_dir}"
     
-    if [ ! -d "${SHARED_DIR:-}" ]; then
-        log_message "WARNING: SHARED_DIR not found or not set"
+    verify_cluster_access
+    debug_registry_info
+    
+    # Validate required environment variables
+    if [ -z "${PRIMARY_WINDOWS_IMAGE:-}" ]; then
+        log_message "ERROR: PRIMARY_WINDOWS_IMAGE environment variable is not set"
+        exit 1
+    fi
+    if [ -z "${PRIMARY_WINDOWS_CONTAINER_IMAGE:-}" ]; then
+        log_message "ERROR: PRIMARY_WINDOWS_CONTAINER_IMAGE environment variable is not set"
+        exit 1
     fi
     
-    debug_registry_info
+    # Create namespace first
     create_or_switch_to_namespace || exit 1
+    
+    # Create ConfigMap before workloads
+    if ! create_winc_test_configmap "${PRIMARY_WINDOWS_IMAGE}" "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"; then
+        log_message "ERROR: Failed to create required ConfigMap"
+        exit 1
+    fi
+    
+    # Create workloads
     create_linux_workloads || exit 1
     create_windows_workloads || exit 1
 
