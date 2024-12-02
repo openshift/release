@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -39,6 +39,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   console-tests:
     name: "4.18"
     namespace: ocp
@@ -63,6 +67,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: libvirt-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   upi-installer:
     name: "4.18"
     namespace: ocp
@@ -469,7 +477,9 @@ tests:
     env:
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+        on the same node\|\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should
+        be able to preserve UDP traffic when server pod cycles for a LoadBalancer
+        service
     observers:
       enable:
       - observers-resource-watch
@@ -580,19 +590,17 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -663,7 +671,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
@@ -842,7 +850,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 21 * * 0
+  cron: 0 5 */1 * *
   restrict_network_access: false
   steps:
     env:
@@ -869,7 +877,7 @@ tests:
     workflow: telco5g-hcp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   restrict_network_access: false
   steps:
     env:
@@ -881,7 +889,7 @@ tests:
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 2,5
   restrict_network_access: false
   steps:
     env:
@@ -892,7 +900,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 3
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -900,7 +908,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 3
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -909,7 +917,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 3
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1834,6 +1842,22 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-crun
   timeout: 5h0m0s
+- as: e2e-rosa-sts-ovn
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: rosa-aws-sts-conformance
+  timeout: 6h0m0s
+- as: e2e-rosa-sts-hypershift-ovn
+  cluster: build09
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    workflow: rosa-aws-sts-hcp-conformance
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

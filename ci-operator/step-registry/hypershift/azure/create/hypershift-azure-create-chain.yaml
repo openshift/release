@@ -27,6 +27,9 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_CP_MI
+      default: "false"
+      documentation: Specifies whether control plane components should authenticate to Azure using managed identities.
     - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
       default: ""
       documentation: "Specifies the type of storage account for storing diagnostics data."
@@ -157,11 +160,16 @@ chain:
         --resource-group-name=${RESOURCE_GROUP_NAME} \
         --vnet-id=${VNET_ID} \
         --subnet-id=${SUBNET_ID} \
-        --network-security-group-id=${NSG_ID}
+        --network-security-group-id=${NSG_ID} \
+        --generate-ssh
       )
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+      fi
+      
+      if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
+        COMMAND+=(--managed-identities-file "${SHARED_DIR}"/hypershift_azure_mi_file.json)
       fi
       
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"

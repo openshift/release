@@ -484,9 +484,12 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
-
-  GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  if [ -n "${PERSISTENT_TG}" ]
+  then
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
+  else
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  fi
   if [ -z "${GATEWAY_ID}" ]
   then
     echo "Error: GATEWAY_ID is empty"
@@ -541,16 +544,23 @@ function dump_resources() {
   done < <(jq -r '.members[].id' ${LB_MCS_POOL_FILE})
 )
 
+(
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
-  VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
+  if [ -n "${PERSISTENT_VPC}" ]
+  then
+    VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_VPC}'")) | .id')
+  else
+    VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  fi
   if [ -z "${VPC_UUID}" ]
   then
-    echo "Error: Could not find a VPC with the name ${INFRA_ID}"
-  else
-    ibmcloud is vpc ${VPC_UUID}
+    echo "Error: VPC_ID is empty"
+    exit
   fi
+
+  ibmcloud is vpc ${VPC_UUID}
+)
 
   echo "8<--------8<--------8<--------8<-------- DHCP networks 8<--------8<--------8<--------8<--------"
 
@@ -752,9 +762,11 @@ POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
 
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "PERSISTENT_TG=${PERSISTENT_TG}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret

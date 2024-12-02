@@ -7,8 +7,12 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
 CRUCIBLE_URL=$(cat "/secret/crucible_url")
+JETLAG_PR=${JETLAG_PR:-}
+REPO_NAME=${REPO_NAME:-}
+PULL_NUMBER=${PULL_NUMBER:-}
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -28,56 +32,65 @@ ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 smcipmitool_url:
-bastion_lab_interface: eno12399
-bastion_controlplane_interface: ens6f0
+bastion_lab_interface: $BASTION_LAB_INTERFACE
+bastion_controlplane_interface: $BASTION_CP_INTERFACE
 controlplane_network: 192.168.216.1/21
 controlplane_network_prefix: 21
-bastion_vlaned_interface: ens1f1
+bastion_vlaned_interface: $BASTION_VLANED_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-controlplane_lab_interface: eno1np0
+controlplane_lab_interface: $CONTROLPLANE_LAB_INTERFACE
 controlplane_pub_network_cidr:
 controlplane_pub_network_gateway:
-jumbo_mtu: false
+jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
-sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/pull_secret root@${bastion}:~/jetlag/pull_secret.txt
-
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
+cat > /tmp/clean-resources.sh << 'EOF'
+podman pod stop $(podman pod ps -q) || echo 'No podman pods to stop'
+podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
+podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
+podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
+rm -rf /opt/*
+EOF
+
+jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 
 # Setup Bastion
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   cd jetlag
-   if [[ -n '$JETLAG_PR' ]]; then
-     git checkout main
-     git branch -D dev || echo 'No dev branch exists'
-     git fetch origin pull/$JETLAG_PR/head:dev
-     git checkout dev
-   elif [[ ${JETLAG_LATEST} == 'true' ]]; then
-     git checkout main
-     git pull
-   else
-     git pull origin $JETLAG_BRANCH
+   git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
+   cd ${jetlag_repo}
+   # JETLAG_PR or PULL_NUMBER can't be set at the same time
+   if [[ -n '${JETLAG_PR}' ]]; then
+     git pull origin pull/${JETLAG_PR}/head:${JETLAG_PR} --rebase
+     git switch ${JETLAG_PR}
+   elif [[ -n '${PULL_NUMBER}' ]] && [[ '${REPO_NAME}' == 'jetlag' ]]; then
+     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+     git switch ${PULL_NUMBER}
    fi
    git branch
    source bootstrap.sh
-   ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+"
 
-# Attempt Deployment
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
+scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
+scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+
+ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   cd jetlag
-   git branch
-   source bootstrap.sh
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)"
+   cd ${jetlag_repo}
+   source .ansible/bin/activate
+   ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /root/clean-resources.sh
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   deactivate
+   rm -rf .ansible
+"

@@ -6,7 +6,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build05
-    context: ci/prow/e2e-agent-compact-ipv4
+    context: ci/prow/e2e-agent-4control-ipv4
     decorate: true
     decoration_config:
       timeout: 6h0m0s
@@ -16,9 +16,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-e2e-agent-compact-ipv4
-    rerun_command: /test e2e-agent-compact-ipv4
-    skip_if_only_changed: ^openshift/|^\.tekton/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+    name: pull-ci-openshift-assisted-service-master-e2e-agent-4control-ipv4
+    optional: true
+    rerun_command: /test e2e-agent-4control-ipv4
     spec:
       containers:
       - args:
@@ -27,8 +27,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-compact-ipv4-cluster-profile
-        - --target=e2e-agent-compact-ipv4
+        - --target=e2e-agent-4control-ipv4
         command:
         - ci-operator
         image: ci-operator:latest
@@ -44,8 +43,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-compact-ipv4-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -69,9 +66,158 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: manifest-tool-local-pusher
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-4control-ipv4,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/e2e-agent-5control-ipv4
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-e2e-agent-5control-ipv4
+    optional: true
+    rerun_command: /test e2e-agent-5control-ipv4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-5control-ipv4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-5control-ipv4,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/e2e-agent-compact-ipv4
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-e2e-agent-compact-ipv4
+    rerun_command: /test e2e-agent-compact-ipv4
+    skip_if_only_changed: ^openshift/|^\.tekton/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-compact-ipv4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -109,7 +255,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-ha-dualstack-cluster-profile
         - --target=e2e-agent-ha-dualstack
         command:
         - ci-operator
@@ -126,8 +271,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-ha-dualstack-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -151,9 +294,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -191,7 +331,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-sno-ipv6-cluster-profile
         - --target=e2e-agent-sno-ipv6
         command:
         - ci-operator
@@ -208,8 +347,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-sno-ipv6-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -233,9 +370,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -257,7 +391,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-assisted-operator-catalog-publish-verify
     rerun_command: /test edge-assisted-operator-catalog-publish-verify
@@ -321,7 +455,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-ci-index
     rerun_command: /test edge-ci-index
@@ -379,7 +513,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-disconnected-capi
     optional: true
@@ -393,7 +527,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-disconnected-capi-cluster-profile
         - --target=e2e-ai-operator-disconnected-capi
         - --variant=edge
         command:
@@ -411,8 +544,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-disconnected-capi-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -436,9 +567,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -462,7 +590,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
@@ -475,7 +603,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-cluster-profile
         - --target=e2e-ai-operator-ztp
         - --variant=edge
         command:
@@ -493,8 +620,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -518,9 +643,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -544,7 +666,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-3masters
     optional: true
@@ -558,7 +680,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-3masters-cluster-profile
         - --target=e2e-ai-operator-ztp-3masters
         - --variant=edge
         command:
@@ -576,8 +697,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-3masters-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -601,9 +720,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -620,6 +736,158 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
+    context: ci/prow/edge-e2e-ai-operator-ztp-4masters
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-4masters
+    optional: true
+    rerun_command: /test edge-e2e-ai-operator-ztp-4masters
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ai-operator-ztp-4masters
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp-4masters,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/edge-e2e-ai-operator-ztp-5masters
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-5masters
+    optional: true
+    rerun_command: /test edge-e2e-ai-operator-ztp-5masters
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ai-operator-ztp-5masters
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp-5masters,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/edge-e2e-ai-operator-ztp-capi
     decorate: true
     labels:
@@ -627,7 +895,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-capi
     optional: true
@@ -641,7 +909,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-capi-cluster-profile
         - --target=e2e-ai-operator-ztp-capi
         - --variant=edge
         command:
@@ -659,8 +926,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-capi-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -684,9 +949,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -710,7 +972,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-compact-day2-masters
     optional: true
@@ -723,7 +985,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-compact-day2-masters-cluster-profile
         - --target=e2e-ai-operator-ztp-compact-day2-masters
         - --variant=edge
         command:
@@ -741,8 +1002,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-compact-day2-masters-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -766,9 +1025,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -792,7 +1048,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-compact-day2-workers
     optional: true
@@ -805,7 +1061,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-compact-day2-workers-cluster-profile
         - --target=e2e-ai-operator-ztp-compact-day2-workers
         - --variant=edge
         command:
@@ -823,8 +1078,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-compact-day2-workers-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -848,9 +1101,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -874,7 +1124,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-disconnected
     optional: true
@@ -888,7 +1138,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-disconnected-cluster-profile
         - --target=e2e-ai-operator-ztp-disconnected
         - --variant=edge
         command:
@@ -906,8 +1155,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-disconnected-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -931,9 +1178,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -957,7 +1201,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-hypershift-zero-nodes
     optional: true
@@ -970,7 +1214,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-hypershift-zero-nodes-cluster-profile
         - --target=e2e-ai-operator-ztp-hypershift-zero-nodes
         - --variant=edge
         command:
@@ -988,8 +1231,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-hypershift-zero-nodes-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1013,9 +1254,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1039,7 +1277,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-multiarch-3masters-ocp
     optional: true
@@ -1052,7 +1290,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-3masters-ocp-cluster-profile
         - --target=e2e-ai-operator-ztp-multiarch-3masters-ocp
         - --variant=edge
         command:
@@ -1070,8 +1307,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-3masters-ocp-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1095,9 +1330,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1121,7 +1353,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-multiarch-sno-ocp
     optional: true
@@ -1134,7 +1366,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-multiarch-sno-ocp-cluster-profile
         - --target=e2e-ai-operator-ztp-multiarch-sno-ocp
         - --variant=edge
         command:
@@ -1152,8 +1383,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-multiarch-sno-ocp-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1177,9 +1406,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1203,7 +1429,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-node-labels
     optional: true
@@ -1216,7 +1442,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-node-labels-cluster-profile
         - --target=e2e-ai-operator-ztp-node-labels
         - --variant=edge
         command:
@@ -1234,8 +1459,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-node-labels-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1259,9 +1482,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1287,7 +1507,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-remove-node
     optional: true
@@ -1300,7 +1520,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-remove-node-cluster-profile
         - --target=e2e-ai-operator-ztp-remove-node
         - --variant=edge
         command:
@@ -1318,8 +1537,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-remove-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1343,9 +1560,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1369,7 +1583,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-masters
     optional: true
@@ -1382,7 +1596,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-masters-cluster-profile
         - --target=e2e-ai-operator-ztp-sno-day2-masters
         - --variant=edge
         command:
@@ -1400,8 +1613,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-masters-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1425,9 +1636,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1451,7 +1659,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers
     rerun_command: /test edge-e2e-ai-operator-ztp-sno-day2-workers
@@ -1463,7 +1671,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-workers-cluster-profile
         - --target=e2e-ai-operator-ztp-sno-day2-workers
         - --variant=edge
         command:
@@ -1481,8 +1688,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-workers-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1506,9 +1711,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1532,7 +1734,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
     optional: true
@@ -1545,7 +1747,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride-cluster-profile
         - --target=e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
         - --variant=edge
         command:
@@ -1563,8 +1764,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1588,9 +1787,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1614,7 +1810,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding
     rerun_command: /test edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding
@@ -1626,7 +1822,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-sno-day2-workers-late-binding-cluster-profile
         - --target=e2e-ai-operator-ztp-sno-day2-workers-late-binding
         - --variant=edge
         command:
@@ -1644,8 +1839,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-sno-day2-workers-late-binding-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1669,9 +1862,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1695,7 +1885,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted
     rerun_command: /test edge-e2e-metal-assisted
@@ -1708,7 +1898,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
         - --target=e2e-metal-assisted
         - --variant=edge
         command:
@@ -1726,8 +1915,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1751,9 +1938,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1777,7 +1961,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-12
     rerun_command: /test edge-e2e-metal-assisted-4-12
@@ -1789,7 +1973,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-12-cluster-profile
         - --target=e2e-metal-assisted-4-12
         - --variant=edge
         command:
@@ -1807,8 +1990,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-12-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1832,9 +2013,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1858,7 +2036,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-13
     optional: true
@@ -1871,7 +2049,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-13-cluster-profile
         - --target=e2e-metal-assisted-4-13
         - --variant=edge
         command:
@@ -1889,8 +2066,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-13-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1914,9 +2089,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1940,7 +2112,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-14
     optional: true
@@ -1953,7 +2125,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-14-cluster-profile
         - --target=e2e-metal-assisted-4-14
         - --variant=edge
         command:
@@ -1971,8 +2142,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1996,9 +2165,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2022,7 +2188,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-15
     optional: true
@@ -2035,7 +2201,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-15-cluster-profile
         - --target=e2e-metal-assisted-4-15
         - --variant=edge
         command:
@@ -2053,8 +2218,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-15-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2078,9 +2241,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2104,7 +2264,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-16
     optional: true
@@ -2117,7 +2277,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-16-cluster-profile
         - --target=e2e-metal-assisted-4-16
         - --variant=edge
         command:
@@ -2135,8 +2294,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2160,9 +2317,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2179,17 +2333,18 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/edge-e2e-metal-assisted-4-control-planes-4-17
+    context: ci/prow/edge-e2e-metal-assisted-4-17
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-control-planes-4-17
-    rerun_command: /test edge-e2e-metal-assisted-4-control-planes-4-17
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-17
+    optional: true
+    rerun_command: /test edge-e2e-metal-assisted-4-17
     spec:
       containers:
       - args:
@@ -2198,8 +2353,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-control-planes-4-17-cluster-profile
-        - --target=e2e-metal-assisted-4-control-planes-4-17
+        - --target=e2e-metal-assisted-4-17
         - --variant=edge
         command:
         - ci-operator
@@ -2216,8 +2370,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-control-planes-4-17-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2241,9 +2393,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2253,7 +2402,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(edge-e2e-metal-assisted-4-control-planes-4-17|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2267,7 +2416,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-control-planes-4-18
     rerun_command: /test edge-e2e-metal-assisted-4-control-planes-4-18
@@ -2279,7 +2428,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-control-planes-4-18-cluster-profile
         - --target=e2e-metal-assisted-4-control-planes-4-18
         - --variant=edge
         command:
@@ -2297,8 +2445,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-control-planes-4-18-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2322,9 +2468,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2341,87 +2484,6 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/edge-e2e-metal-assisted-5-control-planes-4-17
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/variant: edge
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-5-control-planes-4-17
-    rerun_command: /test edge-e2e-metal-assisted-5-control-planes-4-17
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-5-control-planes-4-17-cluster-profile
-        - --target=e2e-metal-assisted-5-control-planes-4-17
-        - --variant=edge
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-5-control-planes-4-17-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(edge-e2e-metal-assisted-5-control-planes-4-17|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build01
     context: ci/prow/edge-e2e-metal-assisted-5-control-planes-4-18
     decorate: true
     labels:
@@ -2429,7 +2491,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-5-control-planes-4-18
     rerun_command: /test edge-e2e-metal-assisted-5-control-planes-4-18
@@ -2441,7 +2503,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-5-control-planes-4-18-cluster-profile
         - --target=e2e-metal-assisted-5-control-planes-4-18
         - --variant=edge
         command:
@@ -2459,8 +2520,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-5-control-planes-4-18-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2484,9 +2543,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2510,7 +2566,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-bond
     optional: true
@@ -2524,7 +2580,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-bond-cluster-profile
         - --target=e2e-metal-assisted-bond
         - --variant=edge
         command:
@@ -2542,8 +2597,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-bond-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2567,9 +2620,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2593,7 +2643,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-bond-4-14
     optional: true
@@ -2607,7 +2657,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-bond-4-14-cluster-profile
         - --target=e2e-metal-assisted-bond-4-14
         - --variant=edge
         command:
@@ -2625,8 +2674,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-bond-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2650,9 +2697,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2676,7 +2720,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-cnv-4-16
     rerun_command: /test edge-e2e-metal-assisted-cnv-4-16
@@ -2688,7 +2732,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
         - --target=e2e-metal-assisted-cnv-4-16
         - --variant=edge
         command:
@@ -2706,8 +2749,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-cnv-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2731,9 +2772,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2757,7 +2795,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-cnv-4-17
     rerun_command: /test edge-e2e-metal-assisted-cnv-4-17
@@ -2770,7 +2808,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-cnv-4-17-cluster-profile
         - --target=e2e-metal-assisted-cnv-4-17
         - --variant=edge
         command:
@@ -2788,8 +2825,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-cnv-4-17-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2813,9 +2848,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2839,7 +2871,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-day2
     optional: true
@@ -2853,7 +2885,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-day2-cluster-profile
         - --target=e2e-metal-assisted-day2
         - --variant=edge
         command:
@@ -2871,8 +2902,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-day2-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2896,9 +2925,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2922,7 +2948,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-day2-arm-workers
     optional: true
@@ -2935,7 +2961,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-day2-arm-workers-cluster-profile
         - --target=e2e-metal-assisted-day2-arm-workers
         - --variant=edge
         command:
@@ -2953,8 +2978,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-day2-arm-workers-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2978,9 +3001,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3004,7 +3024,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-day2-single-node
     optional: true
@@ -3018,7 +3038,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-day2-single-node-cluster-profile
         - --target=e2e-metal-assisted-day2-single-node
         - --variant=edge
         command:
@@ -3036,8 +3055,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-day2-single-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3061,9 +3078,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3087,7 +3101,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-external
     optional: true
@@ -3101,7 +3115,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-external-cluster-profile
         - --target=e2e-metal-assisted-external
         - --variant=edge
         command:
@@ -3119,8 +3132,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-external-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3144,9 +3155,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3170,7 +3178,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-external-4-14
     optional: true
@@ -3183,7 +3191,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-external-4-14-cluster-profile
         - --target=e2e-metal-assisted-external-4-14
         - --variant=edge
         command:
@@ -3201,8 +3208,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-external-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3226,9 +3231,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3252,7 +3254,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ipv4v6
     optional: true
@@ -3266,7 +3268,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
         - --target=e2e-metal-assisted-ipv4v6
         - --variant=edge
         command:
@@ -3284,8 +3285,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3309,9 +3308,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3335,7 +3331,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ipv6
     optional: true
@@ -3348,7 +3344,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
         - --target=e2e-metal-assisted-ipv6
         - --variant=edge
         command:
@@ -3366,8 +3361,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-ipv6-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3391,9 +3384,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3410,6 +3400,82 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
+    context: ci/prow/edge-e2e-metal-assisted-ipxe-static-ip-suite
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ipxe-static-ip-suite
+    optional: true
+    rerun_command: /test edge-e2e-metal-assisted-ipxe-static-ip-suite
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-assisted-ipxe-static-ip-suite
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-ipxe-static-ip-suite,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/edge-e2e-metal-assisted-kube-api-late-binding-single-node
     decorate: true
     labels:
@@ -3417,7 +3483,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-binding-single-node
     optional: true
@@ -3430,7 +3496,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
         - --target=e2e-metal-assisted-kube-api-late-binding-single-node
         - --variant=edge
         command:
@@ -3448,8 +3513,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3473,9 +3536,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3499,7 +3559,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
     optional: true
@@ -3512,7 +3572,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node-cluster-profile
         - --target=e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
         - --variant=edge
         command:
@@ -3530,8 +3589,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3555,9 +3612,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3581,7 +3635,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-net-suite
     optional: true
@@ -3594,7 +3648,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
         - --target=e2e-metal-assisted-kube-api-net-suite
         - --variant=edge
         command:
@@ -3612,8 +3665,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3637,9 +3688,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3663,7 +3711,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-lvm
     rerun_command: /test edge-e2e-metal-assisted-lvm
@@ -3676,7 +3724,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-lvm-cluster-profile
         - --target=e2e-metal-assisted-lvm
         - --variant=edge
         command:
@@ -3694,8 +3741,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-lvm-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3719,9 +3764,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3745,7 +3787,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-mce-4-16
     optional: true
@@ -3758,7 +3800,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-mce-4-16-cluster-profile
         - --target=e2e-metal-assisted-mce-4-16
         - --variant=edge
         command:
@@ -3776,8 +3817,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-mce-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3801,9 +3840,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3827,7 +3863,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-mce-sno-4-16
     optional: true
@@ -3840,7 +3876,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-mce-sno-4-16-cluster-profile
         - --target=e2e-metal-assisted-mce-sno-4-16
         - --variant=edge
         command:
@@ -3858,8 +3893,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-mce-sno-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3883,9 +3916,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3909,7 +3939,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-metallb
     optional: true
@@ -3922,7 +3952,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-metallb-cluster-profile
         - --target=e2e-metal-assisted-metallb
         - --variant=edge
         command:
@@ -3940,8 +3969,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-metallb-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -3965,9 +3992,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3984,6 +4008,82 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
+    context: ci/prow/edge-e2e-metal-assisted-mtv-4-17
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-mtv-4-17
+    rerun_command: /test edge-e2e-metal-assisted-mtv-4-17
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-assisted-mtv-4-17
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-mtv-4-17,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/edge-e2e-metal-assisted-none
     decorate: true
     labels:
@@ -3991,7 +4091,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-none
     optional: true
@@ -4005,7 +4105,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-none-cluster-profile
         - --target=e2e-metal-assisted-none
         - --variant=edge
         command:
@@ -4023,8 +4122,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-none-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4048,9 +4145,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4074,7 +4168,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-odf-4-16
     rerun_command: /test edge-e2e-metal-assisted-odf-4-16
@@ -4086,7 +4180,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
         - --target=e2e-metal-assisted-odf-4-16
         - --variant=edge
         command:
@@ -4104,8 +4197,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-odf-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4129,9 +4220,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4155,7 +4243,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-odf-4-17
     rerun_command: /test edge-e2e-metal-assisted-odf-4-17
@@ -4168,7 +4256,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-odf-4-17-cluster-profile
         - --target=e2e-metal-assisted-odf-4-17
         - --variant=edge
         command:
@@ -4186,8 +4273,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-odf-4-17-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4211,9 +4296,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4237,7 +4319,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-onprem
     optional: true
@@ -4250,7 +4332,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
         - --target=e2e-metal-assisted-onprem
         - --variant=edge
         command:
@@ -4268,8 +4349,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-onprem-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4293,9 +4372,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4319,7 +4395,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-single-node
     optional: true
@@ -4333,7 +4409,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-single-node-cluster-profile
         - --target=e2e-metal-assisted-single-node
         - --variant=edge
         command:
@@ -4351,8 +4426,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-single-node-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4376,9 +4449,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4402,7 +4472,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-static-ip-suite
     optional: true
@@ -4416,7 +4486,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
         - --target=e2e-metal-assisted-static-ip-suite
         - --variant=edge
         command:
@@ -4434,8 +4503,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4459,9 +4526,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4485,7 +4549,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-static-ip-suite-4-14
     optional: true
@@ -4499,7 +4563,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-suite-4-14-cluster-profile
         - --target=e2e-metal-assisted-static-ip-suite-4-14
         - --variant=edge
         command:
@@ -4517,8 +4580,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-static-ip-suite-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4542,9 +4603,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4568,7 +4626,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-tang
     optional: true
@@ -4581,7 +4639,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-tang-cluster-profile
         - --target=e2e-metal-assisted-tang
         - --variant=edge
         command:
@@ -4599,8 +4656,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-tang-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4624,9 +4679,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4650,7 +4702,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-tpmv2
     optional: true
@@ -4663,7 +4715,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-tpmv2-cluster-profile
         - --target=e2e-metal-assisted-tpmv2
         - --variant=edge
         command:
@@ -4681,8 +4732,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-tpmv2-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4706,9 +4755,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4732,7 +4778,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-upgrade-agent
     optional: true
@@ -4745,7 +4791,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-upgrade-agent-cluster-profile
         - --target=e2e-metal-assisted-upgrade-agent
         - --variant=edge
         command:
@@ -4763,8 +4808,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-upgrade-agent-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4788,9 +4831,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4815,7 +4855,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build01
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-nutanix-assisted
     optional: true
@@ -4829,7 +4869,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-nutanix-assisted-cluster-profile
         - --target=e2e-nutanix-assisted
         - --variant=edge
         command:
@@ -4847,8 +4886,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-nutanix-assisted-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4872,9 +4909,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4899,7 +4933,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build01
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-nutanix-assisted-2workers
     optional: true
@@ -4912,7 +4946,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-nutanix-assisted-2workers-cluster-profile
         - --target=e2e-nutanix-assisted-2workers
         - --variant=edge
         command:
@@ -4930,8 +4963,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-nutanix-assisted-2workers-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -4955,9 +4986,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4982,7 +5010,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build01
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-nutanix-assisted-4-14
     optional: true
@@ -4996,7 +5024,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-nutanix-assisted-4-14-cluster-profile
         - --target=e2e-nutanix-assisted-4-14
         - --variant=edge
         command:
@@ -5014,8 +5041,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-nutanix-assisted-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5039,9 +5064,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5065,7 +5087,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-oci-assisted
     optional: true
@@ -5079,7 +5101,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-oci-assisted-cluster-profile
         - --target=e2e-oci-assisted
         - --variant=edge
         command:
@@ -5097,8 +5118,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-oci-assisted-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5122,9 +5141,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-oci-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5148,7 +5164,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-oci-assisted-4-14
     optional: true
@@ -5162,7 +5178,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-oci-assisted-4-14-cluster-profile
         - --target=e2e-oci-assisted-4-14
         - --variant=edge
         command:
@@ -5180,8 +5195,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-oci-assisted-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5205,9 +5218,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-oci-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5231,7 +5241,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-oci-assisted-iscsi
     optional: true
@@ -5244,7 +5254,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-oci-assisted-iscsi-cluster-profile
         - --target=e2e-oci-assisted-iscsi
         - --variant=edge
         command:
@@ -5262,8 +5271,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-oci-assisted-iscsi-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5287,9 +5294,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-oci-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5313,7 +5317,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted
     optional: true
@@ -5327,7 +5331,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-assisted-cluster-profile
         - --target=e2e-vsphere-assisted
         - --variant=edge
         command:
@@ -5345,8 +5348,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-assisted-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5370,9 +5371,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5396,7 +5394,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted-4-14
     optional: true
@@ -5409,7 +5407,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-assisted-4-14-cluster-profile
         - --target=e2e-vsphere-assisted-4-14
         - --variant=edge
         command:
@@ -5427,8 +5424,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-assisted-4-14-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5452,9 +5447,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5478,7 +5470,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted-4-15
     optional: true
@@ -5491,7 +5483,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-assisted-4-15-cluster-profile
         - --target=e2e-vsphere-assisted-4-15
         - --variant=edge
         command:
@@ -5509,8 +5500,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-assisted-4-15-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5534,9 +5523,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5560,7 +5546,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted-4-16
     optional: true
@@ -5573,7 +5559,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-assisted-4-16-cluster-profile
         - --target=e2e-vsphere-assisted-4-16
         - --variant=edge
         command:
@@ -5591,8 +5576,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-assisted-4-16-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5616,9 +5599,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5642,7 +5622,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted-umn
     optional: true
@@ -5655,7 +5635,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-vsphere-assisted-umn-cluster-profile
         - --target=e2e-vsphere-assisted-umn
         - --variant=edge
         command:
@@ -5673,8 +5652,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-assisted-umn-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5698,9 +5675,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5722,7 +5696,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-images
     rerun_command: /test edge-images
@@ -5778,7 +5752,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-lint
     rerun_command: /test edge-lint
@@ -5830,12 +5804,75 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
+    context: ci/prow/edge-operator-publish-verify
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-operator-publish-verify
+    rerun_command: /test edge-operator-publish-verify
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=operator-publish-verify
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(edge-operator-publish-verify|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/edge-subsystem-aws
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-subsystem-aws
     rerun_command: /test edge-subsystem-aws
@@ -5906,7 +5943,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-subsystem-kubeapi-aws
     rerun_command: /test edge-subsystem-kubeapi-aws
@@ -5977,7 +6014,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-unit-test
     rerun_command: /test edge-unit-test
@@ -6041,7 +6078,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-verify-generated-code
     rerun_command: /test edge-verify-generated-code
@@ -6205,6 +6242,84 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/okd-scos-e2e-aws-ovn
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-okd-scos-e2e-aws-ovn
+    optional: true
+    rerun_command: /test okd-scos-e2e-aws-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

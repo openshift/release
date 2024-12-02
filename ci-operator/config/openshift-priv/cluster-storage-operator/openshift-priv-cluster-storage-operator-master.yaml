@@ -8,7 +8,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.18_base-rhel9:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.18:
@@ -29,17 +29,17 @@ images:
   to: cluster-storage-operator
 promotion:
   to:
-  - name: 4.18-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
 resources:
   '*':
@@ -154,6 +154,21 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-cinder-csi
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- always_run: false
+  as: e2e-openstack-manila-csi
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
 - as: hypershift-aws-e2e-external
   steps:
     cluster_profile: hypershift

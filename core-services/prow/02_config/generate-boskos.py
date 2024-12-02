@@ -84,12 +84,19 @@ CONFIG = {
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
     },
+    'metal-perfscale-jetlag-quota-slice': {
+        'metal-perfscale-jetlag-rdu3': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
     'aws-serverless-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
+    },
+    'aws-sustaining-autorelease-412-quota-slice': {
+        # We can re-configure later as per requirement
+        'us-east-1': 5,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -187,6 +194,9 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'azure-sustaining-autorelease-412-quota-slice': {
+        'eastus': 10,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 70,
     },
@@ -202,17 +212,20 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-qe-c3-metal-quota-slice': {
+        'us-central1': 4,
+    },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 4,
     },
     'gcp-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-3-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 80,
+        'us-central1': 70,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
@@ -223,7 +236,8 @@ CONFIG = {
     'gcp-telco-quota-slice': {
         'us-central1': 40,
     },
-    'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-1-quota-slice': {},
+    'libvirt-s390x-2-quota-slice': {},
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
@@ -237,6 +251,7 @@ CONFIG = {
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
     'nutanix-qe-gpu-quota-slice': {},
+    'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
         'default': 18,
@@ -250,6 +265,9 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
+    'rhoso-giant28-quota-slice': {
+        'default': 1,
+    },    
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
@@ -446,12 +464,25 @@ CONFIG = {
     },
     'aws-ovn-perfscale-quota-slice': {
         'us-west-2': 4,
+        'us-east-1': 4,
+    },
+    'aws-rhoai-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
+    },
+    'aws-managed-rosa-rhoai-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
+    },
+    'aws-managed-osd-rhoai-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
     }
 }
 
 for i in range(2,7):
     for j in range(2):
-        CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+        CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
 for i in range(3):
     for j in range(4):
@@ -473,6 +504,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-gpu-quota-slice']['nutanix-qe-gpu-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-flow-quota-slice']['nutanix-qe-flow-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

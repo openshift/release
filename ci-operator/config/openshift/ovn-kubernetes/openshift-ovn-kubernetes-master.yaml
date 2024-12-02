@@ -8,7 +8,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.17_base-rhel9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.22-openshift-4.17:
@@ -54,17 +54,17 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -151,6 +151,7 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
+  timeout: 5h30m0s
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
     cluster_profile: aws
@@ -169,6 +170,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -340,6 +342,45 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l3
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l3-pods
+  timeout: 8h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l2
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+      KUBE_BURNER_VERSION: 1.5.0
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l2-pods
+  timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
@@ -354,6 +395,13 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-hypershift-conformance-techpreview
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: hypershift-aws-conformance
 - as: e2e-azure-ovn-techpreview
   optional: true
   steps:
