@@ -44,6 +44,9 @@ EOF
   yq-go m -a -x -i "${CONFIG}" "${config_patch}"
 }
 
+if [ -n "$SERVICE_ENDPOINT_COS" ]; then
+  patch_endpoint "COS" $SERVICE_ENDPOINT_COS
+fi
 if [ -n "$SERVICE_ENDPOINT_IAM" ]; then
   patch_endpoint "IAM" $SERVICE_ENDPOINT_IAM
 fi
@@ -58,9 +61,6 @@ if [ -n "$SERVICE_ENDPOINT_ResourceManager" ]; then
 fi
 if [ -n "$SERVICE_ENDPOINT_DNSServices" ]; then
   patch_endpoint "DNSServices" $SERVICE_ENDPOINT_DNSServices
-fi
-if [ -n "$SERVICE_ENDPOINT_COS" ]; then
-  patch_endpoint "COS" $SERVICE_ENDPOINT_COS
 fi
 if [ -n "$SERVICE_ENDPOINT_GlobalSearch" ]; then
   patch_endpoint "GlobalSearch" $SERVICE_ENDPOINT_GlobalSearch
