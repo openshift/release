@@ -31,7 +31,7 @@ This script does the following to run Fuse On Openshift interop tests:
 
 - `FUSE_RELEASE`
     - **Definition**: Fuse release or branch/tag used for selecting right image..
-    - **If left empty**: 7.12.x tag will be set.
+    - **If left empty**: latest tag will be set.
 
 ## Custom Images
 
