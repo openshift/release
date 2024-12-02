@@ -91,8 +91,7 @@ if [[ "$PRE_BOOT_ORDER" == "true" ]]; then
   echo "Cheking boot order ..."
   for i in $HOSTS; do
     # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
-    #command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
-    command_output=$(podman run -v /root/config:/badfish/config:Z quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/badfish_interfaces.yml -t foreman 2>&1)
+    command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
     desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
     echo "Cheking boot order of server $i ..."
     echo $command_output
