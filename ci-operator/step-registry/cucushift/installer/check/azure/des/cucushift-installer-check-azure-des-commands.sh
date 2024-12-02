@@ -149,5 +149,17 @@ else
         echo "ERROR: Fail to check des setting in default sc! expected des id: ${expected_default_des_id}, sc des id: ${sc_des_id}"
         critical_check_result=1
     fi
+
+    pv_name=$(oc get pv -ojson | jq -r '.items[].metadata.name' | head -1)
+    if [[ -n "${pv_name}" ]]; then
+        echo -e "\n--- check encryption setting for pv: ${pv_name} ---"
+        pv_des=$(az disk show -n "${pv_name}" -g "${CLUSTER_RESOURCE_GROUP}" --query 'encryption.diskEncryptionSetId' -otsv | awk -F'/' '{print $NF}')
+        if [[ "${pv_des}" == "${DES_DEFAULT}" ]]; then
+            echo "provisioned pv contains expected des setting!"
+        else
+            echo "ERROR: Fail to check des setting for pv: ${pv_name}! expected des: ${DES_DEFAULT}, pv des name: ${pv_des}!"
+            critical_check_result=1
+        fi
+    fi
 fi
 exit ${critical_check_result}

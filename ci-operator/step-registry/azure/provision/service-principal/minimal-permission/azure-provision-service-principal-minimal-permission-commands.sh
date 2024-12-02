@@ -244,6 +244,18 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
+# optional permissions for external dns operator
+required_permissions="""
+\"Microsoft.Network/privateDnsZones/CNAME/read\",
+\"Microsoft.Network/privateDnsZones/CNAME/write\",
+\"Microsoft.Network/privateDnsZones/CNAME/delete\",
+\"Microsoft.Network/privateDnsZones/TXT/read\",
+\"Microsoft.Network/privateDnsZones/TXT/write\",
+\"Microsoft.Network/privateDnsZones/TXT/delete\",
+${required_permissions}
+"""
+
+
 # optional permission to gather bootstrap bundle log
 required_permissions="""
 \"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",

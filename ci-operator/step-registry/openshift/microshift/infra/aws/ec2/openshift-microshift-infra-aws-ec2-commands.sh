@@ -21,20 +21,20 @@ declare -A ami_map=(
   [us-east-1,arm64,rhel-9.2]=ami-04c1dfc4f324c64b2   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
   [us-east-1,x86_64,rhel-9.3]=ami-0fc8883cbe9d895c8  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-east-1,x86_64,rhel-9.4]=ami-0583d8c7a9c35822c  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.4]=ami-07472131ec292b5da   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.4]=ami-0ceb31b482870cee1  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.4]=ami-08fbb4c856514bf2f   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.2]=ami-0e4e5e5727c2a7a33  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
   [us-west-2,arm64,rhel-9.2]=ami-0538b6fddb813b795   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.4]=ami-0423fca164888b941  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.4]=ami-05b40ce1c0e236ef2   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.4]=ami-05d9b7d9c05363c76  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.4]=ami-083a0eb0b1c55a7da   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.2]=ami-0d4c002fec950de2b  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.2]=ami-07dda6169c6afa927   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.3]=ami-0955dc0147853401b  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.3]=ami-0ea2a765094f230d5   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.4]=ami-007c3072df8eb6584  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.4]=ami-02212921a6e889ed6   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.4]=ami-089b71495d6cacd26  # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.4]=ami-06ce7461a466fec39   # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"

@@ -4,20 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-REGION="${LEASED_RESOURCE}"
-DEFAULT_PRIVATE_ENDPOINTS=$(mktemp)
-cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
-{
-    "IAM": "https://private.iam.cloud.ibm.com",
-    "VPC": "https://${REGION}.private.iaas.cloud.ibm.com/v1",
-    "ResourceController": "https://private.resource-controller.cloud.ibm.com",
-    "ResourceManager": "https://private.resource-controller.cloud.ibm.com",
-    "DNSServices": "https://api.private.dns-svcs.cloud.ibm.com/v1",
-    "COS": "https://s3.direct.${REGION}.cloud-object-storage.appdomain.cloud",
-    "GlobalSearch": "https://api.private.global-search-tagging.cloud.ibm.com",
-    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com"
-}
-EOF
+DEFAULT_PRIVATE_ENDPOINTS="${SHARED_DIR}/eps_default.json"
 
 function get_service_endpoint() {
     local service_name=$1
@@ -28,11 +15,80 @@ function get_service_endpoint() {
     echo "${service_endpoint}"
 }
 
+function isPreVersion() {
+  local required_ocp_version="$1"
+  local isPre
+  version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+  echo "get ocp version: ${version}"
+
+  isPre=0
+  if [ -n "${version}" ] && [ "$(printf '%s\n' "${required_ocp_version}" "${version}" | sort --version-sort | head -n1)" = "${required_ocp_version}" ]; then
+    isPre=1
+  fi
+  return $isPre
+}
+
+function check_ep_names() {
+    local isPreVersion="$1"
+    local output expString
+    output=$(openshift-install explain installconfig.platform.ibmcloud.serviceEndpoints)
+    if [[ "${isPreVersion}" == "True" ]]; then
+        expString='Valid Values: "COS","DNSServices","GlobalCatalog","GlobalSearch","GlobalTagging","HyperProtect","IAM","KeyProtect","ResourceController","ResourceManager","VPC"'
+    else
+        expString='Valid Values: "CIS","COS","COSConfig","DNSServices","GlobalCatalog","GlobalSearch","GlobalTagging","HyperProtect","IAM","KeyProtect","ResourceController","ResourceManager","VPC"'
+    fi
+    if ! [[ ${output} == *"${expString}"* ]]; then
+        echo "ERROR: Unexpected explain installconfig.platform.ibmcloud.serviceEndpoints: - ${output} "
+        return 1
+    else
+        echo "Check installconfig.platform.ibmcloud.serviceEndpoints passed."
+        return 0
+    fi
+}
+
+function check_eps() {
+    local epFile url ret src_name service_endpoint url
+    ret=0
+    epFile="${ARTIFACT_DIR}/eps.json"
+    oc get infrastructure -o json | jq -r '.items[0].status.platformStatus.ibmcloud.serviceEndpoints' > ${epFile}
+    declare -a srv_array
+    readarray -t srv_array < <(jq -r 'keys[]' ${DEFAULT_PRIVATE_ENDPOINTS})
+    for srv in "${srv_array[@]}"; do
+        src_name="SERVICE_ENDPOINT_${srv}"
+        if [[ -n "${!src_name}" ]]; then
+            service_endpoint=$(get_service_endpoint "${srv}" "${!src_name}")
+            url=$(cat ${epFile} | jq -r --arg n ${srv} '.[] | select (.name==$n) | .url')
+            echo "${srv} service_endpoint: [${service_endpoint}] url: [${url}] from the infrastructure."
+            if [ -n "$url" ] && [ -n "$service_endpoint" ]; then
+                if [[ "$url" != "$service_endpoint" ]]; then
+                    echo "ERROR 1: [${srv}] endpoint expected is [${service_endpoint}], but get url [${url}] from the infrastructure!!"
+                    ret=$((ret + 1))
+                else
+                    echo "${srv} custom endpoint check passed"
+                fi   
+            else
+                echo "ERROR: [${srv}] endpoint expected is [${service_endpoint}], get url [${url}] from the infrastructure!!"
+                ret=$((ret + 1))
+            fi
+        else
+            echo "WARN:  No custom endpoint is defined for ${srv}"
+        fi
+    done
+    return $ret
+}
+
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+isPre418="True"
+isPreVersion "4.18" || isPre418="False"
+echo "is Pre 4.18 version: ${isPre418}"
 
 ret=0
+
 if [ -n "$SERVICE_ENDPOINT_COS" ]; then
     service_endpoint=$(get_service_endpoint "COS" $SERVICE_ENDPOINT_COS)
     image_registry_pod=$(oc -n openshift-image-registry get pod -l docker-registry=default --no-headers | awk '{print $1}' | head -1)
@@ -47,5 +103,10 @@ if [ -n "$SERVICE_ENDPOINT_COS" ]; then
 else
     echo "WARN: No custom endpoint is defined for COS!"    
 fi
+echo "checking openshift-install explain installconfig.platform.ibmcloud.serviceEndpoints ..." 
+check_ep_names "${isPre418}" || ret=$((ret + $?))
+
+echo "checking oc get infrastructure ..."
+check_eps || ret=$((ret + $?))
 
 exit $ret
