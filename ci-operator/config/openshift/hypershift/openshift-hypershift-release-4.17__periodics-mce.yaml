@@ -189,6 +189,24 @@ tests:
     env:
       MCE_VERSION: "2.7"
     workflow: hypershift-mce-power-conformance
+- as: e2e-x86-power-heterogeneous-conformance
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+        NAME_SUFFIX=x86, CPU_ARCH=x86_64, NODE_ARCH=amd64
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_NODE_COUNT: "1"
+      IS_HETEROGENEOUS: "yes"
+      MCE_VERSION: "2.7"
+      TEST_SKIPS: ""
+      USE_GLB: "no"
+    test:
+    - chain: hypershift-mce-power-test
+    - ref: hypershift-mce-agent-info
+    workflow: hypershift-mce-power-conformance
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
