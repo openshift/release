@@ -10,17 +10,13 @@ function info() {
 
 function wait_for_etcd_patch_done() {
   info 'Waiting for patch etcd cluster...'
-  for _ in {1..30}; do
-    ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
-    if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
-      echo "Patched successfully!"
-      break
-    fi
-    sleep 15
-  done
-  if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
-          echo "Etcd patch failed..."
-          exit 1
+  if
+    ! oc wait --timeout=1m --for=jsonpath='{.spec.controlPlaneHardwareSpeed}'="Slower" etcd cluster 1>/dev/null || \
+    ! oc wait --timeout=30m --all --for=condition=Progressing=false co etcd 1>/dev/null || \
+    ! oc wait --timeout=1m --all --for=condition=Degraded=false co etcd 1>/dev/null || \
+    ! oc wait --timeout=1m --all --for=condition=Available=true co etcd 1>/dev/null; then
+      info "ERROR: Etcd patch failed..."
+      exit 1
   fi
   info 'Etcd Patched successfully!'
 }
@@ -40,7 +36,7 @@ oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 # The controlPlaneHardwareSpeed param is only available from 4.16
 if [[ $(jq -n "$oc_version < 4.16") == "true" ]]; then
-  info 'etcd tuning profile are only available from OCP 4.16... Skipping.'
+  info 'Etcd tuning profile are only available from OCP 4.16... Skipping.'
   exit 0
 fi
 
@@ -48,5 +44,6 @@ fi
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
   info 'Patching etcd cluster operator...'
   oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+  oc wait --timeout=1m --for=condition=Progressing=true co etcd 1>/dev/null # Waiting time to update to true the Progressing state of the etcd cluster
   wait_for_etcd_patch_done
 fi
