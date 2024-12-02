@@ -269,7 +269,7 @@ fi
 #
 # Find out the largest system pool type
 #
-curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.2.1/PowerVS-get-largest-system-pool-v0.2.1-linux-amd64.tar.gz
+curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.2.2/PowerVS-get-largest-system-pool-v0.2.2-linux-amd64.tar.gz
 tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
 chmod u+x /tmp/PowerVS-get-largest-system-pool
 POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -serviceGUID "${POWERVS_SERVICE_INSTANCE_ID}" -limitTypes "release-${BRANCH}" -zone "${POWERVS_REGION}")
