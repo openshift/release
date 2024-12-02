@@ -1,55 +1,29 @@
 #!/bin/bash
 
-# Namespace protection and validation
+# Namespace for Windows Container tests
 WINCNAMESPACE="winc-test"
 
-# Enable strict error handling and debug mode
+# Enable debug mode and disable immediate exit on error
 set -x
 set +e  
 
 script_dir=$(dirname "$0")
 
-# Enhanced logging function
+# Function for logging messages with timestamp
 log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /tmp/winc-test-debug.log
 }
 
-# Registry configuration
-MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
-if [ -f "$MIRROR_REGISTRY_FILE" ]; then
-    DISCONNECTED_REGISTRY=$(head -n 1 "$MIRROR_REGISTRY_FILE")
-    export DISCONNECTED_REGISTRY
-    log_message "Using mirror registry: $DISCONNECTED_REGISTRY"
-    log_message "Full contents of mirror registry file:"
-    cat "$MIRROR_REGISTRY_FILE"
-else
-    log_message "WARNING: Mirror registry file not found at $MIRROR_REGISTRY_FILE"
-fi
-
-# Add registry debug information
-debug_registry_info() {
-    log_message "Registry Debug Information:"
-    log_message "DISCONNECTED_REGISTRY=${DISCONNECTED_REGISTRY:-not_set}"
-    if [ -n "${DISCONNECTED_REGISTRY:-}" ]; then
-        log_message "Testing registry connectivity..."
-        if curl -k -s "${DISCONNECTED_REGISTRY}" > /dev/null; then
-            log_message "Registry is accessible"
-        else
-            log_message "WARNING: Registry might not be accessible"
-        fi
-    fi
-}
-
-# Verify cluster access function
+# Function to verify OpenShift cluster access
 verify_cluster_access() {
     log_message "Verifying cluster access..."
     if ! oc whoami &>/dev/null; then
         log_message "ERROR: Not logged into OpenShift cluster"
-        return 1
+        exit 1
     fi
 }
 
-# Create or switch to namespace function
+# Function to create or switch to the test namespace
 create_or_switch_to_namespace() {
     log_message "Creating/switching to namespace ${WINCNAMESPACE}..."
     if ! oc get namespace "${WINCNAMESPACE}" &>/dev/null; then
@@ -65,7 +39,7 @@ create_or_switch_to_namespace() {
     return 0
 }
 
-# Create ConfigMap function
+# Function to create ConfigMap for Windows test configuration
 create_winc_test_configmap() {
     local windows_image="$1"
     local container_image="$2"
@@ -83,16 +57,46 @@ data:
 EOF
 }
 
-# Function to dump deployment details
+# Read and validate mirror registry URL
+MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+if [ -f "$MIRROR_REGISTRY_FILE" ]; then
+    DISCONNECTED_REGISTRY=$(head -n 1 "$MIRROR_REGISTRY_FILE" | tr -d '[:space:]')
+    if [ -n "$DISCONNECTED_REGISTRY" ]; then
+        export DISCONNECTED_REGISTRY
+        log_message "Using mirror registry: $DISCONNECTED_REGISTRY"
+    else
+        log_message "ERROR: Mirror registry URL is empty"
+        exit 1
+    fi
+else
+    log_message "ERROR: Mirror registry file not found at $MIRROR_REGISTRY_FILE"
+    exit 1
+fi
+
+# Function to debug registry information
+debug_registry_info() {
+    log_message "Registry Debug Information:"
+    log_message "DISCONNECTED_REGISTRY=${DISCONNECTED_REGISTRY:-not_set}"
+    if [ -n "${DISCONNECTED_REGISTRY:-}" ]; then
+        log_message "Testing registry connectivity..."
+        if curl -k -s "${DISCONNECTED_REGISTRY}" > /dev/null; then
+            log_message "Registry is accessible"
+        else
+            log_message "WARNING: Registry might not be accessible"
+        fi
+    fi
+}
+
+# Function to dump deployment details for debugging
 dump_deployment_details() {
     local deployment_name="$1"
     log_message "Dumping full details for deployment: ${deployment_name}"
     log_message "--- Deployment YAML ---"
-    oc get deployment "${deployment_name}" -n "${WINCNAMESPACE}" -oyaml 
+    oc get deployment "${deployment_name}" -n "${WINCNAMESPACE}" -oyaml | tee -a /tmp/winc-test-debug.log
     log_message "--- Deployment Events ---"
-    oc get events -n "${WINCNAMESPACE}" --field-selector "involvedObject.name=${deployment_name}"
+    oc get events -n "${WINCNAMESPACE}" --field-selector "involvedObject.name=${deployment_name}" | tee -a /tmp/winc-test-debug.log
     log_message "--- Pod Details ---"
-    oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -oyaml
+    oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -oyaml | tee -a /tmp/winc-test-debug.log
     log_message "--- Pod Logs ---"
     local pods
     pods=$(oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -o jsonpath='{.items[*].metadata.name}')
@@ -102,23 +106,35 @@ dump_deployment_details() {
     done
 }
 
-# Create Windows workloads function
+# Function to create Windows workloads
 create_windows_workloads() {
     log_message "Creating Windows workloads..."
     create_or_switch_to_namespace || return 1
 
-    if [ -z "${PRIMARY_WINDOWS_IMAGE:-}" ] || [ -z "${PRIMARY_WINDOWS_CONTAINER_IMAGE:-}" ]; then
-        log_message "ERROR: Required variables PRIMARY_WINDOWS_IMAGE and/or PRIMARY_WINDOWS_CONTAINER_IMAGE not set"
-        return 1
+    # Validate required environment variables
+    local missing_vars=()
+    if [ -z "${PRIMARY_WINDOWS_IMAGE:-}" ]; then
+        missing_vars+=("PRIMARY_WINDOWS_IMAGE")
     fi
+    if [ -z "${PRIMARY_WINDOWS_CONTAINER_IMAGE:-}" ]; then
+        missing_vars+=("PRIMARY_WINDOWS_CONTAINER_IMAGE")
+    fi
+    
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        log_message "ERROR: Required variables not set: ${missing_vars[*]}"
+        return 1
+    }
 
+    # Debug: Show node information
     log_message "Available nodes and their labels:"
     oc get nodes --show-labels
     
+    # Create configmap before deployment
     create_winc_test_configmap "${PRIMARY_WINDOWS_IMAGE}" "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
 
     log_message "Deploying Windows workload with image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
     
+    # Create Windows deployment
     if ! oc apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -163,6 +179,7 @@ EOF
         return 1
     fi
 
+    # Wait for Windows workload to be ready
     local loops=0
     local max_loops=15
     local sleep_seconds=20
@@ -191,7 +208,7 @@ EOF
     done
 }
 
-# Create Linux workloads function
+# Function to create Linux workloads
 create_linux_workloads() {
     log_message "Creating Linux workloads..."
     log_message "Using DISCONNECTED_REGISTRY: ${DISCONNECTED_REGISTRY:-not_set}"
@@ -204,9 +221,12 @@ create_linux_workloads() {
     if [ -z "${DISCONNECTED_REGISTRY:-}" ]; then
         log_message "ERROR: DISCONNECTED_REGISTRY is not set"
         return 1
-    fi
+    }
 
-    log_message "Deploying Linux webserver..."
+    local linux_image="${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc"
+    log_message "Using Linux image: ${linux_image}"
+
+    # Create Linux deployment
     if ! oc apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -231,7 +251,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: webserver
-        image: ${DISCONNECTED_REGISTRY}/hello-openshift:multiarch-winc
+        image: ${linux_image}
         command: ["sleep"]
         args: ["infinity"]
         securityContext:
@@ -245,6 +265,7 @@ EOF
         return 1
     fi
 
+    # Wait for Linux workload to be ready
     local loops=0
     local max_loops=15
     local sleep_seconds=20
@@ -273,17 +294,26 @@ EOF
     done
 }
 
-# Main execution
-log_message "Starting script execution..."
-log_message "Script directory: ${script_dir}"
-debug_registry_info
+# Main execution function
+main() {
+    log_message "Starting script execution..."
+    log_message "Script directory: ${script_dir}"
+    
+    if [ ! -d "${SHARED_DIR:-}" ]; then
+        log_message "WARNING: SHARED_DIR not found or not set"
+    fi
+    
+    debug_registry_info
+    create_or_switch_to_namespace || exit 1
+    create_linux_workloads || exit 1
+    create_windows_workloads || exit 1
 
-create_or_switch_to_namespace || exit 1
-create_linux_workloads || exit 1
-create_windows_workloads || exit 1
+    # Final status dump
+    log_message "Final deployment status:"
+    oc get deployments -n "${WINCNAMESPACE}" -o wide
+    oc get pods -n "${WINCNAMESPACE}" -o wide
+    log_message "Script completed successfully"
+}
 
-# Final status dump
-log_message "Final deployment status:"
-oc get deployments -n "${WINCNAMESPACE}" -o wide
-oc get pods -n "${WINCNAMESPACE}" -o wide
-log_message "Script completed successfully"
+# Execute main function with logging
+main 2>&1 | tee -a /tmp/winc-test-debug.log
