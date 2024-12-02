@@ -116,7 +116,16 @@ fi
 
 # sleep 60*60
 oc version
+oc whoami
 oc auth can-i '*' '*'
-echo "cluster route:"
-echo $(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+K8S_CLUSTER_URL=$(oc whoami --show-server)
+echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
+oc create serviceaccount tester-sa-2 -n default
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+oc logout
+oc login --token="${K8S_CLUSTER_TOKEN}" --server="${K8S_CLUSTER_URL}"
+echo "login as ad >>>> "
+oc whoami
+oc auth can-i '*' '*'
+# bash ./.ibm/pipelines/openshift-ci-tests.sh
