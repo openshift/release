@@ -9,9 +9,35 @@ set +e
 
 script_dir=$(dirname "$0")
 
-# Enhanced logging function - moved up since it's used by other functions
+# Enhanced logging function
 log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /tmp/winc-test-debug.log
+}
+
+# Registry configuration
+MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+if [ -f "$MIRROR_REGISTRY_FILE" ]; then
+    DISCONNECTED_REGISTRY=$(head -n 1 "$MIRROR_REGISTRY_FILE")
+    export DISCONNECTED_REGISTRY
+    log_message "Using mirror registry: $DISCONNECTED_REGISTRY"
+    log_message "Full contents of mirror registry file:"
+    cat "$MIRROR_REGISTRY_FILE"
+else
+    log_message "WARNING: Mirror registry file not found at $MIRROR_REGISTRY_FILE"
+fi
+
+# Add registry debug information
+debug_registry_info() {
+    log_message "Registry Debug Information:"
+    log_message "DISCONNECTED_REGISTRY=${DISCONNECTED_REGISTRY:-not_set}"
+    if [ -n "${DISCONNECTED_REGISTRY:-}" ]; then
+        log_message "Testing registry connectivity..."
+        if curl -k -s "${DISCONNECTED_REGISTRY}" > /dev/null; then
+            log_message "Registry is accessible"
+        else
+            log_message "WARNING: Registry might not be accessible"
+        fi
+    fi
 }
 
 # Verify cluster access function
@@ -19,7 +45,7 @@ verify_cluster_access() {
     log_message "Verifying cluster access..."
     if ! oc whoami &>/dev/null; then
         log_message "ERROR: Not logged into OpenShift cluster"
-        exit 1
+        return 1
     fi
 }
 
@@ -57,42 +83,16 @@ data:
 EOF
 }
 
-# Registry configuration with enhanced debugging
-MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
-if [ -f "$MIRROR_REGISTRY_FILE" ]; then
-    DISCONNECTED_REGISTRY=$(head -n 1 "$MIRROR_REGISTRY_FILE")
-    export DISCONNECTED_REGISTRY
-    log_message "Using mirror registry: $DISCONNECTED_REGISTRY"
-    log_message "Full contents of mirror registry file:"
-    cat "$MIRROR_REGISTRY_FILE"
-else
-    log_message "WARNING: Mirror registry file not found at $MIRROR_REGISTRY_FILE"
-fi
-
-# Add registry debug information
-debug_registry_info() {
-    log_message "Registry Debug Information:"
-    log_message "DISCONNECTED_REGISTRY=${DISCONNECTED_REGISTRY:-not_set}"
-    if [ -n "${DISCONNECTED_REGISTRY:-}" ]; then
-        log_message "Testing registry connectivity..."
-        if curl -k -s "${DISCONNECTED_REGISTRY}" > /dev/null; then
-            log_message "Registry is accessible"
-        else
-            log_message "WARNING: Registry might not be accessible"
-        fi
-    fi
-}
-
 # Function to dump deployment details
 dump_deployment_details() {
     local deployment_name="$1"
     log_message "Dumping full details for deployment: ${deployment_name}"
     log_message "--- Deployment YAML ---"
-    oc get deployment "${deployment_name}" -n "${WINCNAMESPACE}" -oyaml | tee -a /tmp/winc-test-debug.log
+    oc get deployment "${deployment_name}" -n "${WINCNAMESPACE}" -oyaml 
     log_message "--- Deployment Events ---"
-    oc get events -n "${WINCNAMESPACE}" --field-selector "involvedObject.name=${deployment_name}" | tee -a /tmp/winc-test-debug.log
+    oc get events -n "${WINCNAMESPACE}" --field-selector "involvedObject.name=${deployment_name}"
     log_message "--- Pod Details ---"
-    oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -oyaml | tee -a /tmp/winc-test-debug.log
+    oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -oyaml
     log_message "--- Pod Logs ---"
     local pods
     pods=$(oc get pods -n "${WINCNAMESPACE}" -l "app=${deployment_name}" -o jsonpath='{.items[*].metadata.name}')
@@ -107,16 +107,14 @@ create_windows_workloads() {
     log_message "Creating Windows workloads..."
     create_or_switch_to_namespace || return 1
 
-    # Verify required variables
     if [ -z "${PRIMARY_WINDOWS_IMAGE:-}" ] || [ -z "${PRIMARY_WINDOWS_CONTAINER_IMAGE:-}" ]; then
         log_message "ERROR: Required variables PRIMARY_WINDOWS_IMAGE and/or PRIMARY_WINDOWS_CONTAINER_IMAGE not set"
         return 1
-    }
-    # Debug: Show node information
+    fi
+
     log_message "Available nodes and their labels:"
     oc get nodes --show-labels
     
-    # Create configmap before deployment
     create_winc_test_configmap "${PRIMARY_WINDOWS_IMAGE}" "${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
 
     log_message "Deploying Windows workload with image: ${PRIMARY_WINDOWS_CONTAINER_IMAGE}"
@@ -165,7 +163,6 @@ EOF
         return 1
     fi
 
-    # Wait for Windows workload to be ready with enhanced debugging
     local loops=0
     local max_loops=15
     local sleep_seconds=20
@@ -248,7 +245,6 @@ EOF
         return 1
     fi
 
-    # Wait for Linux workload with enhanced debugging
     local loops=0
     local max_loops=15
     local sleep_seconds=20
@@ -277,23 +273,17 @@ EOF
     done
 }
 
-# Main execution function
-main() {
-    log_message "Starting script execution..."
-    log_message "Script directory: ${script_dir}"
-    debug_registry_info
-    
-    #verify_cluster_access || exit 1
-    create_or_switch_to_namespace || exit 1
-    create_linux_workloads || exit 1
-    create_windows_workloads || exit 1
+# Main execution
+log_message "Starting script execution..."
+log_message "Script directory: ${script_dir}"
+debug_registry_info
 
-    # Final status dump
-    log_message "Final deployment status:"
-    oc get deployments -n "${WINCNAMESPACE}" -o wide
-    oc get pods -n "${WINCNAMESPACE}" -o wide
-    log_message "Script completed successfully"
-}
+create_or_switch_to_namespace || exit 1
+create_linux_workloads || exit 1
+create_windows_workloads || exit 1
 
-# Execute main function with logging
-main 2>&1 | tee -a /tmp/winc-test-debug.log
+# Final status dump
+log_message "Final deployment status:"
+oc get deployments -n "${WINCNAMESPACE}" -o wide
+oc get pods -n "${WINCNAMESPACE}" -o wide
+log_message "Script completed successfully"
