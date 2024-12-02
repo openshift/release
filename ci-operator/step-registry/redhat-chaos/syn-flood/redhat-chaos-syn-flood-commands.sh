@@ -22,7 +22,7 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 export KUBECONFIG=/tmp/config
-
+export NAMESPACE=$TARGET_NAMESPACE 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
