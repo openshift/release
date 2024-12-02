@@ -39,10 +39,6 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-    E2E_EXTRA_ARGS="${E2E_EXTRA_ARGS} --e2e.openstack-ca-cert-file ${SHARED_DIR}/osp-ca.crt"
-fi
-
 # run the test
 hack/ci-test-e2e.sh ${E2E_EXTRA_ARGS} \
         --test.v \
