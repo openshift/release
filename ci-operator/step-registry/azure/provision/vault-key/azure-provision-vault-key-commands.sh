@@ -56,7 +56,7 @@ az role assignment create --assignee "$SP_ID" --scope "$KV_ID" --role "Key Vault
 echo "Creating Keys within the KeyVault"
 KEYVAULT_KEY_NAME="${KV_BASE_NAME}-key"
 poll "az keyvault key create --vault-name $KEYVAULT_NAME -n $KEYVAULT_KEY_NAME --protection software"
-KEYVAULT_KEY_URL="$(az keyvault key show --vault-name "$KEYVAULT_NAME" --name "$KEYVAULT_KEY_NAME" --query 'key.kid' -o tsv)"
+poll "KEYVAULT_KEY_URL=\$(az keyvault key show --vault-name \"$KEYVAULT_NAME\" --name \"$KEYVAULT_KEY_NAME\" --query 'key.kid' -o tsv)"
 
 echo "Saving relevant info to \$SHARED_DIR"
 # Key URL format: https://<KEYVAULT_NAME>.vault.azure.net/keys/<KEYVAULT_KEY_NAME>/<KEYVAULT_KEY_VERSION>

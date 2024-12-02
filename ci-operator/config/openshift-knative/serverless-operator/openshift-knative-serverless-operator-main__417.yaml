@@ -1,6 +1,6 @@
 base_images:
-  ocp_4.13_cli-artifacts:
-    name: "4.13"
+  ocp_4.14_cli-artifacts:
+    name: "4.14"
     namespace: ocp
     tag: cli-artifacts
   ocp_4.18_cli-artifacts:
@@ -54,7 +54,7 @@ images:
   to: serverless-knative-operator
 - dockerfile_path: must-gather/Dockerfile
   inputs:
-    ocp_4.13_cli-artifacts:
+    ocp_4.14_cli-artifacts:
       as:
       - $CLI_ARTIFACTS
     ocp_ubi-minimal_8:
@@ -71,6 +71,10 @@ images:
       - registry.ci.openshift.org/origin/4.18:operator-registry
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
   to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
@@ -889,6 +893,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
+  timeout: 5h0m0s
 - as: test-soak-aws-417-c
   cluster_claim:
     architecture: amd64
@@ -964,6 +969,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
+  timeout: 5h0m0s
 - as: test-upgrade-aws-417
   cluster_claim:
     architecture: amd64

@@ -1,0 +1,33 @@
+chain:
+  as: openshift-e2e-test-clusterinfra-qe-longrun
+  env:
+  - name: E2E_TEST_TYPE
+    default: "longduration"
+    documentation: |-
+      The kind of test we will execute.
+      Allowed values ['default', 'destructive', 'longduration', 'ui']
+        * 'default' - All the test cases, exclude destructive/longduration
+        * 'destructive' - Test cases with destructive tag
+        * 'longduration' - Test cases with long-duration tag
+        * 'ui' - Test cases with console tag
+  - name: TEST_FILTERS_CLUSTERINFRASTRUCTURE
+    default: "disruptive"
+    documentation: |
+      It is filters to select case based on some case attribution which is in case title.
+  - name: TEST_SCENARIOS
+    default: Cluster_Infrastructure
+    documentation: |-
+      Select the test case. It's a RE pattern and is passed to the 'grep -E'
+  - name: TEST_TIMEOUT
+    default: "90"
+    documentation: Time-out duration for each test-case execution in minutes.
+  steps:
+  - chain: cucushift-installer-check-cluster-health
+  - ref: idp-htpasswd
+  - ref: openshift-extended-test-longduration
+  - ref: cucushift-pre
+  - ref: cucushift-e2e
+  - ref: openshift-e2e-test-clusterinfra-qe
+  - ref: openshift-e2e-test-qe-report
+  documentation: |-
+    Execute long duration e2e tests from QE and cluster-api-actuator-pkg repo, which include golang, cucushift, ...(more to add)
