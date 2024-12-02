@@ -55,6 +55,7 @@ jq --version || get_jq
 ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
   || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+# copied from https://github.com/stackrox/stackrox/blob/master/operator/tests/common/central-cr-with-scanner-v4.yaml
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
@@ -109,6 +110,39 @@ spec:
         limits:
           cpu: 2000m
           memory: 4Gi
+  scannerV4:
+    # Explicitly enable, scannerV4 is currenlty opt-in
+    scannerComponent: Enabled
+    indexer:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "1500Mi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+    matcher:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "5Gi"
+        limits:
+          cpu: "1000m"
+          memory: "5500Mi"
+    db:
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "2Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2500Mi"
 ---
 apiVersion: v1
 kind: Secret
