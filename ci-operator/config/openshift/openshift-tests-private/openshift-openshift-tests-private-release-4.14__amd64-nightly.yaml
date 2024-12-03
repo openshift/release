@@ -19,6 +19,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -63,6 +67,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -2206,7 +2214,7 @@ tests:
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
-      TEST_PARALLEL: "1"
+      TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "40"
     test:
@@ -3048,6 +3056,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
+- as: vsphere-ipi-ovn-winc-f14
+  cron: 52 8 16,30 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

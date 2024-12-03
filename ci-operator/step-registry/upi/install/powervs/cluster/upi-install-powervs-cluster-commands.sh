@@ -275,6 +275,9 @@ function configure_terraform() {
     echo "IC: PowerVS instance ID: ${POWERVS_SERVICE_INSTANCE_ID}"
     export POWERVS_SERVICE_INSTANCE_ID
 
+    # store the powervs_service_instance_id for later
+    echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
+
     echo "Release Image used is:"
     curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
     jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
@@ -292,7 +295,7 @@ rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier5k"
-system_type         = "s922"
+system_type         = "e980"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "p2"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
@@ -370,7 +373,7 @@ function build_upi_cluster() {
     fi
 
     echo "Retrieving the SSH key"
-    scp -i "${IBMCLOUD_HOME}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 

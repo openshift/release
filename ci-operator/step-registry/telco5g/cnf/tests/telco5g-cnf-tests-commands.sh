@@ -447,13 +447,15 @@ fi
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
-oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+    oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+fi
 
 # Skiplist common for all releases
 create_tests_skip_list_file
 
 if [[ "$CNF_BRANCH" == *"4."* ]]; then
-    function_version="${CNF_BRANCH//4./}"
+    function_version="${CNF_BRANCH//release-4./}"
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch

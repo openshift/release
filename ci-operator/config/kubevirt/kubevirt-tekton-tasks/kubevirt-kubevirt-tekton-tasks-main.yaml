@@ -55,10 +55,23 @@ tests:
           ln -s oc kubectl
           popd
         fi
+
+        accessKeyPath="/tmp/secrets/accessKeyId"
+        secretKeyPath="/tmp/secrets/secretKey"
+        if test -f "$accessKeyPath" && test -f "$secretKeyPath"; then
+          export REGISTRY_ACCESS_KEY_ID=$(cat ${accessKeyPath} | tr -d '\n')
+          export REGISTRY_SECRET_KEY=$(cat ${secretKeyPath} | tr -d '\n')
+          export IMAGE_DESTINATION="quay.io/kubevirtci/tekton-tasks"
+        fi
+
         automation/build-test.sh
         export PATH=$PATH:$(pwd)/go/bin
         NUM_NODES=4 \
           make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: tekton-tasks-pusher
+        namespace: test-credentials
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks
