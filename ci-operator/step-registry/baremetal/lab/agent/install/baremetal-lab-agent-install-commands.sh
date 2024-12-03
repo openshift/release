@@ -254,7 +254,7 @@ update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
-  retrieveMCOStatus &
+retrieveMCOStatus &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
