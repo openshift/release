@@ -58,7 +58,7 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-sleep 300
+sleep 60
 
 # Enable the console plugin
 oc patch console.operator cluster -n openshift-storage --type json -p '[{"op": "add", "path": "/spec/plugins", "value": ["odf-console"]}]'
