@@ -16,14 +16,25 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile.rhel7
+  dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.19_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: cluster-kube-controller-manager-operator
+  to: etcd
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.installer
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: installer-etcd-artifacts
 promotion:
   to:
   - name: scos-4.19
@@ -48,7 +59,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: master
+  branch: openshift-4.19
   org: openshift
-  repo: cluster-kube-controller-manager-operator
+  repo: etcd
   variant: okd-scos
