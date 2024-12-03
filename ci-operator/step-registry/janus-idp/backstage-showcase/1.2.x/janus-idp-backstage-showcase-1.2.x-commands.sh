@@ -29,7 +29,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     git merge origin/1.2.x --no-edit
     GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
-    SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
+    SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "Tag name: $TAG_NAME"
     IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
