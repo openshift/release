@@ -7,14 +7,14 @@ set -o errexit
 set -o pipefail
 set -x
 
-ls /secrets
-cp -rv /secrets/* ${SHARED_DIR}
+ls -al /secrets
+#cp -rv /secrets/* ${SHARED_DIR}
 
-#export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-#export AWS_REGION="us-east-1"
-#export AWS_PAGER=""
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_REGION="us-east-1"
+export AWS_PAGER=""
 
-#ls -l ${AWS_SHARED_CREDENTIALS_FILE}
+ls -al ${CLUSTER_PROFILE_DIR}
 
 ## prepare kubeconfig
 #aws s3 cp s3://${BUCKET_NAME}/kubeconfig  ${SHARED_DIR}/kubeconfig
