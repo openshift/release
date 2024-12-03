@@ -76,9 +76,8 @@ export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 
-sleep 30
-
 oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
+
 
 # Copy logs into artifact directory if they exist
 echo "Checking for additional logs in ${LOGS_FOLDER}"
@@ -87,3 +86,5 @@ if [ -d "${LOGS_FOLDER}" ]; then
     ls $LOGS_FOLDER
     cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
 fi
+
+sleep 1800
