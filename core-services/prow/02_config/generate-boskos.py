@@ -463,7 +463,6 @@ CONFIG = {
         'default': 1,
     },
     'aws-ovn-perfscale-quota-slice': {
-        'us-west-2': 4,
         'us-east-1': 4,
     },
     'aws-rhoai-qe-quota-slice': {

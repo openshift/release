@@ -1,0 +1,39 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+images:
+- from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: elasticsearch-operator
+promotion:
+  to:
+  - name: 5.y
+    namespace: logging
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: elasticsearch-operator
