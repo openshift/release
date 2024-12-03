@@ -11,45 +11,27 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.22
-images:
-- dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: ovn-kubernetes-microshift
 releases:
   initial:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.18"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
 resources:
   '*':
     requests:
