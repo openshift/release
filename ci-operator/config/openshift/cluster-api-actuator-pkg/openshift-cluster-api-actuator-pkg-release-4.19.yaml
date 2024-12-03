@@ -16,6 +16,7 @@ promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
+    disabled: true
     excluded_images:
     - cluster-api-actuator-pkg-test
     name: "4.19"
@@ -51,7 +52,7 @@ tests:
   container:
     from: src
 - as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -63,8 +64,24 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-capi-techpreview
+  optional: true
+  run_if_changed: pkg/capi/aws\.go
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-vsphere-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -77,7 +94,7 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
 - as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
@@ -89,9 +106,25 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-azure-capi-techpreview
+  optional: true
+  run_if_changed: pkg/capi/azure\.go
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -104,9 +137,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-gcp-capi-techpreview
+  optional: true
+  run_if_changed: pkg/capi/gcp\.go
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make -C /go/src/github.com/openshift/cluster-api-actuator-pkg
+        test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-openstack-operator
   optional: true
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:

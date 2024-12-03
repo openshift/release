@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
     labels:
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -152,7 +152,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-csi
     decorate: true
     labels:
@@ -226,7 +226,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     labels:
@@ -299,7 +299,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-etcd-certrotation
     decorate: true
     labels:
@@ -372,7 +372,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-etcd-recovery
     decorate: true
     labels:
@@ -445,7 +445,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-jenkins
     decorate: true
     labels:
@@ -518,7 +518,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -591,7 +591,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-cgroupsv2
     decorate: true
     labels:
@@ -665,7 +665,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
     decoration_config:
@@ -740,7 +740,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-etcd-scaling
     decorate: true
     labels:
@@ -813,7 +813,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-fips
     decorate: true
     labels:
@@ -886,7 +886,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-image-registry
     decorate: true
     labels:
@@ -955,11 +955,86 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-image-registry,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build06
+    context: ci/prow/e2e-aws-ovn-ipsec-serial
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.17-e2e-aws-ovn-ipsec-serial
+    optional: true
+    rerun_command: /test e2e-aws-ovn-ipsec-serial
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-ipsec-serial
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-ipsec-serial,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-kube-apiserver-rollout
     decorate: true
     labels:
@@ -1032,7 +1107,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-kubevirt
     decorate: true
     labels:
@@ -1106,7 +1181,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -1179,7 +1254,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     labels:
@@ -1253,7 +1328,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node-serial
     decorate: true
     labels:
@@ -1327,7 +1402,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
     labels:
@@ -1400,7 +1475,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node-techpreview-serial
     decorate: true
     labels:
@@ -1473,7 +1548,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node-upgrade
     decorate: true
     labels:
@@ -1547,7 +1622,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -1620,7 +1695,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-upi
     decorate: true
     labels:
@@ -1693,7 +1768,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-virt-techpreview
     decorate: true
     labels:
@@ -1766,7 +1841,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-aws-proxy
     decorate: true
     labels:
@@ -1839,7 +1914,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure
     decorate: true
     labels:
@@ -1912,7 +1987,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
     labels:
@@ -1985,7 +2060,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     labels:
@@ -2058,7 +2133,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-baremetalds-kubevirt
     decorate: true
     labels:
@@ -2132,7 +2207,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-external-aws
     decorate: true
     decoration_config:
@@ -2207,7 +2282,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-external-aws-ccm
     decorate: true
     decoration_config:
@@ -2287,7 +2362,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.17-e2e-gcp-csi
@@ -2726,7 +2801,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.17-e2e-gcp-ovn-image-ecosystem
@@ -2873,7 +2948,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.17-e2e-gcp-ovn-techpreview
@@ -2946,7 +3021,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.17-e2e-gcp-ovn-techpreview-serial
@@ -3685,7 +3760,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
@@ -3759,7 +3834,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-openstack-serial
     decorate: true
     labels:
@@ -4051,7 +4126,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -4105,7 +4180,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/lint
     decorate: true
     labels:
@@ -4159,7 +4234,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -4218,7 +4293,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -4272,7 +4347,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:
@@ -4326,7 +4401,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build01
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     labels:

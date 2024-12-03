@@ -15,6 +15,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.12"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -43,6 +47,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -585,6 +593,25 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - ref: fips-check-optional-operator-images-scan
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-proxy-fips-f60-compliance
+  cron: 31 13 23 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-proxy-workers-rhel8-etcd-encryption-f60
   cron: 27 7 24 2,4,6,8,10,12 *

@@ -19,6 +19,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.16"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -63,6 +67,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -2620,6 +2628,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-f28-compliance
+  cron: 4 11 12 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "40"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-proxy-private-rt-f28
   cron: 5 8 26 * *
   steps:
@@ -3431,6 +3457,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-custom-transit-switch-masquerade-subnet
+- as: vsphere-ipi-ovn-winc-f7
+  cron: 3 18 7,16,23,30 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

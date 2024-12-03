@@ -59,10 +59,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  driver-toolkit-tests:
-    name: "4.14"
-    namespace: ocp
-    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.14"
     namespace: ocp
@@ -451,7 +447,7 @@ tests:
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -471,7 +467,7 @@ tests:
 - as: e2e-gcp-ovn-fips
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -484,7 +480,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -557,7 +553,7 @@ tests:
 - as: e2e-gcp-ovn-rt
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
@@ -777,24 +773,6 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: driver-toolkit-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-telco5g
   cluster: build05
   cron: 10 08 */1 * 1-5
@@ -843,7 +821,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 1 * * 2,4,6
+  cron: 0 21 * * 1,3,5
   restrict_network_access: false
   steps:
     env:
