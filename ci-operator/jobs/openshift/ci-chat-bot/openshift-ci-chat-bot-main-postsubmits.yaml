@@ -1,27 +1,25 @@
-presubmits:
-  project-flotta/flotta-operator:
+postsubmits:
+  openshift/ci-chat-bot:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build05
-    context: ci/prow/unit-fast
+    - ^main$
+    cluster: build03
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-project-flotta-flotta-operator-release-4.15-unit-fast
-    rerun_command: /test unit-fast
+    max_concurrency: 1
+    name: branch-ci-openshift-ci-chat-bot-main-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-fast
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,6 +38,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -51,7 +52,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-fast,?($|\s.*)
