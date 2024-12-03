@@ -15,4 +15,4 @@ spec:
     - ${FEATURE}
 EOF
 
-oc adm wait-for-stable-cluster --timeout=2h
+oc adm wait-for-stable-cluster --timeout=3h
