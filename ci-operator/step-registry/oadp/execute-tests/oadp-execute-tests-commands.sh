@@ -76,9 +76,8 @@ export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 
-sleep 30
+# oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
 
-oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
 
 # Copy logs into artifact directory if they exist
 echo "Checking for additional logs in ${LOGS_FOLDER}"
@@ -87,3 +86,27 @@ if [ -d "${LOGS_FOLDER}" ]; then
     ls $LOGS_FOLDER
     cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
 fi
+
+
+chmod +x $OADP_GIT_DIR/test_settings/scripts/collect_artifacts.sh
+
+$OADP_GIT_DIR/test_settings/scripts/collect_artifacts.sh
+
+SLEEP_DURATION=5
+MAX_ATTEMPTS=3
+attempt=1
+FILENAME="must-gather-archive.tar.gz"
+
+while [ $attempt -le $MAX_ATTEMPTS ]; do 
+        if [ -e $FILENAME ]; then
+           echo "File $FILENAME exists"
+           cp ./must-gather-archive.tar.gz $ARTIFACT_DIR/
+           exit 0
+        else
+           echo " Attemp $attempt: Files $FILENAME does not exist. Trying again in $SLEEP_DURATION seconds."
+           sleep $SLEEP_DURATION
+           ((attempt++))
+        fi
+done
+echo "File $FILENAME not found after $MAX_ATTEMPTS attempts."
+
