@@ -50,17 +50,20 @@ tests:
     true
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make update-deps-overrides
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
   steps:
     dependencies:
@@ -89,6 +92,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: sonar
   commands: |
     export HOME="/tmp"
