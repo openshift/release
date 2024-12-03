@@ -4,17 +4,10 @@ set -euo pipefail
 
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-  EXTRA_ARGS="${EXTRA_ARGS} --openstack-ca-cert-file ${SHARED_DIR}/osp-ca.crt"
-fi
-
 OPENSTACK_COMPUTE_FLAVOR=$(cat "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
 OPENSTACK_EXTERNAL_NETWORK_ID=$(cat "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK_ID")
 
-if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
-    >&2 echo clouds.yaml has not been generated
-    exit 1
-fi
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -34,7 +27,6 @@ COMMAND=(
   /usr/bin/hcp create cluster openstack
   --name "${CLUSTER_NAME}"
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}"
-  --openstack-credentials-file "${SHARED_DIR}/clouds.yaml"
   --openstack-external-network-id "${OPENSTACK_EXTERNAL_NETWORK_ID}"
   --openstack-node-flavor "${OPENSTACK_COMPUTE_FLAVOR}"
   --openstack-node-image-name "${RHCOS_IMAGE_NAME}"
@@ -45,10 +37,6 @@ COMMAND=(
   --release-image "${RELEASE_IMAGE}"
   --annotations=hypershift.openshift.io/skip-release-image-validation=true
 )
-
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-  COMMAND+=(--openstack-ca-cert-file "${SHARED_DIR}/osp-ca.crt")
-fi
 
 if [[ $ENABLE_ICSP == "true" ]]; then
   COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")

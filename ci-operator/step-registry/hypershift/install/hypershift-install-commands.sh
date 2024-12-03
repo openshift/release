@@ -12,6 +12,13 @@ if [[ $HO_MULTI == "true" ]]; then
   oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
   chmod +x /tmp/hs-cli/hypershift
   HCP_CLI="/tmp/hs-cli/hypershift"
+elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+  mkdir /tmp/hs-cli
+  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli/hypershift
+  HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
