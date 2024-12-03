@@ -228,6 +228,10 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
+if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
@@ -287,6 +291,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
   - name: Add docker auth to enable pulling containers from CI registry for HCP cluster
     shell: >-
       oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
+  - name: Patching hostedcluster to disable all default sources
+    shell: >-
+      oc --kubeconfig=/home/kni/.kube/config_${SNO_NAME} patch hostedcluster ${CLUSTER_NAME} -n clusters --type=merge -p '{"spec": {"configuration": {"operatorhub": {"disableAllDefaultSources": true}}}}'
 
 EOF
 
