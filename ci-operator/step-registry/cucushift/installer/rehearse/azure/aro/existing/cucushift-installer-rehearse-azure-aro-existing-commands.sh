@@ -37,7 +37,7 @@ az storage blob download --account-name aroclusterinfo --container-name aro-clus
 
 ## prepare kubeconfig
 #aws s3 cp s3://${BUCKET_NAME}/kubeconfig  ${SHARED_DIR}/kubeconfig
-cp ${SHARED_DIR}/kubeconfig ${SHARED_DIR}/nested_kubeconfig
+#cp ${SHARED_DIR}/kubeconfig ${SHARED_DIR}/nested_kubeconfig
 
 ## run_time env users
 #aws s3 cp s3://${BUCKET_NAME}/runtime_env "${SHARED_DIR}/runtime_env"
