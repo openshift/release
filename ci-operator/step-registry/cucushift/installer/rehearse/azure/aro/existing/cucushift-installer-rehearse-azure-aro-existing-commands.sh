@@ -7,7 +7,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-ls -al /secrets
+#ls -al /secrets
 #cp -rv /secrets/* ${SHARED_DIR}
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
