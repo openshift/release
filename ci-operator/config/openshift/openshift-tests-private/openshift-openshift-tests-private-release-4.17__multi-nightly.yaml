@@ -199,6 +199,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
+- as: aws-ipi-byo-route53-compact-cf-f28-longduration-cloud
+  cron: 52 17 18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SIZE_VARIANT: compact
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
 - as: aws-ipi-disc-priv-amd-mixarch-f28-destructive
   cron: 17 4 13 * *
   steps:
@@ -213,22 +223,6 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-priv-amd-mixarch-f9-longduration-cloud
-  cron: 29 8 3,12,24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-arm-mixarch-f7
   cron: 31 11 2,9,16,25 * *
@@ -301,6 +295,16 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb-subnets-day2
+- as: aws-ipi-ingress-lbtype-nlb-subnets-f28-longduration-cloud
+  cron: 25 15 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb-subnets-day2
 - as: aws-ipi-ingress-lbtype-nlb-subnets-arm-amd-day0-f7
   cron: 48 3 7,14,23,30 * *
@@ -766,22 +770,6 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disc-fullypriv-amd-mixarch-f9-longduration-cloud
-  cron: 55 20 7,19,28 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      E2E_RUN_TAGS: '@disconnected'
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-fullyprivate-internal-registry-amd-f28-destructive
   cron: 58 7 26 * *
@@ -1391,20 +1379,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-disc-priv-amd-mixarch-f28-longduration-cloud
-  cron: 42 23 27 * *
+- as: gcp-ipi-disc-priv-amd-arm-day0-f28-longduration-cloud
+  cron: 45 14 26 * *
   steps:
     cluster_profile: gcp-qe
     env:
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
-      ADDITIONAL_WORKERS: "1"
-      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: amd64
       E2E_RUN_TAGS: '@disconnected'
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
+      FEATURE_GATES: '["MultiArchInstallGCP=true"]'
+      FEATURE_SET: CustomNoUpgrade
     test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe-longrun
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-disk-encryption-amd-f28-destructive
   cron: 21 13 23 * *
