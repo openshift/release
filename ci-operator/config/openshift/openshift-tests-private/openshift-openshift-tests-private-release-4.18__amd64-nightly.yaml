@@ -38,7 +38,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: release
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -1019,6 +1019,51 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp
+- as: aws-rosa-sts-shared-vpc-stage-critical-f7
+  cron: 45 4 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: rosa-shared-vpc
+      VERSION: "4.18"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-advanced-stage-critical-f7
+  cron: 8 10 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: rosa-advanced
+      VERSION: "4.18"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-non-sts-advanced-stage-critical-f7
+  cron: 33 5 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: rosa-non-sts-advanced
+      VERSION: "4.18"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-lifecycle-advanced
 - as: aws-rosa-hcp-external-auth-stage-full-f7
   cron: 44 8 2,9,16,25 * *
   steps:
