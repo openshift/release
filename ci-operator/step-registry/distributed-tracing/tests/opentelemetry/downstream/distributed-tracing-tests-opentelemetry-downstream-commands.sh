@@ -62,7 +62,7 @@ tests/e2e-targetallocator || any_errors=true
 OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
 oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\"]}]"
 sleep 60
-if oc -n openshift-opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
+if oc -n openshift-opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-product.openshift-opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
     echo "CSV updated successfully, continuing script execution..."
 else
     echo "Operator CSV update failed, exiting with error."
