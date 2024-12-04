@@ -118,6 +118,7 @@ fi
 oc version
 oc whoami
 oc auth can-i '*' '*'
+export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 oc create serviceaccount tester-sa-2 -n default
@@ -125,12 +126,4 @@ oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:defau
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
 oc logout
 
-echo $K8S_CLUSTER_TOKEN | cat > /tmp/secrets/K8S_CLUSTER_TOKEN
-set -x
-
-echo "K8S_CLUSTER_URL >>>> $K8S_CLUSTER_URL"
-oc login --token="${K8S_CLUSTER_TOKEN}" --server="${K8S_CLUSTER_URL}"
-echo "login as ad >>>> "
-oc whoami
-oc auth can-i '*' '*'
-# bash ./.ibm/pipelines/openshift-ci-tests.sh
+bash ./.ibm/pipelines/openshift-ci-tests.sh
