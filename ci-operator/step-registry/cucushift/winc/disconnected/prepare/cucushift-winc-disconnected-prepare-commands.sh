@@ -9,7 +9,7 @@ WINCNAMESPACE="winc-test"
 
 # Define image paths
 PRIMARY_WINDOWS_CONTAINER_IMAGE="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
-PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe"
+PRIMARY_WINDOWS_IMAGE="windows-golden-images/windows-server-2022-template-qe-20241104"
 export PRIMARY_WINDOWS_CONTAINER_IMAGE
 export PRIMARY_WINDOWS_IMAGE
 script_dir=$(dirname "$0")

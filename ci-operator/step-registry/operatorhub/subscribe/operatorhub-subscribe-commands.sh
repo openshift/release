@@ -4,59 +4,37 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export SUB_SOURCE="qe-app-registry"
-
-# Helper function to execute and log commands
-function run_command() {
-    local CMD="$1"
-    echo "DEBUG: Running Command: ${CMD}"
-    eval "${CMD}"
-}
-
-# Display current environment settings
-echo "DEBUG: Current environment variables:"
-echo "SUB_INSTALL_NAMESPACE: ${SUB_INSTALL_NAMESPACE}"
-echo "SUB_PACKAGE: ${SUB_PACKAGE}"
-echo "SUB_CHANNEL: ${SUB_CHANNEL}"
-echo "SUB_SOURCE: ${SUB_SOURCE}"
-echo "SUB_SOURCE_NAMESPACE: ${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
-
-# Check CatalogSource status and validate
-echo "DEBUG: Checking CatalogSource status:"
-run_command "oc get catalogsource -n openshift-marketplace"
-
-# Validate CatalogSource exists
-if ! oc get catalogsource "${SUB_SOURCE}" -n openshift-marketplace &> /dev/null; then
-    echo "ERROR: CatalogSource ${SUB_SOURCE} not found"
-    exit 1
+if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
+  echo "ERROR: INSTALL_NAMESPACE is not defined"
+  exit 1
 fi
 
-echo "DEBUG: Detailed CatalogSource information:"
-run_command "oc describe catalogsource ${SUB_SOURCE} -n openshift-marketplace"
-
-# Check marketplace pods
-echo "DEBUG: Checking marketplace pods:"
-run_command "oc get pods -n openshift-marketplace"
-
-# Special check for aosqe-index version
-if [[ "${SUB_SOURCE}" == "aosqe-index" ]]; then
-    echo "DEBUG: Found aosqe-index, checking version:"
-    run_command "oc get catalogsource aosqe-index -n openshift-marketplace -o jsonpath='{.spec.image}'"
+if [[ -z "${SUB_PACKAGE}" ]]; then
+  echo "ERROR: PACKAGE is not defined"
+  exit 1
 fi
 
-# Verify available package manifests
-echo "DEBUG: Checking available packages from catalog source:"
-run_command "oc get packagemanifest -n openshift-marketplace | grep ${SUB_PACKAGE} || true"
-
-# Create namespace if it doesn't exist
-if ! oc get ns "${SUB_INSTALL_NAMESPACE}" &> /dev/null; then
-    echo "DEBUG: Creating namespace ${SUB_INSTALL_NAMESPACE}"
-    oc create ns "${SUB_INSTALL_NAMESPACE}"
+if [[ -z "${SUB_CHANNEL}" ]]; then
+  echo "ERROR: CHANNEL is not defined"
+  exit 1
 fi
 
-# Create OperatorGroup for the namespace
-echo "DEBUG: Creating OperatorGroup"
-cat <<EOF | oc apply -f -
+if [[ "${SUB_TARGET_NAMESPACES}" == "!install" ]]; then
+  SUB_TARGET_NAMESPACES="${SUB_INSTALL_NAMESPACE}"
+fi
+
+echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
+
+# create the install namespace
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "${SUB_INSTALL_NAMESPACE}"
+EOF
+
+# deploy new operator group
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -64,11 +42,10 @@ metadata:
   namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
   targetNamespaces:
-  - "${SUB_INSTALL_NAMESPACE}"
+  - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
-# Create Subscription for the operator
-echo "DEBUG: Creating Subscription"
+# subscribe to the operator
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -77,53 +54,44 @@ metadata:
   namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
   channel: "${SUB_CHANNEL}"
+  installPlanApproval: Automatic
   name: "${SUB_PACKAGE}"
   source: "${SUB_SOURCE}"
-  sourceNamespace: "${SUB_SOURCE_NAMESPACE:-openshift-marketplace}"
+  sourceNamespace: openshift-marketplace
 EOF
 
-# Monitor deployment progress
-echo "DEBUG: Monitoring operator deployment..."
-for i in $(seq 1 30); do
-    echo "DEBUG: Attempt ${i}/30 - Checking subscription status"
-    
-    # Check subscription status
-    echo "DEBUG: Current Subscription status:"
-    run_command "oc get subscription ${SUB_PACKAGE} -n ${SUB_INSTALL_NAMESPACE} -o yaml"
-    
-    # Check CSV (ClusterServiceVersion) status
-    echo "DEBUG: ClusterServiceVersion status:"
-    run_command "oc get csv -n ${SUB_INSTALL_NAMESPACE}"
-    
-    # Check related pods
-    echo "DEBUG: Pods in namespace ${SUB_INSTALL_NAMESPACE}:"
-    run_command "oc get pods -n ${SUB_INSTALL_NAMESPACE}"
-    
-    # Check recent events
-    echo "DEBUG: Recent events in namespace ${SUB_INSTALL_NAMESPACE}:"
-    run_command "oc get events -n ${SUB_INSTALL_NAMESPACE} --sort-by='.lastTimestamp' | tail -n 5"
-    
-    # Check if subscription is successful
-    if oc get subscription "${SUB_PACKAGE}" -n "${SUB_INSTALL_NAMESPACE}" \
-        -o jsonpath='{.status.state}' | grep -q "AtLatestKnown"; then
-        echo "DEBUG: Operator successfully deployed"
-        
-        # Final status check on success
-        echo "DEBUG: Final deployment status:"
-        run_command "oc get all -n ${SUB_INSTALL_NAMESPACE}"
-        exit 0
-    fi
-    
+# can't wait before the resource exists. Need to sleep a bit before start watching
+sleep 60
+
+RETRIES=30
+CSV=
+for i in $(seq "${RETRIES}"); do
+  if [[ -z "${CSV}" ]]; then
+    CSV=$(oc get subscription -n "${SUB_INSTALL_NAMESPACE}" "${SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
+  fi
+
+  if [[ -z "${CSV}" ]]; then
+    echo "Try ${i}/${RETRIES}: can't get the ${SUB_PACKAGE} yet. Checking again in 30 seconds"
     sleep 30
+  fi
+
+  if [[ $(oc get csv -n ${SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+    echo "${SUB_PACKAGE} is deployed"
+    break
+  else
+    echo "Try ${i}/${RETRIES}: ${SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
+    sleep 30
+  fi
 done
 
-# If deployment fails, gather diagnostic information
-echo "ERROR: Operator deployment failed"
-echo "DEBUG: Final status check:"
-run_command "oc get subscription ${SUB_PACKAGE} -n ${SUB_INSTALL_NAMESPACE} -o yaml"
-run_command "oc get events -n ${SUB_INSTALL_NAMESPACE} --sort-by='.lastTimestamp'"
-run_command "oc get csv -n ${SUB_INSTALL_NAMESPACE}"
-run_command "oc get catalogsource -n ${SUB_SOURCE_NAMESPACE}"
-run_command "oc describe catalogsource ${SUB_SOURCE} -n ${SUB_SOURCE_NAMESPACE}"
+if [[ $(oc get csv -n "${SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
+  echo "Error: Failed to deploy ${SUB_PACKAGE}"
+  echo "CSV ${CSV} YAML"
+  oc get CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
+  echo
+  echo "CSV ${CSV} Describe"
+  oc describe CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}"
+  exit 1
+fi
 
-exit 1
+echo "successfully installed ${SUB_PACKAGE}"
