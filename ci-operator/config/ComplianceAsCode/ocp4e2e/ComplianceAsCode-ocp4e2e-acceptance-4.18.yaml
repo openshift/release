@@ -1,0 +1,143 @@
+base_images:
+  ansible:
+    name: "4.18"
+    namespace: ocp
+    tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.17"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.17"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+promotion:
+  to:
+  - name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: aws-c2s-ipi-disc-priv-fips-f30-compliance
+  cron: 10 10 13,29 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      OPERTORS_TO_MIRROR: compliance-operator
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~Disruptive
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-c2s-ipi-disc-priv-fips-f30-compliance-desturctive
+  cron: 58 5 8,22 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      OPERTORS_TO_MIRROR: compliance-operator
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;Disruptive
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-rosa-sts-hcp-f30-compliance
+  cron: 6 14 25 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      FILTERS_ADDITIONAL: ""
+      OPENSHIFT_VERSION: "4.18"
+      TEST_FILTERS: ~HyperShiftMGMT&;~NonHyperShiftHOST&;ROSA&;
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: The Compliance Operator on ROSA hcp cluster
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts-hcp
+- as: aws-ipi-ovn-hypershift-fips-guest-f30-compliance
+  cron: 38 4 5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --fips
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~NonHyperShiftHOST&;~ROSA&
+      TEST_SCENARIOS: The Compliance Operator on hypershift hosted cluster
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+zz_generated_metadata:
+  branch: acceptance-4.18
+  org: ComplianceAsCode
+  repo: ocp4e2e
