@@ -31,8 +31,6 @@ ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 bastion_controlplane_interface: $BASTION_CP_INTERFACE
-controlplane_network: 192.168.216.1/21
-controlplane_network_prefix: 21
 bastion_lab_interface: $LAB_INTERFACE
 controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
@@ -42,6 +40,11 @@ jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
+
+if [[ $PUBLIC_VLAN == "true" ]]; then
+  echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+fi
+
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Clean up previous attempts
