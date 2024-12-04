@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: "4.15"
   ocp_4.18_base-rhel9:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.18:
@@ -24,19 +24,30 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: olm-operator-controller
+- dockerfile_path: openshift/registry.Dockerfile
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+  to: e2e-test-registry
 promotion:
   to:
-  - name: 4.18-priv
+  - excluded_images:
+    - e2e-test-registry
+    name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
 resources:
   '*':
@@ -66,15 +77,17 @@ tests:
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
-- as: openshift-e2e-aws-techpreview
+- as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: upstream-e2e
+      cli: latest
       commands: make -C openshift test-e2e
+      dependencies:
+      - env: E2E_REGISTRY_IMAGE
+        name: e2e-test-registry
       from: src
       resources:
         requests:

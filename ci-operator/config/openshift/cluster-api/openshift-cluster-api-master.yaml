@@ -12,13 +12,17 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.18_base-rhel9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: make manager-core
 build_root:
   from_repository: true
@@ -35,17 +39,17 @@ images:
   to: cluster-capi-controllers
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -124,6 +128,20 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: regression-clusterinfra-aws-ipi-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: NonPreRelease
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h30m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

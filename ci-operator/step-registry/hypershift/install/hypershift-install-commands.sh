@@ -12,6 +12,13 @@ if [[ $HO_MULTI == "true" ]]; then
   oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
   chmod +x /tmp/hs-cli/hypershift
   HCP_CLI="/tmp/hs-cli/hypershift"
+elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+  mkdir /tmp/hs-cli
+  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli/hypershift
+  HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
@@ -33,6 +40,11 @@ fi
 AZURE_EXTERNAL_DNS_DOMAIN="service.hypershift.azure.devcluster.openshift.com"
 if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
   AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
+if [ "${AUTH_THROUGH_CERTS}" == "true" ]; then
+  KEYVAULT_CLIENT_ID="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")"
+  EXTRA_ARGS="${EXTRA_ARGS} --aro-hcp-key-vault-users-client-id ${KEYVAULT_CLIENT_ID}"
 fi
 
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then

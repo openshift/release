@@ -54,8 +54,7 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: "4.18"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -152,6 +151,7 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
+  timeout: 5h30m0s
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
     cluster_profile: aws
@@ -193,11 +193,28 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: aws
     env:
@@ -325,6 +342,45 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l3
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l3-pods
+  timeout: 8h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l2
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      FEATURE: NetworkSegmentation
+      ITERATION_MULTIPLIER_ENV: "3"
+      KUBE_BURNER_VERSION: 1.5.0
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-installer-featuregate
+    workflow: openshift-qe-udn-density-l2-pods
+  timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
