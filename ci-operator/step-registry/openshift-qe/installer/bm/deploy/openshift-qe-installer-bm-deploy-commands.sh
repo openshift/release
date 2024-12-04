@@ -79,7 +79,12 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
     echo "Resetting IDRAC of server $i ..."
     podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
   done
-  sleep 300
+  for i in $HOSTS; do
+    if ! podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --power-state
+      echo "$i iDRAC is still rebooting"
+      continue
+    fi
+  done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
   echo "Clearing job queue ..."
