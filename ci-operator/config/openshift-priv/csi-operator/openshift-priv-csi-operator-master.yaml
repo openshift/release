@@ -27,6 +27,10 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
+  ocp_4.19_base-rhel9:
+    name: 4.19-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -35,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -87,12 +95,18 @@ images:
     ocp_4.18_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
@@ -350,6 +364,32 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- as: hypershift-e2e-openstack-csi-cinder
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
+- as: hypershift-e2e-openstack-csi-manila
+  run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
 - as: smb-operator-e2e
   optional: true
   steps:
