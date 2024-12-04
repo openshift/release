@@ -41,7 +41,7 @@ install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
 
-if [[ $PUBLIC_VLAN == "true" ]]; then
+if [[ $PUBLIC_VLAN == "false" ]]; then
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 fi
 
