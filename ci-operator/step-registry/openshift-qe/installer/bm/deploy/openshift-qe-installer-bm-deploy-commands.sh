@@ -80,7 +80,7 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
     podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
   done
   for i in $HOSTS; do
-    if ! podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --power-state
+    if ! podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --power-state; then
       echo "$i iDRAC is still rebooting"
       continue
     fi
