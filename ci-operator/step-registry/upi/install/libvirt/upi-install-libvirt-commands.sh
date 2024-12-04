@@ -517,5 +517,3 @@ fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 touch ${INSTALL_DIR}/install-complete
-echo " Amrut - sleeping for an hour to perform http check"
-sleep 1h
