@@ -1,3 +1,8 @@
+base_images:
+  mapt:
+    name: mapt
+    namespace: ci
+    tag: v0.7.0
 build_root:
   project_image:
     dockerfile_literal: |
@@ -7,6 +12,8 @@ images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
+- from: mapt
+  to: mapt-runner
 releases:
   initial:
     integration:
@@ -53,7 +60,46 @@ tests:
   cron: 0 7 * * *
   steps:
     test:
+    - as: janus-idp-backstage-showcase-helm-aks-mapt-create
+      commands: |
+        cd $SHARED_DIR
+        azure aks create \
+          --project-name "aks" \
+          --backed-url "file:///workspace" \
+          --conn-details-output "/workspace" \
+          --spot \
+          --enable-app-routing
+      credentials:
+        - mount_path: /tmp/secrets
+          name: rhdh
+          namespace: test-credentials
+      from: mapt-runner
+      resources:
+        limits:
+          memory: 6Gi
+          cpu: "2"
+        requests:
+          cpu: "2"
+          memory: 6Gi
     - ref: janus-idp-backstage-showcase-helm-aks-nightly
+    - as: janus-idp-backstage-showcase-helm-aks-mapt-destroy
+      commands: |
+        cd $SHARED_DIR
+        azure aks destroy \
+          --project-name "aks" \
+          --backed-url "file:///workspace" 
+      credentials:
+        - mount_path: /tmp/secrets
+          name: rhdh
+          namespace: test-credentials
+      from: mapt-runner
+      resources:
+        limits:
+          memory: 6Gi
+          cpu: "2"
+        requests:
+          cpu: "2"
+          memory: 6Gi
 - as: e2e-tests-nightly-gke
   cron: 0 8 * * *
   steps:
