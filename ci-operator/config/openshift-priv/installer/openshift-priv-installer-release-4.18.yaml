@@ -429,6 +429,22 @@ tests:
     - ref: openshift-e2e-test
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-aws-default-config
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws-default
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-aws-ovn-edge-zones
   optional: true
   run_if_changed: aws

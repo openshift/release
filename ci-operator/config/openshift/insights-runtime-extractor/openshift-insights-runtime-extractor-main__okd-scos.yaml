@@ -1,55 +1,67 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
-  origin_scos-4.18_base-stream9:
-    name: scos-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
+  origin_scos-4.19_base-stream9:
+    name: scos-4.19
     namespace: origin
     tag: base-stream9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: ./Containerfile-extractor
+  from: origin_scos-4.19_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
+      - go-builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-    origin_scos-4.18_base-stream9:
+    origin_scos-4.19_base-stream9:
       as:
+      - rust-builder
       - registry.ci.openshift.org/ocp/4.18:base-rhel9
   to: insights-runtime-extractor
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: ./Containerfile-exporter
+  from: origin_scos-4.19_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
+      - go-builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-    origin_scos-4.18_base-stream9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
   to: insights-runtime-exporter
 promotion:
   to:
-  - name: scos-4.18
+  - name: scos-4.19
     namespace: origin
 releases:
   latest:
     integration:
-      name: scos-4.18
+      include_built_images: true
+      name: scos-4.19
       namespace: origin
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift

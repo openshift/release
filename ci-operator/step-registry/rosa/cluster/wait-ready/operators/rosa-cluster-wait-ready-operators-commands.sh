@@ -66,13 +66,16 @@ else
   echo "All cluster operators ready after $(( ${end_time} - ${start_time} )) seconds"
 fi
 
-# Additionally, OSD has a job "osd-cluster-ready" that determines when
+# Additionally, non-HCP has a job "osd-cluster-ready" that determines when
 # the managed service operators are done and the cluster is truly ready.
 # Don't consider the cluster ready until that's done.
-while ! oc get job/osd-cluster-ready -n openshift-monitoring &>/dev/null; do
-  echo "Waiting for job/osd-cluster-ready to exist..."
-  sleep 30
-done
+if [[ "$HOSTED_CP" == "false" ]]
+then
+  while ! oc get job/osd-cluster-ready -n openshift-monitoring &>/dev/null; do
+    echo "Waiting for job/osd-cluster-ready to exist..."
+    sleep 30
+  done
 
-echo "Waiting for job/osd-cluster-ready to complete..."
-oc wait --for=condition=complete job/osd-cluster-ready -n openshift-monitoring --timeout=60m
+  echo "Waiting for job/osd-cluster-ready to complete..."
+  oc wait --for=condition=complete job/osd-cluster-ready -n openshift-monitoring --timeout=60m
+fi
