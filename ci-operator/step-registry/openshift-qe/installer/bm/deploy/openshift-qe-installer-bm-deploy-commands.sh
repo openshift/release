@@ -63,6 +63,7 @@ EOF
 # Pre-reqs
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
+podman pull quay.io/quads/badfish:latest
 USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
