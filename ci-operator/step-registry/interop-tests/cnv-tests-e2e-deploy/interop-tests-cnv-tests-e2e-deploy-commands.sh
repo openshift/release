@@ -35,7 +35,8 @@ tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
 
 # Overwrite the default configuration file used for testing
-export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
+export KUBEVIRT_TESTING_CONFIGURATION_FILE=${KUBEVIRT_TESTING_CONFIGURATION_FILE:-'kubevirt-tier1-ocs.json'}
+export ARTIFACTS="${ARTIFACT_DIR}"
 make deploy_test || exit_code=$?
 
 FINISH_TIME=$(date "+%s")
