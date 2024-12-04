@@ -4,26 +4,21 @@ base_images:
     namespace: ci
     tag: v0.7.0
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
-      RUN yum -y install make wget gcc git httpd-tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
 images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
-- from: mapt
-  to: mapt-runner
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -59,10 +54,31 @@ tests:
 - as: e2e-tests-nightly-aks
   cron: 0 7 * * *
   steps:
-    test:
+    post:
+    - as: janus-idp-backstage-showcase-helm-aks-mapt-destroy
+      commands: |
+        export HOME="${SHARED_DIR}/mapt"
+        cd $HOME
+        azure aks destroy \
+          --project-name "aks" \
+          --backed-url "file:///workspace"
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from: mapt
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    pre:
     - as: janus-idp-backstage-showcase-helm-aks-mapt-create
       commands: |
-        cd $SHARED_DIR
+        export HOME="${SHARED_DIR}/mapt"
+        cd $HOME
         azure aks create \
           --project-name "aks" \
           --backed-url "file:///workspace" \
@@ -73,7 +89,7 @@ tests:
       - mount_path: /tmp/secrets
         name: rhdh
         namespace: test-credentials
-      from: mapt-runner
+      from: mapt
       resources:
         limits:
           cpu: "2"
@@ -81,22 +97,8 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
+    test:
     - ref: janus-idp-backstage-showcase-helm-aks-nightly
-    - as: janus-idp-backstage-showcase-helm-aks-mapt-destroy
-      commands: "cd $SHARED_DIR\nazure aks destroy \\\n  --project-name \"aks\" \\\n
-        \ --backed-url \"file:///workspace\" \n"
-      credentials:
-      - mount_path: /tmp/secrets
-        name: rhdh
-        namespace: test-credentials
-      from: mapt-runner
-      resources:
-        limits:
-          cpu: "2"
-          memory: 6Gi
-        requests:
-          cpu: "2"
-          memory: 6Gi
 - as: e2e-tests-nightly-gke
   cron: 0 8 * * *
   steps:
