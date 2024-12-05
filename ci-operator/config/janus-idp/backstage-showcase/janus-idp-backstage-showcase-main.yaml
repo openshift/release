@@ -52,9 +52,13 @@ tests:
     post:
     - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-destroy
       commands: |
+        export HOME WORKSPACE
+        HOME=/tmp
+        WORKSPACE=$(pwd)
+        cd /tmp || exit
         mapt azure aks destroy \
           --project-name "aks" \
-          --backed-url "file://${SHARED_DIR}/mapt"
+          --backed-url "file:///${HOME}"
       credentials:
       - mount_path: /tmp/secrets
         name: rhdh
@@ -73,11 +77,14 @@ tests:
     pre:
     - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-create
       commands: |
-        mkdir "${SHARED_DIR}/mapt"
+        export HOME WORKSPACE
+        HOME=/tmp
+        WORKSPACE=$(pwd)
+        cd /tmp || exit
         mapt azure aks create \
           --project-name "aks" \
-          --backed-url "file://${SHARED_DIR}/mapt" \
-          --conn-details-output "${SHARED_DIR}/mapt" \
+          --backed-url "file:///${HOME}" \
+          --conn-details-output "${SHARED_DIR}" \
           --spot \
           --enable-app-routing
       credentials:
