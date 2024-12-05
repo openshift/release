@@ -21,7 +21,6 @@ lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
 sno_node_count: $NUM_SNO_NODES
-public_vlan: false
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
@@ -31,22 +30,21 @@ ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
-smcipmitool_url:
-bastion_lab_interface: $BASTION_LAB_INTERFACE
 bastion_controlplane_interface: $BASTION_CP_INTERFACE
-controlplane_network: 192.168.216.1/21
-controlplane_network_prefix: 21
-bastion_vlaned_interface: $BASTION_VLANED_INTERFACE
+bastion_lab_interface: $LAB_INTERFACE
+controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-controlplane_lab_interface: $CONTROLPLANE_LAB_INTERFACE
-controlplane_pub_network_cidr:
-controlplane_pub_network_gateway:
 jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
+
+if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+fi
+
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Clean up previous attempts
@@ -165,6 +163,10 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=/root/${TYPE}/kubeconfig dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate
    rm -rf .ansible
 "
+
+scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig
