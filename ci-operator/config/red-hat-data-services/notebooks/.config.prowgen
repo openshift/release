@@ -1,0 +1,52 @@
+slack_reporter:
+- channel: "#pr-review-ai-ide-team"
+  job_states_to_report: 
+  - failure
+  - error
+  report_template: |-
+    '
+      {{- $active_release := "2024b" -}}
+      {{- $previous_release := "2024a" -}}
+      {{- $emoji := "" -}}
+      {{- $group_tag := "" -}}
+      {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef $previous_release) -}}
+          {{- $emoji = ":warning:" -}}
+      {{- else -}}
+        {{- $group_tag = "<!subteam^S05UB882TDF> " -}}
+        {{- if eq .Status.State "failure" -}}
+          {{- $emoji = ":failed:" -}}
+        {{- else -}}
+          {{- $emoji = ":bangbang:" -}}
+        {{- end -}}
+      {{- end -}}
+
+      {{- printf "%s" $emoji}} {{ printf "%s" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{ printf "%s" $emoji -}}
+    '     
+  job_names: 
+  - notebook-codeserver-ubi9-python-3-11-image-mirror
+  - notebook-codeserver-ubi9-python-3-9-image-mirror
+  - notebook-cuda-jupyter-min-ubi9-python-3-11-image-mirror
+  - notebook-cuda-jupyter-min-ubi9-python-3-9-image-mirror
+  - notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
+  - notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
+  - notebook-jupyter-ds-ubi9-python-3-11-image-mirror
+  - notebook-jupyter-ds-ubi9-python-3-9-image-mirror
+  - notebook-jupyter-min-ubi9-python-3-9-image-mirror
+  - notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
+  - notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
+  - notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
+  - notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
+  - notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
+  - notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
+  - notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
+  - notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
+  - runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
+  - runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
+  - runtime-datascience-ubi9-python-3-11-image-mirror
+  - runtime-datascience-ubi9-python-3-9-image-mirror
+  - runtime-minimal-ubi9-python-3-11-image-mirror
+  - runtime-minimal-ubi9-python-3-9-image-mirror
+  - runtime-pytorch-ubi9-python-3-11-image-mirror
+  - runtime-pytorch-ubi9-python-3-9-image-mirror
+  - runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
+  - runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror

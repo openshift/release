@@ -451,6 +451,19 @@ tests:
         SPOKE_WORKER_AGENTS=0
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-4masters-periodic
+  cron: 00 20 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=4
+        SPOKE_WORKER_AGENTS=0
+      NUM_EXTRA_WORKERS: "4"
+    workflow: assisted-baremetal-operator-ztp
 - always_run: false
   as: e2e-ai-operator-ztp-5masters
   optional: true
@@ -1408,6 +1421,16 @@ tests:
         NUM_WORKERS=1
         OPENSHIFT_VERSION=4.18
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-masters-none
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
+        NUM_MASTERS=4
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

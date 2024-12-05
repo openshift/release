@@ -8,7 +8,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.18_base-rhel9:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.18:
@@ -31,17 +31,17 @@ images:
   to: cluster-config-api
 promotion:
   to:
-  - name: 4.18-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
+      name: 4.19-priv
       namespace: ocp-private
 resources:
   '*':
@@ -75,6 +75,11 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: bin
 - as: integration
   commands: |
     make integration -k --warn-undefined-variables

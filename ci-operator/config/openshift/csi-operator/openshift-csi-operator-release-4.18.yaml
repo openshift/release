@@ -214,8 +214,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: "4.18"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -350,6 +349,34 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- as: hypershift-e2e-openstack-csi-cinder
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
+- as: hypershift-e2e-openstack-csi-manila
+  run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
 - as: smb-operator-e2e
   optional: true
   steps:
@@ -397,6 +424,37 @@ tests:
     env:
       PROJECT_NAME: csi-operator
     workflow: openshift-ci-security
+- as: periodic-e2e-aws-efs-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: periodic-e2e-smb-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: periodic-e2e-azure-file-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: azure4
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+    workflow: openshift-e2e-azure-csi-file
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

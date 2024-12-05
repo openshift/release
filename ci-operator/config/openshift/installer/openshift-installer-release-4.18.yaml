@@ -232,8 +232,7 @@ images:
   to: src-oc
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: "4.18"
     namespace: ocp
@@ -348,6 +347,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
         keyA valueA
         key2 value2
@@ -361,6 +361,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -387,6 +388,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-aws-post
     - ref: ipi-deprovision-aws-custom-security-groups
@@ -396,6 +399,7 @@ tests:
     - chain: ipi-conf-aws-sharednetwork
     - ref: aws-provision-security-group
     - ref: ipi-conf-aws-custom-security-groups
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
@@ -405,16 +409,39 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-aws-post
     - ref: aws-deprovision-iam-profile
     pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-byo-ipv4-pool-public
     - ref: aws-provision-iam-profile
-    - chain: ipi-conf-aws
     - ref: ipi-conf-aws-byo-iam-profile
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: ipi-install-monitoringpvc
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-default-config
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws-default
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-edge-zones
@@ -422,6 +449,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - always_run: false
@@ -430,6 +459,8 @@ tests:
   run_if_changed: aws
   steps:
     cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - always_run: true
@@ -445,20 +476,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_METADATA_SERVICE_AUTH: Required
-    workflow: openshift-e2e-aws
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-min-perms
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
+      AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
@@ -820,10 +839,9 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - always_run: false
@@ -1046,6 +1064,19 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
         NETWORK_TYPE=OVNKubernetes
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv6-minimaliso
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV6
+        MIRROR_IMAGES=true
+        AGENT_MINIMAL_ISO=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
