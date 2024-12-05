@@ -82,6 +82,7 @@ if [[ -e ${telco_qe_preserved_dir} && ! -h ${telco_qe_preserved_dir} ]]; then
   echo "Unexpected wrong condition found!!! The ${telco_qe_preserved_dir} file already exists and is not a symbolic link."
   exit 1
 else
+  rm -fv ${telco_qe_preserved_dir}/preserve
   rm -fv ${telco_qe_preserved_dir}
   ln -s /var/builds/${1} ${telco_qe_preserved_dir}
   find ${telco_qe_preserved_dir}/ | grep "/hub-kubeconfig" || \
