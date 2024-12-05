@@ -52,10 +52,9 @@ tests:
     post:
     - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-destroy
       commands: |
-        pwd
-        echo "${SHARED_DIR}"
-        chmod -R a+rwx ${SHARED_DIR}
-        mapt azure aks destroy --project-name "aks" --backed-url "file://${SHARED_DIR}"
+        mapt azure aks destroy \
+          --project-name "aks" \
+          --backed-url "file://${SHARED_DIR}/mapt"
       credentials:
       - mount_path: /tmp/secrets
         name: rhdh
@@ -74,17 +73,15 @@ tests:
     pre:
     - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-create
       commands: |
-        pwd
-        echo "${SHARED_DIR}"
-        chmod -R a+rwx ${SHARED_DIR}
+        mkdir "${SHARED_DIR}/mapt"
         mapt azure aks create \
           --project-name "aks" \
-          --backed-url "file://${SHARED_DIR}" \
-          --conn-details-output "${SHARED_DIR}" \
+          --backed-url "file://${SHARED_DIR}/mapt" \
+          --conn-details-output "${SHARED_DIR}/mapt" \
           --spot \
           --enable-app-routing
       credentials:
-      - mount_path: /secrets
+      - mount_path: /tmp/secrets
         name: rhdh
         namespace: test-credentials
       from_image:
