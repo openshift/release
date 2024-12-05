@@ -12,6 +12,11 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM base
+    # Use latest golang
+    RUN GO_VERSION=$(curl -sSfL "https://go.dev/VERSION?m=text" | head -n1) && \
+        curl -sSfL -o- https://go.dev/dl/$GO_VERSION.linux-amd64.tar.gz | \
+            tar xfz - -C /usr/local
+    ENV PATH="/usr/local/go/bin:$PATH"
     COPY . /workdir
   from: base
   to: crio-crio-base-src
