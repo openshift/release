@@ -205,32 +205,81 @@ function extract_migrated_caps() {
     done
 }
 
-# Get the capabilities which are introdcued for the 1st time in the target payload
-# By comparing two payloads at manifest level
-function extract_potential_new_caps() {
-    local source_dir="$1"
-    local target_dir="$2"
-    local target_cap_files target_file filename source_file target_cap
-    local candidate_new_caps=""
+# not used yet, keep it here for future usage
+function lowerVersion() {
+    local version="$1" target_version="$2"
 
-    # Check for missing environment variables
-    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
-        echo "ERROR: Missing required arguments"
-        return 1
+    local ret=0
+    if [[ "$(printf '%s\n' "${target_version}" "${version}" | sort --version-sort | head -n1)" == "${target_version}" ]]; then
+        ret=1
     fi
+    return $ret
+}
 
-    target_cap_files=$(grep -rl "capability.openshift.io/name" ${target_dir})
-    for target_file in ${target_cap_files}; do
-        filename=$(basename "${target_file}")
-        source_file="$source_dir/$filename"
+# Get the new caps transfered from an existing operator on source verion
+# by removing those capacities that are GAed as optional ones
+function get_transfered_new_caps() {
+    local candidate_new_caps="$1" source_ver="$2"
+    local cap tmp_candidate_new_caps
 
-        if [ ! -f "$source_file" ]; then
-            target_cap=$(grep 'capability.openshift.io/name:' "$target_file" | cut -d ':' -f2 | tr -d '"' | sort | uniq )
-            candidate_new_caps="${candidate_new_caps} ${target_cap}"
+    tmp_candidate_new_caps="${candidate_new_caps}"
+    source_ver=$(echo "$source_ver" | cut -d. -f1,2)
+    for cap in ${candidate_new_caps}; do
+        #shellcheck disable=SC2076
+        if [[ " ${!new_caps_version[*]} " =~ " ${cap} " ]]; then
+            echo "${cap} is GAed as optional capacity later than source version - ${source_ver}"
+            tmp_candidate_new_caps="${tmp_candidate_new_caps/$cap}"
         fi
     done
-    echo "${candidate_new_caps}" | xargs -n1 | sort -u | xargs
+    transfered_new_caps=$(echo "${tmp_candidate_new_caps}" | xargs -n1 | sort -u | xargs)
 }
+# The function is complicated, and might be unreliable if some new change in 
+# manifest level, so disable it for now.
+#function get_transfered_new_caps() {
+#    local source_dir="$1" target_dir="$2" candidate_new_caps="$3" found="no"
+#    local cap target_cap_files target_file filename source_file target_cap crd_files cr_kind tmp_candidate_new_caps
+#
+#    tmp_candidate_new_caps="${candidate_new_caps}"
+#    for cap in ${candidate_new_caps}; do
+#        target_cap_files=$(grep -rl "capability.openshift.io/name: ${cap}$" ${target_dir} || true)
+#        if [[ -z "$target_cap_files" ]]; then
+#            echo "Did not find out $cap capacity manifest files in target payload"
+#            continue
+#        fi
+#        # most of capacities can be identified if it is new or not on source version by comparing file name if the capacity manifests are not changed a lot
+#        found="no"
+#        for target_file in ${target_cap_files}; do
+#            filename=$(basename "${target_file}")
+#            source_file="$source_dir/$filename"
+#            if [[ -f "$source_file" ]] && [[ -z "$(grep 'release.openshift.io/feature-set:' $source_file | grep -E 'CustomNoUpgrade|TechPreviewNoUpgrade|DevPreviewNoUpgrade')" ]]; then
+#                echo "Found related manifest - $filename in source payload manifests for $cap capacity, it is known (not TP) for source version"
+#                found="yes"
+#                break
+#            fi
+#        done
+#        # but if capacity manifest is changed between source and target version, try to search CR type for the capacity
+#        # e.g: "Build", it isn't operator type, related manifests defining "Build" are totally changed from 4.13 to 4.18
+#        # Another special capacity "DeploymentConfig", there is no any relalted manifests defining "DeploymentConfig" in both 4.13 and 4.18
+#        crd_files=""
+#        [[ "$found" == "no" ]] && crd_files=$(grep -l "^kind: CustomResourceDefinition$" ${target_cap_files} || true)
+#        for target_file in ${crd_files}; do
+#            cr_kind=$(yq-go r "${target_file}" "spec.names.kind")
+#            [[ -n "$cr_kind" ]] && cr_kind_files=$(grep -rl "kind: ${cr_kind}$" "${source_dir}" || true)
+#            if [[ -n "$cr_kind_files" ]] && [[ -z "$(grep -E 'CustomNoUpgrade|TechPreviewNoUpgrade|DevPreviewNoUpgrade' $cr_kind_files)" ]]; then
+#                echo "Found related ${cr_kind} resource in source payload manifests for $cap capacity, it is known (not TP) for source version"
+#                found="yes"
+#                break
+#            fi
+#        done
+#        # remove total unknown capacity, the source cluster never install it, even upgraded, there would be no such resource.
+#        # some exception, some fresh capacities introduced later than source version maybe installed automatically as some enabled capacity's dependency during upgrade 
+#        if [[ "${found}" == "no" ]]; then
+#            echo "${cap} is totally new for source version..."
+#            tmp_candidate_new_caps=${tmp_candidate_new_caps/$cap}
+#        fi
+#    done
+#    transfered_new_caps=$(echo "${tmp_candidate_new_caps}" | xargs -n1 | sort -u | xargs)
+#}
 
 function check_cvo_cap() {
     local result=0
@@ -308,6 +357,16 @@ caps_operator[CloudControllerManager]="cloud-controller-manager"
 caps_operator[Ingress]="ingress"
 caps_operator[OperatorLifecycleManagerV1]="olm"
 
+# Mapping between optional capacity and version info
+# NOTE:
+# Only record the new GAed and optional capacity. For example,
+# "OperatorLifecycleManagerV1" is GAed in 4.18 as an optional capacity
+# For such an optional capacity, when basecap is none or vset basecap
+# doesn't include it, previous verison of OCP does not install it, even
+# the cluster is upgraded to the latest version
+declare -A new_caps_version
+new_caps_version["OperatorLifecycleManagerV1"]="4.18"
+
 # Mapping between optional capability and resources
 # Need update when new resource marks as optional
 caps_resource_list="Build DeploymentConfig"
@@ -339,13 +398,11 @@ echo -e "\nsource_baseline_caps is ${source_baseline_caps}\
 \ntarget_known_caps is ${target_known_caps}"
 
 new_caps=$(get_new_caps "${source_known_caps}" "${target_known_caps}")
-echo -e "\nnew_caps is ${new_caps}"
-potential_new_caps=$(extract_potential_new_caps "${source_manifests_dir}" "${target_manifests_dir}")
-for cap in $potential_new_caps; do
-    new_caps=${new_caps/$cap}
-done
-echo -e "after strip those capacities which are not existing in source version and introduced for the 1st time in target version\
-\nnew_caps is ${new_caps}"
+transfered_new_caps=""
+get_transfered_new_caps "${new_caps}" "${version_set[-1]}"
+echo -e "\nnew_caps is ${new_caps}\
+\nafter strip those capacities that are GAed as optional later than source version\
+\ntransfered_new_caps is ${transfered_new_caps}"
 
 additionalcaps_from_cluster=$(oc get clusterversion version -ojson | jq -r 'if .spec.capabilities.additionalEnabledCapabilities then .spec.capabilities.additionalEnabledCapabilities[] else empty end')
 echo -e "\nadditionalcaps_from_cluster is ${additionalcaps_from_cluster}"
@@ -364,8 +421,8 @@ if [[ "${baselinecaps_from_cluster}" == "v4."* ]]; then
     target_enabled_caps="${target_baseline_caps} ${additionalcaps_from_cluster}"
     expected_enabled_caps="${target_enabled_caps}"
     
-    expected_enabled_caps="${expected_enabled_caps} ${new_caps}"
-    expected_implicit_caps="${expected_implicit_caps} ${new_caps}"
+    expected_enabled_caps="${expected_enabled_caps} ${transfered_new_caps}"
+    expected_implicit_caps="${expected_implicit_caps} ${transfered_new_caps}"
 
     if [ ${#migrated_caps[@]} -eq 0 ]; then
         echo "migrated_caps is empty."
@@ -406,8 +463,8 @@ fi
 # NOTE: here "new caps" means caps are existing in previous version, become optional operators in target version
 if [[ "${baselinecaps_from_cluster}" == "None" ]]; then
     expected_enabled_caps="${additionalcaps_from_cluster}"
-    expected_enabled_caps="${expected_enabled_caps} ${new_caps}"
-    expected_implicit_caps="${expected_implicit_caps} ${new_caps}"
+    expected_enabled_caps="${expected_enabled_caps} ${transfered_new_caps}"
+    expected_implicit_caps="${expected_implicit_caps} ${transfered_new_caps}"
 
     if [ ${#migrated_caps[@]} -eq 0 ]; then
         echo "migrated_caps is empty."
