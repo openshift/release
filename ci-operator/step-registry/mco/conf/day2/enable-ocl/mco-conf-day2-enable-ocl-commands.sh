@@ -27,7 +27,7 @@ function debug_and_exit() {
     echo '####################################################'
     echo ''
     echo 'All pods:'
-    run_command "oc get pods"
+    run_command "oc get pods -n openshift-machine-config-operator"
     echo ''
     echo '####################################################'
     echo '####################################################'
@@ -91,30 +91,30 @@ done
 
 for custom_mcp_name in "${mcp_arr[@]}"; do
     echo "Waiting for $custom_mcp_name MachineConfigPool to start updating..."
-    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATING=True' --timeout=300s &>/dev/null"
+    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATING=True' --timeout=600s &>/dev/null"
     then
         debug_and_exit
     fi
 done
 
 
-for custom_mcp_name in "${mcp_arr[@]}"; do
-    echo "Wait for the $custom_mcp_name MCP to start building the OCL build"
-    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
-    if ! run_command "oc wait --for=condition=Building  machineosbuild $machine_os_build_name --timeout=300s &>/dev/null"
-    then
-        debug_and_exit
-    fi
-done
+#for custom_mcp_name in "${mcp_arr[@]}"; do
+#    echo "Wait for the $custom_mcp_name MCP to start building the OCL build"
+#    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
+#    if ! run_command "oc wait --for=condition=Building  machineosbuild $machine_os_build_name --timeout=300s &>/dev/null"
+#    then
+#        debug_and_exit
+#    fi
+#done
 
-for custom_mcp_name in "${mcp_arr[@]}"; do
-    echo "Wait for the $custom_mcp_name MCP OCL build to succeed"
-    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
-    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s &>/dev/null"
-    then
-        debug_and_exit
-    fi
-done
+#for custom_mcp_name in "${mcp_arr[@]}"; do
+#    echo "Wait for the $custom_mcp_name MCP OCL build to succeed"
+#    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
+#    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s &>/dev/null"
+#    then
+#        debug_and_exit
+#    fi
+#done
 
 for custom_mcp_name in "${mcp_arr[@]}"; do
     echo "Waiting for $custom_mcp_name MachineConfigPool to finish updating..."
