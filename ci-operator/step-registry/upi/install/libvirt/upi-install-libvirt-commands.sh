@@ -258,6 +258,13 @@ if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Check for kdump worker yaml config, and save it in the installation directory
+KDUMP_WORKER_YAML="${SHARED_DIR}/manifest_99_worker_kdump.yml"
+if [ -f "${KDUMP_WORKER_YAML}" ]; then
+  echo "Saving ${KDUMP_WORKER_YAML} to the install directory..."
+  cp ${KDUMP_WORKER_YAML} /tmp/manifests
+fi
+
 if [ "${INSTALLER_TYPE}" == "default" ]; then
   # Generating ignition configs
   echo "Generating ignition configs..."
