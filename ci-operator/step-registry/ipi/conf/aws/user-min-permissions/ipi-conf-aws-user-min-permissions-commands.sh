@@ -31,6 +31,27 @@ EOF
 	fi
 }
 
+# if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
+# 	if [[ -z "${POLICY_ARN-}" ]]; then
+# 		echo "POLICY_ARN must be defined with the Policy ARN when SKIP_CREATE_POLICY is set."
+# 		exit 1
+# 	fi
+# 	echo "Detected to skip policy creation by SKIP_CREATE_POLICY=yes. The existing POLICY_ARN must have required permissions to install a cluster."
+# 	exit 0
+# fi
+
+RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
+if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
+	# If there is no initial release, we will be installing latest.
+	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
+fi
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
+ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
+ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
+rm /tmp/pull-secret
+
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"

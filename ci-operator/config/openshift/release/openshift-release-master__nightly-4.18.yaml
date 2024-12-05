@@ -1858,6 +1858,21 @@ tests:
     cluster_profile: aws-perfscale-qe
     workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
+- as: e2e-aws-ovn-perms-discovery
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_INSTALL_USE_CUSTOM_IDENTITY: "yes"
+      SKIP_CREATE_POLICY: "yes"
+      POLICY_ARN: "arn:aws:iam::aws:policy/AdministratorAccess"
+    # Existing Trail is limited to us-east-1, using only that region for tests.
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -579,6 +579,11 @@ aws|aws-arm64|aws-usgov)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+        # TODO: running the workflow locally (release-devenv) the 'create manifests' was failing
+        # for invalid credentials, testing manually it is working. Looks like there are some
+        # async operation from AWS side preventing the APIs to validate the recent created user.
+        echo "Waiting 30s to AWS populate recently created credentials"
+        sleep 30
     else
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     fi
