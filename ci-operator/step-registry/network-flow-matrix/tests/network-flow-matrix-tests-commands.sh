@@ -9,6 +9,7 @@ cluster_version_to_branch() {
   echo "$branch"
 }
 BRANCH=$(cluster_version_to_branch)
+MAIN_BRANCH="release-4.19"
 
 ADDITIONAL_NFTABLES_RULES_FILE_PATH="${SHARED_DIR}/additional-nftables-rules"
 
@@ -26,6 +27,10 @@ udp dport 10180 accept
 # https://github.com/openshift/origin/blob/master/vendor/k8s.io/kubernetes/test/e2e/network/service.go#L2724
 tcp dport 80 accept
 udp dport 80 accept" > ${ADDITIONAL_NFTABLES_RULES_FILE_PATH}
+
+if [ ${BRANCH} = ${MAIN_BRANCH} ]; then
+  BRANCH="main"
+fi
 
 source $HOME/golang-1.22.4
 echo "Go version: $(go version)"
