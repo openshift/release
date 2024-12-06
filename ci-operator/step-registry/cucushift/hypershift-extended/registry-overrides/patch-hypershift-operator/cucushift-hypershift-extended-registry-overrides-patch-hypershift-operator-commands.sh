@@ -5,10 +5,19 @@ set -euxo pipefail
 # Generate registry overrides file
 ACR_LOGIN_SERVER="$(</var/run/vault/acr-pull-credentials/loginserver)"
 REGISTRY_OVERRIDES_FILE="$SHARED_DIR"/hypershift_operator_registry_overrides
+
+# Add entries for component images
 cat <<EOF >> "$REGISTRY_OVERRIDES_FILE"
 quay.io/openshift-release-dev/ocp-v4.0-art-dev=$ACR_LOGIN_SERVER/openshift-release-dev/ocp-v4.0-art-dev
 quay.io/openshift-release-dev/ocp-release=$ACR_LOGIN_SERVER/openshift-release-dev/ocp-release
 EOF
+
+# Add an entry for the release image itself
+RELEASE_IMAGE_REPO="${RELEASE_IMAGE_LATEST%@*}"
+echo "${RELEASE_IMAGE_REPO}=registry.ci.openshift.org/ocp/release" >> "$REGISTRY_OVERRIDES_FILE"
+
+# Save the registry overrides file
+cp "$REGISTRY_OVERRIDES_FILE" "${ARTIFACT_DIR}/hypershift_operator_registry_overrides_file"
 
 # Get registry overrides from file
 REGISTRY_OVERRIDES=""
@@ -30,6 +39,5 @@ oc patch deployment operator -n hypershift --type=json -p='[
     "value": "'"--registry-overrides=$REGISTRY_OVERRIDES"'"
   }
 ]'
-oc wait deployment operator -n hypershift --for='condition=PROGRESSING=True' --timeout=1m
 oc rollout status deployment -n hypershift operator --timeout=5m
 
