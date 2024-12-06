@@ -51,6 +51,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -157,6 +163,20 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
+- as: azure-ipi-arm-f28-ota
+  cron: 29 5 9 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-47160
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-custom-nsg-f28
   cron: 20 20 23 * *
   steps:
