@@ -129,8 +129,6 @@ function is_openshift_version_gte() {
 
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
-    echo "sleeping 6 hours"
-    sleep 21600
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
