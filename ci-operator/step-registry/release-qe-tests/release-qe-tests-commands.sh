@@ -4,10 +4,10 @@ set -e
 set -u
 set -o pipefail
 
-prow_api_token=$(cat "/var/run/vault/tests-private-account/prow-api-token")
+prow_api_token=$(cat "/var/run/vault/release-tests-token/prow_api_token")
 export APITOKEN=$prow_api_token
 
-github_token=$(cat "/var/run/vault/tests-private-account/token-git")
+github_token=$(cat "/var/run/vault/release-tests-token/github_token")
 export GITHUB_TOKEN=$github_token
 
 release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token/token)
