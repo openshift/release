@@ -170,6 +170,34 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- always_run: false
+  as: hypershift-e2e-openstack-csi-cinder
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
+- always_run: false
+  as: hypershift-e2e-openstack-csi-manila
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-conformance
 - as: hypershift-aws-e2e-external
   steps:
     cluster_profile: hypershift
