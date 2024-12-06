@@ -651,8 +651,6 @@ echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
-sleep 7200
-
 # Don't require the installer to run in a FIPS-enabled environment
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
