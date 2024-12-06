@@ -4,10 +4,6 @@ ref:
     namespace: ocp
     name: "4.17"
     tag: upi-installer
-  credentials:
-  - namespace: test-credentials # this entry injects the custom credential
-    name: aro-secrets
-    mount_path: /secret
   cli: latest
   grace_period: 10m
   timeout: 1h0m0s
@@ -17,8 +13,14 @@ ref:
       cpu: 100m
       memory: 100Mi
   env:
-    - name: BUCKET_NAME
-      default: "mgahagan-bucket"
-      documentation: "bucket to download the resources"
+    - name: AZURE_SA_NAME
+      default: "aroclusterinfo"
+      documentation: "Name of the Azure Storage Account"
+    - name: AZURE_SA_CONTAINER
+      default: "aro-cluster"
+      documentation: "Name of the Storage Account Container which contains the cluster info files"
+    - name: ARO_CLUSTER_FILES
+      default: "api.login api.url cluster-id cluster-name cluster-type console.url kubeconfig"
+      documentation: "Space separated list of file names to download from $AZURE_SA_CONTAINER"
   documentation: |-
     prepare resources to run e2e with an existing ARO cluster
