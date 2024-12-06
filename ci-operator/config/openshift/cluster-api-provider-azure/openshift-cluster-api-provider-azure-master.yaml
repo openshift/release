@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -66,6 +70,19 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-azure
+- as: regression-clusterinfra-cucushift-rehearse-azure-ipi-techprev
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: NonPreRelease
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - as: e2e-azure
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
