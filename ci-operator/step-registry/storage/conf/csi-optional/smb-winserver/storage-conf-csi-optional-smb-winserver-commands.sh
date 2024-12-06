@@ -78,7 +78,7 @@ logger "INFO" "New-SmbShare TestShare on the windows node"
 ssh_key_file_name="ssh-privatekey"
 ssh_key=${CLUSTER_PROFILE_DIR}/${ssh_key_file_name}
 bastion_dns=$(oc get service --all-namespaces -l run=ssh-bastion -o go-template="{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}")
-ssh_proxy_cmd_template="ssh -i ${ssh_key} -o StrictHostKeyChecking=no -o ProxyCommand=\"ssh -i ${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_dns}\" Administrator@NODE_IP \"powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \\\"New-NetFirewallRule -DisplayName 'SMB' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 445 -EdgeTraversalPolicy Allow; mkdir C:\\smbshare; New-LocalUser -Name sambauser -Password (ConvertTo-SecureString -Force -AsPlainText 'OpenshiftWin2022samba'); New-SmbShare -Name TestShare -Path C:\\smbshare -FullAccess sambauser\\\"\""
+ssh_proxy_cmd_template="ssh -i ${ssh_key} -o StrictHostKeyChecking=no -o ProxyCommand=\"ssh -i ${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_dns}\" Administrator@NODE_IP \"powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \\\"Get-WmiObject -Class Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber; New-NetFirewallRule -DisplayName 'SMB' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 445 -EdgeTraversalPolicy Allow; mkdir C:\\smbshare; New-LocalUser -Name sambauser -Password (ConvertTo-SecureString -Force -AsPlainText 'OpenshiftWin2022samba'); New-SmbShare -Name TestShare -Path C:\\smbshare -FullAccess sambauser\\\"\""
 smb_config_cmds="${ssh_proxy_cmd_template//NODE_IP/${WIN_NODE_IP}}"
 
 exec_command "${smb_config_cmds}" 
