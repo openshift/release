@@ -72,24 +72,34 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
 fi
 
+metadata_file="${SHARED_DIR}/metadata.json"
 if [ -z "${RESOURCE_GROUP}" ]; then
   rg_file="${SHARED_DIR}/resourcegroup"
   if [ -f "${rg_file}" ]; then
     bastion_rg=$(cat "${rg_file}")
+  elif [ -f "${metadata_file}" ]; then
+    bastion_rg="$(jq -r .infraID ${metadata_file})-rg"
   else
-    echo "Did not find ${rg_file}!"
+    echo "Could not determine the resource group name!"
     exit 1
   fi
 else
   bastion_rg="${RESOURCE_GROUP}"
 fi
 
+bastion_subnet=""
+bastion_nsg=""
 if [ -z "${VNET_NAME}" ]; then
   vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
   if [ -f "${vnet_file}" ]; then
     bastion_vnet_name=$(yq-go r ${vnet_file} 'platform.azure.virtualNetwork')
+  elif [ -f "${metadata_file}" ]; then
+    infra_id=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
+    bastion_vnet_name="${infra_id}-vnet"
+    bastion_subnet="${infra_id}-master-subnet"    
+    bastion_nsg="${infra_id}-nsg"
   else
-    echo "Did not find ${vnet_file}!"
+    echo "Could not determine the bastion vnet name!"
     exit 1
   fi
 else
@@ -182,19 +192,25 @@ echo "Deploy the bastion image from bastion vhd"
 run_command "az image create --resource-group ${bastion_rg} --name '${bastion_name}-image' --source ${vhd_blob_url} --os-type Linux --storage-sku Standard_LRS" || exit 2
 bastion_image_id=$(az image show --resource-group ${bastion_rg} --name "${bastion_name}-image" | jq -r '.id')
 
-echo "Create bastion subnet"
-open_port="22 873 3128 3129 5000 6001 6002" bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
-run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}" &&
-run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}" &&
-#subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
-bastion_subnet_cidr="10.0.99.0/24"
-if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-    # for ash wwt, the parameter name get changed
-    vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
+open_port="22 873 3128 3129 5000 6001 6002"
+if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
+    echo "Create bastion subnet"
+    bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
+    run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
+    run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
+    #subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
+    bastion_subnet_cidr="10.0.99.0/24"
+    if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+        # for ash wwt, the parameter name get changed
+        vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
+    else
+        vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
+    fi
+    run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 else
-    vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
+    # bastion subnet and nsg already exist, create additional nsg rule
+    run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
 fi
-run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 
 echo "Create bastion vm"
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then

@@ -3,6 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   cli:
     name: "4.17"
     namespace: ocp
@@ -454,6 +458,60 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: baremetalds-agent-hypershift-mce-inplace-f7
+  cluster: build05
+  cron: 31 20 2,9,16,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.17
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-agent-hypershift-mce-mceupgrade-inplace-f7
+  cluster: build05
+  cron: 14 15 8,15,22,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.17
+      MCE_TARGET_VERSION: "2.8"
+      MCE_VERSION: "2.7"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-agent-hypershift-mce-compact-full-inplace-f7
+  cluster: build05
+  cron: 19 23 5,14,21,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=32768
+        MASTER_DISK=256
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=256G
+        NUM_EXTRA_WORKERS=2
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.17
+      MCE_TARGET_VERSION: "2.8"
+      MCE_VERSION: "2.7"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-full
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetal-compact-agent-ipv4-static-connected-f28
   cluster: build05
   cron: 7 15 13 * *
