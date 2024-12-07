@@ -9,7 +9,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.17"
   latest:
     release:
       architecture: amd64
@@ -28,77 +28,6 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: loaded-upgrade-414to416-3nodes
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      CHURN: "false"
-      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
-      ZONES_COUNT: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - chain: ipi-install
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-qe-upgrade-max-unavailable
-    - chain: openshift-qe-cluster-density-v2
-    - chain: openshift-upgrade-qe-sanity-cpou
-  timeout: 8h0m0s
-- always_run: false
-  as: loaded-upgrade-ipsec-414to416-3nodes
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      CHURN: "false"
-      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
-      ZONES_COUNT: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - chain: openshift-qe-upgrade-max-unavailable
-    - chain: openshift-qe-cluster-density-v2
-    - chain: openshift-upgrade-qe-sanity-cpou
-  timeout: 8h0m0s
-- always_run: false
   as: loaded-upgrade-414to416-24nodes
   steps:
     allow_skip_on_success: true
@@ -111,13 +40,10 @@ tests:
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       MAX_UNAVAILABLE_WORKER: "3"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      PAUSED_MCP_NAME: worker infra
+      TIMEOUT: "150"
       ZONES_COUNT: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - chain: ipi-install
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -134,6 +60,7 @@ tests:
     - chain: openshift-qe-upgrade-max-unavailable
     - chain: openshift-qe-cluster-density-v2
     - chain: openshift-upgrade-qe-sanity-cpou
+    workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
 - always_run: false
   as: loaded-upgrade-ipsec-414to416-24nodes
@@ -148,14 +75,10 @@ tests:
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       MAX_UNAVAILABLE_WORKER: "3"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      PAUSED_MCP_NAME: worker infra
+      TIMEOUT: "150"
       ZONES_COUNT: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -172,6 +95,47 @@ tests:
     - chain: openshift-qe-upgrade-max-unavailable
     - chain: openshift-qe-cluster-density-v2
     - chain: openshift-upgrade-qe-sanity-cpou
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
+- always_run: false
+  as: loaded-upgrade-414to416-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE_WORKER: "15"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PAUSED_MCP_NAME: worker infra
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      TIMEOUT: "150"
+      WORKER_REPLICA_COUNT: "120"
+      ZONES_COUNT: "3"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: workers-scale
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity-cpou
+    workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
 - always_run: false
   as: loaded-upgrade-ipsec-414to416-120nodes
@@ -181,21 +145,19 @@ tests:
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       CHURN: "false"
-      COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE_WORKER: "15"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PAUSED_MCP_NAME: worker infra
       PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
       SIZE_VARIANT: large
+      TIMEOUT: "150"
+      WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -209,9 +171,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - chain: workers-scale
     - chain: openshift-qe-upgrade-max-unavailable
     - chain: openshift-qe-cluster-density-v2
     - chain: openshift-upgrade-qe-sanity-cpou
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
