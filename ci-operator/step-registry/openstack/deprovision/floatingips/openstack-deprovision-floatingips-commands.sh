@@ -12,3 +12,10 @@ if [[ -f "${SHARED_DIR}/DELETE_FIPS" ]]; then
 		< "${SHARED_DIR}/DELETE_FIPS" \
 		|| true
 fi
+
+if [[ -f "${SHARED_DIR}/HIVE_DELETE_FIPS" ]]; then
+	xargs --verbose --no-run-if-empty \
+		openstack floating ip delete \
+		< "${SHARED_DIR}/HIVE_DELETE_FIPS" \
+		|| true
+fi
