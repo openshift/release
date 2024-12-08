@@ -245,15 +245,22 @@ if ! wait $!; then
   exit 1
 fi
 
+
+function retrieveMCOStatus(){
+  watch -n 30 oc get co machine-config >> "${ARTIFACT_DIR}/get_mco_status.txt"
+}
+
 update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
+retrieveMCOStatus &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
-update_image_registry
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+
+oc get nodes > "${ARTIFACT_DIR}/get_nodes.txt"
