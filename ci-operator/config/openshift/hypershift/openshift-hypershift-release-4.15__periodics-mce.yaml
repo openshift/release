@@ -24,6 +24,30 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  414-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  415-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  416-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  417-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
   latest:
     candidate:
       product: ocp
@@ -41,112 +65,82 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-ovn-conformance
-  cron: 0 4 * * *
+- as: e2e-agent-connected-hub414-mce25-hc415-conformance
+  cron: 0 17 15 * *
   steps:
     cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:414-latest
     env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
       MCE_VERSION: "2.5"
-    workflow: hypershift-mce-aws-conformance
-- as: e2e-agent-connected-ovn-ipv4-manual-conformance
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-manual-conformance
-- as: e2e-agent-connected-ovn-ipv4-metal3-conformance
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-metal3-conformance
-- as: e2e-agent-connected-ovn-dualstack-metal3-conformance
-  cron: 0 8 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-      IP_STACK: v4v6
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-metal3-conformance
-- as: e2e-agent-connected-ovn-ipv4-metal3-compact-conformance
-  cron: 0 12 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NUM_WORKERS=0
-        NUM_MASTERS=3
-        MASTER_VCPU=16
-        MASTER_MEMORY=40960
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-metal3-conformance
-- as: e2e-agent-disconnected-ovn-ipv6-metal3-conformance
-  cron: 0 16 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-disconnected-conformance
-- as: e2e-agent-disconnected-ovn-dualstack-metal3-conformance
-  cron: 0 20 * * *
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        MIRROR_IMAGES=true
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-      IP_STACK: v4v6
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-agent-disconnected-conformance
-- as: e2e-kubevirt-metal-ovn
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      HYPERSHIFT_NODE_COUNT: "2"
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_VERSION: "2.5"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
-    workflow: hypershift-mce-kubevirt-baremetalds-conformance
-- as: e2e-ibmz-ovn-conformance
-  cron: 0 4 * * *
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub414-mce26-hc415-conformance
+  cron: 0 17 15 * *
   steps:
     cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:414-latest
     env:
-      MCE_VERSION: "2.5"
-    workflow: hypershift-mce-ibmz-conformance
-- as: e2e-power-ovn-conformance
-  cron: 0 6 * * *
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub417-mce27-hc415-conformance
+  cron: 0 17 15 * *
   steps:
     cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:417-latest
     env:
-      MCE_VERSION: "2.5"
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.7"
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub416-mce27-hc415-conformance
+  cron: 0 17 15 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:416-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.7"
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub416-mce26-hc415-conformance
+  cron: 0 17 15 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:416-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.6"
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub415-mce27-hc415-conformance
+  cron: 0 17 15 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:415-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.7"
+    workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub415-mce26-hc415-conformance
+  cron: 0 17 15 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:415-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+      MCE_VERSION: "2.6"
     workflow: hypershift-mce-power-conformance
 zz_generated_metadata:
   branch: release-4.15
