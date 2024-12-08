@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: telco-vse-sync-test-runner
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: telco-vse-sync-test-runner
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: telco-vse-sync-test-runner:latest
+    source:
+      dockerfile: |
+        FROM registry.ci.openshift.org/ci/telco-runner
+        RUN  yum group install "Development Tools" -y && \
+             dnf install -y git golang tar python3-yaml ruby-devel && \
+             pip3 install pandas junitparser matplotlib allantools && \
+             gem install asciidoctor-pdf:2.3.9 asciidoctor-diagram:2.2.14 rouge:3.30.0
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.ci.openshift.org/ci/telco-runner
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ConfigChange
