@@ -309,7 +309,7 @@ Resources:
     Type: AWS::EC2::DHCPOptions
     Condition: DoDhcp
     Properties: 
-        DomainName: example.com
+        DomainName: example.com.
         DomainNameServers: 
           - AmazonProvidedDNS
   VPCDHCPOptionsAssociation:
