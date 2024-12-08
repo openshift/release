@@ -53,3 +53,35 @@ do
         exit ${EXIT_CODE}
     fi
 done
+
+if [ -f "${SHARED_DIR}/HIVE_FIP_API" ] && [ -f "${SHARED_DIR}/HIVE_FIP_INGRESS" ]; then
+  HIVE_FIP_API=$(<"${SHARED_DIR}"/HIVE_FIP_API)
+  HIVE_FIP_INGRESS=$(<"${SHARED_DIR}"/HIVE_FIP_INGRESS)
+  HIVE_CLUSTER_NAME=$(<"${SHARED_DIR}"/HIVE_CLUSTER_NAME)
+  
+  declare -A ipmapHive
+  ipmapHive["api"]=${HIVE_FIP_API}
+  ipmapHive["ingress.apps"]=${HIVE_FIP_INGRESS}
+
+  for key in "${!ipmapHive[@]}"
+  do
+    NAME=${key}
+    IP=${ipmapHive[${key}]}
+    for TRY in ${COUNT}
+    do
+        sleep ${SLEEP_TIME}
+        echo "Attempt ${TRY} to verify we can resolve ${NAME}.${HIVE_CLUSTER_NAME}.${BASE_DOMAIN}"
+        check_ip_resolves "${IP}" "${NAME}.${HIVE_CLUSTER_NAME}.${BASE_DOMAIN}"
+        if [[ "$?" -eq "0" ]] ; then
+            echo "${NAME}.${HIVE_CLUSTER_NAME}.${BASE_DOMAIN} resolves correctly to ${IP}"
+            EXIT_CODE=0
+            break
+        fi
+        EXIT_CODE=1
+    done
+    if [[ ${EXIT_CODE} -ne 0 ]]; then
+        echo "FAILED: After ${TRY_COUNT} tries, ${NAME}.${HIVE_CLUSTER_NAME}.${BASE_DOMAIN} did not resolve to ${IP}"
+        exit ${EXIT_CODE}
+    fi
+  done
+fi
