@@ -376,6 +376,9 @@ fi
 oc_adm_top_nodes_loop &
 WATCHERS+=( "$!" )
 
+echo " Amrut - sleeping for an hour to perform http check"
+sleep 1h
+
 case "${TEST_TYPE}" in
 conformance-parallel)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
