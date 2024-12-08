@@ -336,6 +336,24 @@ function upgrade() {
         clear_upgrade
         check_upgrade_status "${cluster_src_ver}"
     fi
+    if check_ota_case_enabled "OCP-73358"; then
+        local retry=0 out top_hop_image top_hop_version top_hop_minor_version expected
+        top_hop_image="$(< "${SHARED_DIR}/upgrade-edge")"
+        if [[ -z "${top_hop_image:-}" ]]; then
+            echo "Error: OCP-73358 The top hop image is not given, break the job"
+            return 1
+        fi
+        run_command "oc adm upgrade --to-image=${top_hop_image} --allow-explicit-upgrade"
+        sleep 1m
+        out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
+        top_hop_version="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${top_hop_image}" --output=json | jq -r '.metadata.version')"
+        top_hop_minor_version="$(echo "${top_hop_version}" | cut -f2 -d.)"
+        expected="Precondition "ClusterVersionGiantHop" failed because of "MultipleMinorVersionsUpdate": ${TARGET_VERSION} is more than one minor version beyond the current target ${SOURCE_VERSION} (4.${top_hop_minor_version} > 4.(${SOURCE_MINOR_VERSION}+1)), and only updates within the current minor version or to the next minor version are supported."
+        if [[ ${out} != *"${expected}"* ]]; then
+            echo -e "Upgrade to a more than one minor version should fail, but actually not. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
+            return 1
+        fi
+    fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
