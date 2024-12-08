@@ -356,6 +356,77 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 30 01 * * 0-5
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-18-periodic
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-metal-assisted-4-18-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 30 20 * * 0-5
   decorate: true
   extra_refs:
@@ -368,7 +439,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-control-planes-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-control-planes-4-18-periodic
   spec:
     containers:
     - args:
@@ -377,7 +448,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-4-control-planes-periodic
+      - --target=e2e-metal-assisted-4-control-planes-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -510,7 +581,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-bond-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-bond-4-18-periodic
   spec:
     containers:
     - args:
@@ -519,7 +590,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-bond-periodic
+      - --target=e2e-metal-assisted-bond-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -640,7 +711,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 30 01 * * 1,4
+  cron: 30 11 * * 0-5
   decorate: true
   extra_refs:
   - base_ref: master
@@ -652,7 +723,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-arm-workers-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-4-18-periodic
   spec:
     containers:
     - args:
@@ -661,7 +732,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-day2-arm-workers-periodic
+      - --target=e2e-metal-assisted-day2-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -711,7 +782,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 30 11 * * 0-5
+  cron: 30 01 * * 1,4
   decorate: true
   extra_refs:
   - base_ref: master
@@ -723,7 +794,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-arm-workers-4-18-periodic
   spec:
     containers:
     - args:
@@ -732,7 +803,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-day2-periodic
+      - --target=e2e-metal-assisted-day2-arm-workers-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -794,7 +865,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-single-node-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-sno-4-18-periodic
   spec:
     containers:
     - args:
@@ -803,7 +874,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-day2-single-node-periodic
+      - --target=e2e-metal-assisted-day2-sno-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -865,7 +936,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-external-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-external-4-18-periodic
   spec:
     containers:
     - args:
@@ -874,7 +945,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-external-periodic
+      - --target=e2e-metal-assisted-external-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -936,7 +1007,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv4v6-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv4v6-4-18-periodic
   spec:
     containers:
     - args:
@@ -945,7 +1016,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-ipv4v6-periodic
+      - --target=e2e-metal-assisted-ipv4v6-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1007,7 +1078,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv6-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv6-4-18-periodic
   spec:
     containers:
     - args:
@@ -1016,7 +1087,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-ipv6-periodic
+      - --target=e2e-metal-assisted-ipv6-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1078,7 +1149,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipxe-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipxe-4-18-periodic
   spec:
     containers:
     - args:
@@ -1087,7 +1158,80 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-ipxe-periodic
+      - --target=e2e-metal-assisted-ipxe-4-18-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 00 10 * * 0-5
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-kube-api-late-binding-sno-4-18-periodic
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-metal-assisted-kube-api-late-binding-sno-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1149,7 +1293,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-kube-api-net-suite-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-kube-api-net-suite-4-18-periodic
   spec:
     containers:
     - args:
@@ -1158,7 +1302,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-kube-api-net-suite-periodic
+      - --target=e2e-metal-assisted-kube-api-net-suite-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1220,7 +1364,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-lvm-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-lvm-4-18-periodic
   spec:
     containers:
     - args:
@@ -1229,7 +1373,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-lvm-periodic
+      - --target=e2e-metal-assisted-lvm-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1291,7 +1435,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-mce-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-mce-4-18-periodic
   spec:
     containers:
     - args:
@@ -1300,7 +1444,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-mce-periodic
+      - --target=e2e-metal-assisted-mce-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1362,7 +1506,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none-4-18-periodic
   spec:
     containers:
     - args:
@@ -1371,7 +1515,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-none-periodic
+      - --target=e2e-metal-assisted-none-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1504,7 +1648,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-onprem-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-onprem-4-18-periodic
   spec:
     containers:
     - args:
@@ -1513,78 +1657,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-onprem-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build05
-  cron: 30 01 * * 0-5
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-periodic
+      - --target=e2e-metal-assisted-onprem-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1646,7 +1719,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-single-node-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-sno-4-18-periodic
   spec:
     containers:
     - args:
@@ -1655,7 +1728,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-single-node-periodic
+      - --target=e2e-metal-assisted-sno-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1788,7 +1861,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-static-ip-suite-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-static-ip-suite-4-18-periodic
   spec:
     containers:
     - args:
@@ -1797,7 +1870,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-static-ip-suite-periodic
+      - --target=e2e-metal-assisted-static-ip-suite-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1859,7 +1932,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-upgrade-agent-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-upgrade-agent-4-18-periodic
   spec:
     containers:
     - args:
@@ -1868,7 +1941,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-upgrade-agent-periodic
+      - --target=e2e-metal-assisted-upgrade-agent-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -2003,7 +2076,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-nutanix-assisted-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-nutanix-assisted-4-18-periodic
   spec:
     containers:
     - args:
@@ -2012,7 +2085,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-nutanix-assisted-periodic
+      - --target=e2e-nutanix-assisted-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -2074,7 +2147,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-vsphere-assisted-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-vsphere-assisted-4-18-periodic
   spec:
     containers:
     - args:
@@ -2083,7 +2156,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-vsphere-assisted-periodic
+      - --target=e2e-vsphere-assisted-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -2369,7 +2442,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-opct-oci-assisted-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-opct-oci-assisted-4-18-periodic
   spec:
     containers:
     - args:
@@ -2378,7 +2451,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=opct-oci-assisted-periodic
+      - --target=opct-oci-assisted-4-18-periodic
       command:
       - ci-operator
       image: ci-operator:latest
