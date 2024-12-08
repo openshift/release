@@ -68,16 +68,39 @@ tests:
   steps:
     cluster_profile: gcp-qe-c3-metal
     workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
-- as: installer-rehearse-ibmcloud-dis
+- as: installer-rehearse-ibmcloud-capi
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: ibmcloud-qe
     env:
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: installer-rehearse-ibmcloud-vpc
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CREATE_CLUSTER_RESOURCE_GROUP: "yes"
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
