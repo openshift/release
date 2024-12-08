@@ -1,0 +1,37 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator-upgrade-to-latest
+  cron: 30 8 10 * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      INSTALL_CATSRC: qe-app-registry
+      INSTALL_CHANNEL: stable-v1
+      INSTALL_CSV: cert-manager-operator.v1.13.0
+      UPGRADE_CATSRC: qe-app-registry
+      UPGRADE_CHANNEL: stable-v1
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: cert-manager-upgrade-tests
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: upgrade-on-ocp-4.16
