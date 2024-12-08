@@ -20,6 +20,11 @@ images:
       && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
       && rm -f /tmp/google-cloud-sdk.tar.gz
     ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+    # Use latest golang
+    RUN GO_VERSION=$(curl -sSfL "https://go.dev/VERSION?m=text" | head -n1) && \
+        curl -sSfL -o- https://go.dev/dl/$GO_VERSION.linux-amd64.tar.gz | \
+            tar xfz - -C /usr/local
+    ENV PATH="/usr/local/go/bin:$PATH"
     WORKDIR /workdir
     COPY . .
   from: base

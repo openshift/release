@@ -31,6 +31,11 @@ images:
     COPY --from=build /*.rpm /
     # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
     RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    # Use latest golang
+    RUN GO_VERSION=$(curl -sSfL "https://go.dev/VERSION?m=text" | head -n1) && \
+        curl -sSfL -o- https://go.dev/dl/$GO_VERSION.linux-amd64.tar.gz | \
+            tar xfz - -C /usr/local
+    ENV PATH="/usr/local/go/bin:$PATH"
   inputs:
     base-machine-with-rpms:
       as:
