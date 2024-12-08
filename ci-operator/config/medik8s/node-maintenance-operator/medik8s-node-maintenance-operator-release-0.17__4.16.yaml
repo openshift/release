@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: base
   operator-sdk:
-    name: "4.13"
+    name: "4.17"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build
@@ -20,7 +20,7 @@ operator:
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/node-maintenance-operator:latest
+  - pullspec: quay.io/medik8s/node-maintenance-operator:.*
     with: pipeline:node-maintenance-operator
 releases:
   latest:
@@ -34,6 +34,11 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
