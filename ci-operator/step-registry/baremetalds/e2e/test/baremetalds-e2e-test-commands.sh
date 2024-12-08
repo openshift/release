@@ -56,7 +56,7 @@ function set_test_provider() {
     # Currently all v6 deployments are disconnected, so we have to tell
     # openshift-tests to exclude those tests that require internet
     # access.
-    if [[ "${DS_IP_STACK}" != "v6" ]];
+    if [[ ! "${DS_IP_STACK}" =~ ^v6 ]];
     then
         export TEST_PROVIDER='{"type":"baremetal"}'
     else
@@ -67,9 +67,11 @@ function set_test_provider() {
 function mirror_release_image_for_disconnected_upgrade() {
     # All IPv6 clusters are disconnected and
     # release image should be mirrored for upgrades.
-    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+    if [[ "${DS_IP_STACK}" =~ ^v6 ]]; then
       # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+podman restart --time 1 external-squid || true
+
 MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
 RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
@@ -242,57 +244,63 @@ echo "$(date) - waiting for nodes to be ready..."
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 echo "$(date) - all nodes are ready"
 
-# this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
-echo "$(date) - waiting for non-samples imagesteams to import..."
-count=0
-while :
-do
+function check_imagestreams_import() {
+  # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
+  echo "$(date) - waiting for non-samples imagesteams to import..."
+  count=0
+  while :
+  do
 
-  # The local image registry isn't working in 4.6 and isn't needed for the
-  # subset of tests we use for this version
-  if ! is_openshift_version_gte "4.7" ; then
-    echo "Skipping imagesteams wait"
-    break
-  fi
+    # The local image registry isn't working in 4.6 and isn't needed for the
+    # subset of tests we use for this version
+    if ! is_openshift_version_gte "4.7" ; then
+      echo "Skipping imagesteams wait"
+      break
+    fi
 
-  non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
-  if [ -z "${non_imported_imagestreams}" ]
-  then
-    break
-  fi
-  echo "The following image streams are yet to be imported (attempt #${count}):"
-  echo "${non_imported_imagestreams}"
+    non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+    if [ -z "${non_imported_imagestreams}" ]
+    then
+      break
+    fi
+    echo "The following image streams are yet to be imported (attempt #${count}):"
+    echo "${non_imported_imagestreams}"
 
-  count=$((count+1))
-  if (( count > 30 )); then
-    echo "Failed while waiting on imagestream import"
-    exit 1
-  fi
+    count=$((count+1))
+    if (( count > 30 )); then
+      echo "Failed while waiting on imagestream import"
+      exit 1
+    fi
 
-  sleep 60
-done
-echo "$(date) - all imagestreams are imported."
+    sleep 60
+  done
+  echo "$(date) - all imagestreams are imported."
 
-# In some cases the cluster events are processed slowly by the kube-apiservers,
-# producing a late revision updates that could be missed by the previous co check.
-echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
-sleep 10m
+  # In some cases the cluster events are processed slowly by the kube-apiservers,
+  # producing a late revision updates that could be missed by the previous co check.
+  echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+  sleep 10m
 
-check_clusteroperators_status
+  check_clusteroperators_status
+}
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
+    check_imagestreams_import
     upgrade
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 upgrade)
+    check_imagestreams_import
     upgrade
     ;;
 suite-conformance)
+    check_imagestreams_import
     suite
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
+    check_imagestreams_import
     suite
     ;;
 *)
