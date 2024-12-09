@@ -10,6 +10,13 @@ echo "************ baremetalds devscripts setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "************ CHOCOBOMB DEBUGGING ************"
+echo "${SHARED_DIR}/server-ip"
+cat "${SHARED_DIR}/server-ip"
+echo "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+cat "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+echo "************ CHOCOBOMB DEBUGGING ************"
+
 # Get dev-scripts logs and other configuration
 finished()
 {
@@ -371,6 +378,14 @@ fi
 if [ "${EXTRA_MANIFESTS}" == "true" ];
 then
   echo "export ASSETS_EXTRA_FOLDER=/root/manifests" >> /root/dev-scripts/config_root.sh
+fi
+
+# For k8s-nmstate tests we need to pass around the image built by Prow so that
+# it can be mirrored to the local registry
+if [[ "$JOB_SPEC" =~ .*"kubernetes-nmstate".* ]];
+then
+  echo "export K8S_NMSTATE_HANDLER_IMAGE=${K8S_NMSTATE_HANDLER_IMAGE}" >> /root/dev-scripts/config_root.sh
+  echo "export K8S_NMSTATE_OPERATOR_IMAGE=${K8S_NMSTATE_OPERATOR_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
