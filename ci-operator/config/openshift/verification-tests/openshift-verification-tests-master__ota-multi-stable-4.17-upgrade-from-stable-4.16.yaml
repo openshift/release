@@ -51,6 +51,11 @@ releases:
       architecture: multi
       channel: candidate
       version: "4.17"
+  twohoptarget:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -90,6 +95,28 @@ tests:
     - ref: cucushift-upgrade-healthcheck
     - ref: cucushift-ota-postupgrade
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: gcp-ipi-basecap-none-additionalcaps-arm-canary-f28
+  cron: 21 7 11 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RETARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RETARGET
+        name: release:twohoptarget
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-canary
+    workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
 zz_generated_metadata:
   branch: master
   org: openshift
