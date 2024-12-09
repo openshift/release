@@ -1,0 +1,44 @@
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 250Mi
+tests:
+- as: e2e
+  steps:
+    cluster_profile: devsandboxci-aws
+    env:
+      BASE_DOMAIN: devsandboxci.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export WEBHOOK_URL=$(cat /usr/local/sandbox/ci-secrets/webhook_url)
+        make test-e2e
+      credentials:
+      - mount_path: /usr/local/sandbox/ci-secrets
+        name: ci-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: "3"
+          memory: 250Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: codeready-toolchain
+  repo: workload-analyzer
