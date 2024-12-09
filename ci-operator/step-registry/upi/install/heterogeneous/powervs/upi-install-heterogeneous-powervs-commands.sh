@@ -7,15 +7,20 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Development Assumptions:
 # - jq, yq, openshift-install are installed
 
-
+##### Constants
 IBMCLOUD_HOME=/tmp/ibmcloud
 export IBMCLOUD_HOME
 
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
+REGION="${LEASED_RESOURCE}"
+export REGION
+
+PATH=${PATH}:/tmp:"${IBMCLOUD_HOME}/ocp-install-dir"
+export PATH
 
 ##### Functions
-
-
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
     if [ -z "$(command -v ibmcloud)" ]
@@ -39,6 +44,7 @@ function login_ibmcloud() {
 
 # Download automation code
 function download_automation_code() {
+    mkdir -p ${IBMCLOUD_HOME_FOLDER}
     echo "Downloading the head for ocp4-upi-compute-powervs"
     # Need to revert to ocp-power-automation
           # Before the workspace is created, download the automation code
@@ -52,6 +58,7 @@ function download_automation_code() {
 
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
+    mkdir -p ${IBMCLOUD_HOME_FOLDER}
     echo "Attempting to install terraform using gzip"
     curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
@@ -60,18 +67,9 @@ function download_terraform_binary() {
     terraform version -no-color
 }
 
-
-
-
-
-if [ "${ADDITIONAL_WORKERS}" == "0" ]
-then
-    echo "No additional workers requested"
-    exit 0
-fi
-
 # Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {
+     "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
   local version="${1}"
   local workspace_name="${2}"
   local region="${3}"
@@ -141,110 +139,32 @@ function cleanup_ibmcloud_powervs() {
       ibmcloud pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
-
-    echo "Updating the service instance"
-    ibmcloud resource service-instance-update "${CRN}" --allow-cleanup true || true
-    sleep 30
-    echo "Deleting the service instance"
-    ibmcloud resource service-instance-delete "${CRN}" --force --recursive || true
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ibmcloud pi workspace ls 2> /dev/null| grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
-    echo "Done Deleting the ${CRN}"
   done
 
   echo "Done cleaning up prior runs"
 }
 
-function get_ready_nodes_count() {
-  oc get nodes \
-    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
-    grep -c -E ",True$"
-}
+function configure_automation() {
+    SERVICE_NAME=power-iaas
+    export SERVICE_NAME
+    SERVICE_PLAN_NAME=power-virtual-server-group
+    export SERVICE_PLAN_NAME
 
-# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
-function wait_for_nodes_readiness()
-{
-  local expected_nodes=${1}
-  local max_retries=${2:-10}
-  local period=${3:-5}
-  for i in $(seq 1 "${max_retries}") max
-  do
-    if [ "${i}" == "max" ]
-    then
-      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
-      return 1
-    fi
-    sleep "${period}m"
-    ready_nodes=$(get_ready_nodes_count)
-    if [ "${ready_nodes}" == "${expected_nodes}" ]
-    then
-        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
-        return 0
-    fi
-    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
-      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
-  done
-}
+    # Saving the OCP VERSION so we can use in a subsequent deprovision
+    echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+    # Generates a workspace name like rdr-mac-4-14-au-syd-n1
+    # this keeps the workspace unique
+    CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 
-EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
-
-echo "Cluster type is ${CLUSTER_TYPE}"
-
-case "$CLUSTER_TYPE" in
-*ibmcloud*)
-  # Add code for ppc64le
-  if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "ppc64le" ]
-  then
-      # Saving the OCP VERSION so we can use in a subsequent deprovision
-      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
-
-      echo "Adding additional ppc64le nodes"
-      REGION="${LEASED_RESOURCE}"
-      IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
-      SERVICE_NAME=power-iaas
-      SERVICE_PLAN_NAME=power-virtual-server-group
-
-      # Generates a workspace name like rdr-mac-4-14-au-syd-n1
-      # this keeps the workspace unique
-      CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
-      if [ ! -z "${WORKFLOW_TYPE}" ]
-      then
-         CUCUSHIFT="-cucushift"
-      else
-        CUCUSHIFT=""
-      fi
-      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
-
-      # Setup ibmcloud binary
-      PATH=${PATH}:/tmp
-      mkdir -p ${IBMCLOUD_HOME_FOLDER}
-      setup_ibmcloud_cli
-      login_ibmcloud
-
-      # Terraform Setup
-      download_terraform_binary
-      PATH=$PATH:"${IBMCLOUD_HOME}"/ocp-install-dir"
-      export PATH
-
-      # Downloads the Automation Code
-
-      download_automation_code
+    # Setup ibmcloud binary
+      
+    
+      
+      
 
       RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
 
       # Run Cleanup
-      cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 
       # create workspace for powervs from cli
       echo "Display all the variable values:"
@@ -315,15 +235,7 @@ case "$CLUSTER_TYPE" in
 
       echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
-      # The CentOS-Stream-9 image is stock-image on PowerVS.
-      # This image is available across all PowerVS workspaces.
-      # The VMs created using this image are used in support of ignition on PowerVS.
-      echo "Creating the Centos Stream Image"
-      echo "PowerVS Target CRN is: ${CRN}"
-      ibmcloud pi workspace target "${CRN}"
-      ibmcloud pi image ls
-      ibmcloud pi image create CentOS-Stream-9 --json
-      echo "Import image status is: $?"
+
 
       # Set the values to be used for generating var.tfvars
       POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
@@ -337,12 +249,6 @@ case "$CLUSTER_TYPE" in
 
       # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
-      if [ ! -z "${WORKFLOW_TYPE}" ]
-      then
-        CUCUSHIFT_TAG="cucushift-"
-      else
-        CUCUSHIFT_TAG=""
-      fi
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
 
@@ -365,29 +271,94 @@ case "$CLUSTER_TYPE" in
 	        ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
 	      done
       done
-      
-      cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
+}
+
+# The CentOS-Stream-9 image is stock-image on PowerVS.
+# This image is available across all PowerVS workspaces.
+# The VMs created using this image are used in support of ignition on PowerVS.
+function setup_powervs_image() {
+    echo "PowerVS Target CRN is: ${CRN}"
+    ibmcloud pi workspace target "${CRN}"
+
+    COUNT=$(ibmcloud pi image ls --json | jq -r '.images[] | [.name? | select(. = "CentOS-Stream-9")] | length')
+    if [ ${COUNT} -ne 1 ]
+    then
+        echo "Creating the Centos Stream Image"
+        ibmcloud pi image ls
+        ibmcloud pi image create CentOS-Stream-9 --json
+        echo "Import image status is: $?"
+    fi
+}
+
+# run_automation executes the terraform based on automation
+function run_automation() {
+    cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform plan -var-file=data/var.tfvars -no-color \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
         || cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
 
-      echo "Shared Directory: copy the terraform.tfstate"
-      cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
-  fi
-;;
-*)
-  echo "Adding workers with a different ISA for jobs using the cluster type ${CLUSTER_TYPE} is not implemented yet..."
-  exit 4
-esac
+    echo "Shared Directory: copy the terraform.tfstate"
+    cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+}
 
-echo "Wait for the nodes to become ready..."
-wait_for_nodes_readiness ${EXPECTED_NODES}
-ret="$?"
-if [ "${ret}" != "0" ]
+# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
+function wait_for_additional_nodes_readiness() {
+    local expected_nodes=${1}
+
+    echo "Wait for the nodes to become ready..."
+    for i in $(seq 1 "${max_retries}") max
+    do
+        echo "Node details:"
+        oc get nodes -lnode-role.kubernetes.io/worker= -Lkubernetes.io/arch --no-headers
+        echo ""
+
+        COUNT_NODES=$(oc get nodes -lnode-role.kubernetes.io/worker= -Lkubernetes.io/arch --no-headers | grep -c Ready)
+        if [ "${i}" == "max" ]
+        then
+            echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${COUNT_NODES}... Failing."
+            return 1
+        fi
+
+        if [ "${COUNT_NODES}" == "${expected_nodes}" ]
+        then
+            echo "[INFO] Found ${COUNT_NODES}/${expected_nodes} ready nodes, continuing..."
+            return 0
+        fi
+
+        echo "[INFO] - ${expected_nodes} ready nodes expected, found ${COUNT_NODES}..." \
+            "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+            sleep "3m"
+    done
+}
+
+## Main Execution Path
+if [ "${ADDITIONAL_WORKERS}" == "0" ]
 then
-  echo "Some errors occurred, exiting with ${ret}."
-  exit "${ret}"
+    echo "No additional workers requested"
+    exit 0
 fi
+
+if [ "${CLUSTER_TYPE}" != "ibmcloud" ]
+then
+    echo "Adding workers with a different ISA for jobs using the cluster type ${CLUSTER_TYPE} is not implemented yet..."
+    exit 4
+fi
+
+if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" != "ppc64le" ]
+then
+    echo "only runs with ppc64le"
+    exit 64
+fi
+
+setup_ibmcloud_cli
+login_ibmcloud
+download_terraform_binary
+download_automation_code
+configure_worker_node
+cleanup_ibmcloud_powervs
+setup_powervs_image
+run_automation
+wait_for_additional_nodes_readiness ${ADDITIONAL_WORKERS}
 
 exit 0
