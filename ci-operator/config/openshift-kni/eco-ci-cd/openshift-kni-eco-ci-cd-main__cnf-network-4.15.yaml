@@ -1,0 +1,27 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN yum install -y openssl git nmap
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    env:
+      MY_TEST_VAR: overwrite
+    test:
+    - ref: telcov10n-functional-cnf-network-eco-gotests
+    workflow: telcov10n-functional-cnf-network-ocp-setup
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-network-4.15

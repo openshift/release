@@ -5,6 +5,76 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: build05
+    context: ci/prow/cnf-network-4.15-eco-ci-cd
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cluster: build05
+      ci-operator.openshift.io/variant: cnf-network-4.15
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-eco-ci-cd-main-cnf-network-4.15-eco-ci-cd
+    reporter_config:
+      slack:
+        channel: '#eco-ci-cd-notifications'
+        job_states_to_report:
+        - failure
+        - error
+        - success
+        - aborted
+        report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+          Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs> {{end}}'
+    rerun_command: /test cnf-network-4.15-eco-ci-cd
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=eco-ci-cd
+        - --variant=cnf-network-4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnf-network-4.15-eco-ci-cd,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
     cluster: build03
     context: ci/prow/telco-operators-dast-4.16-images
     decorate: true
