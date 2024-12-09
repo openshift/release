@@ -4,68 +4,22 @@ set -o errexit
 set -o pipefail
 
 echo "Deploying a DataScience Cluster"
-cat <<EOF | oc apply -f -
-apiVersion: datasciencecluster.opendatahub.io/v1
-kind: DataScienceCluster
-metadata:
-  name: "${DSC_NAME}"
-  labels:
-    app.kubernetes.io/name: datasciencecluster
-    app.kubernetes.io/instance: "${DSC_NAME}"
-    app.kubernetes.io/part-of: "${OPERATOR_NAME}"
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: "${OPERATOR_NAME}"
-spec:
-  components:
-    codeflare:
-      managementState: Managed
-    kserve:
-      managementState: Managed
-    trustyai:
-      managementState: Removed
-    ray:
-      managementState: Managed
-    kueue:
-      managementState: Managed
-    workbenches:
-      managementState: Managed
-    dashboard:
-      managementState: Managed
-    modelmeshserving:
-      managementState: Managed
-    datasciencepipelines:
-      managementState: Managed
-    trainingoperator:
-      managementState: Removed
-EOF
+csv=$(oc get csv -n default -o json | jq -r '.items[] | select(.metadata.name | startswith("rhods-operator"))')
+if [[ -z "${csv}" ]]; then
+  echo "Error: Cannot find csv with name 'rhods-operator*'"
+  oc get csv -n default
+  exit 1
+fi
+
+csv_name=$(echo "${csv}" | jq -r '.metadata.name')
+echo "Found csv '${csv_name}'"
+echo "Found the initialization-resource"
+echo "${csv}" | jq -r '.metadata.annotations."operatorframework.io/initialization-resource"' | jq -r | tee "/tmp/default-dsc.json"
+file="/tmp/default-dsc.json"
+oc apply -f "${file}"
 
 echo "⏳ Wait for DataScientCluster to be deployed"
 oc wait --for=jsonpath='{.status.phase}'=Ready datasciencecluster/${DSC_NAME} --timeout=9000s 
-
-echo "Apply DSCInitialization CustomResource"
-cat <<EOF | oc apply -f -
-apiVersion: dscinitialization.opendatahub.io/v1
-kind: DSCInitialization
-metadata:
-  name: ${DSCI_NAME}
-spec:
-    applicationsNamespace: redhat-ods-applications
-    monitoring:
-        managementState: Managed
-        namespace: redhat-ods-monitoring
-    serviceMesh:
-        controlPlane:
-            metricsCollection: Istio
-            name: data-science-smcp
-            namespace: istio-system
-        managementState: Managed
-    trustedCABundle:
-        customCABundle: ''
-        managementState: Managed
-EOF
-
-echo "Wait For DSCInitialization CustomResource To Be Ready"
-oc wait DSCInitialization --for jsonpath='{.status.phase}'=Ready --all --timeout=160s
 
 # Verify RHOAI operator installation
 namespace="openshift-operators"
@@ -88,5 +42,28 @@ label_selectors=("app=rhods-dashboard" "app=notebook-controller" "app.kubernetes
 for label_selector in "${label_selectors[@]}"; do
   oc get deployment -l ${label_selector} -n ${namespace} -o json | jq -e '.status | .replicas == .readyReplicas'
 done
+
+# Verify all pods are running
+oc_wait_for_pods() {
+    local ns="${1}"
+    local pods
+
+    for i in {1..60}; do
+        echo "Waiting for pods in '${ns}' in state Running or Completed"
+        pods=$(oc get pod -n "${ns}" | grep -v "Running\|Completed" | tail -n +2)
+        echo "${pods}"
+        if [[ -z "${pods}" ]]; then
+            echo "All pods in '${ns}' are in state Running or Completed"
+            break
+        fi
+        sleep 20
+    done
+    if [[ -n "${pods}" ]]; then
+        echo "ERROR: Some pods in '${ns}' are not in state Running or Completed"
+        echo "${pods}"
+        exit 1
+    fi
+}
+oc_wait_for_pods "redhat-ods-applications"
 
 echo "OpenShfit AI Operator is deployed successfully"
