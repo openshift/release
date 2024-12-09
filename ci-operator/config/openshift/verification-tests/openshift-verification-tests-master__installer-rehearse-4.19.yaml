@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: ansible
   aws-efs-csi-operator-create-efs:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
   dev-scripts:
@@ -12,11 +12,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   openstack-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: openstack-installer
   upi-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -24,13 +24,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -56,37 +56,41 @@ tests:
     - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
     pre:
     - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
-- as: installer-rehearse-azure
-  cron: '@yearly'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-ipi-public-to-private
-- as: installer-rehearse-gcp
-  cron: '@yearly'
-  steps:
-    cluster_profile: gcp-qe-c3-metal
-    workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
-- as: installer-rehearse-ibmcloud-dis
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe-2
-    env:
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: installer-rehearse-ibmcloud
+- as: installer-rehearse-ibmcloud-capi
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: installer-rehearse-ibmcloud-vpc
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CREATE_CLUSTER_RESOURCE_GROUP: "yes"
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: verification-tests
-  variant: installer-rehearse-4.18
+  variant: installer-rehearse-4.19
