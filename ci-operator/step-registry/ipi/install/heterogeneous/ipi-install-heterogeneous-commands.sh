@@ -288,7 +288,7 @@ case $CLUSTER_TYPE in
     )
 EOF
 )")
-  machineset_nums=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 '.items | length')
+  machineset_nums=$(echo "$MACHINE_SET" | yq-v4 '.items | length')
   base_replicas=$(( ADDITIONAL_WORKERS / machineset_nums ))
   remainder=$(( ADDITIONAL_WORKERS % machineset_nums ))
   for i in $(seq 0 $(( machineset_nums - 1 ))); do

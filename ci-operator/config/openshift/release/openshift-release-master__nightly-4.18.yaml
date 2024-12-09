@@ -477,7 +477,9 @@ tests:
     env:
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+        on the same node\|\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should
+        be able to preserve UDP traffic when server pod cycles for a LoadBalancer
+        service
     observers:
       enable:
       - observers-resource-watch
@@ -588,19 +590,17 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -671,7 +671,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
@@ -850,7 +850,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 21 * * 0
+  cron: 0 5 */1 * *
   restrict_network_access: false
   steps:
     env:
@@ -900,7 +900,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -908,7 +908,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -917,7 +917,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: equinix-ocp-metal
     observers:

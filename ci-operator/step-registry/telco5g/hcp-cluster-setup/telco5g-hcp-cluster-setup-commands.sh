@@ -52,6 +52,13 @@ if $INTERNAL_ONLY && $INTERNAL; then
 elif $INTERNAL; then
     CL_SEARCH="any"
 fi
+
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    CL_SEARCH="computeqe"
+fi
+
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
@@ -221,6 +228,10 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
+if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
@@ -281,6 +292,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
     shell: >-
       oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
 
+  - name: Patching hostedcluster to disable all default sources
+    shell: >-
+      oc --kubeconfig=/home/kni/.kube/config_${SNO_NAME} patch hostedcluster ${CLUSTER_NAME} -n clusters --type=merge -p '{"spec": {"configuration": {"operatorhub": {"disableAllDefaultSources": true}}}}'
+
 EOF
 
 # Run the playbook to install the cluster
@@ -294,10 +309,10 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e vsno_ip=$SNO_IP \
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
-    -e vsno_release=nightly \
+    -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
     -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
-    -e hcp_release=nightly $PLAYBOOK_ARGS || status=$?
+    -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.

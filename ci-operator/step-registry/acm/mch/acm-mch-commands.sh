@@ -68,19 +68,23 @@ if [ -n "${MCH_CATALOG_ANNOTATION}" ];then
   # Extract operator_source and operator_channel using the provided commands
   operator_name="multicluster-engine"
 
+  # Prioritize the use of the default catalog
+  operator_source=$(oc get packagemanifest | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
+  if [[ -n "${operator_source}" ]]; then
+    operator_source="${DEFAULT_OPERATOR_SOURCE}" ;
+  else
+    operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}' || echo)
+    if [[ -z "${operator_source}" ]]; then
+        echo "ERROR: '${operator_name}' packagemanifest not found in any available catalog"
+        exit 1
+    fi
+  fi
+
   # 1. Check if "source": "!any" is found and substitute with "source": "${operator_source}"
   if [[ "$MCH_CATALOG_ANNOTATION" == *'"source": "!any"'* ]]; then
-    operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}' || echo)
     MCH_CATALOG_ANNOTATION=${MCH_CATALOG_ANNOTATION//'"source": "!any"'/'"source": "'$operator_source'"'}
   # 2. Check if only "!any" (not within "source") is found and substitute with "${operator_source}"
   elif [[ "$MCH_CATALOG_ANNOTATION" == *'!any'* ]]; then
-    # Prioritize the use of the default catalog
-    operator_source=$(oc get packagemanifest ${operator_name} | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
-    if [[ -n "${operator_source}" ]]; then
-        operator_source="${DEFAULT_OPERATOR_SOURCE}" ;
-    else
-      operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}' || echo)
-    fi
     MCH_CATALOG_ANNOTATION=${MCH_CATALOG_ANNOTATION//"!any"/"$operator_source"}
   else
     # To get current source value...

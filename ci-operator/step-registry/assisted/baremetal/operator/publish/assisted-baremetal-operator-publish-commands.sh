@@ -12,6 +12,7 @@ echo "## Detect if there are changes in the olm related manifests."
 echo "## Exit if no changes."
 set +o errexit
 
+test="false"
 if [[ "$JOB_TYPE" = "presubmit" ]]; then
     echo "This is a test job"
     test="true"
@@ -21,7 +22,7 @@ fi
 
 if [ "$test" != "true" ]; then
     if git diff HEAD~1 --exit-code "deploy/olm-catalog" >/dev/null 2>&1; then
-        echo "   no changes detected"
+        echo "no changes detected"
         exit 0
     fi
 
