@@ -114,19 +114,19 @@ storageConfig:
 mirror:
   operators:
   - catalog: brew.registry.redhat.io/rh-osbs/iib:875516
-    targetCatalog: tracing/tempo
+    targetCatalog: rh-osbs/tempo
     packages:
     - name: tempo-product
       channels:
       - name: stable
   - catalog: brew.registry.redhat.io/rh-osbs/iib:877598
-    targetCatalog: tracing/otel
+    targetCatalog: rh-osbs/otel
     packages:
     - name: opentelemetry-product
       channels:
       - name: stable
   - catalog: brew.registry.redhat.io/rh-osbs/iib:876810
-    targetCatalog: tracing/jaeger
+    targetCatalog: rh-osbs/jaeger
     packages:
     - name: jaeger-product
       channels:
@@ -151,7 +151,7 @@ EOF
     run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
     run_command "./oc-mirror --config=/tmp/image-set.yaml docker://${MIRROR_REGISTRY_HOST} --continue-on-error --ignore-history --source-skip-tls --dest-skip-tls || true"
     run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
-    run_command "sed -e 's/registry.redhat.io/registry.stage.redhat.io/g' -e 's/brew.registry.stage.redhat.io/brew.registry.redhat.io/g' mapping.txt > mapping-stage.txt"
+    run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/jaeger|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
     run_command "oc image mirror -a ${REG_CREDS} -f mapping-stage.txt --insecure --filter-by-os='.*'"
 
     # print and apply generated ICSP and catalog source
