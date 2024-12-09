@@ -1,22 +1,19 @@
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
-      RUN yum -y install make wget gcc git httpd-tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
 images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -52,6 +49,51 @@ tests:
 - as: e2e-tests-nightly-aks
   cron: 0 7 * * *
   steps:
+    post:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-destroy
+      commands: |
+        mapt azure aks destroy \
+          --project-name "aks" \
+          --backed-url "s3://rhdh-ci-mapt"
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from_image:
+        name: mapt
+        namespace: ci
+        tag: v0.7.0
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    pre:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-create
+      commands: |
+        mapt azure aks create \
+          --project-name "aks" \
+          --backed-url "s3://rhdh-ci-mapt" \
+          --conn-details-output "${SHARED_DIR}" \
+          --spot \
+          --enable-app-routing
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from_image:
+        name: mapt
+        namespace: ci
+        tag: v0.7.0
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
     test:
     - ref: janus-idp-backstage-showcase-helm-aks-nightly
 - as: e2e-tests-nightly-gke
