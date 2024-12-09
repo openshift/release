@@ -1,3 +1,8 @@
+base_images:
+  rhel-coreos-base:
+    name: rhel-coreos-base
+    namespace: coreos
+    tag: "9.6"
 build_root:
   image_stream_tag:
     name: coreos-assembler
@@ -23,6 +28,15 @@ images:
     WORKDIR /tmp/cosa
   from: root
   to: build-image
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: Containerfile
+  inputs:
+    "rhel-coreos-base":
+      as:
+        - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+  to: node
 promotion:
   to:
   - excluded_images:
