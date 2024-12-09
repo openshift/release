@@ -38,6 +38,10 @@ iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+# When test was triggered from a PR in the openshift/release repository
+if [[ -n ${PULL_NUMBER:-} ]] && [[ ${REPO_OWNER} == "openshift" ]] && [[ ${REPO_NAME} == "release" ]]; then
+  export ES_INDEX="kube-burner-rehearsal"
+fi
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
