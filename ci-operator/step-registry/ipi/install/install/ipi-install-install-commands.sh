@@ -779,6 +779,7 @@ do
     write_install_status
     populate_artifact_dir
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    sleep 7200
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
