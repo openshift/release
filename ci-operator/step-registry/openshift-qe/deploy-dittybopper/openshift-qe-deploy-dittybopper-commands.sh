@@ -20,7 +20,7 @@ DITTYBOPPER_REPO_BRANCH=master
 DITTYBOPPER_REPO=https://github.com/cloud-bulldozer/performance-dashboards.git
 DITTYBOPPER_PARAMS=""
 rm -rf performance-dashboards
-git clone --single-branch --branch $DITTYBOPPER_REPO_BRANCH --depth 1 $DITTYBOPPER_REPO
+git clone -q --single-branch --branch $DITTYBOPPER_REPO_BRANCH --depth 1 $DITTYBOPPER_REPO
 pushd performance-dashboards/dittybopper
 ./deploy.sh $DITTYBOPPER_PARAMS
 popd
