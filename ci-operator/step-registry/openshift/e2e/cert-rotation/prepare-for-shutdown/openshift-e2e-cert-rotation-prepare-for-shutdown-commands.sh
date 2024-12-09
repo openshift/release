@@ -121,7 +121,9 @@ function wait-for-valid-lb-ext-kubeconfig {
 cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
-  oc --request-timeout=5s wait --for=condition=Progressing clusteroperator/kube-apiserver --timeout=300s 
+  # TODO: kube-apiserver never starts progressing in 4.19+
+  # oc --request-timeout=5s wait --for=condition=Progressing=True clusteroperator/kube-apiserver --timeout=300s
+  sleep 300
 EOZ
 chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"

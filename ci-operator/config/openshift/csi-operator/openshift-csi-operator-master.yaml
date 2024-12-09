@@ -130,12 +130,18 @@ images:
     ocp_4.18_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: azure-disk-csi-driver-operator
 - dockerfile_path: Dockerfile.azure-file
   inputs:
@@ -381,7 +387,7 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
-- as: hypershift-e2e-openstack-csi-cinder
+- as: hypershift-e2e-openstack-aws-csi-cinder
   run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
   steps:
     cluster_profile: hypershift
@@ -393,8 +399,8 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-conformance
-- as: hypershift-e2e-openstack-csi-manila
+    workflow: hypershift-openstack-aws-conformance
+- as: hypershift-e2e-openstack-aws-csi-manila
   run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
     cluster_profile: hypershift
@@ -406,7 +412,7 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-conformance
+    workflow: hypershift-openstack-aws-conformance
 - as: smb-operator-e2e
   optional: true
   steps:
