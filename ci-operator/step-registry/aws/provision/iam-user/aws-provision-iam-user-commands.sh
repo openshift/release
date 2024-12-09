@@ -52,11 +52,12 @@ function aws_create_user() {
 
 function create_cred_file()
 {
-	local policy_file=$1
-	local postfix=$2
-	local cred_file=$3
-	local policy_name policy_doc policy_outout
-	local user_name policy_arn user_outout cred_outout
+	local user_name=$1
+	local policy_name=$2
+	local policy_file=$3
+	local cred_file=$4
+	local policy_doc policy_outout
+	local policy_arn user_outout cred_outout
 	local key_id key_sec
 
 	
@@ -64,14 +65,12 @@ function create_cred_file()
 	echo "Policy file:"
 	jq . $policy_file
 
-	policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
 	policy_doc=$(cat "${policy_file}" | jq -c .)
 	policy_outout=/tmp/aws_policy_output
 
 	echo "Creating policy ${policy_name}"
 	aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
 
-	user_name="${CLUSTER_NAME}-minimal-perm-${postfix}"
 	policy_arn=$(jq -r '.Policy.Arn' ${policy_outout})
 	user_outout=/tmp/aws_user_output
 	cred_outout=/tmp/aws_cred_output
@@ -103,13 +102,18 @@ POLICY_FILE_INSTALLER="${SHARED_DIR}/aws-permissions-policy-creds.json"
 POLICY_FILE_CCOCTL="${SHARED_DIR}/aws-permissions-policy-creds-ccoctl.json"
 
 if [ -f "${POLICY_FILE_INSTALLER}" ]; then
-	create_cred_file "${POLICY_FILE_INSTALLER}" "installer" "${SHARED_DIR}/aws_minimal_permission"
+
+	USER_NAME="${CLUSTER_NAME}-minimal-perm-installer"
+	POLICY_NAME="${CLUSTER_NAME}-required-policy-installer"
+	create_cred_file ${USER_NAME} ${POLICY_NAME} "${POLICY_FILE_INSTALLER}" "${SHARED_DIR}/aws_minimal_permission"
 else
 	echo "User permission policy file for installer not found. Skipping user creation"
 fi
 
 if [ -f "${POLICY_FILE_CCOCTL}" ]; then
-	create_cred_file "${POLICY_FILE_CCOCTL}" "ccoctl" "${SHARED_DIR}/aws_minimal_permission_ccoctl"
+	USER_NAME="${CLUSTER_NAME}-minimal-perm-ccoctl"
+	POLICY_NAME="${CLUSTER_NAME}-required-policy-ccoctl"
+	create_cred_file ${USER_NAME} ${POLICY_NAME} "${POLICY_FILE_CCOCTL}" "${SHARED_DIR}/aws_minimal_permission_ccoctl"
 else
 	echo "User permission policy file for ccoctl not found. Skipping user creation"
 fi
