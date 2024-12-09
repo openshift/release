@@ -61,7 +61,7 @@ v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
 v417=" ${v416}"
-v418=" ${v417}"
+v418=" ${v417} OperatorLifecycleManagerV1"
 latest_defined="v418"
 always_default="${!latest_defined}"
 

@@ -39,7 +39,8 @@ check_pull_number() {
 
 queue_url=$(cat "/var/run/token/dpu-token/queue-url")
 queue_endpoint=$(cat "/var/run/token/dpu-token/queue-endpoint")
-endpoint_resolve="${queue_endpoint}:80:10.30.45.137"
+ip_address=$(cat "/var/run/token/dpu-token/ip-address")
+endpoint_resolve="${queue_endpoint}:80:${ip_address}"
 
 #Check timeout wa
 timed_out_response=$(check_timeout_status)
