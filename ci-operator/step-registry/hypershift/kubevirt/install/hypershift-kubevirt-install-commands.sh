@@ -36,7 +36,11 @@ fi
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
 # Make the masters schedulable so we have more capacity to run VMs
-oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
+then
+  oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+fi
 
 # In case of nested-mgmt topology where there's only one worker node, we need to label it as a master
 # in order to get some kubevirt components to be scheduled. This is needed since CNV 4.17.0+
@@ -59,7 +63,6 @@ if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
   rm /tmp/global-pull-secret.json
 
   sleep 5
-
   oc wait mcp master worker --for condition=updated --timeout=20m
 
   # Create a catalog source for the pre-release builds
