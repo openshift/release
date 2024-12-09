@@ -379,6 +379,11 @@ function build_upi_cluster() {
 
     echo "Copying the terraform.tfstate"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+    if [ ! -f "${SHARED_DIR}"/kubeconfig ]
+    then
+        echo "kubeconfig not found install failed"
+        exit 7
+    fi
     echo "Done copying the kubeconfig"
 }
 

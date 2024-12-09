@@ -117,15 +117,6 @@ ROLE_OUT=$(mktemp)
 
 PRINCIPAL_LIST=$(mktemp)
 echo ${CLUSTER_CREATOR_USER_ARN} > ${PRINCIPAL_LIST}
-if [[ -e ${SHARED_DIR}/sts_ingress_role_arn ]]; then
-  ingress_role=$(head -n 1 ${SHARED_DIR}/sts_ingress_role_arn)
-  if [[ ${ingress_role} == "" ]]; then
-    echo "Ingress role is empty, exit now"
-    exit 1
-  else
-    echo ${ingress_role} >> ${PRINCIPAL_LIST}
-  fi 
-fi
 
 cat <<EOF> $ASSUME_ROLE_POLICY_DOC
 {

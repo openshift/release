@@ -24,7 +24,11 @@ fi
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
 # Make the masters schedulable so we have more capacity to run VMs
-oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
+then
+  oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+fi
 
 source "${SHARED_DIR}/packet-conf.sh"
 
