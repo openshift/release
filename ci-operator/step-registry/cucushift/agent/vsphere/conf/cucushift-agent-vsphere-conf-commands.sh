@@ -143,6 +143,7 @@ fi
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 baseDomain: ${base_domain}
+AdditionalTrustBundlePolicy: Always
 controlPlane:
   name: master
   replicas: ${MASTERS}
