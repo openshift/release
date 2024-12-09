@@ -27,37 +27,20 @@ function cleanup_ibmcloud_powervs() {
 
   echo "Cleaning up the Transit Gateways"
   RESOURCE_GROUP_ID=$(ic resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
-  for GW in $(ic tg gateways --output json | jq -r '.[].id')
+  for GW in $(ic tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
   do
-    echo "Checking the resource_group and location for the transit gateways ${GW}"
-    VALID_GW=$(ic tg gw "${GW}" --output json | jq -r '. | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")')
-    if [ -n "${VALID_GW}" ]
+    VPC_CONN="${WORKSPACE_NAME}-vpc"
+    VPC_CONN_ID="$(ic tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
+    if [ ! -z "${VPC_CONN_ID}" ]
     then
-      TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
-      if [ ! -z "${WORKFLOW_TYPE}" ]
-      then
-        CUCUSHIFT_TAG="cucushift-"
-      else
-        CUCUSHIFT_TAG=""
-      fi
-      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${CUCUSHIFT_TAG}${version}" || true )
-      if [ -n "${TAGS}" ]
-      then
-        for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
-        do 
-          ic tg connection-delete "${GW}" "${CS}" --force || true
-          sleep 120
-          ic tg connection-delete "${GW}" "${CS}" --force || true
-          sleep 30
-        done
-        ic tg gwd "${GW}" --force || sleep 120s || true
-        ic tg gateway "${GW}" || true
-        ic tg gwd "${GW}" --force || sleep 120s || true
-        echo "waiting up a minute while the Transit Gateways are removed"
-        sleep 60
-      fi
+      echo "deleting VPC connection"
+      ic tg connection-delete "${GW}" "${CS}" --force || true
+      sleep 120
+      echo "Done Cleaning up GW VPC Connection"
+    else
+      echo "GW VPC Connection not found. VPC Cleanup not needed."
     fi
+    break
   done
 
   echo "reporting out the remaining TGs in the resource_group and region"
@@ -377,6 +360,18 @@ case "$CLUSTER_TYPE" in
       # created resources.
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
+      #Create the VPC Connection for the TG
+      for GW in $(ic tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+      do
+	      for CS in $(ic is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+	      do
+  	      VPC_CONN_NAME=$(ic is vpc "${CS}" --output json | jq -r .name)
+	        VPC_NW_ID=$(ic is vpc "${CS}" --output json | jq -r .crn)
+	        echo "Creating new VPC connection for gateway now."
+	        ic tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+	      done
+      done
+      
       cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
         && "${IBMCLOUD_HOME_FOLDER}"/terraform plan -var-file=data/var.tfvars -no-color \

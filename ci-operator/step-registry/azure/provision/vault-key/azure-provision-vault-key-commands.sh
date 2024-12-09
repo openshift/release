@@ -20,6 +20,9 @@ function poll() {
 }
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+    AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -31,7 +34,8 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 set -x
 
 KV_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-LOCATION="$LEASED_RESOURCE"
+LOCATION=${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}
+
 if [[ $AZURE_KEYVAULT_USE_AKS_RG == "true" ]]; then
     RESOURCE_GROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
 else
@@ -52,7 +56,7 @@ az role assignment create --assignee "$SP_ID" --scope "$KV_ID" --role "Key Vault
 echo "Creating Keys within the KeyVault"
 KEYVAULT_KEY_NAME="${KV_BASE_NAME}-key"
 poll "az keyvault key create --vault-name $KEYVAULT_NAME -n $KEYVAULT_KEY_NAME --protection software"
-KEYVAULT_KEY_URL="$(az keyvault key show --vault-name "$KEYVAULT_NAME" --name "$KEYVAULT_KEY_NAME" --query 'key.kid' -o tsv)"
+poll "KEYVAULT_KEY_URL=\$(az keyvault key show --vault-name \"$KEYVAULT_NAME\" --name \"$KEYVAULT_KEY_NAME\" --query 'key.kid' -o tsv)"
 
 echo "Saving relevant info to \$SHARED_DIR"
 # Key URL format: https://<KEYVAULT_NAME>.vault.azure.net/keys/<KEYVAULT_KEY_NAME>/<KEYVAULT_KEY_VERSION>

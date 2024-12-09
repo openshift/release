@@ -24,6 +24,30 @@ python3 -m pip install -r $TEST_REPOSITORY_DIR/requirements.txt --ignore-install
 python3 -m pip install $MTC_APPS_DEPLOYER_DIR
 python3 -m pip install $MTC_PYTHON_CLIENT_DIR
 
+RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
+
+# Login to the source cluster and add permissions
+SOURCE_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${SOURCE_CLUSTER_PREFIX}*")
+if [ -f "${SOURCE_CLUSTER_DIR}/auth/rosa-admin-password" ]; then
+  SOURCE_KUBEADMIN_PASSWORD_FILE="/${SOURCE_CLUSTER_DIR}/auth/rosa-admin-password"
+  TEST_USER="rosa-admin"
+else
+  SOURCE_KUBEADMIN_PASSWORD_FILE="/${SOURCE_CLUSTER_DIR}/auth/kubeadmin-password"
+  TEST_USER="kubeadmin"
+fi
+SOURCE_KUBECONFIG="/${SOURCE_CLUSTER_DIR}/auth/kubeconfig"
+
+echo "Logging into source cluster."
+export KUBECONFIG=$SOURCE_KUBECONFIG
+SOURCE_KUBEADMIN_PASSWORD=$(cat $SOURCE_KUBEADMIN_PASSWORD_FILE)
+
+API_URL=$(oc whoami --show-server)
+oc login ${API_URL} -u ${TEST_USER} -p ${SOURCE_KUBEADMIN_PASSWORD}
+
+# Update admin permission for migration-controller service account
+oc adm policy add-cluster-role-to-user cluster-admin -z migration-controller -n openshift-migration
+
+# Login to the target cluster and add permissions
 TARGET_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${TARGET_CLUSTER_PREFIX}*")
 if [ -f "${TARGET_CLUSTER_DIR}/auth/rosa-admin-password" ]; then
   TARGET_KUBEADMIN_PASSWORD_FILE="/${TARGET_CLUSTER_DIR}/auth/rosa-admin-password"
@@ -33,9 +57,7 @@ else
   TEST_USER="kubeadmin"
 fi
 TARGET_KUBECONFIG="/${TARGET_CLUSTER_DIR}/auth/kubeconfig"
-RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
 
-# Login to the cluster
 echo "Logging into target cluster."
 export KUBECONFIG=$TARGET_KUBECONFIG
 TARGET_KUBEADMIN_PASSWORD=$(cat $TARGET_KUBEADMIN_PASSWORD_FILE)

@@ -81,7 +81,8 @@ images:
   to: custom-os-image
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
     name: 4.19-priv
     namespace: ocp-private
@@ -105,6 +106,15 @@ tests:
   commands: make test-unit
   container:
     from: src
+- always_run: false
+  as: e2e-agent-compact-ipv4
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-fips-op
   optional: true
@@ -446,7 +456,6 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
