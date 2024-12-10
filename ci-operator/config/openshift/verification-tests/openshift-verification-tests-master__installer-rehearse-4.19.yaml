@@ -61,7 +61,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
       FEATURE_SET: CustomNoUpgrade
       SLEEP_DURATION: 15h
     post:
@@ -72,7 +72,23 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
-- as: installer-rehearse-ibmcloud-vpc
+- as: installer-rehearse-ibmcloud-minimal-perm-capi
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
+- as: installer-rehearse-ibmcloud-vpc-capi
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe

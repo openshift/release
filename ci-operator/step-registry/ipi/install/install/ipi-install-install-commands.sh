@@ -623,6 +623,7 @@ ibmcloud*)
     else
       IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     fi
+    echo "setting IBMCloud Key: $IC_API_KEY"
     export IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
