@@ -21,7 +21,9 @@ NAME_SPACE="showcase-ci-nightly"
 TAG_NAME="next"
 
 # Clone and checkout the specific PR
-git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+#git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+git clone https://github.com/albarbaro/backstage-showcase.git
+git checkout ci-job-config
 cd backstage-showcase || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
