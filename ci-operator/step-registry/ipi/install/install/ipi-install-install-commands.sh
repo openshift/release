@@ -639,6 +639,10 @@ nutanix)
     if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
         export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
     fi
+    if [[ -f "${CLUSTER_PROFILE_DIR}/proxy-conf.sh" ]]; then
+      # shellcheck disable=SC1091
+      source "${CLUSTER_PROFILE_DIR}/proxy-conf.sh"
+    fi
     ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
