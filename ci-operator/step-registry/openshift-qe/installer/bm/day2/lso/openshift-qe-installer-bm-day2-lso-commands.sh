@@ -9,13 +9,12 @@ oc config view
 oc projects
 
 # Disk cleaning
-ssh ${SSH_ARGS} root@${bastion} '
-  for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
-    for j in {0..7}; do
-      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo sgdisk --zap-all /dev/nvme$j\n1
-      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo wipefs -a /dev/nvme$j\n1
-    done
-  done'
+for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+  for j in {0..7}; do
+    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo sgdisk --zap-all /dev/nvme$j\n1
+    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo wipefs -a /dev/nvme$j\n1
+  done
+done
 
 # Install the LSO operator
 cat <<EOF | oc apply -f -
