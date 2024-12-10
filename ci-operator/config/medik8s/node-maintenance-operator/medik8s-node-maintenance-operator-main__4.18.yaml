@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.12"
+    name: "4.18"
     namespace: ocp
     tag: base
 binary_build_commands: make build
@@ -23,7 +23,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.12"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -42,6 +42,7 @@ tests:
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
       OPERATOR_NAMESPACE: nmo-install
+      OPERATOR_RELEASED_VERSION: 0.17.0
     test:
     - as: e2e-install-operator-last-version
       cli: latest
@@ -53,9 +54,10 @@ tests:
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
         # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
-        BUNDLE_IMG=quay.io/medik8s/node-maintenance-operator-bundle:v0.17.0 make bundle-run
+        BUNDLE_IMG=quay.io/medik8s/node-maintenance-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
       env:
       - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
       from: src
       resources:
         requests:
@@ -89,4 +91,4 @@ zz_generated_metadata:
   branch: main
   org: medik8s
   repo: node-maintenance-operator
-  variant: "4.12"
+  variant: "4.18"
