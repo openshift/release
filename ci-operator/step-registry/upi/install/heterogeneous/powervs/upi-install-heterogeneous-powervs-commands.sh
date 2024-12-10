@@ -39,17 +39,14 @@ function setup_ibmcloud_cli() {
 # login to the ibmcloud
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
-    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${REGION}"
 }
 
 # Download automation code
 function download_automation_code() {
     mkdir -p ${IBMCLOUD_HOME_FOLDER}
     echo "Downloading the head for ocp4-upi-compute-powervs"
-    # Need to revert to ocp-power-automation
-          # Before the workspace is created, download the automation code
-      # release-4.14-per
-      cd "${IBMCLOUD_HOME_FOLDER}" \
+    cd "${IBMCLOUD_HOME_FOLDER}" \
         && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
         && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
         && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
@@ -68,208 +65,135 @@ function download_terraform_binary() {
 }
 
 # Cleans up the failed prior jobs
-function cleanup_ibmcloud_powervs() {
-     "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
-  local version="${1}"
-  local workspace_name="${2}"
-  local region="${3}"
-  local resource_group="${4}"
-  local api_key="${5}"
-  echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
-
-  echo "Cleaning up the Transit Gateways"
-  RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
-  for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
-  do
-    VPC_CONN="${WORKSPACE_NAME}-vpc"
-    VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
-    if [ ! -z "${VPC_CONN_ID}" ]
-    then
-      echo "deleting VPC connection"
-      ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
-      sleep 120
-      echo "Done Cleaning up GW VPC Connection"
-    else
-      echo "GW VPC Connection not found. VPC Cleanup not needed."
-    fi
-    break
-  done
-
-  echo "reporting out the remaining TGs in the resource_group and region"
-  ibmcloud tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
-
-  echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
-  do
-    echo "Targetting power cloud instance"
-    ibmcloud pi workspace target "${CRN}"
-
-    echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[] | .id')
+function cleanup_prior() {
+    echo "Clean up transit gateway - VPC connection"
+    RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
     do
-      echo "Deleting PVM Instance ${INSTANCE_ID}"
-      ibmcloud pi instance delete "${INSTANCE_ID}" --delete-data-volumes
-      sleep 60
+        VPC_CONN="${WORKSPACE_NAME}-vpc"
+        VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
+        if [ ! -z "${VPC_CONN_ID}" ]
+        then
+        echo "deleting VPC connection"
+        ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+        sleep 120
+        echo "Done Cleaning up GW VPC Connection"
+        else
+        echo "GW VPC Connection not found. VPC Cleanup not needed."
+        fi
+        break
     done
 
-    echo "Deleting the Images"
-    for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
+    # Delete any vpc older than 24 hrs
+    echo "Cleaning up VPCs"
+    for VPC in $(ibmcloud is vpcs --resource-group-name "multi-arch-cicd-resource-group" 2>&1 | grep multi-arch-cicd-resource-group | grep -v Listing | grep -i ci-op | awk '{print $1}')
     do
-      echo "Deleting Images ${IMAGE_ID}"
-      ibmcloud pi image delete "${IMAGE_ID}"
-      sleep 60
+        echo "VPC=${VPC}"
+        ibmcloud is vpc 
+        ibmcloud is vpc-delete "${VPC}" -f
+        sleep 10s
     done
 
-    if [ -n "$(ibmcloud pi network ls 2> /dev/null | grep DHCP || true)" ]
-    then
-       curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
-       chmod +x /tmp/pvsadm
+    ibmcloud is vpc r014-e85d5a63-c6ae-433f-9473-5557344f2747 --output json | jq -r '[. | select((.created_at + 2d) > now())]'
 
-       POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
 
-       NET_ID=$(IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
-       IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
-       sleep 60
-    fi
-
-    echo "Deleting the Network"
-    for NETWORK_ID in $(ibmcloud pi network ls 2> /dev/null | awk '{print $1}')
+    WORKSPACE_NAME=
+    echo "Cleaning up workspaces for ${workspace_name}"
+    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
     do
-      echo "Deleting network ${NETWORK_ID}"
-      ibmcloud pi network delete "${NETWORK_ID}" || true
-      sleep 60
+        echo "Targetting power cloud instance"
+        ibmcloud pi workspace target "${CRN}"
+
+        echo "Deleting the PVM Instances"
+        for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[] | .id')
+        do
+            echo "Deleting PVM Instance ${INSTANCE_ID}"
+            ibmcloud pi instance delete "${INSTANCE_ID}" --delete-data-volumes
+            sleep 60
+        done
+
+        echo "Deleting the Images"
+        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
+        do
+            echo "Deleting Images ${IMAGE_ID}"
+            ibmcloud pi image delete "${IMAGE_ID}"
+            sleep 60
+        done
+
+        if [ -n "$(ibmcloud pi network ls 2> /dev/null | grep DHCP || true)" ]
+        then
+            curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
+            chmod +x /tmp/pvsadm
+            POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
+            NET_ID=$(IC_API_KEY="@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
+            IC_API_KEY="@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
+            sleep 60
+        fi
+
+        echo "Deleting the Network"
+        for NETWORK_ID in $(ibmcloud pi network ls 2> /dev/null | awk '{print $1}')
+        do
+        echo "Deleting network ${NETWORK_ID}"
+        ibmcloud pi network delete "${NETWORK_ID}" || true
+        sleep 60
+        done
     done
-  done
 
   echo "Done cleaning up prior runs"
 }
 
 function configure_automation() {
-    SERVICE_NAME=power-iaas
-    export SERVICE_NAME
-    SERVICE_PLAN_NAME=power-virtual-server-group
-    export SERVICE_PLAN_NAME
-
     # Saving the OCP VERSION so we can use in a subsequent deprovision
     echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
-    # Generates a workspace name like rdr-mac-4-14-au-syd-n1
-    # this keeps the workspace unique
-    CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 
-    # Setup ibmcloud binary
-      
-    
-      
-      
+    export INSTALL_CONFIG_FILE=${SHARED_DIR}/install-config.yaml
+    # Resource Group:
+    RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+    echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
-      RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+    # create workspace for powervs from cli
+    echo "Display all the variable values:"
+    POWERVS_REGION=$(bash "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    echo "VPC Region is ${REGION}"
+    echo "PowerVS region is ${POWERVS_REGION}"
+    echo "Resource Group is ${RESOURCE_GROUP}"
 
-      # Run Cleanup
-
-      # create workspace for powervs from cli
-      echo "Display all the variable values:"
-      POWERVS_REGION=$(bash "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
-      echo "VPC Region is ${REGION}"
-      echo "PowerVS region is ${POWERVS_REGION}"
-      echo "Resource Group is ${RESOURCE_GROUP}"
-
-      ##Create a Workspace on a Power Edge Router enabled PowerVS zone
-      # Dev Note: uses a custom loop since we want to redirect errors
-      for i in {1..5}
-      do
-        echo "Attempt: $i/5"
-        ibmcloud resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
-        if [ $? = 0 ]; then
-          break
-        elif [ "$i" == "5" ]; then
-          echo "All retry attempts failed! Please try running the script again after some time"
-        else
-          sleep 30
-        fi
-        [ -f /tmp/instance.id ] && cat /tmp/instance.id
-      done
-
-      # Process the CRN into a variable
-      CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
+    # Use existing pvs workspace.
+    # Process the CRN into a variable
+    CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
       export CRN
       echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
-      sleep 30
+    # This CRN is useful when manually destroying.
+    echo "PowerVS Service CRN: ${CRN}"
 
-      # Tag the resource for easier deletion
-      ibmcloud resource tag-attach --tag-names "mac-power-worker-${CLEAN_VERSION}" --resource-id "${CRN}" --tag-type user
+    # Set the values to be used for generating var.tfvars
+    POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
+    export POWERVS_SERVICE_INSTANCE_ID
 
-      # Waits for the created instance to become active... after 10 minutes it fails and exists
-      # Example content for TEMP_STATE
-      # active
-      # crn:v1:bluemix:public:power-iaas:osa21:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:6632ebfa-ae9e-4b6c-97cd-c4b28e981c46::
-      COUNTER=0
-      SERVICE_STATE=""
-      while [ -z "${SERVICE_STATE}" ]
-      do
-        COUNTER=$((COUNTER+1)) 
-        TEMP_STATE="NOT_READY"
-        if [ "$(ibmcloud resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
-        then
-            TEMP_STATE="$(ibmcloud resource service-instance -g "${RESOURCE_GROUP}" "${CRN}" --output json | jq -r '.[].state')"
-        fi
-        echo "Current State is: ${TEMP_STATE}"
-        echo ""
-        if [ "${TEMP_STATE}" == "active" ]
-        then
-          SERVICE_STATE="FOUND"
-        elif [[ $COUNTER -ge 20 ]]
-        then
-          SERVICE_STATE="ERROR"
-          echo "Service has not come up... login and verify"
-          exit 2
-        else
-          echo "Waiting for service to become active... [30 seconds]"
-          sleep 30
-        fi
-      done
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY
 
-      echo "SERVICE_STATE: ${SERVICE_STATE}"
+    export PRIVATE_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-privatekey
+    export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-publickey
+    
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-      # This CRN is useful when manually destroying.
-      echo "PowerVS Service CRN: ${CRN}"
-
-      echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
-
-
-
-      # Set the values to be used for generating var.tfvars
-      POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
-      export POWERVS_SERVICE_INSTANCE_ID
-      IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
-      export IC_API_KEY
-      export PRIVATE_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-privatekey
-      export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-publickey
-      export INSTALL_CONFIG_FILE=${SHARED_DIR}/install-config.yaml
-      export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
-      # Invoke create-var-file.sh to generate var.tfvars file
-      echo "Creating the var file"
-      cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
+    # Invoke create-var-file.sh to generate var.tfvars file
+    echo "Creating the var file"
+    cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
+    cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
-      # TODO:MAC check if the var.tfvars file is populated
-      VARFILE_OUTPUT=$(cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars)
-      echo "varfile_output is ${VARFILE_OUTPUT}"
-
-      # copy the var.tfvars file and the POWERVS_SERVICE_CRN to ${SHARED_DIR} so that it can be used to destroy the
-      # created resources.
-      cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
-
-      #Create the VPC Connection for the TG
-      for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
-      do
-	      for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
-	      do
-  	      VPC_CONN_NAME=$(ibmcloud is vpc "${CS}" --output json | jq -r .name)
-	        VPC_NW_ID=$(ibmcloud is vpc "${CS}" --output json | jq -r .crn)
-	        echo "Creating new VPC connection for gateway now."
-	        ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
-	      done
+    #Create the VPC to fixed transit gateway Connection for the TG
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    do
+        for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+        do
+            VPC_CONN_NAME=$(ibmcloud is vpc "${CS}" --output json | jq -r .name)
+            VPC_NW_ID=$(ibmcloud is vpc "${CS}" --output json | jq -r .crn)
+            echo "Creating new VPC connection for gateway now."
+            ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+        done
       done
 }
 
@@ -305,9 +229,10 @@ function run_automation() {
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
 function wait_for_additional_nodes_readiness() {
     local expected_nodes=${1}
+    local MAX_RETRIES=10
 
     echo "Wait for the nodes to become ready..."
-    for i in $(seq 1 "${max_retries}") max
+    for i in $(seq 1 "${MAX_RETRIES}") max
     do
         echo "Node details:"
         oc get nodes -lnode-role.kubernetes.io/worker= -Lkubernetes.io/arch --no-headers
@@ -327,7 +252,7 @@ function wait_for_additional_nodes_readiness() {
         fi
 
         echo "[INFO] - ${expected_nodes} ready nodes expected, found ${COUNT_NODES}..." \
-            "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+            "Waiting ${period}min before retrying (timeout in $(( (MAX_RETRIES - i) * (period) ))min)..."
             sleep "3m"
     done
 }
@@ -356,7 +281,7 @@ login_ibmcloud
 download_terraform_binary
 download_automation_code
 configure_worker_node
-cleanup_ibmcloud_powervs
+cleanup_prior
 setup_powervs_image
 run_automation
 wait_for_additional_nodes_readiness ${ADDITIONAL_WORKERS}
