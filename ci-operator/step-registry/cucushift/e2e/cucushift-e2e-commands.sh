@@ -402,6 +402,8 @@ if [[ -z "$E2E_RUN_TAGS" ]] ; then
 else
     export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
 fi
+date --utc
+oc version --client --output='yaml' || true
 set_cluster_access
 preparation_for_test
 filter_tests

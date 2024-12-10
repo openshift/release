@@ -33,15 +33,18 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
+      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:870308
       SKIP_TESTS: tests/e2e-openshift/monitoring tests/e2e-openshift/red-metrics tests/e2e-openshift-ossm/*
+      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:875494
     test:
-    - ref: enable-stage-catalogsource
+    - ref: distributed-tracing-install-otel-konflux-catalogsource
+    - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
     workflow: cucushift-installer-rehearse-aws-ipi
