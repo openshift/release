@@ -45,9 +45,14 @@ any_errors=false
 
 # Set the operator args required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--enable-nginx-instrumentation=true\"]}]"
-sleep 10
-oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--feature-gates=+operator.observability.prometheus\", \"--enable-nginx-instrumentation=true\"]}]"
+sleep 60
+if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
+    echo "CSV updated successfully, continuing script execution..."
+else
+    echo "Operator CSV update failed, exiting with error."
+    exit 1
+fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
@@ -63,27 +68,19 @@ tests/e2e-instrumentation \
 tests/e2e-pdb \
 tests/e2e-opampbridge \
 tests/e2e-otel \
+tests/e2e-multi-instrumentation \
 tests/e2e-targetallocator || any_errors=true
 
 # Set the operator args required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-multi-instrumentation\"]}]"
-sleep 10
-oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
-
-# Execute OpenTelemetry e2e tests
-chainsaw test \
---report-name "junit_otel_multi_instrumentation" \
---report-path "$ARTIFACT_DIR" \
---report-format "XML" \
---test-dir \
-tests/e2e-multi-instrumentation || any_errors=true
-
-# Set the operator args required for tests execution.
-OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--label=.*filter.out\"]}]"
-sleep 10
-oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\"]}]"
+sleep 60
+if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
+    echo "CSV updated successfully, continuing script execution..."
+else
+    echo "Operator CSV update failed, exiting with error."
+    exit 1
+fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \

@@ -19,10 +19,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-# As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
-# we use the last part of it to define the VLAN ID.
-# TODO: find a similar unique value for dual stack and ipv6 single stack configurations?
-VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
+# Use the last octet of the first master node as the VLAN ID to keep it unique in the managed network
+VLAN_ID=$(yq '.[] | select(.name|test("master-00")).ip' "${SHARED_DIR}/hosts.yaml")
 VLAN_ID=${VLAN_ID//*\./}
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"

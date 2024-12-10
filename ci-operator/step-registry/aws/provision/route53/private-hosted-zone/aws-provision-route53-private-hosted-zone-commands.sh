@@ -51,6 +51,9 @@ HOSTED_ZONE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.HostedZone.Id' | awk 
 echo "${HOSTED_ZONE_ID}" > "${SHARED_DIR}/hosted_zone_id"
 CHANGE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.ChangeInfo.Id' | awk -F / '{printf $3}')"
 
+# add a sleep time to reduce Rate exceeded errors
+sleep 120
+
 aws --region "${REGION}" route53 wait resource-record-sets-changed --id "${CHANGE_ID}" &
 wait "$!"
 echo "Hosted zone ${HOSTED_ZONE_ID} successfully created."
@@ -110,15 +113,6 @@ EOF
 
   PRINCIPAL_LIST=$(mktemp)
   echo ${CLUSTER_CREATOR_USER_ARN} > ${PRINCIPAL_LIST}
-  if [[ -e ${SHARED_DIR}/sts_ingress_role_arn ]]; then
-    ingress_role=$(head -n 1 ${SHARED_DIR}/sts_ingress_role_arn)
-    if [[ ${ingress_role} == "" ]]; then
-      echo "Ingress role is empty, exit now"
-      exit 1
-    else
-      echo ${ingress_role} >> ${PRINCIPAL_LIST}
-    fi 
-  fi
 
   cat <<EOF> $ASSUME_ROLE_POLICY_DOC
 {

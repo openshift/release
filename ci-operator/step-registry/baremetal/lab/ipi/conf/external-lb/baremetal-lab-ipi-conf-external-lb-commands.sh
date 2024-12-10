@@ -14,11 +14,12 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 echo "Creating patch file to enable UserManaged loadbalancer: ${SHARED_DIR}/install-config.yaml"
 
-cat > "${SHARED_DIR}/external_lb_patch_install_config.yaml" <<EOF
+cat > "${SHARED_DIR}/external_lb_append.patch_install_config.yaml" <<EOF
 networking:
   machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
-  - cidr: $(yq ".api_vip" "${SHARED_DIR}/external_vips.yaml")/32
+  # TODO: Remove when https://issues.redhat.com/browse/OCPBUGS-35811 is fixed
+  $([ "${ipv4_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip" "${SHARED_DIR}/external_vips.yaml")/32")
+  $([ "${ipv6_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip_v6" "${SHARED_DIR}/external_vips.yaml")/128")
 platform:
   baremetal:
     loadBalancer:

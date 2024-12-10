@@ -42,7 +42,12 @@ data="{
 }"
 
 clusters_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
-pe_uuid=$(echo "${clusters_json}" | jq '.entities[] | select (.spec.name != "Unnamed") | .metadata.uuid' | head -n 1)
+# For QE nutanix with multi zone, we need to select PE by host IP
+if [[ $LEASED_RESOURCE =~ "nutanix-qe" ]]; then
+    pe_uuid=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .metadata.uuid" | head -n 1)
+else
+    pe_uuid=$(echo "${clusters_json}" | jq '.entities[] | select (.spec.name != "Unnamed") | .metadata.uuid' | head -n 1)
+fi
 
 if [[ -z "${pe_uuid}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - Cannot get PE UUID"

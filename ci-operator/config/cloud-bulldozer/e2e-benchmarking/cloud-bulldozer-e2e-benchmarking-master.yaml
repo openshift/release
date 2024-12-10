@@ -3,13 +3,6 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
-images:
-- dockerfile_path: prow/Dockerfile
-  to: e2e-benchmarking
-promotion:
-  to:
-  - namespace: e2e
-    tag: latest
 releases:
   arm64-latest:
     candidate:
@@ -241,6 +234,53 @@ tests:
         TicketId 382
     test:
     - ref: cloud-bulldozer-e2e-benchmarking-router-perf
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: e2e-udn-density-pods-l3
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      IF_INSTALL_INFRA_WORKLOAD: "false"
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        TicketId 382
+    test:
+    - ref: cloud-bulldozer-e2e-benchmarking-udn-density-pods
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: e2e-udn-density-pods-l2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_LAYER_3: "false"
+      IF_INSTALL_INFRA_WORKLOAD: "false"
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        TicketId 382
+    test:
+    - ref: cloud-bulldozer-e2e-benchmarking-udn-density-pods
     workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: master

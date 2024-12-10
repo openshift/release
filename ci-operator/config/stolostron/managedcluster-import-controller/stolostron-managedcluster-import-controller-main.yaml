@@ -24,7 +24,7 @@ images:
 promotion:
   to:
   - disabled: true
-    name: "2.7"
+    name: "2.8"
     namespace: stolostron
 releases:
   initial:
@@ -54,7 +54,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: sonar-post-submit
   commands: |
     export SONAR_GO_TEST_ARGS="./..."
@@ -67,19 +66,18 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: check
   commands: make check
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: managedcluster-import-controller
@@ -132,7 +130,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.7
+      DESTINATION_BRANCH: backplane-2.8
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

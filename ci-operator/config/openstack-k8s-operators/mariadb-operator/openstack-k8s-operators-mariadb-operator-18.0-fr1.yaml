@@ -1,0 +1,104 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install python-openstackclient
+    COPY oc /usr/bin/oc
+    COPY opm /usr/bin/opm
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    opm-builder:
+      paths:
+      - destination_dir: .
+        source_path: /bin/opm
+  to: openstack-operator-ci-build-deploy
+- build_args:
+  - name: KUTTL_VERSION
+    value: v0.17.0
+  dockerfile_literal: |
+    FROM openstack-operator-ci-build-deploy
+    ARG KUTTL_VERSION=v0.17.0
+    RUN curl -s -L "https://github.com/kudobuilder/kuttl/releases/download/${KUTTL_VERSION}/kubectl-kuttl_${KUTTL_VERSION#v}_linux_x86_64" -o kubectl-kuttl
+    RUN chmod +x ./kubectl-kuttl
+    RUN mv ./kubectl-kuttl /usr/local/bin
+    RUN yum install -y skopeo
+  from: openstack-operator-ci-build-deploy
+  to: openstack-operator-ci-build-deploy-kuttl
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: functional
+  commands: |
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    export GOFLAGS=
+    make test GINKGO_ARGS='--no-color'
+  container:
+    from: src
+- as: mariadb-operator-build-deploy
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  optional: true
+  steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
+    workflow: openstack-k8s-operators-test-build-deploy
+- as: mariadb-operator-build-deploy-kuttl
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
+    workflow: openstack-k8s-operators-test-build-deploy-kuttl
+  timeout: 6h0m0s
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    # see tradeoff between speed and memory usage at https://tip.golang.org/doc/gc-guide#GOGC
+    export GOGC=10
+    mkdir -p ../operator/ && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure --verbose
+  container:
+    from: openstack-operator-ci-pre-commit
+zz_generated_metadata:
+  branch: 18.0-fr1
+  org: openstack-k8s-operators
+  repo: mariadb-operator

@@ -1,0 +1,85 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: scanner-test-0.4.4
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh noop
+tests:
+- as: e2e-tests
+  optional: true
+  steps:
+    test:
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+- as: slim-e2e-tests
+  optional: true
+  steps:
+    test:
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+- as: merge-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+- as: merge-slim-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: release-2.35
+  org: stackrox
+  repo: scanner

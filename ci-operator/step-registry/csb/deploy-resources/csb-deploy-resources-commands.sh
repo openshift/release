@@ -434,12 +434,6 @@ spec:
       application: tnb
   storageClassName: manual
   volumeMode: Filesystem
-status:
-  accessModes:
-    - ReadWriteMany
-    - ReadWriteOnce
-  capacity:
-    storage: 19Gi
 EOF
 }
 
@@ -583,8 +577,8 @@ dballocator.requestee=software.tnb.db.dballocator.service
 dballocator.expire=6
 dballocator.erase=true
 tnb.user=tnb-tests
-camel.springboot.examples.repo=https://github.com/jboss-fuse/camel-spring-boot-examples.git
-camel.springboot.examples.branch=camel-spring-boot-examples-${CSB_RELEASE}.redhat-00001
+camel.springboot.examples.repo=https://github.com/jboss-fuse/camel-spring-boot-examples
+camel.springboot.examples.branch=camel-spring-boot-examples-${CSB_RELEASE}.${CSB_PATCH}
 EOF
 
 oc delete configmap test-properties -n "${1}" || true

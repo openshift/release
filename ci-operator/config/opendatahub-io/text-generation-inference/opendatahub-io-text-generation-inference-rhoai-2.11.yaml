@@ -1,0 +1,46 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: text-generation-inference
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: rhoai-2.11
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      cpu: "20"
+      memory: 24Gi
+    requests:
+      cpu: "10"
+      memory: 16Gi
+tests:
+- as: image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: text-generation-inference
+    env:
+      IMAGE_REPO: text-generation-inference
+      RELEASE_VERSION: rhoai-2.11
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: rhoai-2.11
+  org: opendatahub-io
+  repo: text-generation-inference

@@ -87,10 +87,10 @@ spec:
     skip_cloning: true
     timeout: 4h0m0s
     utility_images:
-      clonerefs: gcr.io/k8s-prow/clonerefs:v20210825-bc8cae85fb
-      entrypoint: gcr.io/k8s-prow/entrypoint:v20210825-bc8cae85fb
-      initupload: gcr.io/k8s-prow/initupload:v20210825-bc8cae85fb
-      sidecar: gcr.io/k8s-prow/sidecar:v20210825-bc8cae85fb
+      clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20240802-66b115076
+      entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20240802-66b115076
+      initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20240802-66b115076
+      sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20240802-66b115076
   extra_refs:
   - base_ref: master
     org: openshift

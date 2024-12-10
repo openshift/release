@@ -1,12 +1,16 @@
 base_images:
-  ocp_4.14_base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.15_base:
     name: "4.15"
     namespace: ocp
     tag: base
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-8-base-openshift-4.15:
     name: builder
     namespace: ocp
@@ -52,9 +56,9 @@ images:
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
   inputs:
-    ocp_4.14_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
   to: keepalived-ipfailover
 promotion:
   to:
@@ -88,6 +92,11 @@ tests:
   commands: go test -race ./...
   container:
     from: src
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

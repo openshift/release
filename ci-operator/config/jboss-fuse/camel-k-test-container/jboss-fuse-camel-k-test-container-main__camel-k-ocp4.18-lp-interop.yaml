@@ -1,0 +1,90 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: camel-k-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: camel-k-interop-aws
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "camel-k-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","camel-k-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mmajerni@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OPERATORS: |
+        [
+            {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario camel-k
+    test:
+    - ref: install-operators
+    - ref: camel-k-interop-tests
+    workflow: firewatch-ipi-aws
+- as: camel-k-interop-aws-fips
+  cron: 0 0 11 6 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "camel-k-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","camel-k-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mmajerni@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OPERATORS: |
+        [
+            {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario camel-k
+    test:
+    - ref: install-operators
+    - ref: camel-k-interop-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: jboss-fuse
+  repo: camel-k-test-container
+  variant: camel-k-ocp4.18-lp-interop

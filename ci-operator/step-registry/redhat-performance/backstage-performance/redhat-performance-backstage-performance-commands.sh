@@ -13,6 +13,9 @@ export OPENSHIFT_USERNAME
 
 echo -e "[INFO] Start tests"
 
+echo "ENVIRONMENT:"
+env | sort
+
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
     OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
@@ -35,7 +38,7 @@ if [ $? -ne 0 ]; then
 fi
 
 cd "$(mktemp -d)"
-git clone --branch main https://github.com/redhat-performance/backstage-performance.git .
+git clone --branch ${BACKSTAGE_PERFORMANCE_BASE_BRANCH:-main} https://github.com/redhat-performance/backstage-performance.git .
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [ "$USE_PR_BRANCH" == "true" ]; then

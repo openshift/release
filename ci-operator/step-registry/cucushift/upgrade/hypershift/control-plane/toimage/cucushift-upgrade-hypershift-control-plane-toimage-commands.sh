@@ -43,16 +43,12 @@ function check_node() {
     node_number=$(oc get node --no-headers | grep -cv STATUS)
     ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
     if (( node_number == ready_number )); then
-        echo "All nodes status check PASSED"
+        echo "All nodes status Ready"
         return 0
     else
-        if (( ready_number == 0 )); then
-            echo >&2 "No any ready node"
-        else
-            echo >&2 "We found failed node"
-            oc get node --no-headers | awk '$2 != "Ready"'
-        fi
-        return 1
+        echo "Find Not Ready worker nodes, node recreated"
+        oc get no
+        exit 1
     fi
 }
 
@@ -74,12 +70,14 @@ done
 EOT
     oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
 
-    echo "Step #2: Make sure every machine is in 'Ready' status"
-    check_node
-
-    echo "Step #3: Check all pods are in status running or complete"
+    echo "Step #2: Check all pods are in status running or complete"
     check_pod
 }
+
+# original worker node UIDs before controlplane upgrade
+initial_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+IFS=' ' read -r -a initial_array <<< "$initial_uids"
+sorted_initial_uids=$(printf "%s\n" "${initial_array[@]}" | sort | tr '\n' ' ')
 
 if [ ! -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
     exit 1
@@ -100,8 +98,8 @@ echo "Compare MAIN version"
 set -x
 TARGET_VERSION="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" -ojsonpath='{.metadata.version}')"
 TARGET_MAIN_VERSION="$(echo "$TARGET_VERSION" | cut -d '.' -f 1-2)"
-SOURCE_MAIN_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
-echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION , SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
+SOURCE_MAIN_VERSION="$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
+echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION, SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
 oc annotate hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" "hypershift.openshift.io/force-upgrade-to=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --overwrite
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
 
@@ -135,4 +133,27 @@ if [ $_upgradeReady -ne 0 ]; then
 fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+echo "Monitoring for node recreation for 10 minutes..."
+END_TIME=$((SECONDS + 600))
+while [ $SECONDS -lt $END_TIME ]; do
+  check_node
+  sleep 60
+done
+
+# ensure the worker node UIDs are not changed
+current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+IFS=' ' read -r -a current_array <<< "$current_uids"
+sorted_current_uids=$(printf "%s\n" "${current_array[@]}" | sort | tr '\n' ' ')
+
+# compare the worker nodes UIDs
+if [ "$sorted_initial_uids" == "$sorted_current_uids" ]; then
+    echo "No changes detected in node UIDs."
+else
+    echo "Node UIDs have changed!"
+    echo "Initial UIDs: $sorted_initial_uids"
+    echo "Current UIDs: $sorted_current_uids"
+    exit 1
+fi
+
 health_check

@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -23,8 +16,17 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
+  as: ping-bastion
+  cluster: build06
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+- always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -37,11 +39,13 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
@@ -52,7 +56,8 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -65,7 +70,8 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -80,7 +86,8 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: day2-label-infra
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -91,7 +98,8 @@ tests:
     - chain: openshift-qe-installer-bm-day2-label
 - always_run: false
   as: day2-label-webburner
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -102,7 +110,8 @@ tests:
     - chain: openshift-qe-installer-bm-day2-label
 - always_run: false
   as: day2-metallb
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     test:
@@ -110,7 +119,8 @@ tests:
     - chain: openshift-qe-installer-bm-day2-metallb
 - always_run: false
   as: day2-perf-profile-rds-core
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     test:
@@ -118,12 +128,32 @@ tests:
     - chain: openshift-qe-installer-bm-day2-perf-profile-rds-core
 - always_run: false
   as: day2-sriov
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-day2-sriov
+- always_run: false
+  as: day2-lso
+  cluster: build06
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2-lso
+- always_run: false
+  as: day2-odf
+  cluster: build06
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2-lso
+    - chain: openshift-qe-installer-bm-day2-odf
 zz_generated_metadata:
   branch: main
   org: openshift-qe

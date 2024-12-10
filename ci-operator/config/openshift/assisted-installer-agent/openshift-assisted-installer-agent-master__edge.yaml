@@ -1,18 +1,18 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,15 +20,15 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.12
+    name: ocm-2.13
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   dev-scripts:
@@ -36,11 +36,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   tests:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tests
-  tests-4.16:
-    name: "4.16"
+  tests-4.17:
+    name: "4.17"
     namespace: ocp
     tag: tests
 build_root:
@@ -57,14 +57,14 @@ images:
   to: assisted-installer-agent-src
 promotion:
   to:
-  - name: ocm-2.12
+  - name: ocm-2.13
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -150,12 +150,14 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
-- as: e2e-metal-assisted
+- as: e2e-metal-assisted-4-18
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6
+- as: e2e-metal-assisted-ipv6-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -163,25 +165,27 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-single-node
+- as: e2e-metal-assisted-single-node-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4-16
+- as: e2e-metal-assisted-cnv-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=18700
         MASTER_CPU=9
@@ -190,7 +194,7 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-lvm
+- as: e2e-metal-assisted-lvm-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -202,29 +206,31 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-16
+- as: e2e-metal-assisted-odf-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2
+- as: e2e-metal-assisted-day2-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-upgrade-agent
+- as: e2e-metal-assisted-upgrade-agent-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -232,6 +238,7 @@ tests:
       ASSISTED_CONFIG: |
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -244,42 +251,35 @@ tests:
     env:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-oci-assisted
+- as: e2e-oci-assisted-4-18
   optional: true
   steps:
     cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-oci
 - always_run: false
-  as: e2e-oci-assisted-4-16
+  as: e2e-oci-assisted-4-17
   optional: true
   steps:
     cluster_profile: oci-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
+      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.16
+        OPENSHIFT_VERSION=4.17
       PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external
+  as: e2e-metal-assisted-external-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-12
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

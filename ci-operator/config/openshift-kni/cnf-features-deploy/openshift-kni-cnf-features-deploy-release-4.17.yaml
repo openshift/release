@@ -1,0 +1,168 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: base
+  base-9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- context_dir: .
+  dockerfile_path: cnf-tests/Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+  to: cnf-tests
+- context_dir: tools/s2i-dpdk/
+  dockerfile_path: Dockerfile
+  from: base-9
+  to: dpdk
+- context_dir: .
+  dockerfile_path: ztp/resource-generator/Containerfile
+  from: os-min8
+  inputs:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+  to: ztp-site-generator
+promotion:
+  to:
+  - name: "4.17"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: ztp-ci
+  commands: make ztp-ci-job
+  container:
+    from: src
+  run_if_changed: ^ztp
+- as: e2e-aws-ci-tests
+  skip_if_only_changed: ^ztp
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.17
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ci-tests-release-4.17
+        ci-job-type e2e-aws-ci-tests
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-aws-ci-tests
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ran-profile
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.17
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-release-4.17
+        ci-job-type e2e-aws-ran-profile
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-aws-ran-profile
+      commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
+        container-mount-namespace gatekeeper n3000 fec metallb sro multinetworkpolicy"
+        make validate-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cnf-features-deploy
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-telco5g-cnftests
+  cluster: build05
+  optional: true
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: cnftests
+      T5CI_VERSION: "4.17"
+    workflow: telco5g-cnf
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-telco5g-sno-cnftests
+  cluster: build05
+  optional: true
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: sno-cnftests
+      T5CI_VERSION: "4.17"
+    workflow: telco5g-sno-cnf
+- always_run: false
+  as: e2e-telco5g-hcp-cnftests
+  cluster: build05
+  optional: true
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: hcp-cnftests
+      T5CI_VERSION: "4.17"
+    workflow: telco5g-hcp-cnf
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-kni
+  repo: cnf-features-deploy

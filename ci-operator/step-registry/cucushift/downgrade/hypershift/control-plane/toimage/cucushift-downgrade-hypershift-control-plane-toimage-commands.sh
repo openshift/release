@@ -100,21 +100,31 @@ echo "Compare MAIN version"
 set -x
 TARGET_VERSION="$(oc adm release info "${OPENSHIFT_DOWNGRADE_RELEASE_IMAGE_OVERRIDE}" -ojsonpath='{.metadata.version}')"
 TARGET_MAIN_VERSION="$(echo "$TARGET_VERSION" | cut -d '.' -f 1-2)"
-SOURCE_MAIN_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
-echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION , SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
+SOURCE_MAIN_VERSION="$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
+echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION, SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_DOWNGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
 set +x
 
 _downgradeReady=1
 for ((i=1; i<=120; i++)); do
-    count=$(oc get hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" -ojsonpath='{.status.version.history[?(@.image=="'"${OPENSHIFT_DOWNGRADE_RELEASE_IMAGE_OVERRIDE}"'")].state}' | grep -c Completed || true)
-    if [ "$count" -eq 1 ] ; then
-        echo "HyperShift HostedCluster(CP) downgrade successful"
-        _downgradeReady=0
-        break
-    fi
-    echo "Try ${i}/120: HyperShift HostedCluster(CP) is not updated yet. Checking again in 30 seconds"
     sleep 30
+    echo "$(date) Try ${i}/120"
+
+    current=$(oc get hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" -o=jsonpath='{.status.version.history[0].image}')
+    if [[ $current != "$OPENSHIFT_DOWNGRADE_RELEASE_IMAGE_OVERRIDE" ]]; then
+        echo "Waiting for HC.status.version.history[0] to be updated"
+        continue
+    fi
+
+    state=$(oc get hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" -o=jsonpath='{.status.version.history[0].state}')
+    if [[ $state != Completed ]]; then
+        echo "Waiting for HC.status.version.history[0] to complete"
+        continue
+    fi
+
+    echo "HyperShift HostedCluster(CP) downgrade successful"
+    _downgradeReady=0
+    break
 done
 
 if [ $_downgradeReady -ne 0 ]; then

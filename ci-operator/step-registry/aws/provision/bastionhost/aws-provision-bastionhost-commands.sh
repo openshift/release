@@ -34,15 +34,29 @@ if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; 
   # for OCP
   echo "Reading infra id from file metadata.json"
   infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
-  echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
-  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
+  vpc_name="${infra_id}-vpc"
+  public_subnet_name="${infra_id}-subnet-public-${REGION}a"
+  echo "Looking up IDs for VPC ${vpc_name} and subnet ${public_subnet_name}"
+  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${vpc_name} --query 'Vpcs[0].VpcId' --output text)
+  ### This finds any public subnet, as
+  ### * we can't guess which azs are picked (public_subnet_name guesses its a)
+  ### * pre-4.16 its ${infra_id}-subnet-public-${REGION}[abc...] and later 
+  ### its ${infra_id}-public-${REGION}[abc...]
+  ### any public subnet would work here
   PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
+  ### This SG is created by AWS IPI since 4.18
+  ### Previous versions or Byo-VPC may not have it created - 
+  ### CloudFormation has logic to ignore it if its set to "None"
+  ControlPlaneSecurityGroup=$(aws --region ${REGION} ec2 describe-security-groups --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=${infra_id}-controlplane" --query 'SecurityGroups[0].GroupId' --output text)
 else
   VpcId=$(cat "${SHARED_DIR}/vpc_id")
   PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
+  ControlPlaneSecurityGroup="None"
 fi
+
 echo "VpcId: $VpcId"
 echo "PublicSubnet: $PublicSubnet"
+echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
 
 stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
@@ -109,6 +123,9 @@ Parameters:
   PublicSubnet:
     Description: The subnets (recommend public) to launch the registry nodes into
     Type: AWS::EC2::Subnet::Id
+  ControlPlaneSecurityGroup:
+    Description: Control plane security group
+    Type: String
   BastionHostInstanceType:
     Default: t2.medium
     Type: String
@@ -136,6 +153,7 @@ Metadata:
 
 Conditions:
   UseIgnition: !Not [ !Equals ["NA", !Ref BastionIgnitionLocation] ]
+  HasControlPlaneSecurityGroupSet: !Not [ !Equals ["None", !Ref ControlPlaneSecurityGroup] ]
 
 Resources:
   BastionIamRole:
@@ -220,7 +238,8 @@ Resources:
       - AssociatePublicIpAddress: "True"
         DeviceIndex: "0"
         GroupSet:
-        - !GetAtt BastionSecurityGroup.GroupId
+          - !GetAtt BastionSecurityGroup.GroupId
+          - !If [ "HasControlPlaneSecurityGroupSet", !Ref "ControlPlaneSecurityGroup", !Ref "AWS::NoValue"]
         SubnetId: !Ref "PublicSubnet"
       Tags:
       - Key: Name
@@ -275,6 +294,7 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
         ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
+        ParameterKey=ControlPlaneSecurityGroup,ParameterValue="${ControlPlaneSecurityGroup}" \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=BastionIgnitionLocation,ParameterValue="${ign_location}"  &
 

@@ -1,0 +1,98 @@
+base_images:
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: control-plane-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m7g.metal
+      ADDITIONAL_WORKERS: "5"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "5"
+      COMPUTE_NODE_TYPE: m5zn.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m5zn.metal
+      OCP_ARCH: amd64
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: data-path-4nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m7g.metal
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m5zn.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m5zn.metal
+      OCP_ARCH: amd64
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: node-density-heavy-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m7g.metal
+      ADDITIONAL_WORKERS: "5"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "5"
+      COMPUTE_NODE_TYPE: m5zn.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m5zn.metal
+      OCP_ARCH: amd64
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.18-nightly-multi

@@ -4,6 +4,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 4h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -13,10 +14,10 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/cluster: build02
-    ci-operator.openshift.io/variant: nightly-4.15
+    ci-operator.openshift.io/variant: nightly-4.15-upgrade-from-stable-4.14
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-seedgen-aws-ocp-4-15
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-upgrade-from-stable-4.14-image-based-upgrade-e2e-parallel-conformance
   reporter_config:
     slack:
       channel: '#image-based-ci'
@@ -37,89 +38,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/seedgen-aws-ocp-4-15-cluster-profile
-      - --target=seedgen-aws-ocp-4-15
-      - --variant=nightly-4.15
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/seedgen-aws-ocp-4-15-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-    timeout: 4h0m0s
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: lifecycle-agent
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/cluster: build02
-    ci-operator.openshift.io/variant: nightly-4.15-upgrade-from-stable-4.14
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-upgrade-from-stable-4.14-image-based-upgrade-e2e-parallel-conformance
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance
       - --variant=nightly-4.15-upgrade-from-stable-4.14
       command:
@@ -137,8 +55,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -162,9 +78,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -193,6 +106,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-upgrade-from-stable-4.14-image-based-upgrade-e2e-parallel-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -201,7 +126,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance-baseline
       - --variant=nightly-4.15-upgrade-from-stable-4.14
       command:
@@ -219,8 +143,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -244,9 +166,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -275,6 +194,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-upgrade-from-stable-4.14-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -283,7 +214,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance
       - --variant=nightly-4.15-upgrade-from-stable-4.14
       command:
@@ -301,8 +231,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -326,9 +254,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -357,6 +282,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-upgrade-from-stable-4.14-image-based-upgrade-e2e-serial-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -365,7 +302,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance-baseline
       - --variant=nightly-4.15-upgrade-from-stable-4.14
       command:
@@ -383,8 +319,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -408,196 +342,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-    timeout: 3h0m0s
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: lifecycle-agent
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/cluster: build02
-    ci-operator.openshift.io/variant: nightly-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-image-based-install
-  reporter_config:
-    slack:
-      channel: '#image-based-ci'
-      job_states_to_report:
-      - failure
-      - success
-      - error
-      - aborted
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-install-cluster-profile
-      - --target=image-based-install
-      - --variant=nightly-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/image-based-install-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: lifecycle-agent
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/cluster: build02
-    ci-operator.openshift.io/variant: nightly-4.16
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-seedgen-aws-ocp-4-16
-  reporter_config:
-    slack:
-      channel: '#image-based-ci'
-      job_states_to_report:
-      - failure
-      - success
-      - error
-      - aborted
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/seedgen-aws-ocp-4-16-cluster-profile
-      - --target=seedgen-aws-ocp-4-16
-      - --variant=nightly-4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/seedgen-aws-ocp-4-16-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -626,6 +370,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-upgrade-from-stable-4.15-image-based-upgrade-e2e-parallel-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -634,7 +390,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance
       - --variant=nightly-4.16-upgrade-from-stable-4.15
       command:
@@ -652,8 +407,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -677,9 +430,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -708,6 +458,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-upgrade-from-stable-4.15-image-based-upgrade-e2e-parallel-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -716,7 +478,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance-baseline
       - --variant=nightly-4.16-upgrade-from-stable-4.15
       command:
@@ -734,8 +495,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -759,9 +518,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -790,6 +546,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-upgrade-from-stable-4.15-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -798,7 +566,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance
       - --variant=nightly-4.16-upgrade-from-stable-4.15
       command:
@@ -816,8 +583,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -841,9 +606,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -872,6 +634,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-upgrade-from-stable-4.15-image-based-upgrade-e2e-serial-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -880,7 +654,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance-baseline
       - --variant=nightly-4.16-upgrade-from-stable-4.15
       command:
@@ -898,8 +671,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -923,9 +694,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -954,6 +722,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.17-upgrade-from-stable-4.16-image-based-upgrade-e2e-parallel-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -962,7 +742,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance
       - --variant=nightly-4.17-upgrade-from-stable-4.16
       command:
@@ -980,8 +759,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1005,9 +782,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1036,6 +810,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.17-upgrade-from-stable-4.16-image-based-upgrade-e2e-parallel-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -1044,7 +830,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-parallel-conformance-baseline
       - --variant=nightly-4.17-upgrade-from-stable-4.16
       command:
@@ -1062,8 +847,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-parallel-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1087,9 +870,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1118,6 +898,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.17-upgrade-from-stable-4.16-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -1126,7 +918,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance
       - --variant=nightly-4.17-upgrade-from-stable-4.16
       command:
@@ -1144,8 +935,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1169,9 +958,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1200,6 +986,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.17-upgrade-from-stable-4.16-image-based-upgrade-e2e-serial-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -1208,7 +1006,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
       - --target=image-based-upgrade-e2e-serial-conformance-baseline
       - --variant=nightly-4.17-upgrade-from-stable-4.16
       command:
@@ -1226,8 +1023,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/image-based-upgrade-e2e-serial-conformance-baseline-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1251,9 +1046,533 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: manifest-tool-local-pusher
       secret:
-        secretName: cluster-secrets-aws
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 3h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-image-based-install
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-install
+      - --variant=nightly-4.18
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-seedgen-aws-ocp-4-18
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=seedgen-aws-ocp-4-18
+      - --variant=nightly-4.18
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18-upgrade-from-stable-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-upgrade-from-stable-4.17-image-based-upgrade-e2e-parallel-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-upgrade-e2e-parallel-conformance
+      - --variant=nightly-4.18-upgrade-from-stable-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18-upgrade-from-stable-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-upgrade-from-stable-4.17-image-based-upgrade-e2e-parallel-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-upgrade-e2e-parallel-conformance-baseline
+      - --variant=nightly-4.18-upgrade-from-stable-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18-upgrade-from-stable-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-upgrade-from-stable-4.17-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-upgrade-e2e-serial-conformance
+      - --variant=nightly-4.18-upgrade-from-stable-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.18-upgrade-from-stable-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.18-upgrade-from-stable-4.17-image-based-upgrade-e2e-serial-conformance-baseline
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :alert-siren:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-upgrade-e2e-serial-conformance-baseline
+      - --variant=nightly-4.18-upgrade-from-stable-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

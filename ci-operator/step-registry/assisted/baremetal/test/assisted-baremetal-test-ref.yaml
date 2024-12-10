@@ -2,6 +2,7 @@ ref:
   as: assisted-baremetal-test
   from: tests
   grace_period: 10m
+  timeout: 3h0m0s
   commands: assisted-baremetal-test-commands.sh
   resources:
     requests:
@@ -13,9 +14,160 @@ ref:
   - name: RUN_UPGRADE_TEST
     default: "false"
     documentation: If the value is equal to "true", run only the upgrade tests
+  - name: TEST_TYPE
+    default: minimal
+    documentation: |-
+      Specifies the type of test to run:
+      * 'suite' - Run a full test suite. If chosen, 'TEST_SUITE' and 'TEST_PROVIDER' can be specified.
+      * 'custom' - Run a custom list of tests. If chosen, 'CUSTOM_TEST_LIST' must be specified.
+      * 'minimal' - Run the minimal test list.
+      * 'extensive' - Run the extensive test list.
+      * 'none' - Don't run any tests.
   - name: TEST_SUITE
-    default: "full"
-    documentation: Injects extended test list into e2e-metal-assisted.
+    default: "openshift/conformance/parallel"
+    documentation: |-
+      The test suite to run. This will be considered only if 'TEST_TYPE' is set to 'suite'.
+  - name: CUSTOM_TEST_LIST
+    default: ""
+    documentation: |-
+      The test list to run. This will be considered only if 'TEST_TYPE' is set to 'custom'.
+  - name: EXTENSIVE_TEST_LIST
+    default: |-
+      "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition creating/deleting custom resource definition objects works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition getting/updating/patching custom resource definition status sub-resource works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition listing custom resource definition objects works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] custom resource defaulting for requests and from storage works [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] should include custom resource definition resources in discovery documents [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] removes definition from spec when one version gets changed to not be served [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] updates the published spec when one version gets renamed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for CRD preserving unknown fields at the schema root [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for CRD preserving unknown fields in an embedded object [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for CRD with validation schema [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for CRD without validation schema [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of different groups [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of same group and version but different kinds [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of same group but different versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should delete RS created by deployment when not orphaning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should delete pods created by rc when not orphaning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should not be blocked by dependency circle [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Garbage collector should orphan pods created by rc if delete options say so [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should be able to update and delete ResourceQuota. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a configMap. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a pod. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a replica set. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a replication controller. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a secret. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a service. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should create a ResourceQuota and ensure its status is promptly calculated. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] ResourceQuota should verify ResourceQuota with best effort scope. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Servers with support for Table transformation should return a 406 for a backend which does not implement metadata [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Watchers should be able to restart watching from the last resource version observed by the previous watch [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Watchers should be able to start watching from a specific resource version [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Watchers should observe add, update, and delete watch notifications on configmaps [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Watchers should observe an object deletion if it stops meeting the requirements of the selector [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-api-machinery] Watchers should receive events on concurrent watches in same order [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] CronJob should delete failed finished jobs with limit of one job [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] CronJob should delete successful finished jobs with limit of one successful job [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] CronJob should not emit unexpected warnings [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] CronJob should remove from active list jobs that have been deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] CronJob should replace jobs when ReplaceConcurrent [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] CronJob should schedule multiple jobs concurrently [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment Deployment should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment RecreateDeployment should delete old pods and create new ones [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment RollingUpdateDeployment should delete old pods and create new ones [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment deployment reaping should cascade to its replica sets and pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Deployment deployment should delete old replica sets [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment deployment should support proportional scaling [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment deployment should support rollover [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Deployment iterative rollouts should eventually progress [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Deployment should not disrupt a cloud load-balancer's connectivity during rollout [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Deployment test Deployment ReplicaSet orphaning and adoption regarding controllerRef [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: enough pods, absolute => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: enough pods, replicaSet, percentage => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: maxUnavailable allow single eviction, percentage => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: maxUnavailable deny evictions, integer => should not allow an eviction [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: no PDB => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: too few pods, absolute => should not allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] DisruptionController evictions: too few pods, replicaSet, percentage => should not allow an eviction [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]"
+      "[sig-apps] DisruptionController should block an eviction until the PDB is updated to allow it [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] DisruptionController should create a PodDisruptionBudget [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Job should adopt matching orphans and release non-matching pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Job should delete a job [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Job should fail to exceed backoffLimit [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Job should fail when exceeds active deadline [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Job should remove pods when job is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] Job should run a job to completion when tasks sometimes fail and are locally restarted [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] Job should run a job to completion when tasks succeed [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] ReplicaSet Replicaset should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicaSet should adopt matching pods on creation and release no longer matching pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicaSet should serve a basic image on each replica with a private image [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] ReplicaSet should serve a basic image on each replica with a public image [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicaSet should surface a failure condition on a common issue like exceeded quota [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] ReplicationController should adopt matching pods on creation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicationController should release no longer matching pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicationController should serve a basic image on each replica with a private image [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] ReplicationController should serve a basic image on each replica with a public image [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] ReplicationController should surface a failure condition on a common issue like exceeded quota [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] Should recreate evicted statefulset [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should implement legacy replacement when the update strategy is OnDelete [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 with failing container [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 without failing container [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-auth] ServiceAccounts should allow opting out of API token automount [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Kubectl version should check is all data is printed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Proxy server should support --unix-socket=/path [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Proxy server should support proxy with --port 0 [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-network] Proxy version v1 should proxy logs on node using proxy subresource  [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-network] Proxy version v1 should proxy logs on node with explicit kubelet port using proxy subresource  [Suite:openshift/conformance/parallel] [Suite:k8s]"
+      "[sig-network] Services should find a service from listing all namespaces [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-network] Services should provide secure master service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] ConfigMap should fail to create ConfigMap with empty key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Kubelet when scheduling a busybox command that always fails in a pod should be possible to delete [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Lease lease API should be available [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with matching resource requests and limits for memory and cpu [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Probing container with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Secrets should fail to create secret due to empty secret key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-node] Secrets should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-scheduling] LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+    documentation: |-
+      Extensive test list. will be considered if 'TEST_TYPE' is set to 'fixed' and 'FIXED_TEST_LIST' is set to 'extensive'.
+  - name: TEST_PROVIDER
+    default: "baremetal"
+    documentation: |-
+      The test provider for the test suite. This will be considered only if 'TEST_TYPE' is set to 'suite'.
+  - name: TEST_SKIPS
+    default: |-
+      [sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server
+      [sig-auth] [Feature:NodeAuthenticator] The kubelet's main port 10250 should reject requests with no credentials
+      [sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service
+      [sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a NodePort service
+      [sig-network] DNS should provide /etc/hosts entries for the cluster
+      [sig-network] DNS should provide DNS for ExternalName services
+      [sig-network] DNS should provide DNS for pods for Hostname
+      [sig-network] DNS should provide DNS for pods for Subdomain
+      [sig-network] DNS should provide DNS for services
+      [sig-network] DNS should provide DNS for the cluster
+      [sig-network] DNS should resolve DNS of partial qualified names for services
+      [sig-network] DNS should resolve DNS of partial qualified names for the cluster
+      [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options
+      [sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it
+  - name: MINIMAL_TEST_LIST
+    default: |-
+      "[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+      "[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+    documentation: |-
+      Minimal test list. This will be considered if 'TEST_TYPE' is se to 'fixed' and 'FIXED_TEST_LIST' is set to 'minimal'.
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_UPGRADE_RELEASE_IMAGE

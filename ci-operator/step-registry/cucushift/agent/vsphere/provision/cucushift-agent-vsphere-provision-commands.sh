@@ -118,3 +118,9 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+
+version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+  echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+  oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+fi

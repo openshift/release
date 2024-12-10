@@ -22,6 +22,7 @@ function create_dc_and_xpaas_pod()
 
   oc create -n jboss-fuse-interop serviceaccount jboss-fuse-sa || true
   oc adm policy add-scc-to-user privileged -z jboss-fuse-sa -n jboss-fuse-interop
+  oc adm policy add-role-to-user cluster-admin -z jboss-fuse-sa -n jboss-fuse-interop
 
   NGINX_ROUTE=$(oc get routes nginx -n jboss-fuse-interop --no-headers=true | awk '{print $2}')
 
@@ -74,12 +75,6 @@ spec:
       serviceAccountName: jboss-fuse-sa
       terminationGracePeriodSeconds: 60
       volumes:
-        - name: mvn-settings
-          configMap:
-            name: mvn-settings
-            items:
-            - key: settings.xml
-              path: custom.settings.xml
         - name: test-properties
           secret:
             secretName: test-properties
@@ -116,11 +111,11 @@ spec:
             value: ${namespace}
           - name: SUREFIRE_REPORTS_FOLDER
             value: /deployments/xpaas-qe/test-fuse/target/surefire-reports
+          - name: NGINX_DOMAIN
+            value: ${NGINX_ROUTE}
           securityContext:
             privileged: true
           volumeMounts:
-            - name: mvn-settings
-              mountPath: /tmp/
             - name: test-properties
               mountPath: /mnt/
               readOnly: true
@@ -180,12 +175,16 @@ function check_tests() {
            oc wait --for=delete deployment/$todelete -n jboss-fuse-interop --timeout=120s
            sleep 120
          else
+           echo "Store $currentPod logs"
+           oc logs --tail=5000 "$currentPod" -n jboss-fuse-interop > "${ARTIFACT_DIR}"/run-"$currentPod".log
            trymap[$currentTest]=$(expr ${trymap[$currentTest]} + 1)
            currentRetriesNumber=${trymap[$currentTest]}
            echo "$currentPod was unsuccessful at first attempt, rerun #$currentRetriesNumber"
            restartPodAfterFailure $currentPod ${trymap[$currentTest]}
          fi
        elif [[ "$podlog" == *"BUILD FAILURE"* ]]; then
+         echo "Store $currentPod logs"
+         oc logs --tail=5000 "$currentPod" -n jboss-fuse-interop > "${ARTIFACT_DIR}"/run-"$currentPod".log
          trymap[$currentTest]=$(expr ${trymap[$currentTest]} + 1)
          currentRetriesNumber=${trymap[$currentTest]}
          echo "$currentPod was in build failure at first attempt, rerun #$currentRetriesNumber"

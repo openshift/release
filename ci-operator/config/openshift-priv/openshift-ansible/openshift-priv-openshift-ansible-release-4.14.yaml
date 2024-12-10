@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: rhel-8-release-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/openshift-ansible
 images:
 - dockerfile_path: images/installer/Dockerfile
@@ -77,7 +77,7 @@ rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '99
   createrepo _output/local/releases/rpms
 test_binary_build_commands: |
   set -eo pipefail
-  yum install -y gcc libffi-devel openssl-devel python3-devel
+  yum install -y gcc libffi-devel openssl-devel python3-pip python3-devel
   pip3 install tox virtualenv==16.7.9
   chmod uga+w /etc/passwd
 tests:
@@ -85,7 +85,7 @@ tests:
   commands: |
     set -o pipefail
     echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-    tox
+    HOME=/tmp tox
   container:
     from: test-bin
 - as: e2e-aws-workers-rhel8

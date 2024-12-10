@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.13"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
     name: "4.13"
     namespace: ocp
@@ -35,11 +39,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     prerelease:
@@ -73,8 +72,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-disc-priv-sno-basecap-none-f28
-  cron: 14 8 6 * *
+- as: aws-ipi-disc-priv-sno-basecap-none-f60
+  cron: 53 20 12 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -88,13 +87,11 @@ tests:
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disc-priv-sts-efs-f28
-  cron: 23 9 7 * *
+- as: aws-ipi-disc-priv-sts-efs-f60
+  cron: 56 12 18 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -108,13 +105,11 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disc-priv-sts-ep-f28
-  cron: 3 17 16 * *
+- as: aws-ipi-disc-priv-sts-ep-f60
+  cron: 0 14 23 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -126,8 +121,6 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb

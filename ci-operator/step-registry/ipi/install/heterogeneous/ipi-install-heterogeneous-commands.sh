@@ -202,13 +202,13 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.opensh
   | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
 EOF
 )")
-
-echo "Cluster type is ${CLUSTER_TYPE}"
+CLUSTER_TYPE=${CLUSTER_TYPE:-$CLOUD_TYPE}
+REGION=${LEASED_RESOURCE:-$REGION}
+echo -e "Cluster type is ${CLUSTER_TYPE}\nRegion is ${REGION}"
 # AMI for AWS ARM
 case $CLUSTER_TYPE in
 *aws*)
   echo "Extracting AMI..."
-  REGION=${LEASED_RESOURCE}
   amiid_workers_additional=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
     yq-v4 ".data.stream
       | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.aws.regions.\"${REGION}\".image")
@@ -275,8 +275,30 @@ case $CLUSTER_TYPE in
   echo "The image version for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers has been created... "
   echo "Patching the MachineSet..."
   resource_id="/resourceGroups/${rg_name}/providers/Microsoft.Compute/galleries/${gallery_name}/images/${image_name}/versions/latest"
-  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.vmSize = \"${ADDITIONAL_WORKER_VM_TYPE}\"
-       | .spec.template.spec.providerSpec.value.image.resourceID = \"${resource_id}\"" <<< "$MACHINE_SET")
+  echo "Duplicate all the machine sets and distribute the number of ADDITIONAL_WORKERS on Azure for some perfscale test"
+  MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+    .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
+    | .metadata.name += "-additional"
+    | .spec.template.spec.providerSpec.value.vmSize = "${ADDITIONAL_WORKER_VM_TYPE}"
+    | .spec.template.spec.providerSpec.value.image.resourceID = "${resource_id}"
+    | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+    | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
+    | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
+    )
+EOF
+)")
+  machineset_nums=$(echo "$MACHINE_SET" | yq-v4 '.items | length')
+  base_replicas=$(( ADDITIONAL_WORKERS / machineset_nums ))
+  remainder=$(( ADDITIONAL_WORKERS % machineset_nums ))
+  for i in $(seq 0 $(( machineset_nums - 1 ))); do
+      if [ $i -lt $remainder ]; then
+        replicas=$(( base_replicas + 1 ))
+      else
+        replicas=$base_replicas
+      fi
+      MACHINE_SET=$(yq-v4 ".items[$i].spec.replicas = ${replicas}" <<< "$MACHINE_SET")
+  done
 ;;
 *gcp*)
   echo "Extracting gcp boot image..."
@@ -292,7 +314,6 @@ case $CLUSTER_TYPE in
 ;;
 *ibmcloud*)
   FULL_CLUSTER_NAME=$(yq-v4 '.metadata.labels."machine.openshift.io/cluster-api-cluster"' <<< $MACHINE_SET)
-  REGION="${LEASED_RESOURCE}"
   RESOURCE_GROUP=$(yq-v4 ".spec.template.spec.providerSpec.value.resourceGroup" <<< $MACHINE_SET)
 
   IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud

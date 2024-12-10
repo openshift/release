@@ -89,7 +89,6 @@ EOF
 chmod +x "${SHARED_DIR}"/time-skew-gather.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-gather.sh "root@${IP}:/usr/local/bin"
 
-#sleep infinity
 timeout \
 	--kill-after 30m \
 	120m \

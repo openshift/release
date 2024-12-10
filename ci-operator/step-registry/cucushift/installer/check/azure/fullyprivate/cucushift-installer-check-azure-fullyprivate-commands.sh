@@ -12,21 +12,6 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-# A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
-ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP Version: $ocp_version"
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
@@ -61,6 +46,13 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)

@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.15.0-0
+        stream: 4-stable
+        upper: 4.16.0-0
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: redhat-openshift-gitops-interop-ibmcloud
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "gitops-operator-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "gitops-operator-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "GITOPS", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","gitops-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OPERATORS: |
+        [
+            {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "global-operators"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: gitops-operator-tests
+    workflow: firewatch-ipi-ibmcloud
+zz_generated_metadata:
+  branch: v1.14
+  org: redhat-developer
+  repo: gitops-operator
+  variant: gitops-ocp4.15-lp-interop

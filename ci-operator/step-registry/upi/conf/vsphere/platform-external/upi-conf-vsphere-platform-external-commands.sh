@@ -94,6 +94,13 @@ export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
+echo "$(date -u --rfc-3339=seconds) - Discovering controller image 'vsphere-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
+
+PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
+CCM_IMAGE="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='vsphere-cloud-controller-manager')"
+
+echo "$(date -u --rfc-3339=seconds) - Using CCM image=${CCM_IMAGE}"
+
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create basedomain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/basedomain.txt
@@ -264,10 +271,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
-\$portgroup = "${vsphere_portgroup}"
-\$datastore = "${vsphere_datastore}"
-\$datacenter = "${vsphere_datacenter}"
-\$cluster = "${vsphere_cluster}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
@@ -622,7 +629,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: vsphere-cloud-controller-manager
-          image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
+          image: ${CCM_IMAGE}
           env:
           - name: "KUBERNETES_SERVICE_HOST"
             value: "api-int.${cluster_domain}"
@@ -655,6 +662,31 @@ spec:
               - key: node-role.kubernetes.io/master
                 operator: Exists
 EOF
+
+cat > "/tmp/vsphere-conf.ini" <<EOF
+[Global]
+cluster-id = "${cluster_name}"
+insecure-flag = true
+[VirtualCenter "${vsphere_url}"]
+user = "${GOVC_USERNAME}"
+password = "${GOVC_PASSWORD}"
+port = "443"
+datacenters = "$(basename "${vsphere_datacenter}")"
+EOF
+
+cat >"manifests/99_vsphere_csi_driver_config.yaml"<<-EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vsphere-config-secret
+  namespace: vmware-system-csi
+data:
+  csi-vsphere.conf: "$(base64 -w0 < /tmp/vsphere-conf.ini)"
+EOF
+
+curl -o "manifests/99_vsphere_csi_driver_namespace.yaml" https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/namespace.yaml
+curl -o "manifests/99_vsphere_csi_driver_manifests.yaml" "https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/vsphere-csi-driver.yaml"
+
 fi
 
 ### Make control-plane nodes unschedulable

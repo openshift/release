@@ -12,6 +12,7 @@ INGRESS80=""
 INGRESS443=""
 IRONICSRV=""
 INSPECTORSRV=""
+SSH=""
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
@@ -34,6 +35,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     INGRESS443="$INGRESS443
       server $name $ip:443 check inter 1s"
   fi
+  SSH="$SSH
+    listen $name-ssh
+    bind :::$((13000 + "$host"))
+    mode tcp
+    balance source
+    server $name $ip:22 check inter 1s
+    server $name-v6 [$ipv6]:22 check inter 1s"
 done
 ### FIXME temporary
 MC="${MC}
@@ -68,7 +76,7 @@ timeout http-keep-alive 10s
 timeout check           10s
 maxconn                 3000
 frontend stats
-bind *:1936
+bind :::1936
 mode            http
 log             global
 maxconn 10
@@ -80,33 +88,34 @@ stats show-desc Stats for $CLUSTER_NAME cluster
 stats auth admin:$CLUSTER_NAME
 stats uri /stats
 listen api-server-6443
-    bind *:6443
+    bind :::6443
     mode tcp
 $APISRV
 listen machine-config-server-22623
-    bind *:22623
+    bind :::22623
     mode tcp
 $MC
 listen ingress-router-80
-    bind *:80
+    bind :::80
     mode tcp
     balance source
 $INGRESS80
 listen ingress-router-443
-    bind *:443
+    bind :::443
     mode tcp
     balance source
 $INGRESS443
 listen ironic-api-6385
-    bind *:6385
+    bind :::6385
     mode tcp
     balance source
 $IRONICSRV
 listen inspector-api-5050
-    bind *:5050
+    bind :::5050
     mode tcp
     balance source
 $INSPECTORSRV
+$SSH
 EOF
 
 echo "Templating for HAProxy done..."

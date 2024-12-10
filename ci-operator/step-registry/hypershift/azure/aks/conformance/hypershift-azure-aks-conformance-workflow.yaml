@@ -1,0 +1,47 @@
+workflow:
+  as: hypershift-azure-aks-conformance
+  documentation: |-
+    The HyperShift azure conformance workflow executes tests against a new ephemeral
+    HyperShift cluster created from an ephemeral AKS mgmt cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Patryk Stefanski (pstefans@redhat.com)
+    
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-azure-destroy
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-provision
+    - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+    - chain: hypershift-azure-create
+    env:
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_AZURE_LOCATION: "eastus2"
+      CLOUD_PROVIDER: "Azure"
+      AKS: "true"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "service.hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_MANAGED_SERVICE: "ARO-HCP"
+      AKS_CLUSTER_AUTOSCALER_MIN_NODES: "3"
+      AKS_CLUSTER_AUTOSCALER_MAX_NODES: "6"
+      ENABLE_CLUSTER_AUTOSCALER: "true"
+      TEST_SKIPS: etcd leader changes are not excessive

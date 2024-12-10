@@ -36,6 +36,8 @@ export CYPRESS_AUTH_PROVIDER="kube:admin"
 export CYPRESS_RETRIES=2
 export TEST_GROUP="not @crd-validation and not @multi-cluster and not @skip-lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
+# save screenshots from the 1st run
+cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
 export TEST_GROUP="@crd-validation and not @multi-cluster and not @skip-lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 

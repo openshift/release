@@ -1,14 +1,12 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
-    tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal-415
-promotion:
-  to:
-  - namespace: ci
     tag: latest
 releases:
   latest:
@@ -24,7 +22,8 @@ resources:
 tests:
 - always_run: false
   as: deploy-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -37,7 +36,8 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: deploy-sno
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -50,7 +50,8 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -66,11 +67,13 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
@@ -85,7 +88,8 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -101,7 +105,8 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  cluster: build06
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:

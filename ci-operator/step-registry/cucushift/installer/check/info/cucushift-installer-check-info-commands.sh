@@ -32,6 +32,8 @@ run_command "oc get machineconfigpools"
 run_command "oc get proxies.config.openshift.io cluster -oyaml"
 run_command "oc get networks.config.openshift.io cluster -oyaml"
 run_command "oc get networks.operator.openshift.io cluster -oyaml"
+run_command "oc get dns.config cluster -oyaml"
 run_command "oc -n openshift-ingress-operator get ingresscontroller -oyaml"
+run_command "oc -n openshift-ingress get service"
 run_command "oc -n openshift-marketplace get catalogsources.operators.coreos.com"
 set -e

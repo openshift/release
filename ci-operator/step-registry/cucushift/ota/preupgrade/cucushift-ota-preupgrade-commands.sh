@@ -21,6 +21,15 @@ function get_tp_operator(){
     "4.16")
     tp_operator=("cluster-api" "olm")
     ;;
+    "4.17")
+    tp_operator=("cluster-api" "olm")
+    ;;
+    "4.18")
+    tp_operator=("cluster-api")
+    ;;
+    "4.19")
+    tp_operator=("cluster-api")
+    ;;
     *)
     tp_operator=()
     ;;
@@ -48,11 +57,11 @@ function check_tp_operator_notfound(){
                 (( try += 1 ))
                 sleep 60
             else
-                echo "Unexpected ns found for $1!"
+                echo "ns found for $1!"
                 return 1
             fi
         else
-            echo "Unexpected operator found $1!"
+            echo "operator found $1!"
             return 1
         fi
     done
@@ -369,46 +378,6 @@ function pre-OCP-53907(){
     return 0
 }
 
-function pre-OCP-69968(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec testurl="http://examplefortest.com"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${testurl}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${testurl}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
-        return 1
-    fi
-    return 0
-}
-
-function pre-OCP-69948(){
-    echo "Test Start: ${FUNCNAME[0]}"
-    local spec teststore="https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release"
-    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
-    if [[ "${spec}" == *"signatureStores"* ]]; then
-        echo "There should not be signatureStores by default!"
-        return 1
-    fi
-    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${teststore}\"}]}}"; then
-        echo "Fail to patch clusterversion signatureStores!"
-        return 1
-    fi
-    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
-    if [[ "${signstore}" != "${teststore}" ]]; then
-        echo "Fail to set clusterversion signatureStores!"
-        return 1
-    fi
-    return 0
-}
-
 function pre-OCP-56083(){
     echo "Pre Test Start: OCP-56083"
     echo "Unset the upgrade channel"
@@ -556,8 +525,118 @@ function pre-OCP-60397(){
 
 function defer-OCP-60397(){
     echo "Defer Recovery: ${FUNCNAME[0]}"
+    oc adm upgrade --clear || true
     set_upstream_graph "${upstream:-empty}"
     switch_channel "candidate"
+}
+
+function check_mcp_status() {
+    local machineCount updatedMachineCount counter
+    machineCount=$(oc get mcp $1 -o=jsonpath='{.status.machineCount}')
+    counter=0
+    while [ $counter -lt 1200 ]
+    do
+        sleep 20
+        counter=`expr $counter + 20`
+        echo "waiting ${counter}s"
+        updatedMachineCount=$(oc get mcp $1 -o=jsonpath='{.status.updatedMachineCount}')
+        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+            echo "MCP $1 updated successfully"
+            break
+        fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+        echo "Timeout to update MCP $1"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-47160(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    echo "Check the techpreview operator is not installed by default..."
+    local version tp_op op tmp_manifest_dir_pre fs
+    version=$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d. -f1,2)
+    # shellcheck disable=SC2207
+    tp_op=($(get_tp_operator ${version}))
+    if [ -z "${tp_op[*]}" ] ; then
+        echo "Fail to get tp operator list on ${version}!"
+        return 1
+    fi
+    for op in ${tp_op[*]}; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+
+    echo "Check no TechPreviewNoUpgrade featureset in manifests with --included cmd..."
+    tmp_manifest_dir_pre=$(mktemp -d)
+    if ! oc adm release extract --included --to "${tmp_manifest_dir_pre}"; then
+        echo "Failed to extract manifest!"
+        return 1
+    fi
+    if grep -q -r "release.openshift.io/feature-set: .*TechPreviewNoUpgrade" ${tmp_manifest_dir_pre} ; then
+        echo "There should not be TechPreviewNoUpgrade featureset!"
+        return 1
+    fi
+
+    echo "Enable TechPreviewNoUpgrade featureset..."
+    local pre_co_num expected_co_num post_co_num
+    pre_co_num=$(oc get co --no-headers|wc -l)
+    oc patch featuregate cluster -p '{"spec": {"featureSet": "TechPreviewNoUpgrade"}}' --type merge || true
+    fs=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs}" != "TechPreviewNoUpgrade" ]]; then
+        echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    if ! check_mcp_status master || ! check_mcp_status worker ; then
+        echo "Fail to enable TechPreviewNoUpgrade fs!"
+        return 1
+    fi
+
+    echo "Check the techpreview operator is installed..."
+    for op in ${tp_op[*]}; do
+        if check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+    expected_co_num=$(expr $pre_co_num + ${#tp_op[@]})
+    post_co_num=$(oc get co --no-headers|wc -l)
+    if (( "$expected_co_num" != "$post_co_num" )); then
+        echo "Unexpected techpreview operator enabled or disabled!"
+        return 1
+    fi
+
+    echo "Check upgradeable=false condition is set through 'oc adm upgrade'..."
+    tmp_log=$(mktemp)
+    oc adm upgrade 2>&1 | tee "${tmp_log}"
+    if ! grep -q 'Upgradeable=False' "${tmp_log}" || ! grep -q "FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade" "${tmp_log}"; then
+        echo "Upgrade msg is not expected!"
+        return 1
+    fi
+
+    echo "Check there should be TechPreviewNoUpgrade featureset extracted with --included cmd..."
+    local manifest_tp_num manifest_fs_num tmp_manifest_dir_post
+    tmp_manifest_dir_post=$(mktemp -d)
+    if ! oc adm release extract --included --to "${tmp_manifest_dir_post}"; then
+        echo "Failed to extract manifest!"
+        return 1
+    fi
+    manifest_tp_num=$(grep -rh "release.openshift.io/feature-set: .*TechPreviewNoUpgrade" ${tmp_manifest_dir_post}|awk -F": " '{print $2}'|sort -u|wc -l)
+    manifest_fs_num=$(grep -rh "release.openshift.io/feature-set:" ${tmp_manifest_dir_post}|awk -F": " '{print $2}'|sort -u|wc -l)
+    if (( "$manifest_tp_num" != "$manifest_fs_num" )); then
+        echo "There should be TechPreviewNoUpgrade in each featureset annotation!"
+        return 1
+    fi
+
+    echo "Check TechPreviewNoUpgrade flag cannot be unset..."
+    oc patch featuregate cluster -p '{"spec": {"featureSet": ""}}' --type merge || true
+    oc patch featuregate cluster --type=json -p '[{"op":"remove", "path":"/spec/featureSet"}]' || true
+    if [[ "$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')" != "TechPreviewNoUpgrade" ]]; then
+        echo "Unset featureset test fail!"
+        return 1
+    fi
+    return 0
 }
 
 # This func run all test cases with checkpoints which will not break other cases, 

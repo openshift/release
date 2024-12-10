@@ -165,7 +165,7 @@ function filter_test_by_capability() {
     local enabledcaps xversion yversion
     enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    local v411 v412 v413 v414 v415 v416 v417
+    local v411 v412 v413 v414 v415 v416 v417 v418
     v411="baremetal marketplace openshift-samples"
     v412="${v411} Console Insights Storage CSISnapshot"
     v413="${v412} NodeTuning"
@@ -173,6 +173,7 @@ function filter_test_by_capability() {
     v415="${v414} OperatorLifecycleManager CloudCredential"
     v416="${v415} CloudControllerManager Ingress"
     v417="${v416}"
+    v418="${v417}"
     # [console]=console
     # the first `console` is the capability name
     # the second `console` is the tag name in verification-tests
@@ -197,6 +198,9 @@ function filter_test_by_capability() {
     local versioncaps
     versioncaps="$v416"
     case "$xversion.$yversion" in
+        4.18)
+            versioncaps="$v418"
+            ;;
         4.17)
             versioncaps="$v417"
             ;;
@@ -398,6 +402,8 @@ if [[ -z "$E2E_RUN_TAGS" ]] ; then
 else
     export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
 fi
+date --utc
+oc version --client --output='yaml' || true
 set_cluster_access
 preparation_for_test
 filter_tests

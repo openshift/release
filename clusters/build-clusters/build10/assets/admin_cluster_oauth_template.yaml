@@ -1,0 +1,34 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+objects:
+- apiVersion: config.openshift.io/v1
+  kind: OAuth
+  metadata:
+    name: cluster
+  spec:
+    identityProviders:
+    - mappingMethod: claim
+      name: RedHat_Internal_SSO
+      openID:
+        claims:
+          email:
+          - email
+          name:
+          - name
+          preferredUsername:
+          - preferred_username
+          - email
+        clientID: ${build10_id}
+        clientSecret:
+          name: dex-rh-sso
+        extraScopes:
+        - email
+        - profile
+        issuer: https://idp.ci.openshift.org
+      type: OpenID
+    tokenConfig:
+      accessTokenMaxAgeSeconds: 2419200
+parameters:
+- description: build10_id
+  name: build10_id
+  required: true

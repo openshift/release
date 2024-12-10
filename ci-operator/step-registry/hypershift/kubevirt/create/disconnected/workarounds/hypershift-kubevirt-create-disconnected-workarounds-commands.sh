@@ -23,9 +23,12 @@ if [ -f /root/config ] ; then
 source /root/config
 fi
 
-### workaround for https://issues.redhat.com/browse/OCPBUGS-29408
-echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29408"
-# explicitly mirror the RHCOS image used by the selected release
+LOCALIMAGES=localimages
+
+### use candidate oc-mirror to mirror also the containerdisk image for RHCOS
+# TODO: move to dev-scripts repo (the selected OCP release image is already mirrored once there)
+# once the required change will land in the stable version of oc-mirror,
+# see: https://github.com/openshift-metal3/dev-scripts/blob/master/agent/01_agent_requirements.sh#L41
 
 mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
 mirror_registry=${mirror_registry%%/*}
@@ -35,34 +38,35 @@ if [[ $mirror_registry == "" ]] ; then
 fi
 echo "mirror registry is ${mirror_registry}"
 
-LOCALIMAGES=localimages
-
 PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-mkdir -p /home/release-manifests/
-oc image extract ${PAYLOADIMAGE} --path /release-manifests/:/home/release-manifests/ --confirm
-RHCOS_IMAGE=$(cat /home/release-manifests/0000_50_installer_coreos-bootimages.yaml | yq -r .data.stream | jq -r '.architectures.x86_64.images.kubevirt."digest-ref"')
-RHCOS_IMAGE_NO_DIGEST=${RHCOS_IMAGE%@sha256*}
-RHCOS_IMAGE_NAME=${RHCOS_IMAGE_NO_DIGEST##*/}
-RHCOS_IMAGE_REPO=${RHCOS_IMAGE_NO_DIGEST%/*}
 
-set +x
-QUAY_USER=$(cat "/home/registry_quay.json" | jq -r '.user')
-QUAY_PASSWORD=$(cat "/home/registry_quay.json" | jq -r '.password')
-podman login quay.io -u "${QUAY_USER}" -p "${QUAY_PASSWORD}"
-set -x
-oc image mirror ${RHCOS_IMAGE} ${mirror_registry}/${LOCALIMAGES}/${RHCOS_IMAGE_NAME}
+LOCALPATH=ocp_release_kubevirt
 
-oc apply -f - <<EOF2
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: openshift-release-dev
-spec:
-  repositoryDigestMirrors:
-    - mirrors:
-        - ${mirror_registry}/${LOCALIMAGES}
-      source: ${RHCOS_IMAGE_REPO}
+cat <<EOF2 >imageset_config.yaml
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  platform:
+    graph: true
+    release: ${PAYLOADIMAGE}
+    kubeVirtContainer: true
 EOF2
+
+wget https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients/ocp/candidate/oc-mirror.rhel9.tar.gz
+tar xvzf oc-mirror.rhel9.tar.gz
+chmod +x oc-mirror
+jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret > /home/oc_mirror_auth
+./oc-mirror version
+
+# mirror to disk first
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2
+
+# push to the internal registry
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2
+
+# apply IDMS
+cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
+oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
 ###
 

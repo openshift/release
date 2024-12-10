@@ -14,6 +14,9 @@ CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64}
 if [ -z ${VOLUME_MOUNT_FLAGS+x} ]; then VOLUME_MOUNT_FLAGS=':z'; else echo "VOLUME_MOUNT_FLAGS is set to '$VOLUME_MOUNT_FLAGS'"; fi
 
 
+STATE=${STATE:-triggered}
+CLUSTER=${CLUSTER:-}
+
 $CONTAINER_ENGINE run $CONTAINER_ENGINE_OPTS \
     --rm \
     --volume "$PWD:/tmp/release${VOLUME_MOUNT_FLAGS}" \
@@ -26,4 +29,11 @@ $CONTAINER_ENGINE run $CONTAINER_ENGINE_OPTS \
     ${PULL_NUMBER:+"--pull-number" "${PULL_NUMBER}"} \
     ${arg:-} \
     --job "${1}" |
+    {
+        if [[ -n "$CLUSTER" ]]; then
+            yq e ".spec.cluster = \"$CLUSTER\" | .status.state = \"$STATE\"" -
+        else
+            cat -
+        fi
+    } | 
     oc --context app.ci --namespace ci --as system:admin apply -f -

@@ -1,0 +1,134 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  from_repository: true
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+- dockerfile_path: openshift-ci/build-root/Dockerfile
+  from: oc-bin-image
+  to: dependencies
+- context_dir: .
+  from: src
+  to: gitops-operator
+operator:
+  bundles:
+  - as: gitops-operator-bundle
+    context_dir: bundle/
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-developer/gitops-operator:latest
+    with: pipeline:gitops-operator
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tests:
+- as: kuttl-sequential
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-gitops-operator
+        oc get ns openshift-gitops-operator -o yaml
+        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: gitops-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    - as: sequential-e2e-steps
+      commands: |
+        scripts/openshift-CI-kuttl-tests.sh
+        make e2e-tests-sequential
+      from: dependencies
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+- as: kuttl-parallel
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-gitops-operator
+        oc get ns openshift-gitops-operator -o yaml
+        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: gitops-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    - as: parallel-e2e-steps
+      commands: |
+        scripts/openshift-CI-kuttl-tests.sh
+        make e2e-tests-parallel
+      from: dependencies
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+- as: e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
+    test:
+    - as: e2e-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      from: dependencies
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: v1.14
+  org: redhat-developer
+  repo: gitops-operator
+  variant: v4.14

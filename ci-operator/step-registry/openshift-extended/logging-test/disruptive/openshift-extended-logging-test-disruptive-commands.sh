@@ -8,7 +8,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/root/.krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
@@ -43,6 +43,12 @@ which extended-platform-tests
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
 fi
 
 #setup bastion
@@ -153,6 +159,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;

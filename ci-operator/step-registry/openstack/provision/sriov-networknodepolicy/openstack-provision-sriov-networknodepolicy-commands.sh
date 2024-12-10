@@ -60,6 +60,21 @@ wait_for_sriov_pods() {
 }
 
 wait_for_operator_webhook() {
+  for _ in $(seq 1 60); do
+      if oc get DaemonSet operator-webhook -n openshift-sriov-network-operator >/dev/null 2>&1; then
+          OPERATOR_WEBHOOK_EXIST=true
+          break
+      fi
+      echo "Waiting for operator webhook DaemonSet to exist"
+      sleep 2
+  done
+  if [ -n "${OPERATOR_WEBHOOK_EXIST:-}" ] ; then
+      echo "operator webhook DaemonSet exists"
+  else
+      echo "operator webhook DaemonSet does not exist"
+      exit 1
+  fi
+
   # Even if the pods are ready, we need to wait for the webhook server to be
   # actually started, which usually takes a few seconds.
   for _ in $(seq 1 30); do

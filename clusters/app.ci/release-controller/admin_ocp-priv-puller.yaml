@@ -1,0 +1,93 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Use for QE or private CI reps as to provide a long-lived service account token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ocp-priv-image-puller
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Long lived API token for ocp-priv-image-puller
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    kubernetes.io/service-account.name: ocp-priv-image-puller
+  name: ocp-priv-image-puller-secret
+  namespace: ocp-priv
+type: kubernetes.io/service-account-token
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+# A role permitting users/groups access to read the current token for ocp-priv-image-puller in ocp-priv-image-puller-secret. Secret delete permission allows users to rotate the token (app.ci will restore it on the next applyconfig).
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: ocp-priv-image-puller-token-reader
+  namespace: ocp-priv
+rules:
+- apiGroups:
+  - ''
+  resourceNames:
+  - ocp-priv-image-puller-secret
+  resources:
+  - secrets
+  verbs:
+  - get
+  - delete
+- apiGroups:
+  - ''
+  resourceNames:
+  - ocp-priv-image-puller
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ocp-priv-image-puller-token-reader-binding
+  namespace: ocp-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ocp-priv-image-puller-token-reader
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: test-platform-ci-admins
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: art-admins
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: openshift-private-release-admins
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: openshift-private-ci-reps
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: aos-qe
+- apiGroup: ''
+  kind: ServiceAccount
+  name: ocp-priv-image-puller
+  namespace: ocp-priv

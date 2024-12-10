@@ -1,0 +1,33 @@
+ref:
+  as: telcov10n-sno-spoke-gitea-verify
+  commands: telcov10n-sno-spoke-gitea-verify-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: GITEA_NAMESPACE
+    default: "ztp-gitea"
+    documentation: |-
+      Gitea k8s namespace where all its k8s related objects will be created
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: GITEA_HELPER_IMG
+    default: "quay.io/ccardenosa/sno-spoke-helper"
+    documentation: |-
+      Gitea helper image to connect to the Git repo via SSH
+  - name: AUX_HOST
+    default: ""
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ztp-left-shifting
+    mount_path: /var/run/telcov10n/ztp-left-shifting
+  documentation: |-
+    This step allows to verify the Gitea k8s service into the associated OCP Hub cluster
+    through its kubeconfig.

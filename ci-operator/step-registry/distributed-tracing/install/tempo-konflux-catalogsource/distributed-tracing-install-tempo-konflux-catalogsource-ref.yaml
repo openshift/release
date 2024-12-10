@@ -1,0 +1,31 @@
+ref:
+  as: distributed-tracing-install-tempo-konflux-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.10"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: distributed-tracing-install-tempo-konflux-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: TEMPO_ICSP_NAME
+    documentation: The name of ImageContentSourcePolicy
+    default: tempo-registry
+  - name: TEMPO_CATALOG_SOURCE
+    documentation: The name of catalogsource which will be created for operator
+    default: tempo-catalogsource
+  - name: TEMPO_INDEX_IMAGE
+    documentation: The index image for creating the catalogsource
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: dt-secrets
+    mount_path: /var/run/vault/dt-secrets
+  documentation: |-
+    Enable the Konflux catalogsource in a connected env.

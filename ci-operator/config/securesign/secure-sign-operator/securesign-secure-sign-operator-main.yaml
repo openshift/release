@@ -71,11 +71,10 @@ tests:
         {"name": "BACKFILL_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "BackfillRedisImage" | grep -o '[^[:space:]]*@sha.*')},
         {"name": "TUF_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TufImage" | grep -o '[^[:space:]]*@sha.*')},
         {"name": "CTLOG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CTLogImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "CLIENT_SERVER_CG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage_cg" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "CLIENT_SERVER_RE_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage_re" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "CLIENT_SERVER_F_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage_f" | grep -o '[^[:space:]]*@sha.*' || echo "null")},
+        {"name": "CLIENT_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage" | grep -o '[^[:space:]]*@sha.*')},
         {"name": "SEGMENT_BACKUP_JOB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "SegmentBackupImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "TIMESTAMP_AUTHORITY_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TimestampAuthorityImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")}
+        {"name": "TIMESTAMP_AUTHORITY_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TimestampAuthorityImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")},
+        {"name": "CREATE_TREE_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CreateTreeImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")}
         ]}}}
         EOF
         cat /tmp/image_config.patch
@@ -143,6 +142,8 @@ tests:
         export OIDC_ISSUER_URL=https://$(oc get route -n keycloak-system keycloak -o jsonpath='{.status.ingress[0].host}')/auth/realms/trusted-artifact-signer
         export TEST_IMAGE=ttl.sh/$PROW_JOB_ID:1h
         go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.4
+        export OPENSHIFT=true
+        make dev-images
         make test-e2e
       from: src
       resources:

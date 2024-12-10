@@ -13,10 +13,10 @@ function get_image_info() {
 
     case "$arch" in
     x64)
-        sku="aro_${OCP_MAJOR_VERSION}${OCP_MINOR_VERSION}"
+        sku="aro_${OCP_VERSION}"
         ;;
     Arm64)
-        sku="${OCP_MAJOR_VERSION}${OCP_MINOR_VERSION}-arm"
+        sku="${OCP_VERSION}-arm"
         ;;
     *)
         echo "Unsupported arch $arch" >&2
@@ -38,7 +38,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
-AZURE_LOCATION="$LEASED_RESOURCE"
+AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -65,6 +65,7 @@ KUBECONFIG="" oc registry login --to "$PULL_SECRET_WRITABLE"
 echo "Extracting OCP version from release image"
 OCP_MAJOR_VERSION=$(oc adm release info "$RELEASE_IMAGE_LATEST" -a "$PULL_SECRET_WRITABLE" -o json | jq -r '.metadata.version' | cut -d . -f 1)
 OCP_MINOR_VERSION=$(oc adm release info "$RELEASE_IMAGE_LATEST" -a "$PULL_SECRET_WRITABLE" -o json | jq -r '.metadata.version' | cut -d . -f 2)
+OCP_VERSION="${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OCP_VERSION:-${OCP_MAJOR_VERSION}${OCP_MINOR_VERSION}}"
 
 echo "Extracting image info"
 get_image_info "$HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_ARCH" > "$IMAGE_JSON"

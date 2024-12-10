@@ -1,0 +1,78 @@
+base_images:
+  camel-quarkus-runner:
+    name: camel-quarkus-qe-test-container
+    namespace: ci
+    tag: latest
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: camel-quarkus-interop-aws
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "quarkus-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quarkus-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CEQ", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["Camel Quarkus"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","camel-quarkus-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: llowinge@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario camel-quarkus
+    test:
+    - ref: camel-quarkus-execute-tests
+    workflow: firewatch-ipi-aws
+- as: camel-quarkus-interop-aws-fips
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "quarkus-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quarkus-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CEQ", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["Camel Quarkus"], "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","camel-quarkus-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: llowinge@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario camel-quarkus
+    test:
+    - ref: camel-quarkus-execute-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: jboss-fuse
+  repo: camel-quarkus-openshift-interop
+  variant: camel-quarkus-ocp4.18-lp-interop
