@@ -9,6 +9,10 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 mkdir -p "${INSTALL_DIR}"
 
+# CCM/CSI manifests for OCI go in openshift/
+mkdir -p "${INSTALL_DIR}/openshift"
+
+
 function oinst() {
   /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'

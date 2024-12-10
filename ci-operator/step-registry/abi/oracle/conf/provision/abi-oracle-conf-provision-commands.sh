@@ -7,7 +7,7 @@ set -o nounset
 
 echo "Print tenancy from vault"
 
-CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+CLUSTER_NAME=$(<"abi-qe-${NAMESPACE}")
 BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
 
 TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
