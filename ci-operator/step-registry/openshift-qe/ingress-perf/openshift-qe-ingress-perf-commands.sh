@@ -21,7 +21,7 @@ if [ ${BAREMETAL} == "true" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  ssh ${SSH_ARGS} root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
   # Setup socks proxy
   ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig

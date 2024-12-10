@@ -56,6 +56,13 @@ tests:
     - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
     pre:
     - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork-public-to-private
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
@@ -67,7 +74,19 @@ tests:
     cluster_profile: ibmcloud-qe
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: installer-rehearse-ibmcloud-dis
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    env:
+      SLEEP_DURATION: 2m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 zz_generated_metadata:
   branch: master
   org: openshift
