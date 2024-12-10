@@ -21,7 +21,11 @@ NAME_SPACE="showcase-ci-nightly"
 TAG_NAME="next"
 
 # Clone and checkout the specific PR
-git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+# git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+# cd backstage-showcase || exit
+
+git clone "https://github.com/subhashkhileri/backstage-showcase.git"
 cd backstage-showcase || exit
+git checkout ephemeral-env-setup-2 || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
