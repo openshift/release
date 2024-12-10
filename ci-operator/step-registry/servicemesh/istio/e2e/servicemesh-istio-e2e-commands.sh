@@ -32,7 +32,7 @@ function check_pod_status() {
 
         if [[ $((CNT)) -eq 0 ]]; then
             echo "Pod $1 did not successfully deploy"
-            oc -n "${MAISTRA_NAMESPACE}" get pods "$1"
+            oc -n "${MAISTRA_NAMESPACE}" describe pods "$1"
             return 1
         fi
     done
@@ -124,6 +124,10 @@ spec:
     name: varlibdocker
 EOF
 }
+
+# tmp, which registry is used?
+oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
+grep openshift ${SHARED_DIR}/pull-secret-build-farm.json
 
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
