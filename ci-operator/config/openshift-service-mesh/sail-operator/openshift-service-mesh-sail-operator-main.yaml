@@ -23,7 +23,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -170,7 +170,11 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
       RELEASE_IMAGE_LATEST: release:next
     env:
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      # tmp workaround, we can't use quay-proxy.ci.openshift.org with servicemesh-istio-e2e-profile workflow
+      # the image is not pulled with quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master": unable to retrieve auth token: invalid username/password: authentication required
+      # we will have to add pull secrets to the cluster so it's possible to pull from there
+      # it works fine with hypershift as it already contains the pull secret
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-3d91e3d29bd1057b14995647d90cbf85e043eba6
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -226,6 +230,10 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      # tmp workaround, we can't use quay-proxy.ci.openshift.org with servicemesh-istio-e2e-profile workflow
+      # the image is not pulled with quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master": unable to retrieve auth token: invalid username/password: authentication required
+      # we will have to add pull secrets to the cluster so it's possible to pull from there
+      # it works fine with hypershift as it already contains the pull secret
       MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-3d91e3d29bd1057b14995647d90cbf85e043eba6
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -281,7 +289,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
