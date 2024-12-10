@@ -11,6 +11,7 @@ BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
 TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
 COMPARTMENT=$(</var/run/oci-secret-compartment/compartment)
 
+SOURCE_DIR="${SHARED_DIR}/oci-openshift"
 
 echo "Downloading OpenTofu...."
 
