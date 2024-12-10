@@ -125,10 +125,6 @@ spec:
 EOF
 }
 
-# tmp, which registry is used?
-oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
-grep openshift ${SHARED_DIR}/pull-secret-build-farm.json
-
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
