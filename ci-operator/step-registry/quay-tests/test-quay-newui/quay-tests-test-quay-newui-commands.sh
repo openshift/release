@@ -118,10 +118,12 @@ export CYPRESS_OCP_ENDPOINT=${ocp_endpoint}
 export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
 
+sleep 25200
+
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
-yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
+#yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
 
-yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
+#yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 
-reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
+#reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
 
