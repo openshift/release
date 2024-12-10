@@ -404,6 +404,8 @@ echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
 
+nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2 || true
+
 set +e
 timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
 rv=\$?
