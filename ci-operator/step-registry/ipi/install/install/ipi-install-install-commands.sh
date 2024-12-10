@@ -635,7 +635,15 @@ openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
-nutanix) ;;
+nutanix)
+    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+    fi
+    if [[ -f "${CLUSTER_PROFILE_DIR}/proxy-conf.sh" ]]; then
+      # shellcheck disable=SC1091
+      source "${CLUSTER_PROFILE_DIR}/proxy-conf.sh"
+    fi
+    ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -775,6 +783,7 @@ do
     write_install_status
     populate_artifact_dir
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    # sleep 7200
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
