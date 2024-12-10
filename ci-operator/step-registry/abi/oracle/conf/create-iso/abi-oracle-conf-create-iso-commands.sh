@@ -46,7 +46,7 @@ echo "Using abi-on-oci branch"
 
 git switch abi-on-oci
 
-cp -R $SOURCE_DIR/custom_manifests/manifests/ $MANIFESTS_DIR
+cp -R $SOURCE_DIR/custom_manifests/manifests/* $MANIFESTS_DIR
 
 ### Create ISO image
 echo -e "\nCreating image..."
