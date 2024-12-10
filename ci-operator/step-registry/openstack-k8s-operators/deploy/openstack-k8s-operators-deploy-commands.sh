@@ -89,6 +89,8 @@ DBSERVICE=$(make --eval $'var:\n\t@echo $(DBSERVICE)' NETWORK_ISOLATION=false va
 DBSERVICE_CONTAINER=$(make --eval $'var:\n\t@echo $(DBSERVICE_CONTAINER)' NETWORK_ISOLATION=false var)
 OPENSTACK_CTLPLANE=$(make --eval $'var:\n\t@echo $(OPENSTACK_CTLPLANE)' NETWORK_ISOLATION=false var)
 OPENSTACK_CTLPLANE_FILE=$(basename $OPENSTACK_CTLPLANE)
+export INSTALL_NNCP=false
+export INSTALL_NMSTATE=false
 
 # Deploy openstack operator
 make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
