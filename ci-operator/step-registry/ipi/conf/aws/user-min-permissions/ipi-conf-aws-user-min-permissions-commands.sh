@@ -295,6 +295,12 @@ EOF
 			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
 			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
 		fi
+
+		# additional permisions for 4.17+
+		# https://issues.redhat.com/browse/OCPBUGS-44848
+		if ((ocp_minor_version >= 17 && ocp_major_version == 4)); then
+			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+		fi
 	else
 		dir=/tmp/min_perms/
 
