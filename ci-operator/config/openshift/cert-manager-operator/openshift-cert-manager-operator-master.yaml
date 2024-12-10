@@ -1,8 +1,12 @@
 base_images:
   base-rhel9:
-    name: "4.17"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
+  ccoctl:
+    name: "4.19"
+    namespace: "ocp"
+    tag: cloud-credential-operator
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -10,7 +14,7 @@ base_images:
   ocp-golang-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -45,12 +49,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -113,6 +117,82 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator-aws-sts
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: ccoctl-role-provision
+      cli: latest
+      commands: |
+        #!/bin/bash
+
+        cd $(mktemp -d)
+        mkdir cred-req
+
+        cat << EOF > cred-req/cred-req.yaml
+        apiVersion: cloudcredential.openshift.io/v1
+        kind: CredentialsRequest
+        metadata:
+          name: cert-manager
+          namespace: openshift-cloud-credential-operator
+        spec:
+          providerSpec:
+            apiVersion: cloudcredential.openshift.io/v1
+            kind: AWSProviderSpec
+            statementEntries:
+            - action:
+              - route53:GetChange
+              effect: Allow
+              resource: arn:aws:route53:::change/*
+            - action:
+              - route53:ChangeResourceRecordSets
+              - route53:ListResourceRecordSets
+              effect: Allow
+              resource: arn:aws:route53:::hostedzone/*
+            - action:
+              - route53:ListHostedZonesByName
+              effect: Allow
+              resource: "*"
+          secretRef:
+            name: aws-creds
+            namespace: cert-manager
+          serviceAccountNames:
+          - cert-manager
+        EOF
+        
+        INFRA_NAME=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
+        AWS_REGION=$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)
+        OIDC_ARN=$(cat "${SHARED_DIR}/aws_oidc_provider_arn")
+
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        ccoctl aws create-iam-roles --credentials-requests-dir ./cred-req --identity-provider-arn $OIDC_ARN --name $INFRA_NAME --output-dir . --region $AWS_REGION | tee ccoctl-output.log
+
+        oc apply -f ./manifests
+      from: ccoctl
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        curl https://patch-diff.githubusercontent.com/raw/openshift/cert-manager-operator/pull/219.diff > pr.diff
+        git apply pr.diff
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !CredentialsMode:Mint"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 256Mi
+    workflow: openshift-e2e-aws-manual-oidc-sts
 zz_generated_metadata:
   branch: master
   org: openshift
