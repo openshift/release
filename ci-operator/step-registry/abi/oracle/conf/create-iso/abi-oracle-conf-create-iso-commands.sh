@@ -7,10 +7,11 @@ set -o nounset
 
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-mkdir -p "${INSTALL_DIR}"
+MANIFESTS_DIR="${INSTALL_DIR}/openshift"
 
+mkdir -p "${INSTALL_DIR}"
 # CCM/CSI manifests for OCI go in openshift/
-mkdir -p "${INSTALL_DIR}/openshift"
+mkdir -p "${MANIFESTS_DIR}"
 
 
 function oinst() {
@@ -30,6 +31,22 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
+
+echo "Downloading mhanss terraform files"
+
+SOURCE_DIR="${SHARED_DIR}/oci-openshift"
+
+mkdir -p $SOURCE_DIR
+
+git clone https://github.com/mhanss/oci-openshift.git $SOURCE_DIR
+
+cd $SOURCE_DIR
+
+echo "Using abi-on-oci branch"
+
+git switch abi-on-oci
+
+cp -R $SOURCE_DIR/custom_manifests/manifests/ $MANIFESTS_DIR
 
 ### Create ISO image
 echo -e "\nCreating image..."
