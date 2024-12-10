@@ -11,19 +11,7 @@ cat /etc/os-release
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
-  # Setup socks proxy
-  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export KUBECONFIG=/tmp/kubeconfig
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
-  cd /tmp
-elif test -f "${SHARED_DIR}/proxy-conf.sh"; then
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -42,21 +30,14 @@ REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 
-if [ ${BAREMETAL} == "true" ]; then
-  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
-  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
-  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"
-  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "export ALL_SCENARIOS=false;export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com";cd /tmp/e2e-benchmarking/workloads/network-perf-v2; sed -i s/--retry-all-errors//g run.sh;VIRT=true WORKLOAD=full-run.yaml ./run.sh"
+git clone $REPO_URL $TAG_OPTION --depth 1
+pushd e2e-benchmarking/workloads/network-perf-v2
+# Clean up resources from possible previous tests.
+oc delete ns netperf --wait=true --ignore-not-found=true
+# Only store the results from the full run versus the smoke test.
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-else
-  git clone $REPO_URL $TAG_OPTION --depth 1
-  pushd e2e-benchmarking/workloads/network-perf-v2
-  # Clean up resources from possible previous tests.
-  oc delete ns netperf --wait=true --ignore-not-found=true
-  # Only store the results from the full run versus the smoke test.
-  export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-  WORKLOAD=full-run.yaml ./run.sh
-fi
+export ALL_SCENARIOS=false ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+pushd e2e-benchmarking/workloads/network-perf-v2
+sed -i s/--retry-all-errors//g run.sh
+VIRT=true WORKLOAD=full-run.yaml ./run.sh
