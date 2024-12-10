@@ -6,8 +6,8 @@ set -o pipefail
 set -o nounset
 
 
-CLUSTER_NAME=$(<"abi-qe-${NAMESPACE}")
-BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
+CLUSTER_NAME="abi-qe-${NAMESPACE}"
+BASE_DOMAIN="${CLUSTER_NAME}.oci-rhelcert.edge-sro.rhecoeng.com"
 
 echo "Preparing agent-config.yaml"
 
