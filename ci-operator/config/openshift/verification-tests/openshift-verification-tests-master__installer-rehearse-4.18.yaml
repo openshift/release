@@ -85,6 +85,22 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: installer-rehearse-ibmcloud-capi
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
