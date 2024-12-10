@@ -478,6 +478,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
 fi
 
+VPC_CIDR="10.1.0.0/16"
 if [[ -n "${VPC_CIDR}" ]]; then
      aws_add_param_to_json "VpcCidr" ${VPC_CIDR} "$vpc_params"
 fi
