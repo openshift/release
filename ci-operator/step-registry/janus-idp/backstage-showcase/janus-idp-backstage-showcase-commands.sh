@@ -14,7 +14,7 @@ GITHUB_REPOSITORY_NAME="backstage-showcase"
 # git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 git clone "https://github.com/subhashkhileri/backstage-showcase.git"
 cd backstage-showcase || exit
-git checkout ephemeral-env-setup || exit
+git checkout ephemeral-env-setup-2 || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
