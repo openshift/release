@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-CLUSTER_NAME=$(<"abi-qe-${NAMESPACE}")
+CLUSTER_NAME="abi-qe-${NAMESPACE}"
 BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
 
 TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
