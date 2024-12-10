@@ -32,4 +32,8 @@ $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
 echo "Run OpenTofu plan"
 
-$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure plan -var="cluster_name=${CLUSTER_NAME}" -var="compartment_ocid=${COMPARTMENT}" -var="tenancy_ocid=${TENANCY_OCID}" -var="zone_dns=${BASE_DOMAIN}"
+$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure plan \
+      -var="cluster_name=${CLUSTER_NAME}" \
+      -var="compartment_ocid=${COMPARTMENT}" \
+      -var="tenancy_ocid=${TENANCY_OCID}" \
+      -var="zone_dns=${BASE_DOMAIN}"
