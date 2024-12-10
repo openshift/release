@@ -15,7 +15,7 @@ if [[ $TAG == "latest" ]]; then
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
 pip install -r requirements.txt

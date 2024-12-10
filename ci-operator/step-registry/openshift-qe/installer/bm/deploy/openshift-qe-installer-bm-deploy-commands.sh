@@ -134,7 +134,7 @@ jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
+   git clone -q -q https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
    cd ${jetlag_repo}
    # JETLAG_PR or PULL_NUMBER can't be set at the same time
    if [[ -n '${JETLAG_PR}' ]]; then
