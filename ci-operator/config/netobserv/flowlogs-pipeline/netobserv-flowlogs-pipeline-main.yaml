@@ -44,30 +44,21 @@ resources:
       memory: 200Mi
 tests:
 - as: qe-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-netobserv
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
   optional: true
   steps:
+    cluster_profile: aws-qe
     dependencies:
-      PATCH_CONSOLE_PLUGIN_IMAGE: pipeline:flowlogs-pipeline
+      PATCH_FLOWLOGS_IMAGE: pipeline:flowlogs-pipeline
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       TEST_FILTERS: NonPreRelease;Serial;Disruptive;~59746
       TEST_SCENARIOS: Network_Observability
       TEST_TIMEOUT: "35"
-      TIMEOUT: +2 hour
     test:
-    - ref: wait
     - ref: netobserv-install-operator
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: netobserv
