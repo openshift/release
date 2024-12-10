@@ -1,15 +1,11 @@
 ref:
-  as: openshift-qe-crd-scale
+  as: openshift-qe-udn-density-l3-pods
   from_image:
     namespace: ci
     name: ocp-qe-perfscale-ci
     tag: latest
   cli: latest
   env:
-  - name: EXTRA_FLAGS
-    default: ""
-    documentation: |-
-      Add args for e2e-benchmarking kube-burner-ocp cmd.
   - name: E2E_VERSION
     default: "v2.2.9"
     documentation: |-
@@ -18,10 +14,26 @@ ref:
     default: "default"
     documentation: |-
       Override the kube burner version
-  - name: FLAGS
+  - name: BAREMETAL
+    default: "false"
+    documentation: |-
+      Set to true if the job is for baremetal
+  - name: ITERATION_MULTIPLIER_ENV
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is false for udn-density-l3-pods workload
+  - name: POD_READY_THRESHOLD
+    default: "1400s"
+    documentation: |-
+      Defines the maximum threshold for Pod Ready
+  - name: EXTRA_FLAGS
     default: ""
     documentation: |-
-      Default empty FLAGS
+      Default EXTRA_FLAGS for udn-density-l3-pods workload is disabled
   - name: PROFILE_TYPE
     default: "both"
     documentation: |-
@@ -30,15 +42,19 @@ ref:
     default: "true"
     documentation: |-
       Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
-  - name: ITERATIONS
-    default: "1024"
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
     documentation: |-
-      The number of iterations/crds
+      Trigger to enable local indexing
   - name: ES_SECRETS_PATH
     default: ""
     documentation: |-
       Override elasticsearch secrets path.
-  commands: openshift-qe-crd-scale-commands.sh
+  - name: KUBECONFIG_PATH
+    default: "~/mno/kubeconfig"
+    documentation: |-
+      Set kubeconfig path inside the bm, default to ~/mno/kubeconfig  
+  commands: openshift-qe-udn-density-l3-pods-commands.sh
   timeout: 6h
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
@@ -47,9 +63,12 @@ ref:
   - namespace: test-credentials
     name: stackrox-perfscale-elasticsearch
     mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: >-
-    This step runs the perfscale crd-scale workload in the deployed cluster
+    This step runs the perfscale udn-density-l3-pods workload in the deployed cluster
