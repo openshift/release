@@ -31,6 +31,12 @@ for component in $COMPONENTS; do
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == cloud-provider ]]; then
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+    elif [[ $component == cpo ]]; then
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
+    elif [[ $component == capz ]]; then
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     fi
 
     client_id="$(eval "az ad sp create-for-rbac --name $name --role Contributor --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"
