@@ -49,7 +49,8 @@ scp -q ${SSH_ARGS} /tmp/foreman-wait_updated.sh root@${bastion}:/tmp/
 ssh ${SSH_ARGS} root@${bastion} "
   set -e
   set -o pipefail
-  ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/foreman-deploy_updated.sh
+  curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r '.nodes[0].name' > /tmp/foreman_inventory_$LAB_CLOUD
+  ansible -i /tmp/foreman_inventory_$LAB_CLOUD bastion -m script -a /tmp/foreman-deploy_updated.sh
   sleep 300
-  ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/foreman-wait_updated.sh
+  ansible -i /tmp/foreman_inventory_$LAB_CLOUD bastion -m script -a /tmp/foreman-wait_updated.sh
 "
