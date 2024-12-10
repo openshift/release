@@ -71,7 +71,10 @@ if [[ -z "$CLUSTER_ID" ]]; then
 fi
 
 echo "Deleting cluster-id: ${CLUSTER_ID}"
+
+sleep 86400
 start_time=$(date +"%s")
+
 rosa delete cluster -c "${CLUSTER_ID}" -y
 while true; do
   CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json 2>/dev/null | jq -r '.state' || true)
