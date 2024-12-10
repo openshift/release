@@ -5,6 +5,14 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+echo "Print tenancy from vault"
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
+
+TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
+COMPARTMENT=$(</var/run/oci-secret-compartment/compartment)
+
 echo "Downloading mhanss terraform files"
 
 SOURCE_DIR="/tmp/oci-openshift"
@@ -34,8 +42,8 @@ $SHARED_DIR/tofu/tofu --version
 
 echo "Run OpenTofu init"
 
-$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR init
+$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
 echo "Run OpenTofu plan"
 
-$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR plan
+$SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure plan -var="cluster_name=${CLUSTER_NAME}" -var="compartment_ocid=${COMPARTMENT}" -var="tenancy_ocid=${TENANCY_OCID}" -var="zone_dns=${BASE_DOMAIN}"
