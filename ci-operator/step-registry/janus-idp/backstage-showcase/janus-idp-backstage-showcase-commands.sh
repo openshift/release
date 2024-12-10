@@ -4,6 +4,42 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+export OPENSHIFT_PASSWORD
+export OPENSHIFT_API
+export OPENSHIFT_USERNAME
+
+OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
+OPENSHIFT_USERNAME="kubeadmin"
+
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
+if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+    OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
+elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+    # Recommendation from hypershift qe team in slack channel..
+    OPENSHIFT_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
+else
+    echo "Kubeadmin password file is empty... Aborting job"
+    exit 1
+fi
+
+timeout --foreground 5m bash <<-"EOF"
+    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+            sleep 20
+    done
+EOF
+if [ $? -ne 0 ]; then
+    echo "Timed out waiting for login"
+    exit 1
+fi
+
+export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
+K8S_CLUSTER_URL=$(oc whoami --show-server)
+echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
+oc create serviceaccount tester-sa-2 -n default
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+oc logout
+
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
@@ -11,10 +47,8 @@ GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 
 # Clone and checkout the specific PR
-# git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
-git clone "https://github.com/subhashkhileri/backstage-showcase.git"
+git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
-git checkout ephemeral-env-setup-2 || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
@@ -84,46 +118,5 @@ else
 
 fi
 
-echo "Test Start"
-
-export OPENSHIFT_PASSWORD
-export OPENSHIFT_API
-export OPENSHIFT_USERNAME
-
-OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
-OPENSHIFT_USERNAME="kubeadmin"
-
-yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
-if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
-    OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
-elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
-    # Recommendation from hypershift qe team in slack channel..
-    OPENSHIFT_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
-else
-    echo "Kubeadmin password file is empty... Aborting job"
-    exit 1
-fi
-
-timeout --foreground 5m bash <<-"EOF"
-    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
-            sleep 20
-    done
-EOF
-if [ $? -ne 0 ]; then
-    echo "Timed out waiting for login"
-    exit 1
-fi
-
-# sleep 60*60
-oc version
-oc whoami
-oc auth can-i '*' '*'
-export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
-K8S_CLUSTER_URL=$(oc whoami --show-server)
-echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
-oc create serviceaccount tester-sa-2 -n default
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
-oc logout
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
