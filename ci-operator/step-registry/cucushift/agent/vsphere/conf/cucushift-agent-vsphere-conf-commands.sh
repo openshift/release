@@ -241,6 +241,7 @@ cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 rendezvousIP: ${rendezvous_ip_address}
+minimalISO: ${MINIMAL_ISO}
 hosts: []
 EOF
 
