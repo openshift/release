@@ -42,10 +42,14 @@ echo "Run OpenTofu init"
 
 $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
+sleep 90000
+
 echo "Run OpenTofu plan"
 
 $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure plan \
       -var="cluster_name=${CLUSTER_NAME}" \
       -var="compartment_ocid=${COMPARTMENT}" \
       -var="tenancy_ocid=${TENANCY_OCID}" \
-      -var="zone_dns=${BASE_DOMAIN}"
+      -var="zone_dns=${BASE_DOMAIN}" \
+      -var="control_plane_count=${masters}" \
+      -var="compute_count=${workers}"
