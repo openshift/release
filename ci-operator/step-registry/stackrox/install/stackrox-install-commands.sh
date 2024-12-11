@@ -92,7 +92,7 @@ spec:
 EOF
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   cat <<EOF >> central-cr.yaml
-    scannerV4:
+  scannerV4:
     # Explicitly enable, scannerV4 is currenlty opt-in
     scannerComponent: Enabled
     indexer:
