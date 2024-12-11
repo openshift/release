@@ -16,4 +16,8 @@ TAG_NAME="next"
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
+ls $SHARED_DIR
+KUBECONFIG=$SHARED_DIR/kubeconfig
+oc whoami
+
 bash ./.ibm/pipelines/openshift-ci-tests.sh
