@@ -173,17 +173,13 @@ for ((i = 0; i < total_host; i++)); do
   echo "${mac_addresses[$i]}"
 done >"${SHARED_DIR}"/mac-addresses.txt
 
-declare -a hostnames=()
-for ((i = 0; i < total_host; i++)); do
-  if [ "${WORKERS}" -gt 0 ]; then
-    hostnames+=("${cluster_name}-master-$i")
-    hostnames+=("${cluster_name}-worker-$i")
-    echo "${hostnames[$i]}"
-  else
-    hostnames+=("${cluster_name}-master-$i")
-    echo "${hostnames[$i]}"
-  fi
-done >"${SHARED_DIR}"/hostnames.txt
+for ((i = 0; i < MASTERS; i++)); do
+  echo "test-master-$i" >>./hostnames.txt
+done
+
+for ((i = 0; i < WORKERS; i++)); do
+  echo "test-worker-$i" >>./hostnames.txt
+done
 
 for ((i = 0; i < total_host; i++)); do
   ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
