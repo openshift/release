@@ -300,6 +300,7 @@ EOF
 		# https://issues.redhat.com/browse/OCPBUGS-44848
 		if ((ocp_minor_version >= 17 && ocp_major_version == 4)); then
 			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+			echo "iam:UntagInstanceProfile" >>"${PERMISION_LIST}"
 		fi
 	else
 		dir=/tmp/min_perms/
