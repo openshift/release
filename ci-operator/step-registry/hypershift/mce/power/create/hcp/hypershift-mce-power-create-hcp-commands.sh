@@ -90,7 +90,7 @@ EOF
 
 
 # Creating AgentServiceConfig
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+CLUSTER_VERSION=4.17
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
 cat <<EOF | oc create -f -
