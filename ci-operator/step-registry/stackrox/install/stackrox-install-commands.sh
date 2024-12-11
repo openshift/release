@@ -292,8 +292,13 @@ create_cr secured-cluster
 
 echo ">>> Wait for deployments"
 wait_deploy central-db
-wait_deploy scanner
-wait_deploy scanner-db
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  wait_deploy scannerv4
+  wait_deploy scannerv4-db
+else
+  wait_deploy scanner
+  wait_deploy scanner-db
+fi
 wait_deploy sensor
 wait_deploy admission-control
 oc get deployments -n stackrox
