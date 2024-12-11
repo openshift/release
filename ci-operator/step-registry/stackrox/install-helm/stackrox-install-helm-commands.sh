@@ -165,6 +165,10 @@ function install_central_with_helm() {
       installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
   fi
 
+  if [[ "${SCANNER_V4:-true}" == "true" ]]; then
+      installflags+=('--set' 'scannerV4.disable=false')
+  fi
+
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
