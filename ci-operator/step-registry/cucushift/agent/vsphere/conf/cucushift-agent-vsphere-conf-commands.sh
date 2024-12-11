@@ -174,11 +174,11 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/mac-addresses.txt
 
 for ((i = 0; i < MASTERS; i++)); do
-  echo "test-master-$i" >>./hostnames.txt
+  echo "test-master-$i" >>"${SHARED_DIR}"/hostnames.txt
 done
 
 for ((i = 0; i < WORKERS; i++)); do
-  echo "test-worker-$i" >>./hostnames.txt
+  echo "test-worker-$i" >>"${SHARED_DIR}"/hostnames.txt
 done
 
 for ((i = 0; i < total_host; i++)); do
