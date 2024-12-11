@@ -9,10 +9,9 @@ oc config view
 oc projects
 
 # Disk cleaning
-for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
-  for j in {0..7}; do
-    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo sgdisk --zap-all /dev/nvme$j\n1
-    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo wipefs -a /dev/nvme$j\n1
+for worker in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+  for disk in {0..7}; do
+    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -J root@${bastion} core@${worker} "sudo sgdisk --zap-all /dev/nvme${disk}n1; sudo wipefs -a /dev/nvme${disk}n1"
   done
 done
 
