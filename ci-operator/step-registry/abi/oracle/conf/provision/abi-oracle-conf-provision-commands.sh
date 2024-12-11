@@ -11,8 +11,6 @@ BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
 TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
 COMPARTMENT=$(</var/run/oci-secret-compartment/compartment)
 
-SOURCE_DIR="${SHARED_DIR}/oci-openshift"
-
 echo "Downloading OpenTofu...."
 
 # Download the installer script:
@@ -25,6 +23,20 @@ unzip /tmp/tofu_1.8.7_linux_amd64.zip -d $SHARED_DIR/tofu/
 chmod +x $SHARED_DIR/tofu/tofu
 
 $SHARED_DIR/tofu/tofu --version
+
+echo "Downloading mhanss terraform files"
+
+SOURCE_DIR="/tmp/oci-openshift"
+
+mkdir -p $SOURCE_DIR
+
+git clone https://github.com/mhanss/oci-openshift.git $SOURCE_DIR
+
+cd $SOURCE_DIR
+
+echo "Using abi-on-oci branch"
+
+git switch abi-on-oci
 
 echo "Run OpenTofu init"
 

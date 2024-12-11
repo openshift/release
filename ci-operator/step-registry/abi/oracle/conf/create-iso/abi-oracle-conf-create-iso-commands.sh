@@ -34,7 +34,7 @@ oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE
 
 echo "Downloading mhanss terraform files"
 
-SOURCE_DIR="${SHARED_DIR}/oci-openshift"
+SOURCE_DIR="/tmp/oci-openshift"
 
 mkdir -p $SOURCE_DIR
 
