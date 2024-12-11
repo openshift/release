@@ -179,24 +179,33 @@ sleep 10
 update_flowcollector
 oc apply -f $FLOWCOLLECTOR
 
-# some services may not be up
 sleep 30
-echo "====> Waiting for flowlogs-pipeline pods to be ready"
+echo "====> Waiting for flowlogs-pipeline daemonset to be created"
 while :; do
     oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
     sleep 1
 done
 
-oc wait --timeout=180s --for=condition=ready pod -l app=flowlogs-pipeline -n ${NAMESPACE}
+echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
+while :; do
+    oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
+    sleep 1
+done
 
-echo "====> Waiting for ebpf-agent pods to be ready"
-sleep 30
-oc wait --timeout=180s --for=condition=ready pod -l app=netobserv-ebpf-agent -n ${NAMESPACE}-privileged
+echo "====> Waiting for console-plugin deployment to be created"
+while :; do
+    oc get deployment netobserv-plugin -n ${NAMESPACE} && break
+    sleep 1
+done
 
-echo "====> Waiting for console-plugin pod to be ready"
-oc wait -n ${NAMESPACE} --timeout=60s --for condition=Available=True deployment netobserv-plugin
+timeout=0
+while [ $timeout -lt 180 ]; do
+    oc get flowcollector/cluster | grep Ready && break
+    sleep 30
+    timeout=$((timeout+30))
+done
 
-echo "====> Waiting for flowcollector pod to be ready"
-oc wait flowcollector/cluster --timeout=120s --for=condition=ready
+echo "====> Waiting for flowcollector to be ready"
+oc wait flowcollector/cluster --timeout=180s --for=condition=ready
 
 
