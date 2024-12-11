@@ -89,6 +89,45 @@ spec:
           cpu: 1
     telemetry:
       enabled: false
+EOF
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  cat <<EOF >> central-cr.yaml
+    scannerV4:
+    # Explicitly enable, scannerV4 is currenlty opt-in
+    scannerComponent: Enabled
+    indexer:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "1500Mi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+    matcher:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "5Gi"
+        limits:
+          cpu: "1000m"
+          memory: "5500Mi"
+    db:
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "2Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2500Mi"
+EOF
+else
+  cat <<EOF >> central-cr.yaml
   scanner:
     analyzer:
       scaling:
@@ -109,6 +148,10 @@ spec:
         limits:
           cpu: 2000m
           memory: 4Gi
+EOF
+fi
+
+  cat <<EOF >> central-cr.yaml
 ---
 apiVersion: v1
 kind: Secret
