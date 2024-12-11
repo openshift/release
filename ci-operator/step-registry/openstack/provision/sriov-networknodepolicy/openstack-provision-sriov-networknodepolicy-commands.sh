@@ -224,9 +224,5 @@ oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
 create_sriov_networknodepolicy "sriov1" "${OPENSTACK_SRIOV_NETWORK}" "${SRIOV_DEVICE_TYPE}" "${IS_RDMA}"
 
 if [[ "${OPENSTACK_DPDK_NETWORK}" != "" ]]; then
-    if oc get MachineConfig/99-vhostuser-bind >/dev/null 2>&1; then
-        echo "vhostuser is already bound to the ${OPENSTACK_DPDK_NETWORK} network."
-        exit 0
-    fi
     create_sriov_networknodepolicy "dpdk1" "${OPENSTACK_DPDK_NETWORK}" "vfio-pci" "false"
 fi
