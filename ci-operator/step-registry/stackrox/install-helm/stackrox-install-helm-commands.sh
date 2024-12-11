@@ -157,12 +157,14 @@ function install_central_with_helm() {
       installflags+=('--set' 'central.db.resources.requests.cpu=500m')
       installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
       installflags+=('--set' 'central.db.resources.limits.cpu=1')
-      installflags+=('--set' 'scanner.autoscaling.disable=true')
-      installflags+=('--set' 'scanner.replicas=1')
-      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
-      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
-      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
-      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+      if [[ "${ROX_SCANNER_V4:-true}" != "true" ]]; then
+          installflags+=('--set' 'scanner.autoscaling.disable=true')
+          installflags+=('--set' 'scanner.replicas=1')
+          installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+          installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+          installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+          installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+      fi
   fi
 
   if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
@@ -219,8 +221,13 @@ wait_deploy central
 get_init_bundle
 install_secured_cluster_with_helm
 echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
-wait_deploy scanner
-wait_deploy scanner-db
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  wait_deploy scannerv4
+  wait_deploy scannerv4-db
+else
+  wait_deploy scanner
+  wait_deploy scanner-db
+fi
 wait_deploy sensor
 wait_deploy admission-control
 
