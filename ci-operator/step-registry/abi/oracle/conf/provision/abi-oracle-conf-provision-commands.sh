@@ -44,6 +44,8 @@ echo "Run OpenTofu init"
 
 $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
+mkdir -p /tmp/.oci/
+
 cat > "/tmp/.oci/config" <<EOF
 [DEFAULT]
 user=${USER}
