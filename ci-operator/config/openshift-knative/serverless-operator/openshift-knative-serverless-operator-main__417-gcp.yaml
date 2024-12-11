@@ -1,6 +1,6 @@
 base_images:
-  ocp_4.13_cli-artifacts:
-    name: "4.13"
+  ocp_4.14_cli-artifacts:
+    name: "4.14"
     namespace: ocp
     tag: cli-artifacts
   ocp_4.18_cli-artifacts:
@@ -54,7 +54,7 @@ images:
   to: serverless-knative-operator
 - dockerfile_path: must-gather/Dockerfile
   inputs:
-    ocp_4.13_cli-artifacts:
+    ocp_4.14_cli-artifacts:
       as:
       - $CLI_ARTIFACTS
     ocp_ubi-minimal_8:
@@ -71,6 +71,10 @@ images:
       - registry.ci.openshift.org/origin/4.18:operator-registry
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
   to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
@@ -137,7 +141,8 @@ tests:
     cluster_profile: gcp
     test:
     - as: operator-e2e
-      commands: FORCE_KONFLUX_INDEX=true make test-e2e-with-kafka
+      commands: FORCE_KONFLUX_INDEX=true GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin make
+        test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -163,7 +168,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-serving-eventing-e2e
-      commands: FORCE_KONFLUX_INDEX=true make test-upstream-e2e-no-upgrade
+      commands: FORCE_KONFLUX_INDEX=true GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin make
+        test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -189,7 +195,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
-      commands: FORCE_KONFLUX_INDEX=true make test-upstream-e2e-kafka-no-upgrade
+      commands: FORCE_KONFLUX_INDEX=true GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin make
+        test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
