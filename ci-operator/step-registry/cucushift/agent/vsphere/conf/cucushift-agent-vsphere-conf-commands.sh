@@ -173,12 +173,17 @@ for ((i = 0; i < total_host; i++)); do
   echo "${mac_addresses[$i]}"
 done >"${SHARED_DIR}"/mac-addresses.txt
 
+declare -a hostnames=()
 for ((i = 0; i < MASTERS; i++)); do
-  echo "test-master-$i" >>"${SHARED_DIR}"/hostnames.txt
+  hostname="test-master-$i"
+  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=($hostname)
 done
 
 for ((i = 0; i < WORKERS; i++)); do
-  echo "test-worker-$i" >>"${SHARED_DIR}"/hostnames.txt
+  hostname="test-worker-$i"
+  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=($hostname)
 done
 
 for ((i = 0; i < total_host; i++)); do
