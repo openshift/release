@@ -198,6 +198,7 @@ while :; do
     sleep 1
 done
 
+echo "====> Waiting for flowcollector to be ready"
 timeout=0
 while [ $timeout -lt 180 ]; do
     oc get flowcollector/cluster | grep Ready && break
@@ -205,7 +206,5 @@ while [ $timeout -lt 180 ]; do
     timeout=$((timeout+30))
 done
 
-echo "====> Waiting for flowcollector to be ready"
-oc wait flowcollector/cluster --timeout=180s --for=condition=ready
 
 
