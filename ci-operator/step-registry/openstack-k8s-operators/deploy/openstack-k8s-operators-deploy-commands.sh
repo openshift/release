@@ -94,6 +94,13 @@ export INSTALL_NMSTATE=false
 
 # Deploy openstack operator
 make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
+
+# if the new initialization resource exists install it
+# this will also wait for operators to deploy
+if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+  make openstack_init
+fi
+
 # Wait before start checking all deployment status
 # Not expecting to fail here, only in next deployment checks
 n=0
