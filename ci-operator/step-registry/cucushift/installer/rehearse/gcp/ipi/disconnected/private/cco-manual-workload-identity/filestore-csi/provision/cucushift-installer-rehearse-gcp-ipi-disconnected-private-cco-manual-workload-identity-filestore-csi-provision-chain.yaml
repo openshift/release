@@ -1,0 +1,31 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity-filestore-csi-provision
+  steps:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity-provision
+    - ref: ipi-conf-gcp-filestore-workload-identity-federation
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-gcp-filestore
+    - ref: storage-conf-wait-for-csi-driver
+  env:
+    - name: CLUSTERCSIDRIVER
+      default: filestore.csi.storage.gke.io
+    - name: REQUIRED_DEFAULT_STORAGECLASS
+      default: "filestore-csi"
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: manifest-gcp-filestore.yaml
+    - name: TRUECONDITIONS
+      default: GCPFILESTOREDriverControllerServiceControllerAvailable GCPFILESTOREDriverNodeServiceControllerAvailable
+    - name: OO_PACKAGE
+      default: gcp-filestore-csi-driver-operator
+    - name: OO_CHANNEL
+      default: stable
+    - name: OO_INSTALL_NAMESPACE
+      default: openshift-cluster-csi-drivers
+    - name: OO_TARGET_NAMESPACES
+      default: '!all'
+    - name: EVAL_CONFIG_ENVVARS
+      default: "yes"
+    - name: OO_CONFIG_ENVVARS
+      default: POOL_ID=$(cat ${SHARED_DIR}/gcp-filestore-pool-id),PROVIDER_ID=$(cat ${SHARED_DIR}/gcp-filestore-provider-id),SERVICE_ACCOUNT_EMAIL=$(cat ${SHARED_DIR}/gcp-filestore-service-account-email),PROJECT_NUMBER=$(cat ${SHARED_DIR}/gcp-filestore-project-number)
+  documentation: |-
+    Launch an IPI disconnected & private cluster with GCP workload identity for QE e2e tests.
