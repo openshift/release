@@ -510,6 +510,10 @@ suite-conformance)
     suite
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
+ocp-flaky)
+    suite
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/ocp-flaky suite
+    ;;
 suite)
     suite
     ;;

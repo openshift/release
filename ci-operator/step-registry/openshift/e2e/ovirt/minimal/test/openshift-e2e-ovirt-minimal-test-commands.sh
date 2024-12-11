@@ -158,6 +158,10 @@ suite-conformance)
     suite
     TEST_SUITE=openshift/conformance/parallel suite
     ;;
+ocp-flaky)
+    suite
+    TEST_SUITE=openshift/conformance/ocp-flaky suite
+    ;;
 suite)
     suite
     ;;
