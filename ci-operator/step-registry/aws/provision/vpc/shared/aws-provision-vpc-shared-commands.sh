@@ -39,7 +39,7 @@ function aws_add_param_to_json() {
 
 cat > /tmp/01_vpc.yaml << EOF
 AWSTemplateFormatVersion: 2010-09-09
-Description: Template for Best Practice VPC with 1-3 AZs
+Description: Created by aws-provision-vpc-shared
 
 Parameters:
   VpcCidr:
