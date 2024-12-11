@@ -1,0 +1,77 @@
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.19
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - fedora:latest
+  to: ksan-operator
+promotion:
+  to:
+  - namespace: ksan-operator
+    tag: latest
+    tag_by_commit: true
+  - namespace: ksan-operator
+    tag: v0.0-latest
+    tag_by_commit: true
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+  mkdir /.local && chmod 777 /.local
+tests:
+- as: unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+- as: post-unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ksan-operator
