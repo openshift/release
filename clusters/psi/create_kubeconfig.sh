@@ -23,10 +23,12 @@ readonly API_SERVER_URL
 SECRET=$6
 readonly SECRET
 SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
+CONTEXT=${CONTEXT:-$CLUSTER}
+readonly CONTEXT
 
 while :
 do
-  TOKEN=$(oc --context $CLUSTER -n ci extract secret/$SECRET --to=- --keys token)
+  TOKEN=$(oc --context $CONTEXT -n ci extract secret/$SECRET --to=- --keys token)
   if [ ${TOKEN} == "" ];
   then
     echo "waiting for the token to be generated ..."
@@ -49,7 +51,7 @@ contexts:
     namespace: {{SA_NAMESPACE}}
     user: {{SERVICE_ACCOUNT}}
   name: {{CLUSTER}}
-current-context: {{CLUSTER}}
+current-context: {{CONTEXT}}
 kind: Config
 preferences: {}
 users:
@@ -58,7 +60,7 @@ users:
     token: {{TOKEN}}
 "
 
-echo -n "$template" | ${sed_cmd} "s/{{CLUSTER}}/${CLUSTER}/g;s/{{SERVICE_ACCOUNT}}/${SERVICE_ACCOUNT}/g;s/{{SA_NAMESPACE}}/${SA_NAMESPACE}/g;s/{{API_SERVER_URL}}/${API_SERVER_URL//\//\\/}/g;s/{{TOKEN}}/${TOKEN}/g;s/{{SKIP_TLS_VERIFY}}/${SKIP_TLS_VERIFY}/g" > $OUTPUT_PATH
+echo -n "$template" | ${sed_cmd} "s/{{CLUSTER}}/${CLUSTER}/g;s/{{SERVICE_ACCOUNT}}/${SERVICE_ACCOUNT}/g;s/{{SA_NAMESPACE}}/${SA_NAMESPACE}/g;s/{{API_SERVER_URL}}/${API_SERVER_URL//\//\\/}/g;s/{{TOKEN}}/${TOKEN}/g;s/{{SKIP_TLS_VERIFY}}/${SKIP_TLS_VERIFY}/g;s/{{CONTEXT}}/${CONTEXT}/g" > $OUTPUT_PATH
 
 
 
