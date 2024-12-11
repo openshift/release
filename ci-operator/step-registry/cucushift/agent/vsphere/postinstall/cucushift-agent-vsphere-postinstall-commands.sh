@@ -21,7 +21,7 @@ if [ "${MASTERS}" -eq 1 ]; then
 fi
 source "${SHARED_DIR}"/platform-conf.sh
 
-oc get nodes
+oc get nodes > "${ARTIFACT_DIR}/get_nodes.txt"
 
 # Backup
 echo "Getting vsphere-creds and cloud-provider-config"
