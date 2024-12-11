@@ -10,6 +10,8 @@ BASE_DOMAIN="$CLUSTER_NAME.oci-rhelcert.edge-sro.rhecoeng.com"
 
 TENANCY_OCID=$(</var/run/oci-secret-tenancy/tenancy_ocid)
 COMPARTMENT=$(</var/run/oci-secret-compartment/compartment)
+USER=$(</var/run/oci-secret-user/user)
+FINGERPRINT=$(</var/run/oci-secret-fingerprint/fingerprint)
 
 echo "Downloading OpenTofu...."
 
@@ -42,7 +44,16 @@ echo "Run OpenTofu init"
 
 $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
-sleep 90000
+export OCI_CONFIG_FILE=/tmp/.oci/config
+
+cat > "/tmp/.oci/config" <<EOF
+[DEFAULT]
+user=${USER}
+fingerprint=${FINGERPRINT}
+tenancy=${TENANCY_OCID}
+region=us-sanjose-1
+key_file=${CLUSTER_PROFILE_DIR}/ssh-key
+EOF
 
 echo "Run OpenTofu plan"
 
