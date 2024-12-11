@@ -293,8 +293,9 @@ create_cr secured-cluster
 echo ">>> Wait for deployments"
 wait_deploy central-db
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  wait_deploy scannerv4
-  wait_deploy scannerv4-db
+  wait_deploy scanner-v4-indexer
+  wait_deploy scanner-v4-matcher
+  wait_deploy scanner-v4-db
 else
   wait_deploy scanner
   wait_deploy scanner-db

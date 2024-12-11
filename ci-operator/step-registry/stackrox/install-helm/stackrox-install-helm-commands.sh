@@ -222,8 +222,9 @@ get_init_bundle
 install_secured_cluster_with_helm
 echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  wait_deploy scannerv4
-  wait_deploy scannerv4-db
+  wait_deploy scanner-v4-indexer
+  wait_deploy scanner-v4-matcher
+  wait_deploy scanner-v4-db
 else
   wait_deploy scanner
   wait_deploy scanner-db
