@@ -74,32 +74,28 @@ function cleanup_prior() {
         VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
         if [ ! -z "${VPC_CONN_ID}" ]
         then
-        echo "deleting VPC connection"
-        ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
-        sleep 120
-        echo "Done Cleaning up GW VPC Connection"
+            echo "deleting VPC connection"
+            ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+            sleep 120
+            echo "Done Cleaning up GW VPC Connection"
         else
-        echo "GW VPC Connection not found. VPC Cleanup not needed."
+            echo "GW VPC Connection not found. VPC Cleanup not needed."
         fi
         break
     done
 
     # Delete any vpc older than 24 hrs
     echo "Cleaning up VPCs"
-    for VPC in $(ibmcloud is vpcs --resource-group-name "multi-arch-cicd-resource-group" 2>&1 | grep multi-arch-cicd-resource-group | grep -v Listing | grep -i ci-op | awk '{print $1}')
+    for VPC in $(ibmcloud is vpcs --resource-group-name "${RESOURCE_GROUP}" 2>&1 | grep "${RESOURCE_GROUP}" | grep -v Listing | grep -i ci-op | awk '{print $1}')
     do
         echo "VPC=${VPC}"
-        ibmcloud is vpc 
         ibmcloud is vpc-delete "${VPC}" -f
         sleep 10s
     done
 
-    ibmcloud is vpc r014-e85d5a63-c6ae-433f-9473-5557344f2747 --output json | jq -r '[. | select((.created_at + 2d) > now())]'
-
-
     WORKSPACE_NAME=
-    echo "Cleaning up workspaces for ${workspace_name}"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+    echo "Cleaning up workspaces for ${WORKSPACE_NAME}"
+    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
         echo "Targetting power cloud instance"
         ibmcloud pi workspace target "${CRN}"
@@ -194,7 +190,7 @@ function configure_automation() {
             echo "Creating new VPC connection for gateway now."
             ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
         done
-      done
+    done
 }
 
 # The CentOS-Stream-9 image is stock-image on PowerVS.

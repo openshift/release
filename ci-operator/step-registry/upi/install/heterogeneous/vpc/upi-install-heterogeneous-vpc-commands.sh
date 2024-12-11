@@ -16,7 +16,7 @@ echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-export NAME_PREFIX="rdr-multi-arch-${CLEAN_VERSION}"
+export NAME_PREFIX="multi-arch-p-px-${CLEAN_VERSION}"
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)
 export WORKSPACE_NAME
 VPC_NAME="${WORKSPACE_NAME}-vpc"
