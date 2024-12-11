@@ -44,8 +44,6 @@ echo "Run OpenTofu init"
 
 $SHARED_DIR/tofu/tofu -chdir=$SOURCE_DIR/infrastructure init
 
-export OCI_CONFIG_FILE=/tmp/.oci/config
-
 cat > "/tmp/.oci/config" <<EOF
 [DEFAULT]
 user=${USER}
@@ -54,6 +52,8 @@ tenancy=${TENANCY_OCID}
 region=us-sanjose-1
 key_file=${CLUSTER_PROFILE_DIR}/ssh-key
 EOF
+
+export OCI_CONFIG_FILE=/tmp/.oci/config
 
 echo "Run OpenTofu plan"
 
