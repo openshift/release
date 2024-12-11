@@ -158,14 +158,14 @@ echo "====> Deploying 0-click Loki"
 oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/zero-click-loki/1-storage.yaml -n ${NAMESPACE}
 oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/zero-click-loki/2-loki.yaml -n ${NAMESPACE}
 
-sleep 10
+sleep 30
 oc wait --timeout=180s --for=condition=ready pod -l olm.catalogSource=$CATALOG_NAME -n openshift-marketplace
 
 create_ns
 create_og
 subscribe
 
-sleep 30
+sleep 60
 oc wait --timeout=180s --for=condition=ready pod -l app=netobserv-operator -n openshift-netobserv-operator
 
 while :; do
@@ -190,6 +190,7 @@ done
 oc wait --timeout=180s --for=condition=ready pod -l app=flowlogs-pipeline -n ${NAMESPACE}
 
 echo "====> Waiting for ebpf-agent pods to be ready"
+sleep 30
 oc wait --timeout=180s --for=condition=ready pod -l app=netobserv-ebpf-agent -n ${NAMESPACE}-privileged
 
 echo "====> Waiting for console-plugin pod to be ready"
