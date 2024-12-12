@@ -322,10 +322,10 @@ EOF
 		#     hostedZone:
 		#     hostedZoneRole:
 
-		if grep -qE "hostedZone:" "${SHARED_DIR}/install-config.yaml" && grep -qE "hostedZoneRole:" "${SHARED_DIR}/install-config.yaml"; then
-			echo "This is a Shared-VPC (PHZ) cluster,  adding sts:AssumeRole permission to the list."
-			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
-		fi
+		# if grep -qE "hostedZone:" "${SHARED_DIR}/install-config.yaml" && grep -qE "hostedZoneRole:" "${SHARED_DIR}/install-config.yaml"; then
+		# 	echo "This is a Shared-VPC (PHZ) cluster,  adding sts:AssumeRole permission to the list."
+		# 	echo "sts:AssumeRole" >>"${PERMISION_LIST}"
+		# fi
 
 		rm -rf "${dir}"
 	fi
