@@ -141,6 +141,7 @@ then
       --timeout=$MUST_GATHER_TIMEOUT \
       --dest-dir ${ARTIFACT_DIR}/must-gather-ppc64le > ${ARTIFACT_DIR}/must-gather-ppc64le/must-gather-ppc64le.log \
       || true
+  find "${ARTIFACT_DIR}/must-gather-ppc64le" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
   tar -czC "${ARTIFACT_DIR}/must-gather-ppc64le" -f "${ARTIFACT_DIR}/must-gather-ppc64le.tar.gz" .
   rm -rf "${ARTIFACT_DIR}"/must-gather-ppc64le
 
