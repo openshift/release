@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
