@@ -212,6 +212,7 @@ for _ in {1..60}; do
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     curl -k $quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
     cp "$SHARED_DIR"/quay_api_discovery "$ARTIFACT_DIR"/quay_api_discovery || true
+    sleep 500m
     exit 0
   fi
   sleep 15
