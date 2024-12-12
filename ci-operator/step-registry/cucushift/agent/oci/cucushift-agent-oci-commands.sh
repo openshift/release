@@ -21,7 +21,5 @@ chmod +x /tmp/install.sh
 export OCI_CLI_KEY_FILE=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export OCI_CLI_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/oci-config
 
-oci --version
-
 sleep 1500
 
