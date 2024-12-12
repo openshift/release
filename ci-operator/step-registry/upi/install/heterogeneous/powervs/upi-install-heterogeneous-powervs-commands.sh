@@ -70,7 +70,7 @@ function download_terraform_binary() {
 # Cleans up the failed prior jobs
 function cleanup_prior() {
     echo "Clean up transit gateway - VPC connection"
-    RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
+    RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
     for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
     do
         VPC_CONN="${WORKSPACE_NAME}-vpc"
@@ -140,6 +140,7 @@ function cleanup_prior() {
   echo "Done cleaning up prior runs"
 }
 
+# configure the automation
 function configure_automation() {
     # Saving the OCP VERSION so we can use in a subsequent deprovision
     echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
@@ -250,8 +251,8 @@ function wait_for_additional_nodes_readiness() {
         fi
 
         echo "[INFO] - ${expected_nodes} ready nodes expected, found ${COUNT_NODES}..." \
-            "Waiting ${period}min before retrying (timeout in $(( (MAX_RETRIES - i) * (period) ))min)..."
-            sleep "3m"
+            "Waiting 3min before retrying..."
+        sleep "3m"
     done
 }
 
@@ -278,7 +279,7 @@ setup_ibmcloud_cli
 login_ibmcloud
 download_terraform_binary
 download_automation_code
-configure_worker_node
+configure_automation
 cleanup_prior
 setup_powervs_image
 run_automation
