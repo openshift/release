@@ -148,6 +148,8 @@ case "${BOOT_MODE}" in
   # Also, the name of the pxe artifacts are not corrected (prefixed with agent, instead of node)
   ls -lR "${DAY2_INSTALL_DIR}" > "${ARTIFACT_DIR}/pxe_artifacts_names.txt"
 
+  cp "${DAY2_INSTALL_DIR}/report.json" "${ARTIFACT_DIR}/"
+
   # In the target folder, there should be only the following artifacts:
   # * node.x86_64-initrd.img
   # * node.x86_64-rootfs.img
