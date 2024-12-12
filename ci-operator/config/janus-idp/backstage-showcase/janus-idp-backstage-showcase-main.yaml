@@ -93,6 +93,51 @@ tests:
 - as: e2e-tests-nightly-aks
   cron: 0 7 * * *
   steps:
+    post:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-destroy
+      commands: |
+        mapt azure aks destroy \
+          --project-name "aks" \
+          --backed-url azblob://mapt-rhdh-zdrapela-mapt-state/aks-1
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from_image:
+        name: mapt
+        namespace: ci
+        tag: v0.7.0
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    pre:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-create
+      commands: |
+        mapt azure aks create \
+          --project-name "aks" \
+          --backed-url azblob://mapt-rhdh-zdrapela-mapt-state/aks-1 \
+          --conn-details-output "${SHARED_DIR}" \
+          --spot \
+          --enable-app-routing
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from_image:
+        name: mapt
+        namespace: ci
+        tag: v0.7.0
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
     test:
     - ref: janus-idp-backstage-showcase-helm-aks-nightly
 - as: e2e-tests-nightly-gke
