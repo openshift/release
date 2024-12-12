@@ -34,7 +34,10 @@ fi
 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
-echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
+
+echo "Note: This cluster will be automatically deleted after test execution finishes."
+echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
+
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
