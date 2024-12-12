@@ -1,16 +1,25 @@
 base_images:
-  lca-operator:
-    name: "4.15"
+  lifecycle-agent-operator:
+    name: "4.16"
     namespace: ocp-kni
     tag: lifecycle-agent-operator
   tests:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: tests
+build_root:
+  from_repository: true
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
+    with: pipeline:lifecycle-agent-operator
 releases:
   latest:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -24,13 +33,13 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      OO_BUNDLE: operator-bundle
       TESTS_PULL_REF: pipeline:tests
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.15"
+      OCP_BASE_VERSION: "4.16"
       OCP_TARGET_IMAGE_SOURCE: release
-      OCP_TARGET_VERSION: "4.14"
+      OCP_TARGET_VERSION: "4.15"
       SEED_IMAGE_TAG_FORMAT: e2e
     workflow: openshift-image-based-upgrade-e2e
   timeout: 4h0m0s
@@ -40,14 +49,16 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      OO_BUNDLE: operator-bundle
       TESTS_PULL_REF: pipeline:tests
     env:
       CREATE_CLUSTER_ONLY: "true"
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.15"
+      OCP_BASE_VERSION: "4.16"
       SEED_IMAGE_TAG_FORMAT: e2e
       TEST_CLUSTER: seed
+      TEST_SKIPS: NTO should SNO installation does not finish due to wait for non-existing
+        machine-config
     workflow: openshift-image-based-upgrade-e2e-baseline
   timeout: 4h0m0s
 - as: image-based-upgrade-e2e-parallel-conformance
@@ -56,14 +67,14 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      OO_BUNDLE: operator-bundle
       TESTS_PULL_REF: pipeline:tests
     env:
       CONFORMANCE_SUITE: openshift/conformance/parallel
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.15"
+      OCP_BASE_VERSION: "4.16"
       OCP_TARGET_IMAGE_SOURCE: release
-      OCP_TARGET_VERSION: "4.14"
+      OCP_TARGET_VERSION: "4.15"
       SEED_IMAGE_TAG_FORMAT: e2e
     workflow: openshift-image-based-upgrade-e2e
   timeout: 4h0m0s
@@ -73,19 +84,21 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      OO_BUNDLE: operator-bundle
       TESTS_PULL_REF: pipeline:tests
     env:
       CONFORMANCE_SUITE: openshift/conformance/parallel
       CREATE_CLUSTER_ONLY: "true"
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.15"
+      OCP_BASE_VERSION: "4.16"
       SEED_IMAGE_TAG_FORMAT: e2e
       TEST_CLUSTER: seed
+      TEST_SKIPS: NTO should SNO installation does not finish due to wait for non-existing
+        machine-config
     workflow: openshift-image-based-upgrade-e2e-baseline
   timeout: 4h0m0s
 zz_generated_metadata:
-  branch: main
+  branch: release-4.16
   org: openshift-kni
   repo: lifecycle-agent
-  variant: nightly-4.15-upgrade-from-stable-4.14
+  variant: nightly-4.16-upgrade-from-stable-4.15
