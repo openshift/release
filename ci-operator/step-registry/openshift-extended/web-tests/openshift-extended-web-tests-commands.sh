@@ -44,6 +44,9 @@ else
   elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
     echo 'Running destructive tests'
     ./console-test-frontend.sh --tags @destructive || true
+  elif [[ $E2E_RUN_TAGS =~ @isc ]]; then
+    echo "run all isc tests"
+    ./console-test-frontend.sh --tags @isc || true
   elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
     echo "run all compliance-operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
