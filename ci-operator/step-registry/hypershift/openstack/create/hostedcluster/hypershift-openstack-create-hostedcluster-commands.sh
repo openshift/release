@@ -4,17 +4,10 @@ set -euo pipefail
 
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-  EXTRA_ARGS="${EXTRA_ARGS} --openstack-ca-cert-file ${SHARED_DIR}/osp-ca.crt"
-fi
-
 OPENSTACK_COMPUTE_FLAVOR=$(cat "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
 OPENSTACK_EXTERNAL_NETWORK_ID=$(cat "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK_ID")
 
-if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
-    >&2 echo clouds.yaml has not been generated
-    exit 1
-fi
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -31,10 +24,9 @@ CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 echo "$CLUSTER_NAME" > "${SHARED_DIR}/CLUSTER_NAME"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 COMMAND=(
-  /usr/bin/hypershift create cluster openstack
+  /usr/bin/hcp create cluster openstack
   --name "${CLUSTER_NAME}"
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}"
-  --openstack-credentials-file "${SHARED_DIR}/clouds.yaml"
   --openstack-external-network-id "${OPENSTACK_EXTERNAL_NETWORK_ID}"
   --openstack-node-flavor "${OPENSTACK_COMPUTE_FLAVOR}"
   --openstack-node-image-name "${RHCOS_IMAGE_NAME}"
@@ -46,12 +38,13 @@ COMMAND=(
   --annotations=hypershift.openshift.io/skip-release-image-validation=true
 )
 
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-  COMMAND+=(--openstack-ca-cert-file "${SHARED_DIR}/osp-ca.crt")
-fi
-
 if [[ $ENABLE_ICSP == "true" ]]; then
   COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+fi
+
+if [ -f "${SHARED_DIR}/INGRESS_IP" ]; then
+  INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
+  COMMAND+=(--openstack-ingress-floating-ip "${INGRESS_IP}")
 fi
 
 if [[ -n $EXTRA_ARGS ]]; then
@@ -70,18 +63,22 @@ oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedclus
 echo "Cluster became available, creating kubeconfig"
 bin/hypershift create kubeconfig --namespace=clusters --name="${CLUSTER_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
 
-export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-timeout 25m bash -c '
-  echo "Waiting for router-default to have an IP"
-  until [[ "$(oc -n openshift-ingress get service router-default -o jsonpath="{.status.loadBalancer.ingress[0].ip}")" != "" ]]; do
-      sleep 15
-      echo "router-default does not exist yet, retrying..."
-  done
-'
-INGRESS_IP=$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-if [[ -z "${INGRESS_IP}" ]]; then
-  echo "Ingress IP was not found"
-  exit 1
+# This block is for when we need to discover what floating IP was picked for Ingress.
+# We don't need to run this in the case of a pre-defined floating IP.
+if [ ! -f "${SHARED_DIR}/INGRESS_IP" ]; then
+  export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+  timeout 25m bash -c '
+    echo "Waiting for router-default to have an IP"
+    until [[ "$(oc -n openshift-ingress get service router-default -o jsonpath="{.status.loadBalancer.ingress[0].ip}")" != "" ]]; do
+        sleep 15
+        echo "router-default does not exist yet, retrying..."
+    done
+  '
+  INGRESS_IP=$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  if [[ -z "${INGRESS_IP}" ]]; then
+    echo "Ingress IP was not found"
+    exit 1
+  fi
+  echo "${INGRESS_IP}" > "${SHARED_DIR}/INGRESS_IP"
+  echo "Ingress IP was found: ${INGRESS_IP}"
 fi
-echo "${INGRESS_IP}" > "${SHARED_DIR}/INGRESS_IP"
-echo "Ingress IP was found: ${INGRESS_IP}"

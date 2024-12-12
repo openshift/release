@@ -29,7 +29,7 @@
           {
             alert: 'prow-job-backlog-growing',
             expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
-            'for': '60m',
+            'for': '10m',
             labels: {
               severity: 'critical',
             },

@@ -30,23 +30,25 @@ if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATIO
     cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
 fi
 
+if [ "${ENABLE_CREATE_SAMBA_SERVER}" = "true" ]; then
 echo "Copying samba-server manifest from csi-operator repo"
-cp ${OPERATOR_E2E_DIR}/samba-server.yaml ${SMB_SERVER_MANIFEST}
-echo "Using ${SMB_SERVER_MANIFEST}"
-cat ${SMB_SERVER_MANIFEST}
-oc apply -f ${SMB_SERVER_MANIFEST}
+	cp ${OPERATOR_E2E_DIR}/samba-server.yaml ${SMB_SERVER_MANIFEST}
+	echo "Using ${SMB_SERVER_MANIFEST}"
+	cat ${SMB_SERVER_MANIFEST}
+	oc apply -f ${SMB_SERVER_MANIFEST}
 
-echo "Waiting for samba-server to be ready"
-SAMBA_GET_ARGS="-n samba-server samba"
-OC_WAIT_ARGS="--for=jsonpath=.status.readyReplicas=1 --timeout=300s"
-if ! oc wait statefulset ${SAMBA_GET_ARGS} ${OC_WAIT_ARGS}; then
-	oc describe statefulset ${SAMBA_GET_ARGS}
-	oc get statefulset ${SAMBA_GET_ARGS} -o yaml
-	echo "Wait failed, samba-server did not reach Ready state"
-	exit 1
+	echo "Waiting for samba-server to be ready"
+	SAMBA_GET_ARGS="-n samba-server samba"
+	OC_WAIT_ARGS="--for=jsonpath=.status.readyReplicas=1 --timeout=300s"
+	if ! oc wait statefulset ${SAMBA_GET_ARGS} ${OC_WAIT_ARGS}; then
+		oc describe statefulset ${SAMBA_GET_ARGS}
+		oc get statefulset ${SAMBA_GET_ARGS} -o yaml
+		echo "Wait failed, samba-server did not reach Ready state"
+		exit 1
+	fi
+	oc get pods -n samba-server
+	echo "samba-server is ready"
 fi
-oc get pods -n samba-server
-echo "samba-server is ready"
 
 echo "Creating ClusterCSIDriver ${CLUSTER_CSI_DRIVER_NAME}"
 oc apply -f - <<EOF

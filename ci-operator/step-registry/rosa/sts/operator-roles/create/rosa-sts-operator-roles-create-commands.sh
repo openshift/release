@@ -70,6 +70,54 @@ rosa create operator-roles -y --mode auto \
                            ${HOSTED_CP_SWITCH} \
                            ${SHARED_VPC_SWITCH} \
                            | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+
+if [[ "$HOSTED_CP" == "true" ]]; then
+  # FIXME(stbenjam): Remove once managed policies are changed to account
+  # for CAPA changes in 4.17+ https://issues.redhat.com/browse/OSD-25821
+  aws iam put-role-policy \
+    --role-name ${OPERATOR_ROLES_PREFIX}-kube-system-capa-controller-manager \
+    --policy-name CreateTagsPolicy \
+    --policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "CreateTagsCAPAControllerNetworkInterface",
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:CreateTags"
+                ],
+                "Resource": [
+                    "arn:aws:ec2:*:*:network-interface/*"
+                ],
+                "Condition": {
+                    "StringEquals": {
+                        "aws:RequestTag/red-hat-managed": "true"
+                    }
+                }
+            },
+            {
+                "Sid": "CreateTags",
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:CreateTags"
+                ],
+                "Resource": [
+                    "arn:aws:ec2:*:*:instance/*",
+                    "arn:aws:ec2:*:*:volume/*",
+                    "arn:aws:ec2:*:*:network-interface/*"
+                ],
+                "Condition": {
+                    "StringEquals": {
+                        "ec2:CreateAction": [
+                            "RunInstances"
+                        ]
+                    }
+                }
+            }
+        ]
+    }'
+fi
+
 # rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} --output json > "${SHARED_DIR}/operator-roles-arns"
 ret=0
 rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} |grep -v OPERATOR | awk '{print $4}' > "${SHARED_DIR}/operator-roles-arns" || ret=$?
