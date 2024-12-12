@@ -161,9 +161,6 @@ data:
     prometheusOperator:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
-    grafana:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
     k8sPrometheusAdapter:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
@@ -200,4 +197,4 @@ fi
 
 echo "Waiting for all pods to settle"
 sleep 5
-while [[ $(oc get pods --no-headers -A | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
+while [[ $(echo -e "openshift-ingress\nopenshift-image-registry\nopenshift-monitoring" | xargs -I {} oc get pods -n {} --no-headers | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
