@@ -1,0 +1,57 @@
+ref:
+  as: opendatahub-io-ci-s390x-build-dashboard
+  from: dev-scripts
+  env:
+    - name: AGENT_IBMZ_CREDENTIALS
+      default: /etc/hypershift-agent-ibmz-credentials
+    - name: IMAGE_REPO
+      default: ""
+      documentation: |-
+        The repository name of the destination image reference.
+    - name: IMAGE_TAG
+      default: ""
+      documentation: |-
+        The tag for the destination image reference. If blank, the tag for
+        a presubmit will be <version>-PR<pull_num>-<commit_sha> and for a
+        postsubmit will be <version>-<commit_sha>. If equals to YearIndex assigns
+        on IMAGE_TAG the date as full current date YYYYMMDD.
+    - name: REGISTRY_HOST
+      default: quay.io
+      documentation: |-
+        The hostname (and port) of the destination registry.
+    - name: REGISTRY_ORG
+      default: opendatahub
+      documentation: |-
+        The organization of the destination image reference.
+    - name: REGISTRY_SECRET
+      default: opendatahub-io-push-secret
+      documentation: |-
+        The name of the kube secret that contains the registry token file.
+    - name: REGISTRY_SECRET_FILE
+      default: config.json
+      documentation: |-
+        The name of the file in REGISTRY_SECRET with the contents of
+        the .docker/config.json file encoded in base64.
+    - name: RELEASE_VERSION
+      default: ""
+      documentation: |-
+        The current release version for the product.
+    - name: SECRETS_PATH
+      default: /secrets
+      documentation: |-
+        The directory where credentials will be mounted.
+    - name: PLATFORMS
+      default: "linux/s390x,linux/amd64"
+      documentation: |-
+        The platforms for which the specified architecture image will be built.
+  commands: opendatahub-io-ci-s390x-build-dashboard-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  timeout: 60m
+  grace_period: 60s
