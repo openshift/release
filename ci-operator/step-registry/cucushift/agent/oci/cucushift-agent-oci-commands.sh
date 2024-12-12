@@ -15,8 +15,8 @@ if ! whoami &>/dev/null; then
   fi
 fi
 curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/install.sh
-sudo chmod +x /tmp/install.sh
-sudo /tmp/install.sh --accept-all-defaults
+chmod +x /tmp/install.sh
+/tmp/install.sh --accept-all-defaults
 
 export OCI_CLI_KEY_FILE=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export OCI_CLI_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/oci-config
