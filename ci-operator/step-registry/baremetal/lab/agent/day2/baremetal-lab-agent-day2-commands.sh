@@ -138,7 +138,21 @@ case "${BOOT_MODE}" in
 "pxe")
   ### Create pxe files
   echo -e "\nCreate pxe files for day2 worker nodes..."
-  /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+
+  /tmp/oc version > "${ARTIFACT_DIR}/oc_version.txt"
+
+  # The --report and --pxe flags were introduced in 4.18. It should be marked as experimental until 4.19.
+  /tmp/oc adm node-image create --report=true --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+
+  # oc adm node-image create --pxe does not generate only pxe artifacts, but copies everything from the node-joiner pod.
+  # Also, the name of the pxe artifacts are not corrected (prefixed with agent, instead of node)
+  ls -lR "${DAY2_INSTALL_DIR}" > "${ARTIFACT_DIR}/pxe_artifacts_names.txt"
+
+  # In the target folder, there should be only the following artifacts:
+  # * node.x86_64-initrd.img
+  # * node.x86_64-rootfs.img
+  # * node.x86_64-vmlinuz
+
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
