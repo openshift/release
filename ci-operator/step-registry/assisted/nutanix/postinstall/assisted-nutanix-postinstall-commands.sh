@@ -8,8 +8,13 @@ echo "************ nutanix assisted test-infra post-install ************"
 source ${SHARED_DIR}/platform-conf.sh
 source ${SHARED_DIR}/nutanix_context.sh
 
+mkdir -p /logs/artifacts
+export LOG_DIR_FILE='/logs/artifacts/post-install.log'
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 oc project default
+
+timeout=5m
 
 echo "Patching infrastructure/cluster"
 oc patch infrastructure/cluster --type=merge --patch-file=/dev/stdin <<-EOF
@@ -36,6 +41,7 @@ oc patch infrastructure/cluster --type=merge --patch-file=/dev/stdin <<-EOF
   }
 }
 EOF
+
 echo "infrastructure/cluster created"
 
 cat <<EOF | oc create -f -
@@ -49,10 +55,13 @@ stringData:
   credentials: |
     [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"},"prismElements":null}}]
 EOF
+
 echo "machine API credentials created"
 
+# debug post secret for security reasons 
+set -x
+
 version=$(oc version | grep -oE 'Server Version: ([0-9]+\.[0-9]+)' | sed 's/Server Version: //')
-resource_timeout_seconds=300
 
 # Do the following if OCP version is >=4.13
 # Cloud Provider Config is needed for CCM, which was introduced with 4.13 for Nutanix
@@ -101,7 +110,7 @@ EOF
 
 if [[ -z "$(oc get packagemanifests | grep nutanix)" ]]; then
   echo "Can't find CSI operator version that meet the OCP version"
-  cat <<EOF | oc apply -f -
+  cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -116,78 +125,24 @@ spec:
     registryPoll:
       interval: 5m
 EOF
-
-  start_time=$(date +%s)
-  while true; do
-    current_time=$(date +%s)
-    elapsed_time=$((current_time - start_time))
-
-    if [[ $(oc get catalogsource nutanix-csi-operator-beta -n openshift-marketplace -o 'jsonpath={..status.connectionState.lastObservedState}') == "READY" ]]; then
-      echo "CatalogSource is now READY."
-      if oc get packagemanifests nutanixcsioperator &> /dev/null; then
-        echo "Package Manifests nutanixcsioperator is now READY."
-        break
-      fi
-      echo "Waiting for nutanixcsioperator package manifests to become READY ..."
-    fi
-
-    if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
-      echo "Timeout: Nutanix CSI CatalogSource did not become READY within ${resource_timeout_seconds} seconds."
-      exit 1
-    fi
-
-    echo "Waiting for CatalogSource to be READY..."
-    sleep 5s
-  done
 fi
 
-
-starting_csv=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.channels[*].currentCSV\})
-source=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSource\})
-source_namespace=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSourceNamespace\})
-
-cat <<EOF | oc apply -f -
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: nutanixcsioperator
-  namespace: openshift-cluster-csi-drivers
-spec:
-  installPlanApproval: Automatic
-  name: nutanixcsioperator
-  source: ${source}
-  sourceNamespace: ${source_namespace}
-  startingCSV: ${starting_csv}
-EOF
-
-start_time=$(date +%s)
-while true; do
-  current_time=$(date +%s)
-  elapsed_time=$((current_time - start_time))
-
-  if [[ $(oc get subscription nutanixcsioperator -n openshift-cluster-csi-drivers -o 'jsonpath={..status.state}') == "AtLatestKnown" ]]; then
-    echo "Subscription is now ready."
-    break
-  fi
-
-  if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
-    echo "Timeout: Nutanix operator subscription did not become ready within ${resource_timeout_seconds} seconds."
-    exit 1
-  fi
-
-  echo "Waiting for Subscription to be ready..."
-  sleep 5
+counter=1
+echo "Waiting PackageManifests"
+until [[ $(oc get packagemanifests nutanixcsioperator 2> /dev/null) ]]
+  do
+    if [[ "${counter}" -eq 90 ]];
+    then
+      echo "ERROR: Nutanix Package Manifests nutanixcsioperator was not found."
+      oc -n openshift-marketplace get catalogsources.operators.coreos.com -o json
+      oc -n openshift-marketplace get pods
+      oc get packagemanifests nutanixcsioperator -o json
+      exit 1
+      break 
+    fi
+    ((counter++)) && sleep 2
 done
-
-# Create a NutanixCsiStorage resource to deploy your driver
-cat <<EOF | oc create -f -
-apiVersion: crd.nutanix.com/v1alpha1
-kind: NutanixCsiStorage
-metadata:
-  name: nutanixcsistorage
-  namespace: openshift-cluster-csi-drivers
-spec: {}
-EOF
+echo "GOT PackageManifests"
 
 cat <<EOF | oc create -f -
 apiVersion: v1
@@ -198,6 +153,42 @@ metadata:
 stringData:
   # prism-element-ip:prism-port:admin:password
   key: ${PE_HOST}:${PE_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
+EOF
+
+source=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSource\})
+source_namespace=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSourceNamespace\})
+
+cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: nutanixcsioperator
+  namespace: openshift-cluster-csi-drivers
+spec:
+  installPlanApproval: Automatic
+  name: nutanixcsioperator
+  source: ${source}
+  sourceNamespace: ${source_namespace}
+EOF
+
+namespace="openshift-cluster-csi-drivers"
+subscription="nutanixcsioperator"
+echo "Waiting for Subscription to be ready..."
+oc --namespace="${namespace}" wait --for=jsonpath='{..status.state}'="AtLatestKnown"  \
+  --timeout=${timeout}  "subscriptions.operators.coreos.com/${subscription}" -o json
+
+csv=$(oc get subscriptions.operators.coreos.com/${subscription} --namespace=${namespace} -o jsonpath='{..status.installedCSV}')
+echo "Waiting for CSV ${csv} installation"
+oc wait "clusterserviceversions.operators.coreos.com/${csv}" --namespace=${namespace}  --for=jsonpath='{..status.phase}'=Succeeded --timeout=${timeout} -o json
+
+# Create a NutanixCsiStorage resource to deploy your driver
+cat <<EOF | oc create -f -
+apiVersion: crd.nutanix.com/v1alpha1
+kind: NutanixCsiStorage
+metadata:
+  name: nutanixcsistorage
+  namespace: openshift-cluster-csi-drivers
+spec: {}
 EOF
 
 NUTANIX_STORAGE_CONTAINER=SelfServiceContainer
@@ -225,6 +216,10 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 EOF
 
+
+echo "Wait for pods to be up"
+oc wait --namespace=openshift-cluster-csi-drivers --all --for=condition=Ready pods  --timeout=5m -o json
+
 nutanix_pvc_name="nutanix-volume-pvc"
 cat <<EOF | oc create -f -
 kind: PersistentVolumeClaim
@@ -247,35 +242,51 @@ spec:
   volumeMode: Filesystem
 EOF
 
-start_time=$(date +%s)
-while true; do
-  if oc get pvc/"${nutanix_pvc_name}" -n openshift-cluster-csi-drivers &>/dev/null; then
-    pvc_status=$(oc get pvc/"${nutanix_pvc_name}" -n openshift-cluster-csi-drivers -o 'jsonpath={..status.phase}')
-    if [[ "$pvc_status" == "Bound" ]]; then
-      echo "PersistentVolumeClaim is now Bound."
-      break
-    fi
-  fi
 
-  current_time=$(date +%s)
-  elapsed_time=$((current_time - start_time))
+namespace="openshift-cluster-csi-drivers"
+deployment="nutanix-csi-operator-controller-manager" 
 
-  if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
-    echo "Timeout: PersistentVolumeClaim did not become Bound within ${resource_timeout_seconds} seconds."
-    exit 1
-  fi
-
-  echo "Waiting for PersistentVolumeClaim to be Bound..."
-  sleep 5
+echo "Waiting for (deployment) on namespace (${namespace}) with name (${deployment}) to be created..."
+for i in {1..40}; do
+    oc get deployments.apps "${deployment}" --namespace="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 10
 done
 
-oc delete pvc -n openshift-cluster-csi-drivers ${nutanix_pvc_name}
+if [ $i -eq 40 ]; then
+  echo "ERROR: failed Waiting for (deployment) on namespace (${namespace}) with name (${deployment}) to be created..."
+  exit 1
+fi
 
-until
-  oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null &&
-    oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null &&
-    oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null
-do
-  echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-  sleep 1s
-done
+REPLICAS=$(oc get deployments.apps --namespace="${namespace}" "${deployment}"  -o jsonpath='{..status.replicas}')
+echo "Waiting for rplicas in ${deployment} on namespace (${namespace})..."
+oc wait -n "${namespace}" --all --for=jsonpath='{..status.availableReplicas}'="${REPLICAS}"  "deployments.apps/${deployment}" --timeout=5m
+
+
+echo "waiting for clusteroperators to be ready"
+timeout=15m
+if  [[ $(oc wait --timeout=${timeout} --all=true clusteroperator --for='condition=available=true') ]] &&
+    [[ $(oc wait --timeout=${timeout} --all=true clusteroperator --for='condition=progressing=false') ]] &&
+    [[ $(oc wait --timeout=${timeout} --all=true clusteroperator --for='condition=degraded=false') ]];
+then
+  echo "All clusteroperators are Ready"
+  echo "done!"
+else
+  echo "error: failed waiting for cluster operator"
+  # deubg
+  oc get clusteroperator | tee ${LOG_DIR_FILE}
+  oc get clusteroperator -o json | tee ${LOG_DIR_FILE}
+  exit 1
+fi
+
+
+timeout=10m
+echo "Waiting for PersistentVolumeClaim to be Bound..."
+if [[ $(oc --namespace "openshift-cluster-csi-drivers" wait --for=jsonpath='{..status.phase}'=Bound  \
+  --timeout=${timeout}  "persistentvolumeclaim/${nutanix_pvc_name}" -o json) ]]
+then
+  echo "Cleanup PersistentVolumeClaim  ${nutanix_pvc_name}"
+  oc delete pvc -n openshift-cluster-csi-drivers ${nutanix_pvc_name}
+else
+  oc get pvc/"${nutanix_pvc_name}" -n openshift-cluster-csi-drivers -o json
+  exit 1
+fi
+  
