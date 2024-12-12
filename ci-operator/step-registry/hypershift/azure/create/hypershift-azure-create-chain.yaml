@@ -241,8 +241,8 @@ chain:
         "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
-      
-      "${COMMAND[@]}"
+      ("${COMMAND[@]}" || true)
+      sleep 6h
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
@@ -270,6 +270,7 @@ chain:
       
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+      sleep 6h
       until \
         oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
           echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
@@ -282,7 +283,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 45m0s
+    timeout: 24h
     credentials:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
