@@ -17,6 +17,9 @@ export IBMCLOUD_HOME_FOLDER
 REGION="${LEASED_RESOURCE}"
 export REGION
 
+WORKSPACE_NAME="multi-arch-x-px-${REGION}-1"
+export WORKSPACE_NAME
+
 PATH=${PATH}:/tmp:"${IBMCLOUD_HOME}/ocp-install-dir"
 export PATH
 
@@ -93,7 +96,6 @@ function cleanup_prior() {
         sleep 10s
     done
 
-    WORKSPACE_NAME=
     echo "Cleaning up workspaces for ${WORKSPACE_NAME}"
     for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
     do
