@@ -63,15 +63,15 @@ tests:
     env:
       FEATURE_GATES: '[ClusterAPIInstall=true]'
       FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 15h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: installer-rehearse-ibmcloud-dh-dynamic-capi
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: installer-rehearse-ibmcloud-minimal-perm-capi
   cron: '@yearly'
   steps:
@@ -79,14 +79,6 @@ tests:
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 15h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission-provision
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
 - as: installer-rehearse-ibmcloud-vpc-capi
   cron: '@yearly'
