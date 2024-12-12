@@ -197,7 +197,7 @@ function cleanup_prior() {
 
     # VPC Instances
     # VPC LBs 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
     echo "Target region - ${VPC_REGION}"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
@@ -264,7 +264,7 @@ function configure_terraform() {
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+    WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
     echo "IC workspace :  ${WORKSPACE_NAME}"
     echo "IC VPC workspace :  ${VPC_NAME}"
