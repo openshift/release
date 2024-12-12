@@ -132,10 +132,19 @@ winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winw
 echo "Waiting for Windows nodes to come up in Running state"
 while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do echo -n "." && sleep 10; done
 
-# Make sure the Windows nodes get in Ready state
+# If BYOH nodes are requested, wait for them too
+if [[ -n "${BYOH_NODE_COUNT:-}" ]]; then
+    echo "Waiting for Windows BYOH nodes to come up"
+    timeout 15m bash -c 'while [[ $(oc get nodes -l "kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true" --no-headers | wc -l) != "${BYOH_NODE_COUNT}" ]]; do echo "Current BYOH nodes status:"; oc get nodes -l "kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true"; sleep 30; done' || {
+        echo "ERROR: Timed out waiting for ${BYOH_NODE_COUNT} BYOH nodes to come up"
+        exit 1
+    }
+fi
+
+# Make sure all Windows nodes get in Ready state
 oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=15m
 
-# Choose the Windows container vesion depending on the Windows version
+# Choose the Windows container version depending on the Windows version
 # installed on the Windows workers
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
