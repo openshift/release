@@ -236,7 +236,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-
+  if [[ "${CLUSTER_TYPE}" == "vsphere" ]] && [[ -f ${SHARED_DIR}/template.yaml.patch ]]; then
+      grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/.openshift_install.log"
+  fi
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs

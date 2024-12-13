@@ -11,6 +11,15 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
 
+MI_ARGS=""
+if [[ "${AKS_USE_HYPERSHIFT_MI}" == "true" ]]; then
+    HYPERSHIFT_MI_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-mi-info.json"
+    ASSIGN_IDENTITY="$(<"${HYPERSHIFT_MI_LOCATION}" jq -r .assignIdentity)"
+    KUBELET_ASSIGN_IDENTITY="$(<"${HYPERSHIFT_MI_LOCATION}" jq -r .kubeletAssignIdentity)"
+
+    MI_ARGS="--assign-identity ${ASSIGN_IDENTITY} --assign-kubelet-identity ${KUBELET_ASSIGN_IDENTITY}"
+fi
+
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
@@ -31,6 +40,15 @@ if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
     CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
 fi
 
+CERT_ROTATION_ARGS=""
+if [[ "${ENABLE_AKS_CERT_ROTATION:-}" == "true" ]]; then
+    CERT_ROTATION_ARGS+=" --enable-secret-rotation"
+
+    if [[ "${AKS_CERT_ROTATION_POLL_INTERVAL:-}" != "" ]]; then
+        CERT_ROTATION_ARGS+=" --rotation-poll-interval ${AKS_CERT_ROTATION_POLL_INTERVAL}"
+    fi
+fi
+
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
 az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
@@ -46,8 +64,14 @@ AKS_CREATE_COMMAND=(
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
     "${CLUSTER_AUTOSCALER_ARGS:-}"
+    "${CERT_ROTATION_ARGS:-}"
+    "${MI_ARGS:-}"
     --location "$AZURE_LOCATION"
 )
+
+if [[ -n "$AKS_ADDONS" ]]; then
+     AKS_CREATE_COMMAND+=(--enable-addons "$AKS_ADDONS")
+fi
 
 # Version prioritization: specific > latest > default
 if [[ -n "$AKS_K8S_VERSION" ]]; then
@@ -75,7 +99,16 @@ fi
 
 echo "Creating AKS cluster"
 eval "${AKS_CREATE_COMMAND[*]}"
+
+echo "Saving cluster info"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
+if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
+    az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
+    # Grant MI required permissions to the KV which will be created in the same RG as the AKS cluster
+    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
+    RG_ID="$(az group show -n "$RESOURCEGROUP" --query id -o tsv)"
+    az role assignment create --assignee-object-id "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" --role "Key Vault Secrets User" --scope "${RG_ID}" --assignee-principal-type ServicePrincipal
+fi
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(

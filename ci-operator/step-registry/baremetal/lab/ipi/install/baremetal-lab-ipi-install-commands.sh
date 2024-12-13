@@ -49,6 +49,13 @@ function update_image_registry() {
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 echo "[INFO] Initializing..."
 
@@ -226,13 +233,13 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-update_image_registry &
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+update_image_registry
 
 touch  "${SHARED_DIR}/success"
 touch /tmp/install-complete
