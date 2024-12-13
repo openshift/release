@@ -16,7 +16,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: kube-burner-workers-scale-252nodes
+  as: workers-scale-252nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -29,11 +29,11 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - always_run: false
-  as: kube-burner-workers-autoscale-252nodes
+  as: workers-autoscale-252nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -47,7 +47,7 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-120nodes
@@ -67,11 +67,11 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
-- as: kube-burner-workers-autoscale-120nodes
+- as: workers-autoscale-120nodes
   cron: 0 20 27 * *
   steps:
     allow_skip_on_success: true
@@ -86,7 +86,7 @@ tests:
         TicketId 382
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-24nodes
@@ -99,10 +99,10 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
-- as: kube-burner-workers-autoscale-24nodes
+- as: workers-autoscale-24nodes
   cron: 0 16 27 * *
   steps:
     allow_skip_on_success: true
@@ -113,7 +113,7 @@ tests:
       DEPLOY_AUTOSCALER: "true"
       ZONES_COUNT: "3"
     test:
-    - ref: openshift-qe-kube-burner-workers-scale
+    - ref: openshift-qe-workers-scale
     workflow: openshift-qe-installer-aws
 - as: control-plane-24nodes-acs
   cron: 0 12 2,16 * *
@@ -151,13 +151,28 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "3"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "6"
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
       ITERATION_MULTIPLIER_ENV: "15"
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+- as: workers-autoscale-6nodes
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      DEPLOY_AUTOSCALER: "true"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
 - always_run: false
