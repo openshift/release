@@ -51,7 +51,11 @@ export MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
 export EUS_UPGRADE=${EUS_UPGRADE:=false}
 export EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
 echo TARGET_RELEASES is $TARGET_RELEASES
+
 export UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
+
+#making sure this variable is an int
+export UPGRADE_WAIT_NUM=$(($UPGRADE_WAIT_NUM))
 export IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
 export IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
 
