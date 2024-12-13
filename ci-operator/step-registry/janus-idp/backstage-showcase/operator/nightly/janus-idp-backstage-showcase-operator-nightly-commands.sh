@@ -53,7 +53,7 @@ tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$
 export PATH=/tmp/openshift-client:$PATH
 oc version
 
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE NAME_SPACE_RBAC
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE NAME_SPACE_RBAC TAG_NAME
 
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
