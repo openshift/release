@@ -24,12 +24,14 @@ tests:
     - as: e2e
       commands: |
         export GRADLE_USER_HOME=/var/tmp
+        export GLOBALODOCONFIG=/var/tmp/odoconfig
+        export NO_FS_ROOTS_ACCESS_CHECK=true
         sha256sum gradle/wrapper/gradle-wrapper.jar
         curl -s --location --output gradle-wrapper.jar.sha256 https://services.gradle.org/distributions/gradle-8.5-wrapper.jar.sha256
         echo " gradle/wrapper/gradle-wrapper.jar" >> gradle-wrapper.jar.sha256
         sha256sum --check gradle-wrapper.jar.sha256
         echo "Running gradle build"
-        NO_FS_ROOTS_ACCESS_CHECK=true ./gradlew integrationTest --no-daemon -Dplugin.verifier.home.dir=/var/tmp/ides -Dtools.dl.path=/var/tmp/tools
+        ./gradlew integrationTest --no-daemon -Dplugin.verifier.home.dir=/var/tmp/ides -Dtools.dl.path=/var/tmp/tools
       from: src
       resources:
         requests:
