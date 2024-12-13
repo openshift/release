@@ -53,6 +53,9 @@ echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
 echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
 echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
 
+WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
+export WORKSPACE_NAME
+
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
 
@@ -197,8 +200,7 @@ function cleanup_prior() {
 
     # VPC Instances
     # VPC LBs 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    VPC_NAME="${WORKSPACE_NAME}"
     echo "Target region - ${VPC_REGION}"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
 
@@ -264,11 +266,10 @@ function configure_terraform() {
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
+    VPC_NAME="${WORKSPACE_NAME}"
     echo "IC workspace :  ${WORKSPACE_NAME}"
     echo "IC VPC workspace :  ${VPC_NAME}"
-    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
     # Select the workspace ID 
     POWERVS_SERVICE_INSTANCE_ID=$(ibmcloud pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
