@@ -189,8 +189,8 @@ function getDesiredComputeCount {
 # Determine if node count needs to be revised due to day 2 op workaround for medium+ sized clusters
 function fixNodeScaling {
   machine_pool=$(rosa list machinepool -c "$CLUSTER_ID" -o json)
-  if [[ "$HOSTED_CP" == "false" ]] && [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
-    if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    if [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
       if [[ `echo "$machine_pool" | jq -r '.[].autoscaling.min_replicas'` -ne ${MIN_REPLICAS} ]]; then
         rosa edit machinepool -c "$CLUSTER_ID" worker --min-replicas "$MIN_REPLICAS"
       fi

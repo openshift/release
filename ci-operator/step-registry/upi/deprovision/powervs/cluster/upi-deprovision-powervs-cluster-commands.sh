@@ -75,7 +75,7 @@ function setup_ibmcloud_cli() {
 # login to the ibmcloud
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
-    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "$(< ${SHARED_DIR}/RESOURCE_GROUP)" -r "${VPC_REGION}"
 }
 
 # Download automation code
@@ -151,7 +151,7 @@ function cleanup_prior() {
     VPC_NAME="${WORKSPACE_NAME}-vpc"
 
     echo "Target region - ${VPC_REGION}"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
+    ibmcloud target -r "${VPC_REGION}" -g "$(< ${SHARED_DIR}/RESOURCE_GROUP)"
 
     echo "Cleaning up the VPC Load Balancers"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
@@ -172,14 +172,14 @@ function cleanup_prior() {
     done
 
     echo "Cleaning up the Security Groups"
-    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json \
         | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
         | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
         || true
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
-    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
+    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json | jq -r '.[].id')
     do
         ibmcloud is image-delete "${RESOURCE_TGT}" -f
     done

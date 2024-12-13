@@ -39,6 +39,10 @@ function check_ep_names() {
     fi
     if ! [[ ${output} == *"${expString}"* ]]; then
         echo "ERROR: Unexpected explain installconfig.platform.ibmcloud.serviceEndpoints: - ${output} "
+        if [[ "${isPreVersion}" == "True" ]]; then
+            echo "OCPBUGS-44943 (openshift explain installconfig.platform.ibmcloud.serviceEndpoints list new ep name of 4.18 in the previous version ) not block the test"
+            return 0
+        fi
         return 1
     else
         echo "Check installconfig.platform.ibmcloud.serviceEndpoints passed."
