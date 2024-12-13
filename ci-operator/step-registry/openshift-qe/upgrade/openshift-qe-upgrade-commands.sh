@@ -45,19 +45,19 @@ if [ -d ocp-qe-perfscale-ci ];then
 fi
 git clone -b upgrade https://github.com/openshift-qe/ocp-qe-perfscale-ci.git --depth=1
 cd ocp-qe-perfscale-ci/upgrade_scripts 
-export ENABLE_FORCE=${ENABLE_FORCE:=true}
-export SCALE=${SCALE:=false}
-export MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
-export EUS_UPGRADE=${EUS_UPGRADE:=false}
-export EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
+ENABLE_FORCE=${ENABLE_FORCE:=true}
+SCALE=${SCALE:=false}
+MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
+EUS_UPGRADE=${EUS_UPGRADE:=false}
+EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
 echo TARGET_RELEASES is $TARGET_RELEASES
 
-export UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
+UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
 
 #making sure this variable is an int
 export UPGRADE_WAIT_NUM=$(($UPGRADE_WAIT_NUM))
-export IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
-export IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
+IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
+IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
 
 echo "Check OCP Cluster Operator Status"
 RETRY=1
