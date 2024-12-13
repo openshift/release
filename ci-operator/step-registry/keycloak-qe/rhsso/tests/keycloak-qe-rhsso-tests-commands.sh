@@ -11,6 +11,9 @@ export PATH=$PATH:/tmp/tests/ansible-tests/
 cp $KUBECONFIG /tmp/kubeconfig
 export KUBECONFIG=/tmp/kubeconfig
 
+
+sleep 3600
+
 # Run tests
 echo "Executing rhsso tests ref"
 
