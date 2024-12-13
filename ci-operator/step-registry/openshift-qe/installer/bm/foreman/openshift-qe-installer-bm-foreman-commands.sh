@@ -17,9 +17,11 @@ echo 'Running foreman-deploy.sh'
 USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
 for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  hammer host update --name $i --operatingsystem $FOREMAN_OS -pxe-loader "Grub2 UEFI" --build 1
+  hammer host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
   sleep 10
   badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
+  sleep 10
+  badfish --reboot-only -H mgmt-$i -u $USER -p $PWD
 done
 EOF
 if [[ $LAB == "performancelab" ]]; then
@@ -33,9 +35,7 @@ envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_N
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
 for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  nc -z $i 22
-  while [ $? -ne 0 ]; do
-    fc -e : -1
+  while ! nc -z $i 22; do
     echo "Trying SSH port on host $i ..."
     sleep 60
   done
