@@ -10,14 +10,16 @@ export PATH=$PATH:/tmp/tests/ansible-tests/
 # Configure env for test run
 cp $KUBECONFIG /tmp/kubeconfig
 export KUBECONFIG=/tmp/kubeconfig
+export PATH=/tmp/tests/ansible-tests/:$PATH
 
 
-sleep 3600
 
 # Run tests
 echo "Executing rhsso tests ref"
 
 ansible-playbook -v /tmp/tests/ansible-tests/test-ocp-ci-rhbk.yml --extra-vars "ocp_project_name='${OCP_PROJECT_NAME}'"
+
+sleep 3600
 
 #copy junit results to artifacts dir
 mkdir -p $ARTIFACT_DIR/rhsso-tests
