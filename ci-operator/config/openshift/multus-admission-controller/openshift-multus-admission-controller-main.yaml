@@ -1,54 +1,56 @@
 base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  origin_scos-4.19_base-stream9:
-    name: scos-4.19
-    namespace: origin
-    tag: base-stream9
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+  from_repository: true
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile.openshift
-  from: origin_scos-4.19_base-stream9
+- dockerfile_path: Dockerfile.openshift
   inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: multus-admission-controller
 promotion:
   to:
-  - name: scos-4.19
-    namespace: origin
+  - name: "4.19"
+    namespace: ocp
 releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: scos-4.19
-      namespace: origin
+      name: "4.19"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: e2e-aws-ovn
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: multus-admission-controller
+    workflow: openshift-ci-security
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openshift
   repo: multus-admission-controller
-  variant: okd-scos
