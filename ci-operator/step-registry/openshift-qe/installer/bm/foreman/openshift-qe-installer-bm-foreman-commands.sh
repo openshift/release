@@ -32,14 +32,14 @@ envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_N
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
-for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))] .[].name"); do
+for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   nc -z $i 22
   while [ $? -ne 0 ]; do
     fc -e : -1
     echo "Trying SSH port on host $i ..."
     sleep 60
   done
-done'
+done
 EOF
 envsubst '${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated.sh
 
@@ -50,7 +50,7 @@ ssh ${SSH_ARGS} root@${bastion} "
   set -e
   set -o pipefail
   curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r '.nodes[0].name' > /tmp/foreman_inventory_$LAB_CLOUD
-  ansible -i /tmp/foreman_inventory_$LAB_CLOUD bastion -m script -a /tmp/foreman-deploy_updated.sh
+  ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-deploy_updated.sh
   sleep 300
-  ansible -i /tmp/foreman_inventory_$LAB_CLOUD bastion -m script -a /tmp/foreman-wait_updated.sh
+  ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-wait_updated.sh
 "
