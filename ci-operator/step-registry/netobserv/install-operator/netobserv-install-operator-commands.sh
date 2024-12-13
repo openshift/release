@@ -205,6 +205,3 @@ while [ $timeout -lt 180 ]; do
     sleep 30
     timeout=$((timeout+30))
 done
-
-
-
