@@ -376,6 +376,9 @@ CONFIG = {
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
     },
+    'oci-agent-qe-quota-slice': {
+        'default': 50,
+    },
     'oci-edge-quota-slice': {
         'default': 50,
     },
