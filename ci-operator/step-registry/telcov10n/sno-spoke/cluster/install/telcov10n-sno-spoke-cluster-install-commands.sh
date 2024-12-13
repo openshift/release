@@ -155,6 +155,8 @@ function get_and_save_kubeconfig_and_creds {
     | jq -r '.data.kubeconfig' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
   oc -n ${SPOKE_CLUSTER_NAME} get secrets $secret_adm_pass -o json \
     | jq -r '.data.password' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml
+
+  cp -v ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml ${ARTIFACT_DIR}/
 }
 
 function main {

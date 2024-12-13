@@ -29,7 +29,8 @@ images:
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - name: "4.19"
+  - disabled: true
+    name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -70,6 +71,8 @@ tests:
 - as: e2e-hypershift-pao
   steps:
     cluster_profile: hypershift
+    env:
+      HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
     - as: e2e-hypershift-pao
       cli: latest
@@ -84,11 +87,14 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 4h0m0s
     workflow: hypershift-aws-e2e-cluster
 - always_run: false
   as: e2e-pao-updating-profile-hypershift
   steps:
     cluster_profile: hypershift
+    env:
+      HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
     - as: e2e-pao-updating-profile-hypershift
       cli: latest

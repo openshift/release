@@ -20,33 +20,33 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
 PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
-PR_REPO_NAME=$(curl -s  -X GET -H \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
-    jq -r  '.head.repo.full_name')
+PR_REPO_NAME=$(curl -s -X GET -H \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
+  jq -r '.head.repo.full_name')
 
-DEPENDS_ON=$(curl -s  -X GET -H \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
-    jq -r  '.body' | grep -iE "(depends-on).*(openstack-operator)" || true)
+DEPENDS_ON=$(curl -s -X GET -H \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
+  jq -r '.body' | grep -iE "(depends-on).*(openstack-operator)" || true)
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
 BASE_OP=${REF_REPO}
 IS_REHEARSAL=false
 if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
-    echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
-    EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
-    EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
-    if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
-      echo "Failing since this step supports only ${DEFAULT_ORG} changes."
-      exit 1
-    fi
-    IS_REHEARSAL=true
-    BASE_OP=${EXTRA_REF_REPO}
+  echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
+  EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
+  EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
+  REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+  if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
+    echo "Failing since this step supports only ${DEFAULT_ORG} changes."
+    exit 1
+  fi
+  IS_REHEARSAL=true
+  BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 # sets default branch for install_yamls
@@ -64,8 +64,8 @@ function create_openstack_namespace {
 
 # Get build status
 function get_build_status() {
-    le_status=$(oc get builds -l buildconfig="$1" -o json | jq -r '.items[0].status.phase')
-    echo $le_status
+  le_status=$(oc get builds -l buildconfig="$1" -o json | jq -r '.items[0].status.phase')
+  echo $le_status
 }
 
 # Check if build didn't fail
@@ -87,8 +87,8 @@ function check_build_result {
   # sleep time hardcoded to 30s. Adding + 29 to round up the result
   nb_retries=$(((BUILD_COMPLETE_TIMEOUT + 29) / 30))
   while [[ "$build_status" != "Complete" ]]; do
-    n=$((n+1))
-    if (( n > nb_retries )); then
+    n=$((n + 1))
+    if ((n > nb_retries)); then
       echo "Build ${build_name} failed to complete. Current status is ${build_status}. Aborting..."
       exit 1
     fi
@@ -100,20 +100,20 @@ function check_build_result {
 # Clone the openstack-operator and checkout
 # the requested PR
 function clone_openstack_operator {
-    git clone https://github.com/openstack-k8s-operators/openstack-operator.git -b ${REF_BRANCH}
-    pushd openstack-operator
-    local pr_num=""
-    # Depends-On syntax detected in the PR description: get the PR ID
-    if [[ -n $DEPENDS_ON ]]; then
-        pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev)
-    fi
-    # make sure the PR ID we parse is a number
-    if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
-        # checkout pr $pr_num
-        git fetch origin pull/"$pr_num"/head:PR"$pr_num"
-        git checkout PR"$pr_num"
-    fi
-    popd
+  git clone https://github.com/openstack-k8s-operators/openstack-operator.git -b ${REF_BRANCH}
+  pushd openstack-operator
+  local pr_num=""
+  # Depends-On syntax detected in the PR description: get the PR ID
+  if [[ -n $DEPENDS_ON ]]; then
+    pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev)
+  fi
+  # make sure the PR ID we parse is a number
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    # checkout pr $pr_num
+    git fetch origin pull/"$pr_num"/head:PR"$pr_num"
+    git checkout PR"$pr_num"
+  fi
+  popd
 }
 
 # Builds and push operator image
@@ -156,6 +156,12 @@ function build_push_operator_images {
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${BUNDLE_DOCKERFILE}"\"\}\}\}\})
 
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
+
+  # Enable webhooks in Prow CI Job builds
+  oc patch bc/${OPERATOR}-bundle \
+    --type='json' \
+    -p='[{"op": "add", "path": "/spec/strategy/dockerStrategy/env", "value": [{"name": "ENABLE_WEBHOOKS", "value": "true"}]}]'
+
   oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR}-bundle --from-dir . -F
   check_build_result ${OPERATOR}-bundle
@@ -164,7 +170,7 @@ function build_push_operator_images {
   INDEX_DOCKERFILE="index.Dockerfile"
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${INDEX_DOCKERFILE}"\"\}\}\}\})
 
-# todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
+  # todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     local OPENSTACK_BUNDLES
     OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
