@@ -22,6 +22,7 @@ ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:=""}
 ARO_API_SERVER_VISIBILITY=${ARO_API_SERVER_VISIBILITY:=""}
 ARO_OUTBOUND_TYPE=${ARO_OUTBOUND_TYPE:=""}
 ARO_FIPS=${ARO_FIPS:="false"}
+ARO_BYO_NSG=${ARO_BYO_NSG:="false"}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -99,6 +100,11 @@ fi
 # FIPS support
 if [[ ${ARO_FIPS} == "true" ]]; then
   CREATE_CMD="${CREATE_CMD} --fips ${ARO_FIPS}"
+fi
+
+# BYO NSG support
+if [[ ${ARO_BYO_NSG} == "true" ]]; then
+  CREATE_CMD="${CREATE_CMD} --enable-preconfigured-nsg"
 fi
 
 echo "Running ARO create command:"

@@ -3,18 +3,18 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.59.0
-  ocp_4.18_cli:
+  ocp_4.19_cli:
     name: "4.19"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.18
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    tag: rhel-8-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: GOFLAGS="-mod=readonly" make build
 build_root:
   image_stream_tag:
@@ -24,19 +24,20 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.18_cli:
+    ocp_4.19_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.18:cli
-    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:cli
+    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: kube-compare-artifacts
 promotion:
   to:
-  - name: "4.19"
+  - disabled: true
+    name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -69,6 +70,11 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: bin
+- as: system-test
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: bin
+  postsubmit: true
 - as: unit-report-creator
   commands: GOFLAGS="-mod=readonly" make test-report-creator
   container:

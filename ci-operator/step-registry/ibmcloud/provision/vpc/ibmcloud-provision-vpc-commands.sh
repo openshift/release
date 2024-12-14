@@ -60,6 +60,8 @@ function ibmcloud_login {
     "${IBMCLOUD_CLI}" config --check-version=false
     echo "Try to login..." 
     "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    "${IBMCLOUD_CLI}" version
+    "${IBMCLOUD_CLI}" plugin list
 }
 
 function getZoneSubnets() {
@@ -75,10 +77,10 @@ function getZoneAddressprefix() {
 }
 
 function getOneMoreCidr() {
-    local cidr="$1"
+    local cidr="$1" increament="${2:-1}"
 
     IFS='.' read -r -a cidr_num_array <<< "${cidr}"
-    cidr_num_array[2]=$((${cidr_num_array[2]} + 1))    
+    cidr_num_array[2]=$((${cidr_num_array[2]} + ${increament}))    
     IFS=. ; echo "${cidr_num_array[*]}"
 }
 
@@ -99,37 +101,45 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" resource_group="$3" region="$4"
-    local zones zone_cidr zone_cidr_main subnetName
+    local preName="$1" vpcName="$2" rg="$3" num_subnets_pair_per_zone="${4:-1}"
+    local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
+    echo "Creating vpc $vpcName under $rg ..."
     # create vpc
-    "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name ${resource_group}
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
-    # create subnets
-    zones=("${region}-1" "${region}-2" "${region}-3")
+    echo "created ${vpcName} successfully"
 
-    for zone in "${zones[@]}"; do
+    # create subnets
+    for zone in "${ZONES[@]}"; do
         zone_cidr=$(getZoneAddressprefix "${vpcName}" "${zone}")
         zone_cidr_main="${zone_cidr%/*}"
-        subnetName="${preName}-control-plane-${zone}"
-        "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${zone_cidr_main}/24"
-        waitAvailable "subnet" ${subnetName}
-    done
+        subnets_pair_idx=0
+        subnets_idx=0
+        while (( $subnets_pair_idx < $num_subnets_pair_per_zone )); do
+            echo "#${subnets_pair_idx}: Creating controlplane subnet in $zone zone"
+            subnet_cidr_main=$(getOneMoreCidr "${zone_cidr_main}" ${subnets_idx})
+            subnetName="${preName}-control-plane-${zone}-${subnets_pair_idx}"
+            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${subnet_cidr_main}/24"
+            waitAvailable "subnet" ${subnetName}
+            (( subnets_idx += 1 ))
 
-    for zone in "${zones[@]}"; do
-        zone_cidr=$(getZoneAddressprefix "${vpcName}" "${zone}")
-        zone_cidr_main=$(getOneMoreCidr "${zone_cidr%/*}")
-        subnetName="${preName}-compute-${zone}"
-        "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${zone_cidr_main}/24"
-        waitAvailable "subnet" ${subnetName}
+            echo "#${subnets_pair_idx}: Creating compute subnet in $zone zone"
+            subnet_cidr_main=$(getOneMoreCidr "${zone_cidr_main}" ${subnets_idx})
+            subnetName="${preName}-compute-${zone}-${subnets_pair_idx}"
+            "${IBMCLOUD_CLI}" is subnet-create ${subnetName} ${vpcName} --ipv4-cidr-block "${subnet_cidr_main}/24"
+            waitAvailable "subnet" ${subnetName}
+            (( subnets_idx += 1 ))
+
+            (( subnets_pair_idx += 1 ))
+        done
     done
 }
 
 function check_vpc() {
     local vpcName="$1" vpc_info_file="$2"
-
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
 }
 
@@ -167,11 +177,38 @@ function attach_public_gateway_to_subnet() {
     "${IBMCLOUD_CLI}" is subnet-update ${subnetName} --vpc ${vpcName} --pgw ${pgwName} || return 1
 }
 
+# for verify case  OCPBUGS-36236 [IBMCloud] install only checks first set of subnets (no pagination support)
+# for verify case OCPBUGS-36185[IBMCloud] MAPI only checks first set of subnets (no pagination support)
+function checkUsedSubnets() {
+    local used_subnets_file="$1" rg="$2"
+    local used_subnets TOKEN next_start subnets2
+    readarray -t used_subnets < <(yq-go r ${used_subnets_file} | awk '{print $2}')
+
+    TOKEN=$("${IBMCLOUD_CLI}" iam oauth-tokens | awk '{print $4}')
+    rg_id=$("${IBMCLOUD_CLI}" resource group $rg --output json | jq -r '.[0]|.id')
+    filter="resource_group.id=$rg_id&generation=2&version=2024-11-05"
+    echo "filter subnets with $filter"
+    next_start=$(curl -s -X GET "https://$region.iaas.cloud.ibm.com/v1/subnets?${filter}" -H "Authorization: Bearer $TOKEN" | jq -r '.next.href' | awk -F 'start=' '{print $2}')
+    subnets2=$(curl -s -X GET "https://$region.iaas.cloud.ibm.com/v1/subnets?${filter}&start=$next_start" -H "Authorization: Bearer $TOKEN" | jq -r '.subnets[]|.name')
+    echo "second page subnets: " "${subnets2}"
+    for subnet in "${used_subnets[@]}"; do
+        if echo "${subnets2}" | grep -q "$subnet"; then
+            echo "Found: $subnet in the second page"
+            return 0
+        fi
+    done
+    echo "Have not found the used subnet in the second page!!!"
+    return 1  # No matches found
+}
+
+
 ibmcloud_login
 
 rg_file="${SHARED_DIR}/ibmcloud_resource_group"
 if [ -f "${rg_file}" ]; then
     resource_group=$(cat "${rg_file}")
+    echo "Using an existed resource group: ${resource_group}"
+    "${IBMCLOUD_CLI}" resource group ${resource_group} || exit 1
 else
     echo "Did not found a provisoned resource group"
     exit 1
@@ -179,22 +216,24 @@ fi
 "${IBMCLOUD_CLI}" target -g ${resource_group}
 
 ## Create the VPC
-echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
+declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+
+echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
-create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${region}" 
+create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}"
 
 vpcAddressPre=$(getAddressPre ${vpc_info_file})
 
+
 if [[ "${RESTRICTED_NETWORK}" = "yes" ]]; then
     echo "[WARN] Skip creating public gateway to create disconnected network"
 else
-    zones=("${region}-1" "${region}-2" "${region}-3")
-    for zone in "${zones[@]}"; do
+    for zone in "${ZONES[@]}"; do
         echo "Creating public gateway in ${zone}..."
         public_gateway_name="${CLUSTER_NAME}-gateway-${zone}"
         create_zone_public_gateway "${public_gateway_name}" "${vpc_name}" "$zone"
@@ -205,8 +244,44 @@ else
     done
 fi
 workdir="$(mktemp -d)"
-cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("control-plane")) | .name]' | yq-go r -P - >${workdir}/controlPlaneSubnets.yaml
-cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("compute")) | .name]' | yq-go r -P - >${workdir}/computerSubnets.yaml
+
+if [[ "${APPLY_ALL_SUBNETS}" == "no" ]]; then
+    for zone in "${ZONES[@]}"; do
+      case "$PICKUP_SUBNETS_ORDER" in
+      "descending")
+        cp_idx="-1"
+        compute_idx="-1"
+      ;;
+      "ascending")
+        cp_idx="0"
+        compute_idx="0"
+      ;;
+      "random")
+        cp_subnets_len=$(cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" '[.subnets | .[] | select(.zone.name==$z) | select(.name|test("control-plane"))] | length')
+        cp_idx=$(( RANDOM % cp_subnets_len))
+        compute_subnets_len=$(cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" '[.subnets | .[] | select(.zone.name==$z) | select(.name|test("compute"))] | length')
+        compute_idx=$(( RANDOM % compute_subnets_len))
+      ;;
+      "2Paging")
+        cp_idx="0"
+        compute_idx="0"
+      ;;
+      *)
+        echo "unsupported value for PICKUP_SUBNETS_ORDER"
+        exit 2
+      esac
+
+      cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" --argjson idx "$cp_idx" '[[.subnets | sort_by(.created_at) | .[] | select(.zone.name==$z) | select(.name|test("control-plane")) | .name][$idx]]' | yq-go r -P - >>${workdir}/controlPlaneSubnets.yaml
+      cat "${vpc_info_file}" | jq -c -r --arg z "${zone}" --argjson idx "$compute_idx" '[[.subnets | sort_by(.created_at) | .[] | select(.zone.name==$z) | select(.name|test("compute")) | .name][$idx]]' | yq-go r -P - >>${workdir}/computerSubnets.yaml
+    done
+
+    if [[ $PICKUP_SUBNETS_ORDER == "2Paging" ]]; then
+        ( checkUsedSubnets "${workdir}/controlPlaneSubnets.yaml" "${resource_group}" && checkUsedSubnets "${workdir}/computerSubnets.yaml" "${resource_group}" ) || exit 1
+    fi
+else
+    cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("control-plane")) | .name]' | yq-go r -P - >${workdir}/controlPlaneSubnets.yaml
+    cat "${vpc_info_file}" | jq -c -r '[.subnets[] | select(.name|test("compute")) | .name]' | yq-go r -P - >${workdir}/computerSubnets.yaml
+fi
 
 if [[ "${isOldVersion}" == "true" ]]; then
     rg_name_line="resourceGroupName: ${resource_group}"

@@ -11,12 +11,13 @@ trap 'FRC=$?; createMTOJunit; debug' EXIT TERM
 # Print deployments, pods, nodes for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "Getting deployment info...\n"
-        echo -e "oc -n $NAMESPACE get deployments -owide\n$(oc -n $NAMESPACE get deployments -owide)"
-        echo -e "Getting pod info....\n"
-        echo -e "oc -n $NAMESPACE get pods -owide\n$(oc -n $NAMESPACE get pods -owide)"
-        echo -e "Getting nodes info...\n"
-        echo -e "oc get node -owide\n$(oc get node -owide)"
+        set +e
+        oc image info --show-multiarch "${OO_BUNDLE}" |& tee "${ARTIFACT_DIR}/image-info.txt"
+        for r in pods deployments events subscriptions clusterserviceversions clusterpodplacementconfigs; do
+          oc get ${r} -n "${NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/${r}.yaml"
+          oc describe ${r} -n "${NAMESPACE}" |& tee "${ARTIFACT_DIR}/${r}.txt"
+          oc get ${r} -n "${NAMESPACE}" -o wide
+        done
     fi
 }
 
@@ -76,10 +77,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - github.com/openshift/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}
+patches:
 EOF
     if [[ -n "$CATALOG_IMAGE_OVERRIDE" ]]; then
         cat <<EOF >> /tmp/kustomization/kustomization.yaml
-patches:
   - target:
       group: operators.coreos.com
       version: v1alpha1
@@ -93,7 +94,6 @@ EOF
     fi
     if [[ -n "$SUBSCRIPTION_CHANNEL_OVERRIDE" ]]; then
         cat <<EOF >> /tmp/kustomization/kustomization.yaml
-patches:
   - target:
       group: operators.coreos.com
       version: v1alpha1
@@ -106,6 +106,7 @@ patches:
         value: ${SUBSCRIPTION_CHANNEL_OVERRIDE}
 EOF
     fi
+    echo -e "For debug: show kustomization.yaml\n$(cat /tmp/kustomization/kustomization.yaml)"
     oc apply -k /tmp/kustomization
 fi
 if [[ "$MTO_OPERATOR_INSTALL_METHOD" == "bundle" ]]; then 

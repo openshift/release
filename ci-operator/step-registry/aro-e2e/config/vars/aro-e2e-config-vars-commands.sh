@@ -13,12 +13,12 @@ else
 fi
 echo "job specific name of resources: ${ID}"
 
-# read CURL_ADDITIONAL_ARGS from cluster profile secret
-CURL_ADDITIONAL_ARGS="$(<"${CLUSTER_PROFILE_DIR}/curl_additional_args")"
+# read CURL_PROXY from cluster profile secret
+CURL_PROXY="$(<"${CLUSTER_PROFILE_DIR}/curl_proxy")"
 
 cat >> "${SHARED_DIR}/vars.sh" << EOF
 export AZURE_CLUSTER_RESOURCE_GROUP="${ID}"
 export ARO_CLUSTER_SERVICE_PRINCIPAL_NAME="${ID}-csp"
 export ARO_CLUSTER_NAME="${ID}"
-export CURL_ADDITIONAL_ARGS="${CURL_ADDITIONAL_ARGS}"
+export CURL_PROXY="${CURL_PROXY}"
 EOF

@@ -7,7 +7,8 @@ set -o pipefail
 function ssh_command() {
     local node_ip="$1"
     local node_ssh_private_key=$2
-    local cmd="$3"
+    local node_user=$3
+    local cmd="$4"
     local ssh_options ssh_proxy_command="" bastion_ip bastion_ssh_user
 
     ssh_options="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
@@ -18,12 +19,12 @@ function ssh_command() {
     fi
 
     ssh_options="${ssh_options} -o IdentityFile=${node_ssh_private_key}"
-    echo "ssh ${ssh_options} ${ssh_proxy_command} core@${node_ip} ${cmd}" | sh -
+    echo "ssh ${ssh_options} ${ssh_proxy_command} ${node_user}@${node_ip} ${cmd}" | sh -
 }
 
 function check_ssh_access() {
     local node_info_list=$1
-    local node_ssh_private_key=$2
+    local node_ssh_private_key=$2 node_user=$3
     local ret_code=0 ret=0
 
     for node_info in ${node_info_list}; do
@@ -32,12 +33,12 @@ function check_ssh_access() {
         echo "checking on node ${node_name}, node ip is ${node_ip}..."
         cmd="hostname"
         ret=0
-        ssh_command "${node_ip}" "${node_ssh_private_key}" "${cmd}" || ret=1
+        ssh_command "${node_ip}" "${node_ssh_private_key}" "${node_user}" "${cmd}" || ret=1
         if [[ ${ret} -eq 1 ]]; then
-            echo "ERROR: fail to execute command '${cmd}' on node ${node_name}"
+            echo "Fail to execute command '${cmd}' on node ${node_name} with user ${node_user}"
             ret_code=1
         else
-            echo "INFO: check passed on node ${node_name}"
+            echo "Pass to execute command '${cmd}' on node ${node_name} with user ${node_user}"
         fi
     done
 
@@ -72,15 +73,33 @@ fi
 check_result=0
 
 node_info_list=$(oc get node -o wide --no-headers | awk '{print $1":"$6}')
+SSH_KEY_FILES="${DEFAULT_SSH_PRIV_KEY_PATH}"
 for key_type in ${SSH_KEY_TYPE_LIST}; do
-  if [[ -f "${SHARED_DIR}/key-${key_type}" ]]; then
-      echo "------ Check ssh key ${key_type} on all nodes ------"
-      chmod 600 "${SHARED_DIR}/key-${key_type}"
-      check_ssh_access "${node_info_list}" "${SHARED_DIR}/key-${key_type}" || check_result=1
-  else
-      echo "ERROR: could not find private sshkey for key type '${key_type}' in '${SHARED_DIR}'!"
-      check_result=1
-  fi
+    if [[ -f "${SHARED_DIR}/key-${key_type}" ]]; then
+        chmod 600 "${SHARED_DIR}/key-${key_type}"
+        SSH_KEY_FILES="${SSH_KEY_FILES} ${SHARED_DIR}/key-${key_type}"
+    else
+        echo "ERROR: could not find private sshkey for key type '${key_type}' in '${SHARED_DIR}'!"
+        exit 1
+    fi
+done
+
+for key_file in ${SSH_KEY_FILES}; do
+    echo -e "\n------ Check ssh key ${key_file} on all nodes ------"
+    echo "checking on user 'core'..."
+    if check_ssh_access "${node_info_list}" "${key_file}" "core"; then
+        echo "INFO: check passed for ssh key ${key_file} with user core!"
+    else
+        echo "ERROR: check failed for ssh key ${key_file} with user core!"
+        check_result=1
+    fi
+    echo -e "\nchecking on user 'root'..."
+    if check_ssh_access "${node_info_list}" "${key_file}" "root"; then
+        echo "ERROR: check failed for ssh key ${key_file} with user root, should not login"
+        check_result=1
+    else
+        echo "INFO: check passed for ssh key ${key_file} with user root"
+    fi
 done
 
 exit ${check_result}

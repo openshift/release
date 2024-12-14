@@ -89,8 +89,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: 4.18-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -148,12 +147,32 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: e2e-gcp-csi-c3
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: e2e-gcp-csi-n4
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+    workflow: openshift-e2e-gcp-csi-custom-worker
 - as: security
   optional: true
   steps:
     env:
       PROJECT_NAME: gcp-filestore-csi-driver-operator
     workflow: openshift-ci-security
+- always_run: false
+  as: e2e-gcp-manual-oidc-filestore
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity-filestore
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

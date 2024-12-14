@@ -201,7 +201,7 @@ else
 
   # Check if we need to update the source volume
   CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
-  if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
+  if [[ -z "${CURRENT_SOURCE_VOLUME}" || "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
     # Delete the old source volume
     if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
       echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
@@ -258,7 +258,14 @@ if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
-if [ "$INSTALLER_TYPE" == "default" ]; then
+# Check for kdump worker yaml config, and save it in the installation directory
+KDUMP_WORKER_YAML="${SHARED_DIR}/manifest_99_worker_kdump.yml"
+if [ -f "${KDUMP_WORKER_YAML}" ]; then
+  echo "Saving ${KDUMP_WORKER_YAML} to the install directory..."
+  cp ${KDUMP_WORKER_YAML} /tmp/manifests
+fi
+
+if [ "${INSTALLER_TYPE}" == "default" ]; then
   # Generating ignition configs
   echo "Generating ignition configs..."
   ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}

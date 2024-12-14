@@ -15,7 +15,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 BACKUP_SECRET_FILE=$(cat ${SHARED_DIR}/backup_secret_file)
-SEED_VM_NAME="seed"
+SEED_VM_NAME="seed-sno-node"
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
@@ -102,16 +102,36 @@ export RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
 export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
+# Default capacity is 140GB and disk pressure is observed, which leads to pods
+# pending, both during installation and e2e tests.
+export DISK_GB=200
+
+# Sets oc and kubectl from the specified OCP release version.
+set_openshift_clients() {
+  local release_image=\${1}
+
+  mkdir tools && cd tools && echo \${PULL_SECRET} > ./auth.json
+  oc adm release -a ./auth.json extract --tools \${release_image}
+  tar xzf openshift-client-linux-\$(oc adm release -a ./auth.json info \${release_image} -ojson | jq -r .metadata.version).tar.gz
+  sudo mv oc kubectl /usr/local/bin
+  cd -
+  rm -rf ./tools
+}
+
+set_openshift_clients \${RELEASE_IMAGE}
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed
+make seed-vm-create wait-for-seed
 
 if [[ "${CREATE_CLUSTER_ONLY}" == "true" ]]; then
   echo "CREATE_CLUSTER_ONLY was specified, exiting"
   exit 0
 fi
+
+# Prepare the seed vm for seed image creation
+make seed-cluster-prepare
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
@@ -134,7 +154,6 @@ if [[ ! -z "\${SEED_FLOATING_TAG}" ]]; then
   echo "Adding floating tag '${SEED_FLOATING_TAG}' to the seed image"
   skopeo copy "docker://${SEED_IMAGE}:${SEED_IMAGE_TAG}" "docker://${SEED_IMAGE}:${SEED_FLOATING_TAG}"
 fi
-
 EOF
 
 chmod +x ${SHARED_DIR}/create_seed.sh

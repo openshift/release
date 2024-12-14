@@ -1,5 +1,9 @@
 #!/bin/bash
 
+################################################################################################
+# This file is no longer used.  It is being left behind temporarily while we migrate to python #
+################################################################################################
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -112,7 +116,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $api_dns_target
       }
     },{
@@ -127,7 +131,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
-      "Type": "A",
+      "Type": "$RECORD_TYPE",
       $apps_dns_target
       }
 }]}

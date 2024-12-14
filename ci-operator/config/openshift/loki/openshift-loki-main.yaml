@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: base-rhel9
   loki-tag:
-    name: v3.2.0
+    name: v3.2.1
     namespace: logging
     tag: loki
   lokistack-gateway:
@@ -31,8 +31,16 @@ images:
   inputs:
     ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.17:
       as:
-      - golang:1.22.6
+      - golang:1.22.8
   to: loki-operator
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi9/go-toolset:latest
+    COPY . /go/src/github.com/openshift/loki
+  inputs:
+    base:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
+  to: loki-operator-src
 operator:
   bundles:
   - as: loki-operator-bundle
@@ -41,7 +49,7 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v3.2.0
+  - pullspec: quay.io/openshift-logging/loki:v3.2.1
     with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway

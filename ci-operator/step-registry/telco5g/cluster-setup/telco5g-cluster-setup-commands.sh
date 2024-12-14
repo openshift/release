@@ -93,7 +93,7 @@ elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
 elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
 elif [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
-    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
