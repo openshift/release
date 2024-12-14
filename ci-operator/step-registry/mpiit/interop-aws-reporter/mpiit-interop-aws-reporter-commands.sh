@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-export $SLACK_WEBHOOK_URL
+export SLACK_WEBHOOK_URL
 trap "sleep 30m" EXIT TERM INT SIGINT ERR
 
 RUN_COMMAND="poetry run python interop_aws_reporter/app.py"
