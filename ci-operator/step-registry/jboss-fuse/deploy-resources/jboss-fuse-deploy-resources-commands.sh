@@ -8,8 +8,11 @@ function create_foo_project_and_policies()
 {
   oc new-project jboss-fuse-interop
   oc label --overwrite ns ${1} pod-security.kubernetes.io/enforce=privileged
-  oc label --overwrite ns ${1} pod-security.kubernetes.io/enforce-version-
   oc adm policy add-scc-to-user privileged -z default -n ${1}
+
+  oc create -n jboss-fuse-interop serviceaccount jboss-fuse-sa || true
+  oc adm policy add-scc-to-user privileged -z jboss-fuse-sa -n ${1}
+  oc adm policy add-cluster-role-to-user cluster-admin -z jboss-fuse-sa -n ${1}
 }
 
 function create_foo_configmaps()
@@ -299,6 +302,7 @@ spec:
     spec:
       securityContext:
         runAsUser: 0
+      serviceAccountName: jboss-fuse-sa
       terminationGracePeriodSeconds: 60
       volumes:
         - name: nginx-settings
