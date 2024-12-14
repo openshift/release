@@ -95,6 +95,15 @@ export INSTALL_NMSTATE=false
 # Deploy openstack operator
 make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
 
+# Wait until OLM installs openstack CRDs
+n=0
+retries=30
+until [ "$n" -ge "$retries" ]; do
+  oc get crd | grep openstack.org && break
+    n=$((n+1))
+    sleep 10
+done
+
 # if the new initialization resource exists install it
 # this will also wait for operators to deploy
 if oc get crd openstacks.operator.openstack.org &> /dev/null; then
