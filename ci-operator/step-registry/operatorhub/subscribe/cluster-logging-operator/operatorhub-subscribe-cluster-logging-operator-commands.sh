@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Sleep 8h for debugging
+echo "Pause deleting. Sleep 8h for personal usage"
+sleep 14400
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
