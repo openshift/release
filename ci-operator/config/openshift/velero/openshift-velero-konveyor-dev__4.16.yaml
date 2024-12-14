@@ -1,0 +1,101 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: origin
+    tag: base-rhel9
+  cli:
+    name: "4.16"
+    namespace: origin
+    tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+binary_build_commands: echo "Creating bin container"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+images:
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    COPY operator-sdk /usr/local/bin/operator-sdk
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN ln -s /usr/local/bin/operator-sdk /usr/bin/operator-sdk
+    RUN dnf install -y podman && dnf install -y git && dnf clean all
+    RUN git clone --depth 1 --single-branch --branch master https://github.com/openshift/oadp-operator.git /oadp-operator
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    cli-operator-sdk:
+      paths:
+      - destination_dir: .
+        source_path: /usr/local/bin/operator-sdk
+  to: velero-oc-bin-image
+- dockerfile_path: Dockerfile.ubi
+  to: velero-oadp-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  optional: true
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy-oadp-for-velero
+      commands: |
+        ls -l /
+        cd /oadp-operator
+        GIT_REV=$(git rev-parse --short HEAD)
+        IMG="ttl.sh/oadp-operator-${GIT_REV}:1h"
+        BUNDLE_IMG="ttl.sh/oadp-operator-bundle-${GIT_REV}:1h"
+        podman build -f bundle.Dockerfile -t ${BUNDLE_IMG} .
+        podman push ${IMG}
+      from: velero-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: run-oadp-e2e-with-velero-image
+      commands: |
+        ls -l /
+        cd /oadp-operator
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: velero-oc-bin-image
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: ipi-aws
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: konveyor-dev
+  org: openshift
+  repo: velero
+  variant: "4.16"
