@@ -1,0 +1,28 @@
+workflow:
+  as: baremetalds-arbiter
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: packet-sno
+    pre:
+      - ref: baremetalds-packet-setup
+      - ref: ipi-install-rbac
+      - ref: baremetalds-devscripts-proxy
+      - ref: ipi-install-hosted-loki
+      - ref: baremetalds-devscripts-setup
+    test:
+      - ref: baremetalds-sno-test
+    post:
+      - ref: baremetalds-sno-gather
+      - ref: baremetalds-packet-gather-metadata
+      - ref: baremetalds-packet-teardown
+    env:
+      PACKET_OS: "rocky_9"
+      CLUSTERTYPE: baremetal
+      DEVSCRIPTS_CONFIG: |
+        NUM_WORKERS=0
+        NUM_ARBITERS=1
+        NUM_MASTERS=3
+        FEATURE_SET="TechPreviewNoUpgrade"
+  documentation: |-
+    This workflow executes arbiter cluster installation
