@@ -88,9 +88,9 @@ logger "INFO" "IAM roles set successfully"
 # Allow OpenShift service accounts to impersonate Google cloud service account
 logger "INFO" "Configuring Workload Identity Federation for OpenShift service accounts"
 CMD="gcloud iam service-accounts add-iam-policy-binding \"$SERVICE_ACCOUNT_EMAIL\" --member=\"principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/subject/system:serviceaccount:openshift-cluster-csi-drivers:gcp-filestore-csi-driver-controller-sa\" --role=roles/iam.workloadIdentityUser"
-run_command "${CMD}"
+run_command "${CMD}" 1>/dev/null
 CMD="gcloud iam service-accounts add-iam-policy-binding \"$SERVICE_ACCOUNT_EMAIL\" --member=\"principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/subject/system:serviceaccount:openshift-cluster-csi-drivers:gcp-filestore-csi-driver-operator\" --role=roles/iam.workloadIdentityUser"
-run_command "${CMD}"
+run_command "${CMD}" 1>/dev/null
 logger "INFO" "Workload Identity Federation configured successfully"
 
 # Store GCP WIF variables to a known location to be used later in chain as OO_CONFIG_ENVVARS used by `optional-operators-subscribe` step
