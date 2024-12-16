@@ -18,7 +18,7 @@ logger() {
 
 function run_command() {
     local CMD="$1"
-    echo "Running Command: ${CMD}"
+    echo "Running Command: ${CMD}" || true
     eval "${CMD}"
 }
 
@@ -56,11 +56,24 @@ then
   logger "INFO" "Service account activated and project set to ${GOOGLE_PROJECT_ID}"
 fi
 
+logger "INFO" "Obtaining project details and identity pool information"
+CMD="gcloud projects describe \"$GOOGLE_PROJECT_ID\" --format=\"value(projectNumber)\""
+PROJECT_NUMBER=$(run_command "${CMD}")
+POOL_ID=$(cat "${SHARED_DIR}"/gcp-filestore-pool-id)
+
 # Ref: TBD (no Red Hat docs available yet). Google doc: https://cloud.google.com/iam/docs/workload-identity-federation-with-kubernetes#create_the_workload_identity_pool_and_provider
 logger "INFO" "Starting cleanup of GCP Filestore cloud infrastructure for Workload Identity Federation"
 
 ## TODO: replace cleanup steps with ccoctl automation if this ever gets implemented
 ## TODO: alternatively, this could be documented later in the docs, make sure the code below is aligned with the official procedure
+
+# Remove the iam policy binding
+logger "INFO" "Removing IAM policy binding for the service account"
+CMD="gcloud iam service-accounts remove-iam-policy-binding \"$SERVICE_ACCOUNT_EMAIL\" --member=\"principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/subject/system:serviceaccount:openshift-cluster-csi-drivers:gcp-filestore-csi-driver-controller-sa\" --role=roles/iam.workloadIdentityUser 1>/dev/null"
+run_command "${CMD}"
+CMD="gcloud iam service-accounts remove-iam-policy-binding \"$SERVICE_ACCOUNT_EMAIL\" --member=\"principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/subject/system:serviceaccount:openshift-cluster-csi-drivers:gcp-filestore-csi-driver-operator\" --role=roles/iam.workloadIdentityUser 1>/dev/null"
+run_command "${CMD}"
+logger "INFO" "IAM roles remove successfully"
 
 # Delete the Google cloud service account
 logger "INFO" "Deleting Google cloud service account: ${SERVICE_ACCOUNT_EMAIL}"
