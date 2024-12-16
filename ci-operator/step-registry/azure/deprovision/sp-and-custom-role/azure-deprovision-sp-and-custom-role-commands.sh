@@ -17,6 +17,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/installer-sp-minter.json" ]]; then
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/installer-sp-minter.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
