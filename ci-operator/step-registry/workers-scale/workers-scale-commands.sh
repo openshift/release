@@ -54,6 +54,12 @@ function scaleMachineSets(){
     fi
 }
 
+function crdApprove() {
+    echo "Bulk Approve CSR"
+    oc get csr | awk '/Pending/ && $1 !~ /^z/ {print $1}' | xargs -P 0 -I {} oc adm certificate approve {}
+    echo "Bulk Approved CSRs"
+}
+
 function scaleDownMachines() {
     num_to_decrease=$(($1-$2))
     echo "num to decrease $num_to_decrease"
@@ -89,6 +95,7 @@ if [[ $worker_count_num -gt 0 ]]; then
             waitForReady $worker_count_num
         else
             scaleMachineSets $worker_count_num
+            crdApprove
             waitForReady $worker_count_num
         fi
     fi
