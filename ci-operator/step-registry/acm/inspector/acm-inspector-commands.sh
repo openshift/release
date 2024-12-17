@@ -16,6 +16,9 @@ cd acm-inspector/src/supervisor
 python3.9 -m venv venv
 ./venv/bin/pip3.9 install -r requirements.txt
 
+# Inspector requires an oc login, make sure we are logged in
+oc login -u kubeadmin "$(oc whoami --show-server=true)" < "$SHARED_DIR/kubeadmin-password"
+
 # Run the inspector with python 3.9
 ./venv/bin/python3.9 entry.py prom 2>&1 | tee ../../output/report.txt
 
