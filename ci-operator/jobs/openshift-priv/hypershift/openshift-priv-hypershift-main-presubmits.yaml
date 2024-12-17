@@ -19,9 +19,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-hypershift-main-e2e-aks
-    optional: true
     path_alias: github.com/openshift/hypershift
     rerun_command: /test e2e-aks
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:
@@ -104,7 +104,7 @@ presubmits:
     name: pull-ci-openshift-priv-hypershift-main-e2e-aws
     path_alias: github.com/openshift/hypershift
     rerun_command: /test e2e-aws
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:
@@ -338,6 +338,89 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/e2e-aws-override
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: hypershift
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-hypershift-main-e2e-aws-override
+    path_alias: github.com/openshift/hypershift
+    rerun_command: /test e2e-aws-override
+    run_if_changed: (/overrides\.yaml$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-override
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-override,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade-hypershift-operator
     decorate: true
     decoration_config:
@@ -353,7 +436,7 @@ presubmits:
     name: pull-ci-openshift-priv-hypershift-main-e2e-aws-upgrade-hypershift-operator
     path_alias: github.com/openshift/hypershift
     rerun_command: /test e2e-aws-upgrade-hypershift-operator
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:
@@ -586,7 +669,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-kubevirt-aws-ovn
     decorate: true
     decoration_config:
@@ -685,7 +768,7 @@ presubmits:
     name: pull-ci-openshift-priv-hypershift-main-e2e-kubevirt-aws-ovn-reduced
     path_alias: github.com/openshift/hypershift
     rerun_command: /test e2e-kubevirt-aws-ovn-reduced
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:
@@ -835,7 +918,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-kubevirt-metal-conformance
     decorate: true
     decoration_config:
@@ -919,7 +1002,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-openstack
+    context: ci/prow/e2e-openstack-aws
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -931,10 +1014,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack
+    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-aws
     optional: true
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-openstack
+    rerun_command: /test e2e-openstack-aws
     spec:
       containers:
       - args:
@@ -944,7 +1027,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack
+        - --target=e2e-openstack-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -995,14 +1078,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-openstack-conformance
+    context: ci/prow/e2e-openstack-aws-conformance
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1014,10 +1097,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-conformance
+    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-aws-conformance
     optional: true
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-openstack-conformance
+    rerun_command: /test e2e-openstack-aws-conformance
     spec:
       containers:
       - args:
@@ -1027,7 +1110,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-conformance
+        - --target=e2e-openstack-aws-conformance
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1078,14 +1161,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-conformance,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-aws-conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-openstack-csi-cinder
+    context: ci/prow/e2e-openstack-aws-csi-cinder
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1097,10 +1180,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-csi-cinder
+    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-aws-csi-cinder
     optional: true
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-openstack-csi-cinder
+    rerun_command: /test e2e-openstack-aws-csi-cinder
     spec:
       containers:
       - args:
@@ -1110,7 +1193,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-csi-cinder
+        - --target=e2e-openstack-aws-csi-cinder
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1161,14 +1244,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-csi-cinder,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-aws-csi-cinder,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-openstack-csi-manila
+    context: ci/prow/e2e-openstack-aws-csi-manila
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1180,10 +1263,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-csi-manila
+    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-aws-csi-manila
     optional: true
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-openstack-csi-manila
+    rerun_command: /test e2e-openstack-aws-csi-manila
     spec:
       containers:
       - args:
@@ -1193,7 +1276,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-csi-manila
+        - --target=e2e-openstack-aws-csi-manila
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1244,14 +1327,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-csi-manila,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-aws-csi-manila,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/e2e-openstack-nfv
+    context: ci/prow/e2e-openstack-aws-nfv
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1263,10 +1346,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-nfv
+    name: pull-ci-openshift-priv-hypershift-main-e2e-openstack-aws-nfv
     optional: true
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-openstack-nfv
+    rerun_command: /test e2e-openstack-aws-nfv
     spec:
       containers:
       - args:
@@ -1276,7 +1359,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-nfv
+        - --target=e2e-openstack-aws-nfv
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1327,7 +1410,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-nfv,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-aws-nfv,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1483,7 +1566,7 @@ presubmits:
     name: pull-ci-openshift-priv-hypershift-main-unit
     path_alias: github.com/openshift/hypershift
     rerun_command: /test unit
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:
@@ -1547,7 +1630,7 @@ presubmits:
     name: pull-ci-openshift-priv-hypershift-main-verify
     path_alias: github.com/openshift/hypershift
     rerun_command: /test verify
-    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
     spec:
       containers:
       - args:

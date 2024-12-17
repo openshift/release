@@ -29,17 +29,17 @@ function isPreVersion() {
 }
 
 function check_ep_names() {
-    local isPreVersion="$1"
+    local isPreVer="$1"
     local output expString
     output=$(openshift-install explain installconfig.platform.ibmcloud.serviceEndpoints)
-    if [[ "${isPreVersion}" == "True" ]]; then
+    if [[ "${isPreVer}" == "True" ]]; then
         expString='Valid Values: "COS","DNSServices","GlobalCatalog","GlobalSearch","GlobalTagging","HyperProtect","IAM","KeyProtect","ResourceController","ResourceManager","VPC"'
     else
         expString='Valid Values: "CIS","COS","COSConfig","DNSServices","GlobalCatalog","GlobalSearch","GlobalTagging","HyperProtect","IAM","KeyProtect","ResourceController","ResourceManager","VPC"'
     fi
     if ! [[ ${output} == *"${expString}"* ]]; then
         echo "ERROR: Unexpected explain installconfig.platform.ibmcloud.serviceEndpoints: - ${output} "
-        if [[ "${isPreVersion}" == "True" ]]; then
+        if [[ "${isPreVer}" == "True" ]]; then
             echo "OCPBUGS-44943 (openshift explain installconfig.platform.ibmcloud.serviceEndpoints list new ep name of 4.18 in the previous version ) not block the test"
             return 0
         fi
@@ -87,9 +87,9 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-isPre418="True"
-isPreVersion "4.18" || isPre418="False"
-echo "is Pre 4.18 version: ${isPre418}"
+isPreVer="True"
+isPreVersion "4.17" || isPreVer="False"
+echo "is Pre 4.17 version: ${isPreVer}"
 
 ret=0
 
@@ -108,7 +108,7 @@ else
     echo "WARN: No custom endpoint is defined for COS!"    
 fi
 echo "checking openshift-install explain installconfig.platform.ibmcloud.serviceEndpoints ..." 
-check_ep_names "${isPre418}" || ret=$((ret + $?))
+check_ep_names "${isPreVer}" || ret=$((ret + $?))
 
 echo "checking oc get infrastructure ..."
 check_eps || ret=$((ret + $?))

@@ -487,6 +487,19 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-gcp-default-config
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-gcp-default
+    - chain: ipi-install
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
@@ -518,6 +531,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-default-config
+  optional: true
+  run_if_changed: azure
+  steps:
+    cluster_profile: azure4
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-azure-default
+    - chain: ipi-install
   timeout: 6h0m0s
 - as: e2e-azure-ovn
   run_if_changed: azure
@@ -969,11 +995,6 @@ tests:
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        FIPS_MODE=true
-        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-none-platform
@@ -997,22 +1018,6 @@ tests:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-ipv4
-  timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-add-nodes
-  cluster: build05
-  optional: true
-  run_if_changed: ^(cmd|pkg|data).*/agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        FIPS_MODE=true
-        NETWORK_TYPE=OVNKubernetes
-        NUM_EXTRA_WORKERS=2
-        EXTRA_WORKER_DISK=100
-      DEVSCRIPTS_TARGET: agent_plus_add_node
-    workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05

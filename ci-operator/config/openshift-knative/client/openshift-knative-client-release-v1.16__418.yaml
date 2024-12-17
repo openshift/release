@@ -28,6 +28,13 @@ images:
       - $GO_BUILDER
   to: knative-client-kn
 - dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-grpc-ping
 - dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
   inputs:
@@ -39,8 +46,22 @@ images:
       - $GO_BUILDER
   to: knative-client-test-helloworld
 - dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-servingcontainer
 - dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-sidecarcontainer
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -73,6 +94,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-client-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -130,6 +162,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-v1.16
   org: openshift-knative
