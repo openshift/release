@@ -1,0 +1,89 @@
+images:
+- dockerfile_path: build/Dockerfile.lightweight
+  to: topsail
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+tests:
+- as: ci
+  cluster: build06
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    post:
+    - as: 005-unlock-cluster
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci run unlock_cluster
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: 001-lock-cluster
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci run lock_cluster
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: 002-pre-cleanup
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci run pre_cleanup_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: 003-prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci run prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: 004-test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci run test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-psap
+  repo: topsail
+  variant: jump
