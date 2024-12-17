@@ -56,8 +56,8 @@ function cleanup_ibmcloud_powervs() {
   echo "reporting out the remaining TGs in the resource_group and region"
   ibmcloud tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$REGION'")'
 
-  echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}')
+  echo "Cleaning up workspaces for ${WORKSPACE_NAME}"
+  for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}')
   do
     echo "Targetting power cloud instance"
     ibmcloud pi workspace target "${CRN}"
