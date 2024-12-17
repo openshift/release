@@ -639,6 +639,65 @@ function pre-OCP-47160(){
     return 0
 }
 
+function pre-OCP-47200(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    echo "Check the techpreview operator is not installed by default..."
+    local version tp_op op
+    version=$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d. -f1,2)
+    # shellcheck disable=SC2207
+    tp_op=($(get_tp_operator ${version}))
+    if [ -z "${tp_op[*]}" ] ; then
+        echo "Fail to get tp operator list on ${version}!"
+        return 1
+    fi
+    # Skip cluster-api due to the mismatch between ns and operator when enabling CustomNoUpgrade fs
+    if [[ ${#tp_op[@]} -eq 1 ]] && [[ "${tp_op[0]}" == "cluster-api" ]]; then
+        echo "Only cluster-api tp operator avaialble in ${version}, skip the test!"
+        return 1
+    else
+        echo "Drop cluster-api from tp operator list: ${tp_op[*]}"
+        for i in "${!tp_op[@]}"; do
+            if [[ "${tp_op[i]}" == "cluster-api" ]]; then
+                unset 'tp_op[i]'
+                echo "After dropping, the operator list is: ${tp_op[*]}"
+                break
+            fi
+        done
+    fi
+
+    for op in ${tp_op[*]}; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+
+    echo "Enable non-TechPreviewNoUpgrade featureset..."
+    local fs_before fs_after
+    fs_before=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs_before}" != "null" ]]; then
+        echo "The cluster was already enabled featureset unexpected: ${fs_before}"
+        return 1
+    fi
+    oc patch featuregate cluster -p '{"spec": {"featureSet": "CustomNoUpgrade"}}' --type merge || true
+    fs_after=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs_after}" != "CustomNoUpgrade" ]]; then
+        echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    if ! check_mcp_status master || ! check_mcp_status worker ; then
+        echo "Fail to enable CustomNoUpgrade fs!"
+        return 1
+    fi
+
+    echo "Check the techpreview operator is not installed..."
+    for op in ${tp_op[*]}; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
