@@ -3,44 +3,43 @@ kind: MachineSet
 metadata:
   labels:
     machine.openshift.io/cluster-api-cluster: build06-9dc9q
-  name: build06-9dc9q-worker-amd64-us-east-1a
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1a
   namespace: openshift-machine-api
 spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build06-9dc9q
-      machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1a
+      machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1a
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build06-9dc9q
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1a
+        machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1a
     spec:
       metadata:
         labels:
-          node-role.kubernetes.io: worker
-          node-role.kubernetes.io/worker: ""
+          ci-workload: longtests
       providerSpec:
         value:
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-02e527f3ccc13508b
           apiVersion: machine.openshift.io/v1beta1
           blockDevices:
           - ebs:
               encrypted: true
-              iops: 0
+              iops: 5000
               kmsKey:
                 arn: ""
-              volumeSize: 120
+              volumeSize: 800
               volumeType: gp3
           credentialsSecret:
             name: aws-cloud-credentials
           deviceIndex: 0
           iamInstanceProfile:
             id: build06-9dc9q-worker-profile
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           kind: AWSMachineProviderConfig
           metadata:
             creationTimestamp: null
@@ -65,63 +64,66 @@ spec:
             value: owned
           userDataSecret:
             name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-longtests-worker
+        value: ci-longtests-worker
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build06-9dc9q-worker-amd64-us-east-1a
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1a
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
-  minReplicas: 0
+  maxReplicas: 40
+  minReplicas: 1
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build06-9dc9q-worker-amd64-us-east-1a
+    name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1a
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
   labels:
     machine.openshift.io/cluster-api-cluster: build06-9dc9q
-  name: build06-9dc9q-worker-amd64-us-east-1b
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1b
   namespace: openshift-machine-api
 spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build06-9dc9q
-      machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1b
+      machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1b
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build06-9dc9q
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1b
+        machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1b
     spec:
       metadata:
         labels:
-          node-role.kubernetes.io: worker
-          node-role.kubernetes.io/worker: ""
+          ci-workload: longtests
       providerSpec:
         value:
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-02e527f3ccc13508b
           apiVersion: machine.openshift.io/v1beta1
           blockDevices:
           - ebs:
               encrypted: true
-              iops: 0
+              iops: 5000
               kmsKey:
                 arn: ""
-              volumeSize: 120
+              volumeSize: 800
               volumeType: gp3
           credentialsSecret:
             name: aws-cloud-credentials
           deviceIndex: 0
           iamInstanceProfile:
             id: build06-9dc9q-worker-profile
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           kind: AWSMachineProviderConfig
           metadata:
             creationTimestamp: null
@@ -146,63 +148,66 @@ spec:
             value: owned
           userDataSecret:
             name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-longtests-worker
+        value: ci-longtests-worker
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build06-9dc9q-worker-amd64-us-east-1b
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1b
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
-  minReplicas: 0
+  maxReplicas: 40
+  minReplicas: 1
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build06-9dc9q-worker-amd64-us-east-1b
+    name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1b
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
   labels:
     machine.openshift.io/cluster-api-cluster: build06-9dc9q
-  name: build06-9dc9q-worker-amd64-us-east-1c
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1c
   namespace: openshift-machine-api
 spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build06-9dc9q
-      machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1c
+      machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1c
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build06-9dc9q
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build06-9dc9q-worker-amd64-us-east-1c
+        machine.openshift.io/cluster-api-machineset: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1c
     spec:
       metadata:
         labels:
-          node-role.kubernetes.io: worker
-          node-role.kubernetes.io/worker: ""
+          ci-workload: longtests
       providerSpec:
         value:
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-02e527f3ccc13508b
           apiVersion: machine.openshift.io/v1beta1
           blockDevices:
           - ebs:
               encrypted: true
-              iops: 0
+              iops: 5000
               kmsKey:
                 arn: ""
-              volumeSize: 120
+              volumeSize: 800
               volumeType: gp3
           credentialsSecret:
             name: aws-cloud-credentials
           deviceIndex: 0
           iamInstanceProfile:
             id: build06-9dc9q-worker-profile
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           kind: AWSMachineProviderConfig
           metadata:
             creationTimestamp: null
@@ -227,16 +232,20 @@ spec:
             value: owned
           userDataSecret:
             name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-longtests-worker
+        value: ci-longtests-worker
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build06-9dc9q-worker-amd64-us-east-1c
+  name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1c
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
-  minReplicas: 0
+  maxReplicas: 40
+  minReplicas: 1
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build06-9dc9q-worker-amd64-us-east-1c
+    name: build06-9dc9q-ci-longtests-worker-aarch64-us-east-1c
