@@ -20,6 +20,9 @@ source common.sh
 source utils.sh
 source network.sh
 
+# Create namespace if it doesn't exist without throwing an error code
+oc create namespace ibi-cluster --dry-run=client -oyaml | oc apply -f -
+
 # Note: this must match the kubeconfig in the verify reinstall step
 tee <<EOSEC | oc create -f -
 apiVersion: v1
