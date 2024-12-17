@@ -33,7 +33,7 @@ export RESOURCE_GROUP
 
 # Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {
-  echo "Cleaning up prior runs - version: ${CLEAN_VERSION} - workspace_name: ${workspace_name}"
+  echo "Cleaning up prior runs - version: ${CLEAN_VERSION} - workspace_name: ${WORKSPACE_NAME}"
 
   echo "Cleaning up the Transit Gateways"
   RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq --arg resource_group "${RESOURCE_GROUP}" -r '.[] | select(.name == "$resource_group").id')
@@ -54,7 +54,7 @@ function cleanup_ibmcloud_powervs() {
   done
   
   echo "reporting out the remaining TGs in the resource_group and region"
-  ibmcloud tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
+  ibmcloud tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$REGION'")'
 
   echo "Cleaning up workspaces for ${workspace_name}"
   for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}')
@@ -85,8 +85,8 @@ function cleanup_ibmcloud_powervs() {
 
        POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
 
-       NET_ID=$(IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
-       IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
+       NET_ID=$(IC_API_KEY="@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
+       IC_API_KEY="@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
        sleep 60
     fi
 
