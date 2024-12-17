@@ -25,7 +25,7 @@ set -euo pipefail
 
 cd ${remote_workdir}
 oc --kubeconfig ${seed_kubeconfig} adm must-gather --dest-dir=./must-gather-cluster-${SEED_VM_NAME}
-find "./must-gather-cluster-${SEED_VM_NAME}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
+find "./must-gather-cluster-${SEED_VM_NAME}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1"' _ {} \;
 
 
 tar cvaf must-gather-cluster-${SEED_VM_NAME}.tar.gz ./must-gather-cluster-${SEED_VM_NAME}
