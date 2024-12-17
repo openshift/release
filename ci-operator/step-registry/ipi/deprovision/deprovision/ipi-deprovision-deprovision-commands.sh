@@ -110,10 +110,11 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
   fi
-  if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
-    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
-      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
-    fi
+fi
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
   fi
 fi
 

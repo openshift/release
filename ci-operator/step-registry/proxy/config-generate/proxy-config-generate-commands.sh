@@ -6,9 +6,9 @@ set -o pipefail
 
 proxy_public_url_file="${SHARED_DIR}/proxy_public_url"
 
-if [[ -f "${CLUSTER_PROFILE_DIR}/proxy_public_url" ]]; then
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/proxy_public_url" ]]; then
     # shellcheck disable=SC1091
-    proxy_public_url_file="${SHARED_DIR}/proxy_public_url"
+    proxy_public_url_file="${CLUSTER_PROFILE_DIR}/proxy_public_url"
 fi
 
 if [ ! -f "${proxy_public_url_file}" ]; then
