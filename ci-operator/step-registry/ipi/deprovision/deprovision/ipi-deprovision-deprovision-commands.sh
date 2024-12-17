@@ -105,14 +105,15 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     # when bastion host is provisioned in cluster resource group, once the bastion is destroyed in the destroy process,
     # the running destroy process would be interrupted and failed. E.g: azure-ipi-public-to-private jobs.
     echo "proxy-conf.sh detected, but not required by azure4 clusters while destroying cluster, skip proxy setting"
-  elif [[ "${CLUSTER_TYPE}" == nutanix ]]; then
-    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
-      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
-    fi
   else
     echo "Private cluster setting proxy"
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+  fi
+  if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+    fi
   fi
 fi
 
