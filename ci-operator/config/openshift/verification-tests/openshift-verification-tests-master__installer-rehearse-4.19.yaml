@@ -65,17 +65,13 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      SLEEP_DURATION: 15h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: installer-rehearse-ibmcloud-dh-dynamic-capi
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: installer-rehearse-ibmcloud-proxy-private-capi
   cron: '@yearly'
   steps:
@@ -90,7 +86,7 @@ tests:
     pre:
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private-provision
     test:
-    - chain: cucushift-installer-check-cluster-health      
+    - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: installer-rehearse-ibmcloud-dh-static-capi
   cron: '@yearly'
