@@ -163,6 +163,47 @@ GCP_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 logger "INFO" "Available cluster versions:"
 echo "${versionList}"
+
+if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
+  PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)-nightly
+
+  DELAY=60
+  MAX_DELAY=360
+  TIME_LIMIT=3600
+  start_time=$(date +%s)
+
+  while true; do
+    versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
+    logger "INFO" "Looking for $PAYLOAD_TAG in available cluster versions:\n${versionList}"
+    # Check if image has been synced yet
+    if echo "$versionList" | grep -q "$PAYLOAD_TAG"; then
+      logger "INFO" "$PAYLOAD_TAG is available from OCM, continuing..."
+      OPENSHIFT_VERSION=$PAYLOAD_TAG
+      break
+    fi
+
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - start_time))
+
+    # Don't wait longer than $TIME_LIMIT for the payload to be synced
+    if [[ $elapsed_time -ge $TIME_LIMIT ]]; then
+      minutes=$((TIME_LIMIT / 60))
+      logger "ERROR" "timed out after $minutes minutes waiting for $PAYLOAD_TAG to become available"
+      exit 1
+    fi
+
+    # Wait for the current delay before retrying
+    logger "INFO" "Payload tag not found. Waiting for $DELAY seconds before retrying..."
+    sleep $DELAY
+
+    # Double the delay for exponential back-off, but cap it at the max delay
+    DELAY=$((DELAY * 2))
+    if [[ $DELAY -gt $MAX_DELAY ]]; then
+       DELAY=$MAX_DELAY
+    fi
+  done
+fi
+
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
@@ -261,7 +302,7 @@ logger "INFO" "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUST
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
-echo "Waiting for cluster ready..."
+logger "INFO" "Waiting for cluster ready..."
 start_time=$(date +"%s")
 while true; do
   sleep 60

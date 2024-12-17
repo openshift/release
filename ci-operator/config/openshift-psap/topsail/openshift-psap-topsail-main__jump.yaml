@@ -1,16 +1,16 @@
 base_images:
-  os:
-    name: ubi
-    namespace: ocp
+  centos9:
+    name: stream9
+    namespace: coreos
     tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+    name: ci-tools-build-root
+    namespace: ci
+    tag: "1.21"
 images:
 - dockerfile_path: build/Dockerfile.lightweight
-  from: os
+  from: centos9
   to: topsail
 resources:
   '*':
@@ -26,20 +26,7 @@ tests:
   steps:
     allow_skip_on_success: true
     post:
-    - as: post-cleanup
-      commands: |
-        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run jump_ci run post_cleanup_ci
-      credentials:
-      - mount_path: /var/run/psap-ods-secret-1
-        name: psap-ods-secret-1
-        namespace: test-credentials
-      from: topsail
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    - as: unlock_cluster
+    - as: 005-unlock-cluster
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run unlock_cluster
@@ -53,7 +40,7 @@ tests:
           cpu: 1000m
           memory: 500Mi
     pre:
-    - as: lock_cluster
+    - as: 001-lock-cluster
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run lock_cluster
@@ -66,7 +53,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    - as: pre-cleanup
+    - as: 002-pre-cleanup
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run pre_cleanup_ci
@@ -79,7 +66,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    - as: prepare
+    - as: 003-prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run prepare_ci
@@ -93,7 +80,7 @@ tests:
           cpu: 1000m
           memory: 500Mi
     test:
-    - as: test
+    - as: 004-test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run test_ci
