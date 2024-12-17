@@ -3,7 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
 
 ES_USERNAME=$(cat "/secret/es/username")
 ES_PASSWORD=$(cat "/secret/es/password")
