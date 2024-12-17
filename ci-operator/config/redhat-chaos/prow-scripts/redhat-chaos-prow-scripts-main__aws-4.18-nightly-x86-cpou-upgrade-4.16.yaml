@@ -1,0 +1,92 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-418-up
+- dockerfile_literal: |-
+    FROM prow-scripts.prow
+    RUN ls
+  from: prow-scripts.prow
+  to: prow-scripts-418-up
+releases:
+  intermediate:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.16"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: loaded-upgrade-416to418-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "6"
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - chain: ipi-install
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - chain: openshift-upgrade-qe-sanity-cpou
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: aws-4.18-nightly-x86-cpou-upgrade-4.16
