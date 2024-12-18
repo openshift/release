@@ -78,10 +78,20 @@ go mod tidy
 go mod vendor
 make vet
 
-echo "************ Running ${GINKGO_LABEL} tests ************"
-GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
---timeout=1h --keep-separate-reports --keep-going --flake-attempts=2 \
---junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite "${GINKGO_SUITES}"
+run_tests() {
+    echo "************ Running ${GINKGO_LABEL} tests ************"
+    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
+    --timeout=1h --keep-separate-reports --keep-going --flake-attempts=2 \
+    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite "${GINKGO_SUITES}"
+}
+
+if [[ "${T5CI_VERSION}" == "4.17" ]]; then
+    run_tests
+else
+    GINKGO_LABEL="(!openshift && tier-0 || tier-1)"
+    GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance test/e2e/performanceprofile/functests/2_performance_update test/e2e/performanceprofile/functests/3_performance_status  test/e2e/performanceprofile/functests/7_performance_kubelet_node test/e2e/performanceprofile/functests/8_performance_workloadhints"
+    run_tests
+fi
 
 popd
 
