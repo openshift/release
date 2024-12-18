@@ -20,17 +20,22 @@ chmod +x /tmp/install.sh
 
 CONFIG_DIR="/var/run/vault/secrets"
 REGION=$(<"${CONFIG_DIR}"/region)
-export OCI_CLI_KEY_FILE=${CONFIG_DIR}/oci-privatekey
-export OCI_CLI_CONFIG_FILE=${CONFIG_DIR}/config
-export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
-
+USER=$(<"${CONFIG_DIR}"/user)
+FINGERPRINT=$(<"${CONFIG_DIR}"/fingerprint)
 COMPARTMENT_ID=$(<"${CONFIG_DIR}"/compartment-id)
 TEMPLATE_ID=$(<"${CONFIG_DIR}"/template-id)
 TENANCY_ID=$(<"${CONFIG_DIR}"/tenancy-id)
-DNS_ZONE="abi-ci-${UNIQUE_HASH}-$(<${CONFIG_DIR}/dns-zone)"
+CONTENT=$(<"${CONFIG_DIR}"/oci-privatekey)
+
+export OCI_CLI_USER=${USER}
+export OCI_CLI_TENANCY=${TENANCY_ID}
+export OCI_CLI_FINGERPRINT=${FINGERPRINT}
+export OCI_CLI_KEY_CONTENT=${CONTENT}
+export OCI_CLI_REGION=${REGION}
 
 echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 CLUSTER_NAME=$(<"${SHARED_DIR}"/cluster-name.txt)
+DNS_ZONE="abi-ci-${UNIQUE_HASH}-$(<${CONFIG_DIR}/dns-zone)"
 
 CREATED_STACK_ID=$(/tmp/oci resource-manager stack create-from-template \
 --compartment-id "${COMPARTMENT_ID}" \
