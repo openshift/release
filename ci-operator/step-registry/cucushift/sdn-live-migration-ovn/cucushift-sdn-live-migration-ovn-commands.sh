@@ -58,7 +58,7 @@ until
   oc get network -o yaml | grep NetworkTypeMigrationCompleted > /dev/null && \
   for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-transit-switch-port-ifaddr:" | grep "100.85";  done > /dev/null && \
   for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-gateway-router-lrp-ifaddr:" | grep "100.65";  done > /dev/null && \
-  for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-masquerade-subnet:" | grep "100.254";  done > /dev/null && \
+  for ovnpod in \$(oc get pod -n openshift-ovn-kubernetes  --no-headers -l app=ovnkube-node -o custom-columns=NAME:.metadata.name); do oc exec -n openshift-ovn-kubernetes \$ovnpod ip a s br-ex | grep "100.254";  done > /dev/null && \
   oc get network.config/cluster -o jsonpath='{.status.networkType}' | grep OVNKubernetes > /dev/null;
 do
   echo "Live migration is still in progress"
