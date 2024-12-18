@@ -31,6 +31,14 @@ chain:
           documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
+        
+        trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
+        
+        debug() {
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
+          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+          oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+        }
 
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
