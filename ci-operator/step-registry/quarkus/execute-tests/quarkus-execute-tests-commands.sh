@@ -13,6 +13,20 @@ OCP_CRED_USR="kubeadmin"
 OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
 oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
 
+# tests expect, that prometheus is running in the user mode
+cat << EOF > user-mode.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    enableUserWorkload: true
+EOF
+
+oc apply -f "$(pwd)"/user-mode.yaml
+
 # export maven env variable
 export _JAVA_OPTIONS=-Duser.home=$HOME
 

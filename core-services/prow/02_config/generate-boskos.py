@@ -376,6 +376,9 @@ CONFIG = {
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
     },
+    'oci-agent-qe-quota-slice': {
+        'default': 50,
+    },
     'oci-edge-quota-slice': {
         'default': 50,
     },
@@ -463,7 +466,6 @@ CONFIG = {
         'default': 1,
     },
     'aws-ovn-perfscale-quota-slice': {
-        'us-west-2': 4,
         'us-east-1': 4,
     },
     'aws-rhoai-qe-quota-slice': {

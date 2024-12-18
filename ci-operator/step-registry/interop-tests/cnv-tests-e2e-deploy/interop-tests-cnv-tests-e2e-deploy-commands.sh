@@ -11,7 +11,9 @@ BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 
 # Exports
 # export CLUSTER_NAME CLUSTER_DOMAIN
+export ARTIFACTS="${ARTIFACT_DIR}"
 export PATH="${BIN_FOLDER}:${PATH}"
+export KUBEVIRT_TESTING_CONFIGURATION_FILE=${KUBEVIRT_TESTING_CONFIGURATION_FILE:-'kubevirt-tier1-ocs.json'}
 
 # Unset the following environment variables to avoid issues with oc command
 unset KUBERNETES_SERVICE_PORT_HTTPS
@@ -35,7 +37,14 @@ tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
 
 # Overwrite the default configuration file used for testing
-export KUBEVIRT_TESTING_CONFIGURATION_FILE='kubevirt-tier1-ocs.json'
+# If KUBEVIRT_TESTING_CONFIGURATION is set and not empty, is has higher priority over KUBEVIRT_TESTING_CONFIGURATION_FILE
+if [[ -n "${KUBEVIRT_TESTING_CONFIGURATION:-}" ]]; then
+    export KUBEVIRT_TESTING_CONFIGURATION_FILE="${ARTIFACT_DIR}/kubevirt-testing-configuration.json"
+    echo "${KUBEVIRT_TESTING_CONFIGURATION}" | tee "${KUBEVIRT_TESTING_CONFIGURATION_FILE}"
+    echo "🔄 KUBEVIRT_TESTING_CONFIGURATION_FILE set to ${KUBEVIRT_TESTING_CONFIGURATION_FILE}"
+fi
+
+# Run the tests
 make deploy_test || exit_code=$?
 
 FINISH_TIME=$(date "+%s")

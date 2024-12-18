@@ -51,6 +51,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -60,6 +66,17 @@ resources:
       cpu: 400m
       memory: 800Mi
 tests:
+- as: aws-ipi-default-mini-perm-arm-f7
+  cron: 21 17 2,11,18,25 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-default
 - as: aws-ipi-proxy-whitelist-arm-f14
   cron: 28 6 12,26 * *
   steps:
@@ -146,6 +163,35 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
+- as: aws-ipi-arm-f28-ota
+  cron: 27 15 29 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-47200
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-arm-f28-ota
+  cron: 29 5 9 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-47160
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-custom-nsg-f28
   cron: 20 20 23 * *
   steps:
@@ -300,6 +346,18 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-generation
+- as: azure-ipi-default-mini-perm-arm-f7
+  cron: 30 0 3,10,19,26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-default
 - as: azure-mag-ipi-fullyprivate-reboot-nodes-f14
   cron: 52 20 3,19 * *
   steps:
@@ -338,6 +396,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
+- as: gcp-ipi-default-mini-perm-arm-f7
+  cron: 27 4 5,12,21,28 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-default
 - as: gcp-ipi-cco-manual-users-static-f28
   cron: 29 9 27 * *
   steps:
