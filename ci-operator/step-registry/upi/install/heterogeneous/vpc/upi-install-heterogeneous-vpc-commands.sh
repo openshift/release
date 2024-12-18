@@ -8,7 +8,14 @@ error_handler() {
 
 trap 'error_handler $? $LINENO' ERR
 
+IBMCLOUD_HOME=/tmp/ibmcloud
+export IBMCLOUD_HOME
+
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
+export PATH=$PATH:/tmp:"${IBMCLOUD_HOME_FOLDER}"
+
 echo "Invoking installation of UPI based heterogeneous VPC"
 echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
@@ -57,10 +64,6 @@ then
   exit 0
 fi
 
-function ic() {
-  HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-}
-
 NO_OF_RETRY=${NO_OF_RETRY:-"3"}
 
 function retry {
@@ -79,7 +82,7 @@ function retry {
   done
 }
 
-
+# setup the ibmcloud cli
 function setup_ibmcloud_cli() {
   if [ -z "$(command -v ibmcloud)" ]
   then
@@ -87,10 +90,11 @@ function setup_ibmcloud_cli() {
     curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
   fi
 
-  ic config --check-version=false
-  ic version
+  ibmcloud config --check-version=false
+  ibmcloud version
 }
 
+# setup terraform cli
 function setup_terraform_cli() {
   curl -L "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o "${IBMCLOUD_HOME_FOLDER}"/terraform.zip
   cd "${IBMCLOUD_HOME_FOLDER}" || true
@@ -98,39 +102,42 @@ function setup_terraform_cli() {
   ${IBMCLOUD_HOME_FOLDER}/terraform version
 }
 
+# setup the ibmcloud vpc
 function cleanup_ibmcloud_vpc() {
   cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
 
   echo "Cleaning up Instances"
-  for INS in $(ic is instances --output json | jq -r '.[].id')
+  for INS in $(ibmcloud is instances --output json | jq -r '.[].id')
   do
-    VALID_INS=$(ic is instance "${INS}" --output json | jq -r '. | select(.vpc.name == "'${VPC_NAME}'")')
+    VALID_INS=$(ibmcloud is instance "${INS}" --output json | jq -r '. | select(.vpc.name == "'${VPC_NAME}'")')
     if [ -n "${VALID_INS}" ]
     then
-      retry "ic is ind ${INS} --force"
+      retry "ibmcloud is ind ${INS} --force"
       sleep 60
     fi
   done
 
   echo "Cleaning up COS Instances"
-  VALID_COS=$(ic resource service-instances 2> /dev/null | grep "${cos_name}" || true)
+  VALID_COS=$(ibmcloud resource service-instances 2> /dev/null | grep "${cos_name}" || true)
   if [ -n "${VALID_COS}" ]
   then
-    for COS in $(ic resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
+    for COS in $(ibmcloud resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
     do
-      retry "ic resource service-instance-delete ${COS} --force --recursive"
+      retry "ibmcloud resource service-instance-delete ${COS} --force --recursive"
     done
   fi
 
   echo "Done cleaning up prior runs"
 }
 
+# Get node ready count
 function get_ready_nodes_count() {
   oc get nodes \
-  -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
-  grep -c -E ",True$"
+    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
+    grep -c -E ",True$"
 }
 
+# setup multi-arch vpc workspace
 function setup_multi_arch_vpc_workspace(){
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME_FOLDER}" || true
@@ -177,14 +184,7 @@ powervs_machine_cidr = "192.168.200.0/24"
 vpc_skip_ssh_key_create = true
 EOF
 
-  # PowerVS cluster profile requires powervs-config.json
-  cat <<EOF >"/tmp/powervs-config.json"
-{"id":"empty","apikey":"${IBMCLOUD_API_KEY}","region":"empty","zone":"empty","serviceinstance":"empty","resourcegroup":"empty"}
-EOF
-  cp "/tmp/powervs-config.json" "${SHARED_DIR}"/powervs-config.json
-
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars "${SHARED_DIR}"/var-multi-arch-vpc.tfvars
-  cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars
 }
 
 function create_multi_arch_vpc_resources() {
@@ -237,8 +237,8 @@ case "$CLUSTER_TYPE" in
 
     echo "Invoking upi install heterogeneous vpc for ${VPC_NAME}"
     echo "Logging into IBMCLOUD"
-    ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-    ic plugin install -f vpc-infrastructure tg-cli power-iaas
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
+    ibmcloud plugin install -f vpc-infrastructure tg-cli power-iaas
 
     cleanup_ibmcloud_vpc
     setup_multi_arch_vpc_workspace
