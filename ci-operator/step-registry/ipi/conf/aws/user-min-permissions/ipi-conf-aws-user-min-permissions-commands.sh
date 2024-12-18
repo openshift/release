@@ -263,6 +263,7 @@ s3:PutObjectAcl
 s3:PutObjectTagging
 servicequotas:ListAWSDefaultServiceQuotas
 tag:GetResources
+tag:UntagResources
 EOF
 
 		if [[ ${CREDENTIALS_MODE} == "Mint" ]] || [[ ${CREDENTIALS_MODE} == "" ]]; then
