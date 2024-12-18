@@ -6,6 +6,8 @@ set -o pipefail
 set -o verbose
 
 curl https://raw.githubusercontent.com/openshift/openshift-docs/main/scripts/get-updated-distros.sh > scripts/get-updated-distros.sh
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/build_for_portal.py > build_for_portal.py
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/makeBuild.py > makeBuild.py
 
 IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
