@@ -6,7 +6,7 @@ set -o pipefail
 
 # enable for debug
 # exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+set -x
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
@@ -56,7 +56,7 @@ fi
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
     INTERNAL=true
     INTERNAL_ONLY=true
-    CL_SEARCH="computeqe"
+    CL_SEARCH="upstreambil"
     HOSTS_NUMBER=" --number 2"
 fi
 
