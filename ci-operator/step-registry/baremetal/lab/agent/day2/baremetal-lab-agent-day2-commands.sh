@@ -144,7 +144,7 @@ cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 arch=${ADDITIONAL_WORKER_ARCHITECTURE}
 
-/tmp/oc version > "${ARTIFACT_DIR}/oc_version.txt" | tee
+/tmp/oc version | tee "${ARTIFACT_DIR}/oc_version.txt"
 
 case "${BOOT_MODE}" in
 "iso")
@@ -178,8 +178,6 @@ case "${BOOT_MODE}" in
 "pxe")
   ### Create pxe files
   echo -e "\nCreate pxe files for day2 worker nodes..."
-
-  /tmp/oc version > "${ARTIFACT_DIR}/oc_version.txt"
 
   # The --report and --pxe flags were introduced in 4.18. It should be marked as experimental until 4.19.
   /tmp/oc adm node-image create --report=true --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
