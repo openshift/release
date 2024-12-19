@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.16
+    tag: rhel-8-golang-1.21-openshift-4.16
   tools:
     name: "4.16"
     namespace: ocp
@@ -11,14 +11,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.16
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: images/Dockerfile.upgrade
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: quay-test-operator
 promotion:
   to:
@@ -30,7 +30,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -38,6 +38,24 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: quay313-ocp417-upgrade
+  cron: 0 23 12 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.17
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:883724
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_UPGRADE_TESTCASE: Quay-Upgrade-High|Quay-Upgrade-Medium
+      QUAYREGISTRY_QUAY_VERSION: "3.13"
+    test:
+    - ref: quay-tests-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: quay

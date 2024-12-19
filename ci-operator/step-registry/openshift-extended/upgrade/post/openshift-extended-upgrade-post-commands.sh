@@ -4,9 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+# CLUSTER_PROFILE_DIR is set by dptp only when cluster_profile is set in your test per
+# https://docs.ci.openshift.org/docs/architecture/step-registry/#available-environment-variables.
+# as we known, now some tests do not set it because of using cluster claim, so there is no CLUSTER_PROFILE_DIR,
+# and then step will fail with CLUSTER_PROFILE_DIR: unbound variable
+# here we provide fake default value although it is not used for env indeed, but it could keep step running and
+# then the test should get the related resource in other way if there is no cluster profile for your test. 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/.awscred
+export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/osServicePrincipal.json
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/root/.krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
@@ -74,19 +80,19 @@ else
 fi
 
 mkdir -p ~/.ssh
-cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
+cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
-test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
-cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+test -f "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-publickey" ~/.ssh/ssh-publickey || true
 chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
 #set env for rosa which are required by hypershift qe team
-if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
+if test -f "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ocm-token"
 then
-    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
+    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
 if test -f "${SHARED_DIR}/cluster-id"
@@ -103,14 +109,14 @@ gcp)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_GCP_USER="${QE_BASTION_SSH_USER:-core}"
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/google_compute_engine || true
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
 aws)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
@@ -126,7 +132,7 @@ aws-usgov|aws-c2s|aws-sc2s)
     ;;
 alibabacloud)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
     export SSH_CLOUD_PRIV_ALIBABA_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
     export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
@@ -135,7 +141,7 @@ alibabacloud)
 ;;
 azure4|azuremag|azure-arm64)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
     export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
     export TEST_PROVIDER=azure
     ;;
@@ -162,7 +168,7 @@ openstack*)
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)

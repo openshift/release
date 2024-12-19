@@ -840,3 +840,43 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: ksan-operator
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-ksan-operator
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - command:
+      - /tp-entrypoint.sh
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_ksan_operator
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-ksan-operator
+    - configMap:
+        name: image-mirror-mappings
+      name: config

@@ -56,14 +56,14 @@ git clone -b "${NTO_BRANCH}" "${NTO_REPO}" "${NTO_REPO_DIR}"
 pushd "${NTO_REPO_DIR}"
 
 # Set go version
-if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
-    source "$HOME"/golang-1.19
-elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
-    source "$HOME"/golang-1.20
-elif [[ "$T5CI_VERSION" == "4.16" ]]; then
-    source "$HOME"/golang-1.21.11
+if [[ "${T5CI_VERSION}" == "4.12" ]] || [[ "${T5CI_VERSION}" == "4.13" ]]; then
+    source "${HOME}"/golang-1.19
+elif [[ "${T5CI_VERSION}" == "4.14" ]] || [[ "${T5CI_VERSION}" == "4.15" ]]; then
+    source "${HOME}"/golang-1.20
+elif [[ "${T5CI_VERSION}" == "4.16" ]]; then
+    source "${HOME}"/golang-1.21.11
 else
-    source "$HOME"/golang-1.22.4
+    source "${HOME}"/golang-1.22.4
 fi
 
 echo "Go version: $(go version)"
@@ -84,3 +84,41 @@ GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
 --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite "${GINKGO_SUITES}"
 
 popd
+
+
+python3 -m venv "${SHARED_DIR}"/myenv
+source "${SHARED_DIR}"/myenv/bin/activate
+git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
+
+for junit_file in "${ARTIFACT_DIR}"/*.xml; do
+    if [ ! -e "${junit_file}" ]; then
+        echo "No XML files found in ${ARTIFACTS_DIR}."
+        exit 0
+    fi
+    output_file="${junit_file%.xml}.html"
+    # Run j2html.py on the XML file
+    echo "Processing ${junit_file} -> ${output_file}"
+    python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
+    if [[ $? -ne 0 ]]; then
+         echo "Error: Failed to process ${junit_file}."
+         exit 1;
+    fi
+
+    # create json reports
+    json_output_file="${junit_file%.xml}.json"
+    python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
+done
+
+# Run junitparser merge
+
+xml_files=("$ARTIFACT_DIR"/*.xml)
+output_file="${ARTIFACT_DIR}"/junit.xml
+
+# Merge XML files using junitparser
+echo "Merging XML files into ${output_file}"
+junitparser merge "${xml_files[@]}" "${output_file}"
+
+rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
+set +x
+set -e

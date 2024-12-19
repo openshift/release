@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rh-corp-logging
+  labels:
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rh-corp-logging
+  namespace: rh-corp-logging
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rh-corp-logging-application-role-binding
+subjects:
+- kind: ServiceAccount
+  name: rh-corp-logging
+  namespace: rh-corp-logging
+roleRef:
+  kind: ClusterRole
+  name: collect-application-logs
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rh-corp-logging-infrastructure-role-binding
+subjects:
+- kind: ServiceAccount
+  name: rh-corp-logging
+  namespace: rh-corp-logging
+roleRef:
+  kind: ClusterRole
+  name: collect-infrastructure-logs
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rh-corp-logging-audit-role-binding
+subjects:
+- kind: ServiceAccount
+  name: rh-corp-logging
+  namespace: rh-corp-logging
+roleRef:
+  kind: ClusterRole
+  name: collect-audit-logs
+  apiGroup: rbac.authorization.k8s.io

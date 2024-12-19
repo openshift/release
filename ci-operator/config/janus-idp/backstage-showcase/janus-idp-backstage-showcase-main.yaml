@@ -1,22 +1,23 @@
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
-      RUN yum -y install make wget gcc git httpd-tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
 images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
+promotion:
+  to:
+  - name: rhdh
+    namespace: ci
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -26,36 +27,76 @@ resources:
       memory: 2Gi
 tests:
 - as: e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
   skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md$
   steps:
     test:
     - ref: janus-idp-backstage-showcase
+    workflow: generic-claim
 - as: e2e-tests-nightly
-  cron: 0 1 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 7 * * *
   steps:
     test:
     - ref: janus-idp-backstage-showcase-nightly
+    workflow: generic-claim
 - as: e2e-tests-nightly-ocp-v4-16
-  cron: 0 2 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  cron: 0 7 * * *
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.16
     test:
     - ref: janus-idp-backstage-showcase-nightly
+    workflow: generic-claim
 - as: e2e-tests-nightly-ocp-v4-15
-  cron: 0 3 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 7 * * *
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.15
     test:
     - ref: janus-idp-backstage-showcase-nightly
+    workflow: generic-claim
 - as: e2e-tests-nightly-aks
   cron: 0 7 * * *
   steps:
     test:
     - ref: janus-idp-backstage-showcase-helm-aks-nightly
 - as: e2e-tests-nightly-gke
-  cron: 0 8 * * *
+  cron: 0 7 * * *
   steps:
     test:
     - ref: janus-idp-backstage-showcase-helm-gke-nightly
