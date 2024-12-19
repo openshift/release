@@ -151,7 +151,9 @@ az deployment group create -g "$RESOURCE_GROUP" \
 
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/03_infra.json" \
-  --parameters baseName="$INFRA_ID"
+  --parameters baseName="$INFRA_ID" || true
+echo "debug 1219"
+sleep 3600
 
 az network dns zone create -g "$RESOURCE_GROUP" -n "${CLUSTER_NAME}.${BASE_DOMAIN}"
 PUBLIC_IP=$(az network public-ip list -g "$RESOURCE_GROUP" --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
