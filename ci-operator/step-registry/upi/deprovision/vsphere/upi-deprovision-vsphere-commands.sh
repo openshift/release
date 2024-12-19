@@ -49,6 +49,26 @@ for vm in $clustervms; do
 echo Collecting alarms from $vm
 echo " >>>> Alarms for: $vm" >> ${vcenter_state}/vm_alarms.log
 govc object.collect $vm triggeredAlarmState &>> ${vcenter_state}/vm_alarms.log
+
+if [[ $vm == *"lb"* ]]; then
+    ADDRESS=$(govc vm.ip $vm)
+    export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+    SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+
+    # move private key to ~/.ssh/ so that sosreports can be collected if needed
+    mkdir -p ~/.ssh
+    cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+    chmod 0600 ~/.ssh/id_rsa
+
+    # setup passwd for use by SSH if the current user isn't known
+    if ! whoami &> /dev/null; then
+      if [[ -w /etc/passwd ]]; then
+          echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+      fi
+    fi
+    ssh ${SSH_OPTS} core@$ADDRESS -- sudo journalctl -u haproxy.service
+fi
+
 done
 set -e
 
