@@ -4,6 +4,8 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+export OPENSHIFT_CI
+
 echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
 
 mkdir -p /tmp/openshift-client
