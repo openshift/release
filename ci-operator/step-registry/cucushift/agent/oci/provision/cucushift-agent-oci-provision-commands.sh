@@ -71,7 +71,7 @@ pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 
 # Add build02 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
-  yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
+  yq-v4 -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
   cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 pullSecret: >
   ${pull_secret}
@@ -86,9 +86,9 @@ cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
-PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
+
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$PULL_SECRET_PATH" "$RELEASE_IMAGE_LATEST" \
+oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
 
 /tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug &
@@ -100,7 +100,7 @@ mv agent.x86_64.iso "${AGENT_IMAGE}"
 
 EXPIRE_DATE=$(date -d "+7 days" +"%Y-%m-%d")
 
-IMAGE_URI=$(oci os preauth-request create \
+IMAGE_URI=$(/tmp/oci os preauth-request create \
 -bn "${BUCKET_NAME}" \
 -ns "${NAMESPACE_NAME}" \
 --access-type ObjectRead \
