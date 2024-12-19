@@ -88,15 +88,16 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
 fi
 
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
+oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
 
-/tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug &
+/tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug
 
 AGENT_IMAGE="agent.x86_64_${CLUSTER_NAME}.iso"
-mv agent.x86_64.iso "${AGENT_IMAGE}"
+mv "${INSTALL_DIR}"/agent.x86_64.iso "${INSTALL_DIR}"/"${AGENT_IMAGE}"
+echo "Image moved"
 
-/tmp/oci os object put -bn "${BUCKET_NAME}" --file "${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
+/tmp/oci os object put -bn "${BUCKET_NAME}" --file "${INSTALL_DIR}"/"${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
 
 EXPIRE_DATE=$(date -d "+7 days" +"%Y-%m-%d")
 
@@ -107,7 +108,7 @@ IMAGE_URI=$(/tmp/oci os preauth-request create \
 --object-name "${AGENT_IMAGE}" \
 --name "${CLUSTER_NAME}" \
 --time-expires "${EXPIRE_DATE}" \
---query 'data."full-path"'--raw-output)
+--query 'data."full-path"' --raw-output)
 
 CREATED_STACK_ID=$(/tmp/oci resource-manager stack create-from-template \
 --compartment-id "${COMPARTMENT_ID}" \
