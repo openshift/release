@@ -80,6 +80,24 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
+    post:
+    - as: check-sync-pr-valid
+      commands: |
+        cd /tmp
+        curl -sSLfo jq --retry 5 --retry-delay 60 https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64
+        chmod a+x jq
+        pull_labels=$(curl -sSLf --retry 5 --retry-delay 60 "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}")
+        if [ $( echo "$pull_labels" | ./jq -e '.labels[] | select(.name=="kind/sync") | .name' | wc -l ) -gt 0 ]; then
+          remote_base_latest_commit=$(git ls-remote --exit-code -q --refs git@github.com:${REPO_OWNER}/${REPO_NAME}.git refs/heads/${PULL_BASE_REF} | cut -f1)
+          if [ -n "${remote_base_latest_commit}" ] && [ ! $(git merge-base --is-ancestor "${remote_base_latest_commit}" HEAD) ]; then
+            echo "missing commit ${remote_base_latest_commit} from branch ${PULL_HEAD_REF}: branch needs rebase on base branch ${PULL_BASE_REF}";
+            exit 1;
+          fi
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     test:
     - as: upstream-e2e
       cli: latest
