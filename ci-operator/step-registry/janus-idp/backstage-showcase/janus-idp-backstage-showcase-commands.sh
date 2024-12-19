@@ -4,6 +4,7 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+export OPENSHIFT_CI
 export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
