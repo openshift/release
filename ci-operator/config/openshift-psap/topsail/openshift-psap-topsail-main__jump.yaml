@@ -26,7 +26,7 @@ tests:
   steps:
     allow_skip_on_success: true
     post:
-    - as: 005-unlock-cluster
+    - as: 006-unlock-cluster
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
         run jump_ci run unlock_cluster
@@ -53,10 +53,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    - as: 002-pre-cleanup
+    - as: 002-prepare-jump-ci
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run jump_ci run pre_cleanup_ci
+        run jump_ci run prepare_jump_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -66,10 +66,23 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    - as: 003-prepare
+    - as: 003-pre-cleanup
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run jump_ci run prepare_ci
+        run jump_ci test pre_cleanup_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: 004-prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run jump_ci test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -80,10 +93,10 @@ tests:
           cpu: 1000m
           memory: 500Mi
     test:
-    - as: 004-test
+    - as: 005-test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run jump_ci run test_ci
+        run jump_ci test test_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
