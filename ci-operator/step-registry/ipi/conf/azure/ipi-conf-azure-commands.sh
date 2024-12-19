@@ -71,8 +71,13 @@ fi
 if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
     master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
 fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
+
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
+echo "Using compute node replicas: ${workers}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
@@ -82,6 +87,7 @@ platform:
 controlPlane:
   architecture: ${OCP_ARCH}
   name: master
+  replicas: ${master_replicas}
   platform:
     azure:
       type: ${master_type}
