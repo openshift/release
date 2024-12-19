@@ -1,0 +1,52 @@
+RG="jfrancoa-2303-z5rtk-rg"
+VM_NAME="byoh-2019"
+SKU_OFFER="WindowsServer"
+SKU_PUBLISHER="MicrosoftWindowsServer"
+SKU="2019-Datacenter-with-Containers"
+location=$(az group show --resource-group $RG | jq '.location' | tr -d '"')
+vnet=$(az network vnet list -g $RG | jq '.[0].name' | tr -d '"')
+subnet=$(az network vnet list -g $RG | jq '.[0].subnets[] | select(.name | contains("worker")).name' | tr -d '"')
+sku_version=$(az vm image list -l $location -f $SKU_OFFER -p $SKU_PUBLISHER --sku $SKU --all --query "[?sku=='${SKU}'].version" -o tsv | sort -u | tail -n1)
+
+# Create VM
+az vm create --resource-group $RG --location $location --size "Standard_D2s_v3" --vnet-name $vnet --subnet $subnet --nic-delete-option delete --os-disk-delete-option delete --name $VM_NAME --admin-username "capi" --admin-password "qwerty123456!" --image "${SKU_PUBLISHER}:${SKU_OFFER}:${SKU}:${sku_version}"
+
+# Create a script with the user data for byoh pre-requisites
+# Make sure to substitute the SSH-PUBLIC-KEY value first.
+cat << EOF > install_bkp.ps1
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+\$firewallRuleName = "ContainerLogsPort"
+\$containerLogsPort = "10250"
+New-NetFirewallRule -DisplayName \$firewallRuleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort \$containerLogsPort -EdgeTraversalPolicy Allow
+Set-Service -Name sshd -StartupType 'Automatic'
+Start-Service sshd
+(Get-Content -path C:\ProgramData\ssh\sshd_config) | ForEach-Object {\$_.replace('#PubkeyAuthentication yes','PubkeyAuthentication yes').replace('#PasswordAuthentication yes','PasswordAuthentication no')} | Set-Content -path C:\ProgramData\ssh\sshd_config
+\$authorizedKeyFilePath = "\$env:ProgramData\ssh\administrators_authorized_keys"
+New-Item -Force \$authorizedKeyFilePath
+echo "ssh-rsa <SSH-PUBLIC-KEY>"| Out-File \$authorizedKeyFilePath -Encoding ascii
+\$acl = Get-Acl C:\ProgramData\ssh\administrators_authorized_keys
+\$acl.SetAccessRuleProtection(\$true, \$false)
+\$administratorsRule = New-Object system.security.accesscontrol.filesystemaccessrule("Administrators","FullControl","Allow")
+\$systemRule = New-Object system.security.accesscontrol.filesystemaccessrule("SYSTEM","FullControl","Allow")
+\$acl.SetAccessRule(\$administratorsRule)
+\$acl.SetAccessRule(\$systemRule)
+\$acl | Set-Acl
+Restart-Service sshd
+EOF
+
+# Execute user-data script in the newly created VM
+az vm run-command invoke  --command-id RunPowerShellScript --name $VM_NAME -g $RG --scripts @install.ps1
+
+# create config-map.yaml adding the IP for the newly created VM and username
+# Make sure to replace the IP value first
+cat << EOF | oc create -f
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: windows-instances
+  namespace: openshift-windows-machine-config-operator
+data:
+  <IP>: |-
+          username=capi
+EOF
+
