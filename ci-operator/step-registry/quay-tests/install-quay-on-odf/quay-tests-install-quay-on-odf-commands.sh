@@ -45,7 +45,7 @@ EOF
 )
 
 for _ in {1..60}; do
-  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  CSV=$(oc -n quay-enterprise get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
     if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       echo "ClusterServiceVersion \"$CSV\" ready"
