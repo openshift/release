@@ -1,0 +1,48 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN dnf install -y --nodocs make git golang
+images:
+  - dockerfile_path: ./infra/feast-operator/Dockerfile
+    to: feast
+image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+  - as: "e2e-tests" # names this test "e2e-tests"
+    steps: # makes this a multi-stage-test
+      cluster_profile: aws # aws-opendatahub #maybe we need this instead
+      workflow: openshift-e2e-aws
+      test: # specifies `test` phase of the multi-stage job
+        - as: "run-e2e-tests"
+          commands: "./infra/feast-operator/make test-e2e"  # declares which commands to run
+          container:
+            from: "src"
+            clone: false # if the repo should be cloned, true for base_images, false otherwise (but images in the "pipeline" stream already clone the repo in the "src" step)
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: feast
