@@ -1,0 +1,31 @@
+workflow:
+  as: nvidia-gpu-operator-e2e-aws
+  steps:
+    env:
+      BASE_DOMAIN: ""
+      NVIDIAGPU_CLEANUP: ""
+      NVIDIAGPU_DEPLOY_FROM_BUNDLE: ""
+      TEST_FEATURES: ""
+      NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE: ""
+      NVIDIAGPU_NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: ""
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: ""
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: ""
+      
+    post:
+      - chain: ipi-aws-post
+    pre:
+      - chain: ipi-conf-aws
+      - ref: single-node-conf-aws
+      - chain: ipi-install
+    test:
+      - as: gpu-operator-e2e
+        commands: make run-tests
+        from: nvidia-ci
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+
+  documentation: |-
+    This workflow performs provision of ocp cluster using ipi-aws suitable for installing NVIDIA's
+    GPU operator and preform tests on it.
