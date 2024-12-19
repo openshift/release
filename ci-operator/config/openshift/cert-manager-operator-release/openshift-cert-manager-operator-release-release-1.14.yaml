@@ -1,0 +1,113 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
+binary_build_commands: echo "no need to build"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    release:
+      architecture: "amd64"
+      channel: "stable"
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-downstream-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        OO_NAMESPACE="cert-manager-operator"
+        OO_CHANNEL="stable-v1"
+        OO_INIT_VERSION="v1.14.1"
+
+        oc create namespace "$OO_NAMESPACE"
+
+        oc create -f - << EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openshift-cert-manager-operator
+          namespace: cert-manager-operator
+        spec:
+          targetNamespaces:
+          - "cert-manager-operator"
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: openshift-cert-manager-operator
+          namespace: cert-manager-operator
+        spec:
+          channel: ${OO_CHANNEL}
+          name: openshift-cert-manager-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+          installPlanApproval: Automatic
+          startingCSV: cert-manager-operator.${OO_INIT_VERSION}
+        EOF
+
+        is_deployment_available() {
+          DEPLOYMENT_NAME="$1"
+          NAMESPACE="$2"
+
+          TIMEOUT=1800
+          INTERVAL=15
+
+          START_TIME=$(date +%s)
+
+          while true; do
+              if oc get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" ; then
+                  echo "Deployment is Available"
+                  oc wait --for condition=Available -n "$NAMESPACE" deployment "$DEPLOYMENT_NAME"
+                  break
+              else
+                  echo "Deployment is not Available yet. Retrying..."
+              fi
+
+              CURRENT_TIME=$(date +%s)
+              ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+              
+              if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+                  echo "Timeout reached after 1 hour. Exiting."
+                  break
+              fi
+
+              sleep $INTERVAL
+          done
+        }
+
+        is_deployment_available "cert-manager-operator-controller-manager" "cert-manager-operator"
+        is_deployment_available "cert-manager-cainjector" "cert-manager"
+        is_deployment_available "cert-manager-webhook" "cert-manager"
+        is_deployment_available "cert-manager" "cert-manager"
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        git submodule update --init --recursive
+        cd cert-manager-operator
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-1.14
+  org: openshift
+  repo: cert-manager-operator-release
