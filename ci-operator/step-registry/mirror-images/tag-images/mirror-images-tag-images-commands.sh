@@ -40,3 +40,4 @@ MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 # When mirror images using `oc image mirror` command, need unset proxies
 mirror_tag_images
+sleep 14400
