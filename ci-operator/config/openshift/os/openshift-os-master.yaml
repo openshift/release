@@ -1,3 +1,8 @@
+base_images:
+  rhel-coreos-base:
+    name: rhel-coreos-base
+    namespace: coreos
+    tag: "9.6"
 build_root:
   image_stream_tag:
     name: coreos-assembler
@@ -23,10 +28,28 @@ images:
     WORKDIR /tmp/cosa
   from: root
   to: build-image
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_literal: |
+    FROM quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+    ARG OPENSHIFT_CI=0
+    # Avoid shipping modified .pyc files. Due to https://github.com/ostreedev/ostree/issues/1469,
+    # any Python apps that run (e.g. dnf) will cause pyc creation.
+    RUN --mount=type=bind,target=/run/src \
+      find /usr -name '*.pyc' -exec mv {} {}.bak \; && \
+      curl -Lo /run/get-ocp-repo.sh https://raw.githubusercontent.com/jlebon/os/refs/heads/pr/get-ocp-repo-tweaks/ci/get-ocp-repo.sh && \
+      if [ "${OPENSHIFT_CI}" != 0 ]; then bash /run/get-ocp-repo.sh --ocp-layer /run/src/packages-openshift.yaml --output-dir /run/yum.repos.d; fi && \
+      /run/src/scripts/apply-manifest /run/src/packages-openshift.yaml && \
+      find /usr -name '*.pyc.bak' -exec sh -c 'mv $1 ${1%.bak}' _ {} \; && \
+      ostree container commit
+  from: rhel-coreos-base
+  to: rhel-coreos
 promotion:
   to:
   - excluded_images:
     - build-image
+    - rhel-coreos
     name: "4.19"
     namespace: ocp
 releases:
@@ -154,6 +177,11 @@ tests:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   timeout: 3h0m0s
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
