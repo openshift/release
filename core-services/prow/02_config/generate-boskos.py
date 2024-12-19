@@ -479,6 +479,9 @@ CONFIG = {
     'aws-managed-osd-rhoai-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
+    },
+    'ibmcloud-rhoai-qe-quota-slice': {
+        'us-east': 40,
     }
 }
 

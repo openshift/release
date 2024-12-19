@@ -317,7 +317,7 @@ iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
 
-dns_forwarders = "161.26.0.10; 161.26.0.11; 9.9.9.9"
+dns_forwarders = "161.26.0.10; 161.26.0.11"
 
 override_bastion_storage_pool = "General-Flash-7"
 EOF
