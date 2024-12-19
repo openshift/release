@@ -113,8 +113,6 @@ function get_oc_skew() {
   echo "Extract the skew oc client..."
   oc adm release extract -a "${day2_pull_secret}" "${pull_spec}" \
     --command=oc --to=/tmp --insecure=true
-
-  /tmp/oc version > "${ARTIFACT_DIR}/skew_oc_version.txt"
 }
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
@@ -145,6 +143,8 @@ cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 arch=${ADDITIONAL_WORKER_ARCHITECTURE}
+
+/tmp/oc version > "${ARTIFACT_DIR}/oc_version.txt" | tee
 
 case "${BOOT_MODE}" in
 "iso")
