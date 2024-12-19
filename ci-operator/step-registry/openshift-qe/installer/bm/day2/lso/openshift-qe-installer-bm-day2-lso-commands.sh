@@ -5,30 +5,15 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
-  # Setup socks proxy
-  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export KUBECONFIG=/tmp/kubeconfig
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
-fi
-
 oc config view
 oc projects
 
 # Disk cleaning
-ssh ${SSH_ARGS} root@${bastion} '
-  for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
-    for j in {0..7}; do
-      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo sgdisk --zap-all /dev/nvme$j\n1
-      ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null core@$i sudo wipefs -a /dev/nvme$j\n1
-    done
-  done'
+for worker in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+  for disk in {0..7}; do
+    ssh -t -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -J root@${bastion} core@${worker} "sudo sgdisk --zap-all /dev/nvme${disk}n1; sudo wipefs -a /dev/nvme${disk}n1"
+  done
+done
 
 # Install the LSO operator
 cat <<EOF | oc apply -f -
@@ -117,8 +102,3 @@ spec:
     deviceMechanicalProperties:
     - NonRotational
 EOF
-
-if [ ${BAREMETAL} == "true" ]; then
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-fi
