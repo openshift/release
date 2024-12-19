@@ -8,6 +8,9 @@ images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
+- dockerfile_literal: |
+    FROM ghcr.io/redhat-developer/mapt:pr-351
+  to: mapt-pr-351
 promotion:
   to:
   - name: rhdh
@@ -93,8 +96,63 @@ tests:
 - as: e2e-tests-nightly-aks
   cron: 0 7 * * *
   steps:
-    test:
-    - ref: janus-idp-backstage-showcase-helm-aks-nightly
+    post:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-destroy
+      commands: |
+        export AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
+        export AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
+        export AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
+        export ARM_CLIENT_ID=$(cat /tmp/secrets/ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
+        WORKDIR=/opt/mapt/run
+        cd /opt/mapt/run
+        mapt azure aks destroy \
+          --project-name "aks" \
+          --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-3"
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from: mapt-pr-351
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    pre:
+    - as: janus-idp-backstage-showcase-helm-aks-nightly-mapt-create
+      commands: |
+        export AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
+        export AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
+        export AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
+        export ARM_CLIENT_ID=$(cat /tmp/secrets/ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
+        WORKDIR=/opt/mapt/run
+        cd /opt/mapt/run
+        mapt azure aks create \
+          --project-name "aks" \
+          --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-3" \
+          --conn-details-output "${SHARED_DIR}" \
+          --spot \
+          --enable-app-routing
+      credentials:
+      - mount_path: /tmp/secrets
+        name: rhdh
+        namespace: test-credentials
+      from: mapt-pr-351
+      resources:
+        limits:
+          cpu: "2"
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 6Gi
 - as: e2e-tests-nightly-gke
   cron: 0 7 * * *
   steps:
