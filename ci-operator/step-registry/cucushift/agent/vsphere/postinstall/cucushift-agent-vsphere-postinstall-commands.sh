@@ -9,6 +9,9 @@ echo "************ vsphere agent post-install ************"
 # Debug
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+
+oc get nodes | tee "${ARTIFACT_DIR}/get_nodes.txt"
+
 # Skip post installation if the version is 4.15 or more
 if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
   echo "$(date -u --rfc-3339=seconds) - credentials have been added to the cluster, there's no need to execute post-installation."
@@ -20,8 +23,6 @@ if [ "${MASTERS}" -eq 1 ]; then
   exit 0
 fi
 source "${SHARED_DIR}"/platform-conf.sh
-
-oc get nodes
 
 # Backup
 echo "Getting vsphere-creds and cloud-provider-config"
