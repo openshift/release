@@ -34,9 +34,8 @@ fi
 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
-echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 
-echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
+echo "Note: This cluster will be automatically deleted after test execution finishes."
 echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
 
 oc create serviceaccount tester-sa-2 -n default
