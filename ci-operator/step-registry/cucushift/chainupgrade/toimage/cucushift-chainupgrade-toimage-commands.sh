@@ -726,10 +726,17 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
-        end_time=$(date "+%s")
-        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
-        return 1
+
+        echo "MODIFIED SCRIPT"
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n"
+
+        echo "WAITING FOR DEBUG..."
+        while [ ! -f "/tmp/continue" ]
+        do
+            sleep 10
+        done
+
+	return 1
     fi
 }
 
