@@ -314,6 +314,9 @@ EOF
 		create_get_actions_py
 		python3 $GET_ACTIONS_PY ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json > ${PERMISION_LIST}
 
+		# temp fix for no instance-type configuration
+		echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
+
 		rm -rf "${dir}"
 	fi
 
