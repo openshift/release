@@ -1,4 +1,20 @@
 base_images:
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  network-observability-console-plugin:
+    name: network-observability-console-plugin
+    namespace: netobserv
+    tag: ci
+  network-observability-operator:
+    name: network-observability-operator
+    namespace: netobserv
+    tag: ci
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -18,7 +34,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -26,6 +42,24 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: qe-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      PATCH_EBPFAGENT_IMAGE: pipeline:netobserv-ebpf-agent
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: NonPreRelease;Serial;Disruptive;~59746&
+      TEST_SCENARIOS: Network_Observability
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: netobserv-install-operator
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: netobserv
