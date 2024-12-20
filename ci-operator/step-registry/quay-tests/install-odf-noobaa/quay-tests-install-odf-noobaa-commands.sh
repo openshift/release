@@ -68,6 +68,12 @@ for _ in {1..60}; do
 done
 echo "ODF/OCS Operator is deployed successfully"
 
+for _ in {1..60}; do
+  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
+  echo "ODF/OCS Operator pod status $podstatus"
+  sleep 1
+done
+
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
