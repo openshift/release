@@ -2,6 +2,41 @@
 
 set -ex
 
+storage_create () {
+  # Creates storage
+  # Sometimes it fails to find container-00 inside debug pod
+  # TODO: fix issue in install_yamls
+  n=0
+  retries=3
+  while true; do
+    make crc_storage && break
+    n=$((n+1))
+    if (( n >= retries )); then
+      echo "Failed to run 'make crc_storage' target. Aborting"
+      exit 1
+    fi
+    sleep 10
+  done
+}
+
+storage_cleanup () {
+  # Run storage cleanup otherwise we can hit random issue during deploy step where
+  # mariadb pod will use the same pv which have a db already and fails because
+  # The init job assumed that the DB was just created and had an empty root password,
+  # which would not be the case.
+  n=0
+  retries=3
+  while (( n < retries )); do
+    if make crc_storage_cleanup; then
+      break
+    fi
+    n=$((n+1))
+    echo "Failed to run 'make crc_storage_cleanup' target (attempt $n of $retries)"
+    sleep 10
+  done
+}
+
+
 META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
 # Export Ceph options for tests that call 'make ceph'
@@ -92,41 +127,43 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   cd ${HOME}/install_yamls
   # Create/enable openstack namespace
   make namespace
-  # Creates storage
-  # Sometimes it fails to find container-00 inside debug pod
-  # TODO: fix issue in install_yamls
-  n=0
-  retries=3
-  while true; do
-    make crc_storage && break
-    n=$((n+1))
-    if (( n >= retries )); then
-      echo "Failed to run 'make crc_storage' target. Aborting"
-      exit 1
-    fi
-    sleep 10
-  done
 
+  storage_create
+
+  # perform a minor update if it is the openstack-operator
+  if [ ${SERVICE_NAME} == "openstack" ]; then
+    OPENSTACK_IMG_BKP=${OPENSTACK_IMG}
+
+    # deploy operators and ctlplane, to be updated
+    export OPENSTACK_IMG=${OPENSTACK_IMG_BASE_RELEASE:="quay.io/openstack-k8s-operators/openstack-operator-index:87ab1f1fa16743cad640f994f459ef14c5d2b9ca"}
+    export TIMEOUT=${TIMEOUT:="600s"}
+    make openstack_wait || exit 1
+    make openstack_wait_deploy || exit 1
+    make openstack_cleanup || exit 1
+
+    # update operators and ctlplane to the PR
+    export OPENSTACK_IMG=${OPENSTACK_IMG_BKP}
+    make openstack_wait || exit 1
+    sleep 10
+    make openstack_patch_version || exit 1
+    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
+
+    # cleanup to run kuttl
+    make openstack_deploy_cleanup && \
+    oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
+    storage_cleanup && storage_create
+  fi
+
+  # run kuttl
   make ${SERVICE_NAME}_kuttl
+
   if [ -f "$KUTTL_REPORT" ]; then
       cp "${KUTTL_REPORT}" ${ARTIFACT_DIR}
   else
       echo "Report ${KUTTL_REPORT} not found"
   fi
-  # Run storage cleanup otherwise we can hit random issue during deploy step where
-  # mariadb pod will use the same pv which have a db already and fails because
-  # The init job assumed that the DB was just created and had an empty root password,
-  # which would not be the case.
-  n=0
-  retries=3
-  while (( n < retries )); do
-    if make crc_storage_cleanup; then
-      break
-    fi
-    n=$((n+1))
-    echo "Failed to run 'make crc_storage_cleanup' target (attempt $n of $retries)"
-    sleep 10
-  done
+
+  storage_cleanup
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
 fi
