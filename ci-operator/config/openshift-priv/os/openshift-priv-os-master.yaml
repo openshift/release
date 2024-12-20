@@ -1,3 +1,8 @@
+base_images:
+  rhel-coreos-base:
+    name: rhel-coreos-base
+    namespace: coreos
+    tag: "9.6"
 build_root:
   image_stream_tag:
     name: coreos-assembler
@@ -24,10 +29,17 @@ images:
     WORKDIR /tmp/cosa
   from: root
   to: build-image
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: Containerfile
+  from: rhel-coreos-base
+  to: rhel-coreos
 promotion:
   to:
   - excluded_images:
     - build-image
+    - rhel-coreos
     name: 4.19-priv
     namespace: ocp-private
 releases:
@@ -155,6 +167,13 @@ tests:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   timeout: 3h0m0s
+- always_run: false
+  as: e2e-aws
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv
