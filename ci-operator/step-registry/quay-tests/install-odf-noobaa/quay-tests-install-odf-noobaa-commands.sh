@@ -63,6 +63,7 @@ for _ in {1..60}; do
       break
     fi
   fi
+  echo "wait 10s"
   sleep 10
 done
 echo "ODF/OCS Operator is deployed successfully"
