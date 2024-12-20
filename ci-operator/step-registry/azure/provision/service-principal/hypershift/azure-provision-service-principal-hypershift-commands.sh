@@ -52,7 +52,7 @@ az role assignment create \
   --role "Contributor" \
   --scope  /subscriptions/"$AZURE_AUTH_SUBSCRIPTION_ID"/resourceGroups/"$BASE_DOMAIN_RESOURCE_GROUP"
 
-az role assignment list --assignee "${component_to_client_id[ingress]}" --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
+az role assignment list --assignee "${component_to_client_id[ingress]}" --scope /subscriptions/"$AZURE_AUTH_SUBSCRIPTION_ID"/resourceGroups/"$BASE_DOMAIN_RESOURCE_GROUP" --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
 
 cat <<EOF >"${SHARED_DIR}"/hypershift_azure_mi_file.json
 {
