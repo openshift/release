@@ -31,7 +31,7 @@ export WORKLOAD=network-policy
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # Run a non-indexed warmup for scheduling inconsistencies
-ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false EXTRA_FLAGS='--pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}' ./run.sh
+ES_SERVER="" ITERATIONS=${current_worker_count} EXTRA_FLAGS='--pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}' ./run.sh
 
 # The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
