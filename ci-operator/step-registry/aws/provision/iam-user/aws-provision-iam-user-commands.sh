@@ -60,26 +60,15 @@ function create_cred_file()
 	local policy_arn user_outout cred_outout
 	local key_id key_sec
 
-	if [[ "${SKIP_CREATE_POLICY-}" == "yes" ]]; then
-		if [ -z "${POLICY_ARN-}" ]; then
-			echo "POLICY_ARN must be set when SKIP_CREATE_POLICY is set"
-			exit 1
-		fi
-		policy_arn=${POLICY_ARN}
-	elif [ ! -f "${policy_file}" ]; then
-		echo "User permission policy file not found. Skipping user creation"
-		exit 0
-	else
-		echo "Policy file:"
-		jq . $policy_file
+	echo "Policy file:"
+	jq . $policy_file
 
-		policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
-		policy_doc=$(cat "${policy_file}" | jq -c .)
-		policy_outout=/tmp/aws_policy_output
+	policy_name="${CLUSTER_NAME}-required-policy-${postfix}"
+	policy_doc=$(cat "${policy_file}" | jq -c .)
+	policy_outout=/tmp/aws_policy_output
 
-		echo "Creating policy ${policy_name}"
-		aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
-	fi
+	echo "Creating policy ${policy_name}"
+	aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${policy_outout}"
 
 	user_name="${CLUSTER_NAME}-minimal-perm-${postfix}"
 	user_outout=/tmp/aws_user_output
