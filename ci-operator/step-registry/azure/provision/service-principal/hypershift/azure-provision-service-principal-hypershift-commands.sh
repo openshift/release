@@ -31,6 +31,12 @@ for component in $COMPONENTS; do
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == cloud-provider ]]; then
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+    elif [[ $component == cpo ]]; then
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
+    elif [[ $component == capz ]]; then
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     fi
 
     client_id="$(eval "az ad sp create-for-rbac --name $name --role Contributor --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"
@@ -39,6 +45,14 @@ for component in $COMPONENTS; do
     component_to_client_id+=(["$component"]="$client_id")
     component_to_cert_name+=(["$component"]="$name")
 done
+
+# TODO: Remove this once the we used the automated role assignment by "--assign-service-principal-role"
+az role assignment create \
+  --assignee "${component_to_client_id[ingress]}"\
+  --role "Contributor" \
+  --scope  /subscriptions/"$AZURE_AUTH_SUBSCRIPTION_ID"/resourceGroups/"$BASE_DOMAIN_RESOURCE_GROUP"
+
+az role assignment list --assignee "${component_to_client_id[ingress]}" --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
 
 cat <<EOF >"${SHARED_DIR}"/hypershift_azure_mi_file.json
 {
