@@ -17,8 +17,7 @@ TMP_DIR=$(mktemp -d)
 if [ -f "${SHARED_DIR}/CLUSTER_NAME" ]; then
   CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 else
-  HASH="$(echo -n "$PROW_JOB_ID"|sha256sum)"
-  CLUSTER_NAME=${HASH:0:20}
+  CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 fi
 
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
@@ -56,6 +55,20 @@ if [ -f "${SHARED_DIR}/INGRESS_IP" ]; then
   echo "Creating INGRESS DNS $INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
   jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${INGRESS_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_ingress.json"
   cp "${TMP_DIR}/dns_ingress.json" "${SHARED_DIR}/dns_up.json"
+fi
+
+if [ -f "${SHARED_DIR}/HCP_INGRESS_IP" ]; then
+  # Hosted Cluster name always depends on the following pattern.
+  HOSTED_CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
+  HCP_INGRESS_IP=$(<"${SHARED_DIR}"/HCP_INGRESS_IP)
+  if [[ "${INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HCP_INGRESS_RECORD_TYPE="A"
+  else
+    HCP_INGRESS_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating HCP INGRESS DNS $HCP_INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${HOSTED_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HCP_INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HCP_INGRESS_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hcp_ingress.json"
+  cp "${TMP_DIR}/dns_hcp_ingress.json" "${SHARED_DIR}/dns_up.json"
 fi
 
 if [ -f "${SHARED_DIR}/MIRROR_REGISTRY_IP" ]; then
