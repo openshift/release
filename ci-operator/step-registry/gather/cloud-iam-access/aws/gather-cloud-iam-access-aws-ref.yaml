@@ -1,0 +1,36 @@
+ref:
+  as: gather-cloud-iam-access-aws
+  optional_on_success: true
+  from_image:
+    namespace: ocp
+    name: "4.14"
+    tag: upi-installer
+  grace_period: 10m
+  timeout: 60m
+  commands: gather-cloud-iam-access-aws-commands.sh
+  env:
+  - name: AWS_AUDIT_CUSTOM_IDENTITY
+    default: ""
+    documentation: |-
+      Set to "yes" to force to collect IAM events to discover used permissions.
+  - name: AWS_TRAIL_BUCKET_NAME
+    default: "cloud-trail-test-clayton"
+    documentation: |-
+      Bucket name with CloudTrail events.
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: |-
+      Job cluster name.
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  documentation: |-
+    The gather-cloud-iam-access gather collets IAM events through cloud services to try to get
+    inference of permissions used when installing a cluster on CI job.
+    The inference will be more precise when the custom IAM identity is created to execute the job.
+    This step is only enabled when AWS_AUDIT_CUSTOM_IDENTITY flag is set to 'yes'.
+    For AWS clusters, the logs will be collected from the CloudTrail, scraping logs from
+    a pre-provisioned Bucket used as a backend to store the Trail events.
+    The inference and report will consider only IAM credentials prefixed with CLUSTER_NAME,
+    all other resources must be ignored.
