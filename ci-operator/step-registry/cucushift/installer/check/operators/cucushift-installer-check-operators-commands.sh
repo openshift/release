@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 18000
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
