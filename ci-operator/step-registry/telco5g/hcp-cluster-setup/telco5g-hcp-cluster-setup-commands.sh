@@ -307,6 +307,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hcphost=$CLUSTER_NAME \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
+    -e vsno_wait_minutes=90 \
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
