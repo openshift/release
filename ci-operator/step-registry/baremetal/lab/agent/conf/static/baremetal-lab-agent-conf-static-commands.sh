@@ -34,6 +34,9 @@ EOF
 
 cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
 cpuArchitecture: ${day2_arch}
+AdditionalNTPSources:
+  - 10.10.10.10
+  - 10.10.10.11
 hosts: []
 EOF
 
