@@ -158,6 +158,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azurestack-dev-quota-slice': {
+        'mtcazs': 4
+    },
     'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
