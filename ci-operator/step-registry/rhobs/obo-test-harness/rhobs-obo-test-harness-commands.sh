@@ -22,6 +22,7 @@ main() {
 	# should contain
 	# SEE: https://github.com/openshift/osde2e-example-test-harness
 	echo "{}" >"$TEST_RESULT_DIR/addon-metadata.json"
+	sleep 6h
 }
 
 main "$@"
