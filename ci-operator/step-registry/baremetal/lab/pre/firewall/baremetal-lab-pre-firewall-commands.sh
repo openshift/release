@@ -56,7 +56,9 @@ if [ x"${DISCONNECTED}" == x"true" ] && [ "${PLATFORM}" == "baremetal" ]; then
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
-    # TODO: change to firewalld or nftables
+    iptables -A INPUT -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d 192.168.70.0/24 -j DROP
     iptables -A FORWARD -s ${ip} -d 192.168.70.0/24 -j ACCEPT
   done
 EOF

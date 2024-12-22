@@ -92,6 +92,10 @@ VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
 VLAN_ID=${VLAN_ID//*\./}
 echo "52:54:00:00:00:$(printf '%02x' "${VLAN_ID}")" > "${SHARED_DIR}/ipi_bootstrap_mac_address"
 echo "192.168.80.${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ip_address"
+
+echo "sleep for 20 mins"
+sleep 1200
+
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network
 #  vendor: dell
