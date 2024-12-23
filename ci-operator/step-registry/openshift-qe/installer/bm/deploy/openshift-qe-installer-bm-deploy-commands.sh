@@ -13,6 +13,7 @@ CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
+KUBECONFIG_SRC=""
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -164,7 +165,12 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=/root/${TYPE}/kubeconfig dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
+   if [[ ${TYPE} == 'sno' ]]; then
+     KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}'
+   else
+     KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
+   fi
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate
    rm -rf .ansible
 "
