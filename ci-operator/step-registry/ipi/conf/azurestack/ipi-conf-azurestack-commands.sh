@@ -43,7 +43,7 @@ baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
   azure:
-    baseDomainResourceGroupName: openshiftInstallerRG
+    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP_NAME}
     region: ${LEASED_RESOURCE}
     cloudName: AzureStackCloud
     armEndpoint: ${ENDPOINT}
