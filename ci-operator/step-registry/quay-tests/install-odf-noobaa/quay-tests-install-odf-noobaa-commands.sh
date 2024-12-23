@@ -60,7 +60,7 @@ for _ in {1..60}; do
   if [[ -n "$CSV" ]]; then
     echo "ODF ClusterServiceVersion is...: \"$CSV\""
     if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-      echo "ClusterServiceVersion \"$CSV\" ready"
+      echo "ODF ClusterServiceVersion \"$CSV\" ready"
       break
     fi
   fi
@@ -70,6 +70,26 @@ for _ in {1..60}; do
   sleep 10
 done
 echo "ODF/OCS Operator is deployed successfully"
+
+podlable=$(oc -n "$OO_INSTALL_NAMESPACE" get pod --show-labels) 
+echo "openshift-storage pod with label $podlable"
+
+podlable=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator) 
+echo "odf openshift-storage pod with label $podlable"
+
+#check odf operator pod status
+for _ in {1..60}; do
+  PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready"].status' || true)
+ 
+  if [[ "$PStatus" == "True" ]]; then
+      echo "ODF pod is running \"$PStatus\""
+      break
+  fi
+  echo "wait 10s"
+  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod  -l name=ocs-operator) 
+  echo "odf pod status $podstatus"
+  sleep 10
+done
 
 for _ in {1..60}; do
   podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
