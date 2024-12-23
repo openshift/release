@@ -294,6 +294,10 @@ ${SHARED_VPC_SWITCH:-}"
 # Create GCP cluster
 logger "INFO" "Running Command '${cmd}'"
 eval "${cmd}" > "${ARTIFACT_DIR}/cluster.txt"
+exit_code=$?
+
+# Used by gather steps to generate JUnit
+echo $exit_code > "${SHARED_DIR}/install-status.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 mkdir -p "${SHARED_DIR}"
