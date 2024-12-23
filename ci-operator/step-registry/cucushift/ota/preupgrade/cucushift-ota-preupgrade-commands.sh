@@ -268,6 +268,34 @@ function pre-OCP-24358(){
     return 0
 }
 
+function pre-OCP-32747(){
+    local token url alert namespace severity description state
+    token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+    url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+    alert="$(curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/v1/alerts" | jq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+
+    namespace="$(echo "${alert}" | jq -r ".labels.namespace")"
+    if [[ "${namespace}" != "openshift-cluster-version" ]]; then
+        echo "namespace is incorrect, expected is openshift-cluster-version, but observed is ${namespace}"
+        return 1
+    fi
+    severity="$(echo "${alert}" | jq -r ".labels.severity")"
+    if [[ "${severity}" != "info" ]]; then
+        echo "severity is incorrect, expected is info, but observed is ${severity}"
+        return 1
+    fi
+    description="$(echo "${alert}" | jq -r ".annotations.description")"
+    if [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]]; then
+        echo "description is incorrect, expected is 'In most cases, you will still be able to apply patch releases. ', but observed is '${description}'"
+        return 1
+    fi
+    state="$(echo "${alert}" | jq -r ".state")"
+    if [[ "${state}" != "pending" ]]; then
+        echo "state is incorrect, expected is pending, but observed is ${state}"
+        return 1
+    fi
+}
+
 function pre-OCP-47197(){
     echo "Test Start: ${FUNCNAME[0]}"
     local version 
