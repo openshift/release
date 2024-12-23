@@ -62,12 +62,12 @@ EOF
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 podman pull quay.io/quads/badfish:latest
-USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
+USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -123,11 +123,11 @@ if [[ "$PRE_UEFI" == "true" ]]; then
 fi
 EOF
 if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${LAB_CLOUD},${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
