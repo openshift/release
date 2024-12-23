@@ -199,6 +199,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
+- as: aws-ipi-arm-f28-ota
+  cron: 22 22 5 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-47200
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-upi-reboot-nodes-f28
   cron: 35 23 25 * *
   steps:
@@ -429,6 +444,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
+- as: gcp-ipi-default-mini-perm-arm-f7
+  cron: 12 15 3,10,17,24 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-default
 - as: gcp-ipi-cco-manual-users-static-f28
   cron: 55 11 25 * *
   steps:

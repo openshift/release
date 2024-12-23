@@ -487,6 +487,19 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-gcp-default-config
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-gcp-default
+    - chain: ipi-install
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
@@ -518,6 +531,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-default-config
+  optional: true
+  run_if_changed: azure
+  steps:
+    cluster_profile: azure4
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-azure-default
+    - chain: ipi-install
   timeout: 6h0m0s
 - as: e2e-azure-ovn
   run_if_changed: azure
@@ -928,8 +954,8 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
       ARCH: ppc64le
-      BRANCH: master
-      CLUSTER_NAME_MODIFIER: capi-master
+      BRANCH: main
+      CLUSTER_NAME_MODIFIER: capi-main
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
