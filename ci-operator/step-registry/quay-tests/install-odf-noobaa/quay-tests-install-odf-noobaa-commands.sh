@@ -79,22 +79,22 @@ echo "odf openshift-storage pod with label $podlable"
 
 #check odf operator pod status
 for _ in {1..60}; do
-  PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready"].status' || true)
+  PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
  
   if [[ "$PStatus" == "True" ]]; then
       echo "ODF pod is running \"$PStatus\""
       break
   fi
-  echo "wait 10s"
   podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod  -l name=ocs-operator) 
   echo "odf pod status $podstatus"
+  echo "wait 10s"
   sleep 10
 done
 
-for _ in {1..60}; do
+for _ in {1..6}; do
   podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
   echo "ODF/OCS Operator pod status $podstatus"
-  sleep 1
+  sleep 10
 done
 
 cat <<EOF | oc apply -f -
