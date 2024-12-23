@@ -64,4 +64,3 @@ if [ ${BAREMETAL} == "true" ]; then
   pkill ssh
 fi
 #ingress perf test
-#dp
