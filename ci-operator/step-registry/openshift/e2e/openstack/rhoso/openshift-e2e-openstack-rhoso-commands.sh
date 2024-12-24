@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo running on ${LEASED_RESOURCE}
+UNDERLYING_KUBECONFIG=/var/run/cluster-secrets/openstack-rhoso/${LEASED_RESOURCE}-kubeconfig
+
 echo setting up ansible
 # Below var is commented as the junit of the parent-playbook run is just adding noise:
 # export ANSIBLE_CALLBACKS_ENABLED="ansible.builtin.junit"
@@ -39,9 +42,7 @@ cat <<EOF > ${ARTIFACT_DIR}/parent-playbook.yml
 EOF
 
 echo running the job
-KUBECONFIG=${UNDERLYING_KUBECONFIG} oc annotate -n openstack openstackclients.client.openstack.org/openstackclient shiftstack_status=BUSY shiftstack_timestamp="$(date)"  --overwrite
 ansible-playbook ${ARTIFACT_DIR}/parent-playbook.yml || failed=$?
-KUBECONFIG=${UNDERLYING_KUBECONFIG} oc annotate -n openstack openstackclients.client.openstack.org/openstackclient shiftstack_status=FREE shiftstack_timestamp="$(date)"  --overwrite
 
 if [ -f "${SHIFTSTACK_JOB_JUNIT_PATH}" ]; then
   echo moving the junit so it can be parsed by Prow
