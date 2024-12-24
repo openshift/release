@@ -13,6 +13,7 @@ CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
+KUBECONFIG_SRC=""
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -153,6 +154,12 @@ scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secre
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
 
+if [[ ${TYPE} == 'sno' ]]; then
+  KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
+else
+  KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
+fi
+
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
@@ -164,7 +171,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=/root/${TYPE}/kubeconfig dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate
    rm -rf .ansible
 "
