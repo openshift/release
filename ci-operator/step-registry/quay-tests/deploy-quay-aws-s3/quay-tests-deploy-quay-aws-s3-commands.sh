@@ -159,8 +159,9 @@ TAG_EXPIRATION_OPTIONS:
   - 1d
 EOF
 
-# if env variable TLS is set and equals False, by default it is true
-if [ -n "$TLS" ] && [ "$TLS" = "false" ]; then
+# if env variable TLS is set and equals false, by default it is true
+set +u
+if [ -z "$TLS" ] || [ -n "$TLS" ] && [ "$TLS" = "false" ]; then
   oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
   tls=false
   echo "tls is $tls.."
@@ -169,7 +170,7 @@ else
   tls=true
   echo "tls is $tls,,"
 fi
-
+set -u
 
 
 echo "Creating Quay registry..." >&2
