@@ -166,7 +166,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
    if [[ ${TYPE} == 'sno' ]]; then
-     KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}'
+     KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
    else
      KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
    fi
