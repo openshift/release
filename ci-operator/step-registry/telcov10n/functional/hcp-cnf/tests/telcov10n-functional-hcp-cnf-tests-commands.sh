@@ -82,7 +82,7 @@ run_tests() {
     echo "************ Running ${GINKGO_LABEL} tests ************"
     GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
     --timeout=1h --keep-separate-reports --keep-going --flake-attempts=2 \
-    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite "${GINKGO_SUITES}"
+    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite=${GINKGO_SUITES}
 }
 
 if [[ "${T5CI_VERSION}" == "4.17" ]]; then
