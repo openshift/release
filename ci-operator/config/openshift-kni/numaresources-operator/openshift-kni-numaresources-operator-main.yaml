@@ -196,15 +196,12 @@ tests:
 - as: e2e-operator-upgrade
   steps:
     cluster_profile: aws-telco
-    dependencies:
-      OO_BUNDLE: numaresources-operator-bundle-4.17
-      OO_BUNDLE_NEW: numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-numaresources
+      TEST_TYPE: upgrade
     test:
-    - as: e2e-test
+    - ref: openshift-e2e-test
+    - as: test-install-e2e
       cli: latest
       commands: make test-install-e2e
       from: src
@@ -212,8 +209,15 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - ref: telco5g-nrop-upgrade
-    workflow: optional-operators-ci-operator-sdk-aws
+    - as: test-upgrade-e2e
+      cli: latest
+      commands: make test-upgrade-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: telco5g-nrop
 zz_generated_metadata:
   branch: main
   org: openshift-kni
