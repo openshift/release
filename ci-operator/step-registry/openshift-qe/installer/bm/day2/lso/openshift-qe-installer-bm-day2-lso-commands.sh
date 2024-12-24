@@ -8,6 +8,7 @@ cat /etc/os-release
 oc config view
 oc projects
 
+bastion="$(cat /bm/address)"
 # Disk cleaning
 for worker in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
   for disk in {0..7}; do
