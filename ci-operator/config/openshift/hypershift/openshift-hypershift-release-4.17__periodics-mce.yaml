@@ -24,6 +24,11 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  414-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
   latest:
     candidate:
       product: ocp
@@ -207,6 +212,17 @@ tests:
     - chain: hypershift-mce-power-test
     - ref: hypershift-mce-agent-info
     workflow: hypershift-mce-power-conformance
+- as: e2e-agent-connected-hub414-mce27-hc417-conformance
+  cron: 0 17 15 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:414-latest
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_VERSION: "2.7"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-mce-agent-metal3-conformance
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
