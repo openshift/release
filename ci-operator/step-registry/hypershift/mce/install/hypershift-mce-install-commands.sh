@@ -224,6 +224,21 @@ echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
 if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
+  if [[ $MCE_QE_CATALOG == "true" ]]; then
+    oc apply -f - <<EOF
+  apiVersion: operator.openshift.io/v1alpha1
+  kind: ImageContentSourcePolicy
+  metadata:
+    name: hypershift-repo
+  spec:
+    repositoryDigestMirrors:
+    - mirrors:
+      - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/hypershift
+      source: quay.io/hypershift
+EOF
+  echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
+  oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=25m
+  fi
   oc apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
