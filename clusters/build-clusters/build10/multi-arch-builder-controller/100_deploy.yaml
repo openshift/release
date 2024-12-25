@@ -13,15 +13,12 @@ spec:
       labels:
         app: multi-arch-builder-controller
     spec:
-      serviceAccountName: multi-arch-builder-controller
-      nodeSelector:
-        kubernetes.io/arch: amd64
       containers:
-      - name: multi-arch-builder-controller
-        image: multi-arch-builder-controller:latest
-        args:
+      - args:
         - --dry-run=false
+        image: multi-arch-builder-controller:latest
         imagePullPolicy: Always
+        name: multi-arch-builder-controller
         resources:
           limits:
             cpu: 100m
@@ -30,10 +27,13 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
-        - name: docker-config
-          mountPath: /.docker/config.json
-          subPath: .dockerconfigjson
+        - mountPath: /.docker/config.json
+          name: docker-config
           readOnly: true
+          subPath: .dockerconfigjson
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      serviceAccountName: multi-arch-builder-controller
       volumes:
       - name: docker-config
         secret:

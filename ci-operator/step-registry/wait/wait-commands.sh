@@ -25,7 +25,7 @@ function pr_debug_mode_waiting {
       break
     else
       echo "Now:     $(date -d @${now})"
-      echo "Timeout: $(date -d @${TIMEOUT})"
+      echo "Timeout: $(date -d @${END_TIME})"
     fi
     echo "Note: To exit from debug mode before the timeout is reached,"
     echo "just run the following command from the POD Terminal:"

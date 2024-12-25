@@ -46,6 +46,13 @@ if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | 
   exit 1
 fi
 
+# We expect this to have the correct number of addresses.  If we are short, we need to exit here with meaningful message.
+if jq -e --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses | length < 10' "${SUBNETS_CONFIG}"; then
+  echo "SUBNETS.JSON does not contain enough addresses. This workflow is expected to be a single-tenant lease. Please check lease / network type."
+  cat "${SUBNETS_CONFIG}"
+  exit 1
+fi
+
 # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
 
 dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
@@ -93,6 +100,13 @@ export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+
+echo "$(date -u --rfc-3339=seconds) - Discovering controller image 'vsphere-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
+
+PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
+CCM_IMAGE="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='vsphere-cloud-controller-manager')"
+
+echo "$(date -u --rfc-3339=seconds) - Using CCM image=${CCM_IMAGE}"
 
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create basedomain.txt
@@ -622,7 +636,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: vsphere-cloud-controller-manager
-          image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
+          image: ${CCM_IMAGE}
           env:
           - name: "KUBERNETES_SERVICE_HOST"
             value: "api-int.${cluster_domain}"

@@ -314,7 +314,7 @@ def _add_osd_rc_deployment(gendoc):
                                 "--depth=1",
                                 "--link=release"
                             ],
-                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                             "volumeMounts": [
                                 {
                                     "name": "release",
@@ -334,7 +334,7 @@ def _add_osd_rc_deployment(gendoc):
                                 "--max-failures=3",
                                 "--link=release"
                             ],
-                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3",
+                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                             "volumeMounts": [
                                 {
                                     "name": "release",

@@ -124,6 +124,30 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.16
       MCE_VERSION: "2.6"
     workflow: hypershift-mce-agent-disconnected-conformance
+- as: e2e-agent-connected-ovn-ipv4-metal3-oadp
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=3
+        WORKER_MEMORY=32768
+        WORKER_VCPU=8
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      OADP_OPERATOR_SUB_CHANNEL: stable-1.4
+      OADP_OPERATOR_SUB_SOURCE: qe-app-registry
+    test:
+    - chain: hypershift-mce-agent-oadp
+    - ref: hypershift-mce-agent-info
+    - chain: hypershift-conformance
+    workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-kubevirt-metal-ovn
   cron: 0 4 * * *
   steps:

@@ -1,4 +1,3 @@
-#We put only the customized fields in git
 apiVersion: imageregistry.operator.openshift.io/v1
 kind: Config
 metadata:
@@ -7,24 +6,24 @@ spec:
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
+      - podAffinityTerm:
           labelSelector:
             matchExpressions:
             - key: docker-registry
               operator: In
               values:
               - default
-          topologyKey: "kubernetes.io/hostname"
+          topologyKey: kubernetes.io/hostname
+        weight: 100
   managementState: Managed
   nodeSelector:
     node-role.kubernetes.io/infra: ""
   replicas: 5
-  tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/infra
-    operator: Exists
   routes:
   - hostname: registry.build09.ci.openshift.org
     name: public-routes
     secretName: public-route-tls
+  tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/infra
+    operator: Exists

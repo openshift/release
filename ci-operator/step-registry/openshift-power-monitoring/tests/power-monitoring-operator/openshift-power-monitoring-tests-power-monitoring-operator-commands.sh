@@ -70,7 +70,7 @@ create_ds() {
 	# Switch to python 3.10 for model server image v0.7.11 or higher
 	# TODO: Remove this once older CI jobs are deprecated/removed
 	local cmd=""
-	if [[ $img =~ model_server:v0.7.11.* ]]; then
+	if [[ $img =~ model_server:v0.7.12 ]]; then
 		cmd="[\"model-server\", \"-l\", \"info\"]"
 	else
 		cmd="[\"python3.8\", \"-u\", \"src/server/model_server.py\"]"

@@ -64,7 +64,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.12-stage-opentelemetry-stage-tests
     decorate: true
     decoration_config:
@@ -87,7 +87,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-cluster-profile
         - --target=opentelemetry-stage-tests
         - --variant=opentelemetry-product-ocp-4.12-stage
         command:
@@ -105,8 +104,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -130,9 +127,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -339,7 +333,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.14-arm-stage-opentelemetry-stage-tests
     decorate: true
     decoration_config:
@@ -362,7 +356,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-cluster-profile
         - --target=opentelemetry-stage-tests
         - --variant=opentelemetry-product-ocp-4.14-arm-stage
         command:
@@ -380,8 +373,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -405,9 +396,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -673,6 +661,131 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/opentelemetry-product-ocp-4.15-ibm-z-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.15-ibm-z-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.15-ibm-z-stage-images
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test opentelemetry-product-ocp-4.15-ibm-z-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opentelemetry-product-ocp-4.15-ibm-z-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-4.15-ibm-z-stage-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/opentelemetry-product-ocp-4.15-ibm-z-stage-opentelemetry-stage-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.15-ibm-z-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.15-ibm-z-stage-opentelemetry-stage-tests
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test opentelemetry-product-ocp-4.15-ibm-z-stage-opentelemetry-stage-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=opentelemetry-stage-tests
+        - --variant=opentelemetry-product-ocp-4.15-ibm-z-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(opentelemetry-product-ocp-4.15-ibm-z-stage-opentelemetry-stage-tests|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/opentelemetry-product-ocp-4.15-lp-interop-images
     decorate: true
     decoration_config:
@@ -922,6 +1035,131 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/opentelemetry-product-ocp-4.16-ibm-p-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.16-ibm-p-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.16-ibm-p-stage-images
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test opentelemetry-product-ocp-4.16-ibm-p-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opentelemetry-product-ocp-4.16-ibm-p-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-4.16-ibm-p-stage-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/opentelemetry-product-ocp-4.16-ibm-p-stage-opentelemetry-stage-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.16-ibm-p-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.16-ibm-p-stage-opentelemetry-stage-tests
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test opentelemetry-product-ocp-4.16-ibm-p-stage-opentelemetry-stage-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=opentelemetry-stage-tests
+        - --variant=opentelemetry-product-ocp-4.16-ibm-p-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(opentelemetry-product-ocp-4.16-ibm-p-stage-opentelemetry-stage-tests|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/opentelemetry-product-ocp-4.16-lp-interop-images
     decorate: true
     decoration_config:
@@ -1097,7 +1335,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.16-stage-opentelemetry-stage-tests
     decorate: true
     decoration_config:
@@ -1120,7 +1358,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-cluster-profile
         - --target=opentelemetry-stage-tests
         - --variant=opentelemetry-product-ocp-4.16-stage
         command:
@@ -1138,8 +1375,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1163,9 +1398,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1181,7 +1413,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.16-stage-opentelemetry-stage-tests-fips
     decorate: true
     decoration_config:
@@ -1204,7 +1436,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-fips-cluster-profile
         - --target=opentelemetry-stage-tests-fips
         - --variant=opentelemetry-product-ocp-4.16-stage
         command:
@@ -1222,8 +1453,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-fips-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1247,9 +1476,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1325,6 +1551,65 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/opentelemetry-product-ocp-4.17-lp-rosa-classic-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.17-lp-rosa-classic
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.17-lp-rosa-classic-images
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test opentelemetry-product-ocp-4.17-lp-rosa-classic-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opentelemetry-product-ocp-4.17-lp-rosa-classic
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-4.17-lp-rosa-classic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/opentelemetry-product-ocp-4.17-stage-images
     decorate: true
     decoration_config:
@@ -1383,7 +1668,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.17-stage-opentelemetry-stage-tests
     decorate: true
     decoration_config:
@@ -1406,7 +1691,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-cluster-profile
         - --target=opentelemetry-stage-tests
         - --variant=opentelemetry-product-ocp-4.17-stage
         command:
@@ -1424,8 +1708,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1449,9 +1731,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1467,7 +1746,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/opentelemetry-product-ocp-4.17-stage-opentelemetry-stage-tests-fips
     decorate: true
     decoration_config:
@@ -1490,7 +1769,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-stage-tests-fips-cluster-profile
         - --target=opentelemetry-stage-tests-fips
         - --variant=opentelemetry-product-ocp-4.17-stage
         command:
@@ -1508,8 +1786,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-stage-tests-fips-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1533,9 +1809,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1552,18 +1825,18 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/opentelemetry-product-ocp-ibm-p-4.15-stage-images
+    context: ci/prow/opentelemetry-product-ocp-4.18-lp-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: opentelemetry-product-ocp-ibm-p-4.15-stage
+      ci-operator.openshift.io/variant: opentelemetry-product-ocp-4.18-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-ibm-p-4.15-stage-images
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-4.18-lp-interop-images
     path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test opentelemetry-product-ocp-ibm-p-4.15-stage-images
+    rerun_command: /test opentelemetry-product-ocp-4.18-lp-interop-images
     spec:
       containers:
       - args:
@@ -1571,7 +1844,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=opentelemetry-product-ocp-ibm-p-4.15-stage
+        - --variant=opentelemetry-product-ocp-4.18-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1604,198 +1877,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-ibm-p-4.15-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/opentelemetry-product-ocp-ibm-p-4.15-stage-opentelemetry-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: opentelemetry-product-ocp-ibm-p-4.15-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-ibm-p-4.15-stage-opentelemetry-stage-tests
-    path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test opentelemetry-product-ocp-ibm-p-4.15-stage-opentelemetry-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=opentelemetry-stage-tests
-        - --variant=opentelemetry-product-ocp-ibm-p-4.15-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(opentelemetry-product-ocp-ibm-p-4.15-stage-opentelemetry-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/opentelemetry-product-ocp-ibm-z-4.15-stage-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: opentelemetry-product-ocp-ibm-z-4.15-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-ibm-z-4.15-stage-images
-    path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test opentelemetry-product-ocp-ibm-z-4.15-stage-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=opentelemetry-product-ocp-ibm-z-4.15-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-ibm-z-4.15-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/opentelemetry-product-ocp-ibm-z-4.15-stage-opentelemetry-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: opentelemetry-product-ocp-ibm-z-4.15-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-opentelemetry-product-ocp-ibm-z-4.15-stage-opentelemetry-stage-tests
-    path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test opentelemetry-product-ocp-ibm-z-4.15-stage-opentelemetry-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=opentelemetry-stage-tests
-        - --variant=opentelemetry-product-ocp-ibm-z-4.15-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(opentelemetry-product-ocp-ibm-z-4.15-stage-opentelemetry-stage-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )opentelemetry-product-ocp-4.18-lp-interop-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1919,7 +2001,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/upstream-ocp-4.13-amd64-aws-ipi-ovn-hypershift-opentelemetry-e2e-tests
     decorate: true
     decoration_config:
@@ -1942,7 +2024,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-e2e-tests-cluster-profile
         - --target=opentelemetry-e2e-tests
         - --variant=upstream-ocp-4.13-amd64-aws-ipi-ovn-hypershift
         command:
@@ -1960,8 +2041,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1985,9 +2064,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2144,7 +2220,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-e2e-tests-cluster-profile
         - --target=opentelemetry-e2e-tests
         - --variant=upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
         command:
@@ -2162,8 +2237,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2187,9 +2260,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-gcp-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2397,7 +2467,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-ocp-4.15-amd64-aws-security
+    context: ci/prow/upstream-ocp-4.15-amd64-aws-security-sast
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2406,9 +2476,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-upstream-ocp-4.15-amd64-aws-security
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-main-upstream-ocp-4.15-amd64-aws-security-sast
     path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test upstream-ocp-4.15-amd64-aws-security
+    rerun_command: /test upstream-ocp-4.15-amd64-aws-security-sast
     spec:
       containers:
       - args:
@@ -2416,7 +2486,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=security-sast
         - --variant=upstream-ocp-4.15-amd64-aws
         command:
         - ci-operator
@@ -2456,7 +2526,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(upstream-ocp-4.15-amd64-aws-security|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(upstream-ocp-4.15-amd64-aws-security-sast|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -2580,7 +2650,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build05
     context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-opentelemetry-e2e-tests
     decorate: true
     decoration_config:
@@ -2603,7 +2673,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-e2e-tests-cluster-profile
         - --target=opentelemetry-e2e-tests
         - --variant=upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
         command:
@@ -2621,8 +2690,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2646,9 +2713,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2805,7 +2869,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opentelemetry-operator-upgrade-cluster-profile
         - --target=opentelemetry-operator-upgrade
         - --variant=upstream-upgrade-ocp-4.17-amd64-azure
         command:
@@ -2823,8 +2886,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opentelemetry-operator-upgrade-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2848,9 +2909,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

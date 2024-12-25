@@ -1,0 +1,34 @@
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export XDG_CACHE_HOME=/tmp/.cache/
+    export PRE_COMMIT_HOME=/tmp
+    export HOME=/tmp
+    export ANSIBLE_LOCAL_TMP=/tmp
+    export ANSIBLE_REMOTE_TMP=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
+zz_generated_metadata:
+  branch: 18.0-fr1
+  org: openstack-k8s-operators
+  repo: tcib

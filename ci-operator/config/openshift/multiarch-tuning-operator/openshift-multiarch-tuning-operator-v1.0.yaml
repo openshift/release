@@ -11,23 +11,26 @@ binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile
   from: base
   inputs:
     builder:
       as:
       - golang:1.22
-  multi_arch: true
   to: multiarch-tuning-operator
-- dockerfile_path: bundle.Dockerfile
-  multi_arch: true
+- additional_architectures:
+  - arm64
+  dockerfile_path: bundle.Dockerfile
   to: multiarch-tuning-op-bundle
-- dockerfile_literal: |
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
     FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
     FROM src
     COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
   from: src
-  multi_arch: true
   to: operator-sdk-mto
 operator:
   bundles:

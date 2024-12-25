@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/ci-bundle-operator-bundle
     decorate: true
     decoration_config:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/ci-job
     decorate: true
     decoration_config:
@@ -115,7 +115,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -170,7 +170,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build10
+    context: ci/prow/markdownlint
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-oran-o2ims-main-markdownlint
+    rerun_command: /test markdownlint
+    run_if_changed: (?i)(\.md|\.markdown|^hack/.*markdown.*|^.markdown.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=markdownlint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )markdownlint,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
     context: ci/prow/scorecard
     decorate: true
     decoration_config:
@@ -191,7 +247,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/scorecard-cluster-profile
         - --target=scorecard
         command:
         - ci-operator
@@ -208,8 +263,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/scorecard-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -233,9 +286,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-telco
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
