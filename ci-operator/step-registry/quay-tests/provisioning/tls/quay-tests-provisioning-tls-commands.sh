@@ -53,4 +53,5 @@ oc extract cm/kube-root-ca.crt -n openshift-apiserver
 mv ca.crt build_cluster.crt
 echo "current folder..."
 pwd
-ls -l
+cat ssl.cert
+ls -l || true
