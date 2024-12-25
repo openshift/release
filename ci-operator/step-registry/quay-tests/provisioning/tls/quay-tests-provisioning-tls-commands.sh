@@ -12,8 +12,8 @@ echo "Create TLS Cert/Key pairs for Quay Deployment..." >&2
 ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
 printf "\nocp_base_domain_name\n"
 
-#In Prow, base domain is longer, like ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
-#it's easy to meet maxsize error if len(quay_cn_name)>64
+#In Prow, base domain is longer, like: ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
+#it's easy to meet below maxsize error if len(quay_cn_name)>64
 #encoding routines:ASN1_mbstring_ncopy:string too long:crypto/asn1/a_mbstr.c:107:maxsize=64
 quay_cn_wildcard_name="apps."$ocp_base_domain_name
 quay_cn_name="quay.${quay_cn_wildcard_name}"
