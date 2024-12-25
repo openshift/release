@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "registry current folder..."
+pwd
+ls -l
+
 #create secret bundle with odf/noobaa 
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true

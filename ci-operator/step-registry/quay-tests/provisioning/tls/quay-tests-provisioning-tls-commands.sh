@@ -51,4 +51,6 @@ cat rootCA.pem >>ssl.cert
 #Get openshift CA Cert, include into secret bundle
 oc extract cm/kube-root-ca.crt -n openshift-apiserver
 mv ca.crt build_cluster.crt
+echo "current folder..."
+pwd
 ls -l
