@@ -41,15 +41,15 @@ EOF
 # if env variable TLS is set and equals false, by default it is true
 if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-  echo  $("$TLS" | tr -d \")
   tls=true
+  echo  "$("$TLS" | tr -d \")"
 elif [[ "$TLS" = "false" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
     --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
     config-bundle-secret
    echo "tls false..." 
    tls=false
-   echo  $("$TLS" | tr -d \")
+   echo  "$("$TLS" | tr -d \")"
 fi
 
 #Deploy Quay registry, here disable monitoring component
