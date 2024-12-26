@@ -49,3 +49,8 @@ fi
 
 # Ending
 run_command "cat '${install_config_mirror_patch}'"
+
+echo "(jiwei-debug) Updating the 'install_config_mirror_patch'..."
+sed -i 's#openshift/release$#openshift/release-images#' "${install_config_mirror_patch}"
+sed -i 's#openshift$#openshift/release#' "${install_config_mirror_patch}"
+run_command "cat '${install_config_mirror_patch}'"
