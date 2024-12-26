@@ -26,10 +26,11 @@ echo $quay_cn_name
 
 echo "first current folder..."
 pwd
-cd /tmp
+temp_dir=$(mktemp -d)
+
 pwd
 
-cat >>openssl.cnf <<EOF
+cat >>"$temp_dir"/openssl.cnf <<EOF
 [req]
 req_extensions = v3_req
 distinguished_name = req_distinguished_name
@@ -48,14 +49,14 @@ echo "${quay_builder_route}"
 
 #Create custom tls/ssl file
 function create_cert() {
-    openssl genrsa -out rootCA.key 2048
-    openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.pem -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
-    openssl genrsa -out ssl.key 2048
-    openssl req -new -key ssl.key -out ssl.csr -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_name}"
-    openssl x509 -req -in ssl.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out ssl.cert -days 356 -extensions v3_req -extfile openssl.cnf
-    cat rootCA.pem >>ssl.cert
+    openssl genrsa -out "$temp_dir"/rootCA.key 2048
+    openssl req -x509 -new -nodes -key "$temp_dir"/rootCA.key -sha256 -days 1024 -out "$temp_dir"/rootCA.pem -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
+    openssl genrsa -out "$temp_dir"/ssl.key 2048
+    openssl req -new -key "$temp_dir"/ssl.key -out "$temp_dir"/ssl.csr -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_name}"
+    openssl x509 -req -in "$temp_dir"/ssl.csr -CA "$temp_dir"/rootCA.pem -CAkey "$temp_dir"/rootCA.key -CAcreateserial -out "$temp_dir"/ssl.cert -days 356 -extensions v3_req -extfile "$temp_dir"/openssl.cnf
+    cat "$temp_dir"/rootCA.pem >>"$temp_dir"/ssl.cert
 
-    if [ -e ssl.cert ]; then
+    if [ -e "$temp_dir"/ssl.cert ]; then
         echo "Create the TLS/SSL cert file successfully"
     else
         echo "!!! Fail to create the TLS/SSL cert file "
@@ -66,13 +67,14 @@ function create_cert() {
 
 #Get openshift CA Cert, include into secret bundle
 oc extract cm/kube-root-ca.crt -n openshift-apiserver || true
-mv ca.crt build_cluster.crt || true
+mv ca.crt $SHARED_DIR/build_cluster.crt || true
 echo "current folder..."
 pwd
 
 create_cert || true
-cp ssl.cert ssl.key $SHARED_DIR/
-cat ssl.cert
-ls -l || true
+cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key $SHARED_DIR/
+cat "$temp_dir"/ssl.cert
+ls -l "$temp_dir"|| true
+rm -rf "$temp_dir"
 ls -l $SHARED_DIR || true
 echo "tls cert successfully created..." || true
