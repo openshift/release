@@ -9,8 +9,8 @@ QUAYREGISTRY=${QUAYREGISTRY}
 QUAYNAMESPACE=${QUAYNAMESPACE}
 
 echo "Create TLS Cert/Key pairs for Quay Deployment..." >&2
+
 ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
-printf "\nocp_base_domain_name\n"
 
 #In Prow, base domain is longer, like: ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
 #it's easy to meet below maxsize error if len(quay_cn_name)>64
@@ -20,16 +20,12 @@ quay_cn_name="quay.${quay_cn_wildcard_name}"
 quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
 quay_name="${QUAYREGISTRY}-quay-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
 
-echo ${quay_builder_route}
-echo $quay_cn_wildcard_name
-echo $quay_cn_name
-
 echo "first current folder..."
 echo "provisiong tls..." > AFLAFFILR
 pwd
-temp_dir=$(mktemp -d)
+ls -l
 
-pwd
+temp_dir=$(mktemp -d)
 
 cat >>"$temp_dir"/openssl.cnf <<EOF
 [req]
@@ -45,8 +41,6 @@ DNS.1 = ${quay_cn_name}
 DNS.2 = ${quay_builder_route}
 DNS.3 = ${quay_name}
 EOF
-
-echo "${quay_builder_route}"
 
 #Create custom tls/ssl file
 function create_cert() {
@@ -68,14 +62,11 @@ function create_cert() {
 
 #Get openshift CA Cert, include into secret bundle
 oc extract cm/kube-root-ca.crt -n openshift-apiserver  --confirm 
-mv ca.crt $SHARED_DIR/build_cluster.crt || true
-echo "current folder..."
-pwd
 
 create_cert || true
-cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key $SHARED_DIR/
-cat "$temp_dir"/ssl.cert
-ls -l "$temp_dir"|| true
-# rm -rf "$temp_dir"
-ls -l $SHARED_DIR || true
-echo "tls cert successfully created..." || true
+
+#Copy ssl files to SHARED_DIR 
+mv ca.crt "$SHARED_DIR"/build_cluster.crt 
+cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
+
+echo "tls cert successfully created" 
