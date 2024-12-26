@@ -17,8 +17,8 @@ printf "\nocp_base_domain_name\n"
 #encoding routines:ASN1_mbstring_ncopy:string too long:crypto/asn1/a_mbstr.c:107:maxsize=64
 quay_cn_wildcard_name="apps."$ocp_base_domain_name
 quay_cn_name="quay.${quay_cn_wildcard_name}"
-quay_name="${QUAYREGISTRY}-quay-${NAMESPACE}.${quay_cn_wildcard_name}"
 quay_builder_route="${QUAYREGISTRY}-quay-builder-${NAMESPACE}.${quay_cn_wildcard_name}"
+quay_name="${QUAYREGISTRY}-quay-${NAMESPACE}.${quay_cn_wildcard_name}"
 
 echo ${quay_builder_route}
 echo $quay_cn_wildcard_name
@@ -34,24 +34,38 @@ basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
-DNS.1 = ${quay_name}
+DNS.1 = ${quay_cn_name}
 DNS.2 = ${quay_builder_route}
-DNS.3 = ${quay_cn_name}
+DNS.3 = ${quay_name}
 EOF
 
 echo "${quay_builder_route}"
 
-openssl genrsa -out rootCA.key 2048
-openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.pem -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
-openssl genrsa -out ssl.key 2048
-openssl req -new -key ssl.key -out ssl.csr -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_name}"
-openssl x509 -req -in ssl.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out ssl.cert -days 356 -extensions v3_req -extfile openssl.cnf
-cat rootCA.pem >>ssl.cert
+#Create custom tls/ssl file
+function create_cert() {
+    openssl genrsa -out rootCA.key 2048
+    openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.pem -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
+    openssl genrsa -out ssl.key 2048
+    openssl req -new -key ssl.key -out ssl.csr -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_name}"
+    openssl x509 -req -in ssl.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out ssl.cert -days 356 -extensions v3_req -extfile openssl.cnf
+    cat rootCA.pem >>ssl.cert
+
+    if [ -e ssl.cert ]; then
+        echo "Create the TLS/SSL cert file successfully"
+    else
+        echo "!!! Fail to create the TLS/SSL cert file "
+        return 1
+    fi
+
+}
 
 #Get openshift CA Cert, include into secret bundle
-oc extract cm/kube-root-ca.crt -n openshift-apiserver
-mv ca.crt build_cluster.crt
+oc extract cm/kube-root-ca.crt -n openshift-apiserver || true
+mv ca.crt build_cluster.crt || true
 echo "current folder..."
 pwd
+
+create_cert
 cat ssl.cert
 ls -l || true
+echo "tls cert successfully created..." || true

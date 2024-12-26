@@ -78,7 +78,7 @@ podlable=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator)
 echo "odf openshift-storage pod with label $podlable"
 
 #check odf operator pod status
-for _ in {1..60}; do
+for i in {1..60}; do
   PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
  
   if [[ "$PStatus" == "True" ]]; then
@@ -87,7 +87,7 @@ for _ in {1..60}; do
   fi
   podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod  -l name=ocs-operator) 
   echo "odf pod status $podstatus"
-  echo "wait 10s"
+  echo "wait $((i*10))s"
   sleep 10
 done
 

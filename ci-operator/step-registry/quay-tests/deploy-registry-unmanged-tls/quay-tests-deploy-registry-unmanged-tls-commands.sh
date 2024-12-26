@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "registry current folder..."
+echo "registry current folder... ${NAMESPACE},${QUAYREGISTRY} "
 pwd
 ls -l
 
@@ -40,11 +40,11 @@ EOF
 
 # if env variable TLS is set and equals false, by default it is true
 if [ "$TLS" = "false" ]; then
-  oc create secret generic -n ${NAMESPACE} --from-file config.yaml=./config.yaml config-bundle-secret
+  oc create secret generic -n "${NAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=false
   echo "tls is $tls.."
 else [ "$TLS" = "true" ]
-  oc create secret generic -n ${NAMESPACE} --from-file config.yaml=./config.yaml config-bundle-secret
+  oc create secret generic -n "${NAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=true
   echo "tls is $tls,"
 fi
@@ -56,7 +56,7 @@ cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: quay
+  name: ${QUAYREGISTRY}
   namespace: ${NAMESPACE}
 spec:
   configBundleSecret: config-bundle-secret
