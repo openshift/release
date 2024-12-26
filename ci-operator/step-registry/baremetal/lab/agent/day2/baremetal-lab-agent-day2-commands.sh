@@ -83,19 +83,19 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-
+/cli/oc version
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
 
-echo "Extract the latest oc client..."
-oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=oc --to=/tmp --insecure=true
+#echo "Extract the latest oc client..."
+#oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+#   --command=oc --to=/tmp --insecure=true
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
-  oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
+  /cli/oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
 fi
 
 DAY2_INSTALL_DIR="${DAY2_INSTALL_DIR:-/tmp/installer_day2}"
@@ -110,7 +110,7 @@ case "${BOOT_MODE}" in
 "iso")
   ### Create iso file
   echo -e "\nCreate node.iso for day2 worker nodes..."
-  /tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+  /cli/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
@@ -138,7 +138,7 @@ case "${BOOT_MODE}" in
 "pxe")
   ### Create pxe files
   echo -e "\nCreate pxe files for day2 worker nodes..."
-  /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+  /cli/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
