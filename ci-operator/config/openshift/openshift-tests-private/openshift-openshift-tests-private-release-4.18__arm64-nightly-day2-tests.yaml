@@ -1,0 +1,136 @@
+base_images:
+  ansible:
+    name: "4.18"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.18"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.18"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  openstack-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.18"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: baremetal-pxe-sno-agent-ipv4-static-day2-skew-minus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      OC_SKEW_VERSION: "4.17"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-pxe-day2
+- as: baremetal-pxe-compact-agent-ipv4-static-day2-skew-plus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+- as: baremetal-pxe-sno-agent-ipv4-static-disc-day2-skew-plus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+- as: baremetal-sno-agent-ipv4-static-day2-skew-minus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+- as: baremetal-sno-agent-ipv4-static-day2-skew-plus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+- as: baremetal-sno-agent-ipv4-static-disc-day2-skew-plus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+- as: baremetal-sno-agent-ipv4-static-day2-disc-skew-minus-1
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-day2-tests

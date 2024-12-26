@@ -83,15 +83,55 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+function get_oc_skew() {
+  LATEST_SKEW_OC_RELEASE=""
+
+  case "${ADDITIONAL_WORKER_ARCHITECTURE}" in
+  "x86_64")
+      #  https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest?prefix=4.17
+      #  LATEST_SKEW_OC_RELEASE=$(curl -s "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest?prefix=${OC_SKEW_VERSION}")
+      LATEST_SKEW_OC_RELEASE=$(curl -s "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${OC_SKEW_VERSION}.0-0.nightly/latest")
+  ;;
+  "aarch64")
+      #  https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=4.17
+      #LATEST_SKEW_OC_RELEASE=$(curl -s "https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OC_SKEW_VERSION}")
+      LATEST_SKEW_OC_RELEASE=$(curl -s "https://arm64.ocp.releases.ci.openshift.org/api/v1/releasestream/${OC_SKEW_VERSION}.0-0.nightly-arm64/latest")
+  ;;
+  *)
+    echo "Unknown arch: ${ADDITIONAL_WORKER_ARCHITECTURE}"
+    exit 1
+  esac
+
+  # {
+  # "name": "4.17.9",
+  # "phase": "Accepted",
+  # "pullSpec": "quay.io/openshift-release-dev/ocp-release:4.17.9-x86_64",
+  # "downloadURL": "https://openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com/4.17.9"
+  # }
+
+  pull_spec=$(echo "$LATEST_SKEW_OC_RELEASE" | jq -r '.pullSpec')
+  echo "oc skew pull spec: $pull_spec"
+
+  echo "Extract the skew oc client..."
+  oc adm release extract -a "${day2_pull_secret}" "${pull_spec}" \
+    --command=oc --to=/tmp --insecure=true
+}
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
 
-echo "Extract the latest oc client..."
-oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=oc --to=/tmp --insecure=true
+## If no oc skew version is specified, use same version as current ocp payload
+
+if [ -z "${OC_SKEW_VERSION}" ]; then
+  echo "Extract the latest oc client..."
+  oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+    --command=oc --to=/tmp --insecure=true
+else
+  echo "Skew test, downloading oc skew binary version ${OC_SKEW_VERSION}"
+  get_oc_skew
+fi
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
@@ -105,6 +145,8 @@ cp "${SHARED_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 arch=${ADDITIONAL_WORKER_ARCHITECTURE}
+
+/tmp/oc version | tee "${ARTIFACT_DIR}/oc_version.txt"
 
 case "${BOOT_MODE}" in
 "iso")
@@ -138,14 +180,29 @@ case "${BOOT_MODE}" in
 "pxe")
   ### Create pxe files
   echo -e "\nCreate pxe files for day2 worker nodes..."
-  /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+  # The --report and --pxe flags were introduced in 4.18. It should be marked as experimental until 4.19.
+  /tmp/oc adm node-image create --report=true --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
+
+  # oc adm node-image create --pxe does not generate only pxe artifacts, but copies everything from the node-joiner pod.
+  # Also, the name of the pxe artifacts are not corrected (prefixed with agent, instead of node)
+  ls -lR "${DAY2_INSTALL_DIR}" > "${ARTIFACT_DIR}/pxe_artifacts_names.txt"
+
+  cp "${DAY2_INSTALL_DIR}/report.json" "${ARTIFACT_DIR}/"
+
+  # In the target folder, there should be only the following artifacts:
+  # * node.x86_64-initrd.img
+  # * node.x86_64-rootfs.img
+  # * node.x86_64-vmlinuz
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
+  #scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/*-vmlinuz* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/*-vmlinuz* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}_2"
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
+  #scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/*-initrd* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/*-initrd* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}_2.img"
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
+  #scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/*-rootfs* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/*-rootfs* \
    "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}_2.img"
 ;;
 *)
