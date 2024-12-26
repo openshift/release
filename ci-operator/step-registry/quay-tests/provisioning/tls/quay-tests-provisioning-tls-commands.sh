@@ -69,4 +69,6 @@ create_cert || true
 mv ca.crt "$SHARED_DIR"/build_cluster.crt 
 cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
 
+echo "temp dir $temp_dir"
+ls -l $temp_dir
 echo "tls cert successfully created" 

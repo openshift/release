@@ -39,15 +39,17 @@ TAG_EXPIRATION_OPTIONS:
 EOF
 
 # if env variable TLS is set and equals false, by default it is true
-if [ "$TLS" = "true" ]; then
+if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-  "$TLS" | tr -d \"
-else
-  [ "$TLS" = "false" ]
+  echo  $("$TLS" | tr -d \")
+  tls=true
+elif [[ "$TLS" = "false" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
     --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
     config-bundle-secret
-    "$TLS" | tr -d \"
+   echo "tls false..." 
+   tls=false
+   echo  $("$TLS" | tr -d \")
 fi
 
 #Deploy Quay registry, here disable monitoring component
@@ -74,7 +76,7 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: $(echo "$TLS" | tr -d '"')
+    managed: $tls
   - kind: route
     managed: true
 EOF
