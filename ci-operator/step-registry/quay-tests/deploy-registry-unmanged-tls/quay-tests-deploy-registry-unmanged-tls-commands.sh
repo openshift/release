@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "registry current folder... ${NAMESPACE},${QUAYREGISTRY} "
+echo "registry current folder... ${QUAYNAMESPACE},${QUAYREGISTRY} "
 pwd
 ls -l
 
@@ -40,11 +40,11 @@ EOF
 
 # if env variable TLS is set and equals false, by default it is true
 if [ "$TLS" = "false" ]; then
-  oc create secret generic -n "${NAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
+  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=false
   echo "tls is $tls.."
 else [ "$TLS" = "true" ]
-  oc create secret generic -n "${NAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
+  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=true
   echo "tls is $tls,"
 fi
@@ -57,7 +57,7 @@ apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
   name: ${QUAYREGISTRY}
-  namespace: ${NAMESPACE}
+  namespace: ${QUAYNAMESPACE}
 spec:
   configBundleSecret: config-bundle-secret
   components:
@@ -80,11 +80,11 @@ spec:
 EOF
 
 for _ in {1..60}; do
-  if [[ "$(oc -n ${NAMESPACE} get ${QUAYREGISTRY} quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+  if [[ "$(oc -n ${QUAYNAMESPACE} get ${QUAYREGISTRY} quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
-    oc -n ${NAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
-    oc get ${QUAYREGISTRY} quay -n ${NAMESPACE} -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get ${QUAYREGISTRY} quay -n ${NAMESPACE} -o jsonpath='{.status.registryEndpoint}') || true
+    oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    oc get ${QUAYREGISTRY} quay -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get ${QUAYREGISTRY} quay -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     exit 0

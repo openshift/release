@@ -6,7 +6,7 @@ set -o pipefail
 
 #Create TLS Cert/Key pairs for Quay Deployment
 QUAYREGISTRY=${QUAYREGISTRY}
-NAMESPACE=${NAMESPACE}
+QUAYNAMESPACE=${QUAYNAMESPACE}
 
 echo "Create TLS Cert/Key pairs for Quay Deployment..." >&2
 ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
@@ -17,8 +17,8 @@ printf "\nocp_base_domain_name\n"
 #encoding routines:ASN1_mbstring_ncopy:string too long:crypto/asn1/a_mbstr.c:107:maxsize=64
 quay_cn_wildcard_name="apps."$ocp_base_domain_name
 quay_cn_name="quay.${quay_cn_wildcard_name}"
-quay_builder_route="${QUAYREGISTRY}-quay-builder-${NAMESPACE}.${quay_cn_wildcard_name}"
-quay_name="${QUAYREGISTRY}-quay-${NAMESPACE}.${quay_cn_wildcard_name}"
+quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
+quay_name="${QUAYREGISTRY}-quay-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
 
 echo ${quay_builder_route}
 echo $quay_cn_wildcard_name
