@@ -24,6 +24,11 @@ echo ${quay_builder_route}
 echo $quay_cn_wildcard_name
 echo $quay_cn_name
 
+echo "first current folder..."
+pwd
+cd /tmp
+pwd
+
 cat >>openssl.cnf <<EOF
 [req]
 req_extensions = v3_req
@@ -65,7 +70,9 @@ mv ca.crt build_cluster.crt || true
 echo "current folder..."
 pwd
 
-create_cert
+create_cert || true
+cp ssl.cert ssl.key $SHARED_DIR/
 cat ssl.cert
 ls -l || true
+ls -l $SHARED_DIR || true
 echo "tls cert successfully created..." || true
