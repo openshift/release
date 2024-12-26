@@ -7,12 +7,12 @@ set -o pipefail
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
-#Deploy Quay Operator to OCP namespace '${NAMESPACE}'
+#Deploy Quay Operator to OCP namespace '${QUAYNAMESPACE}'
 cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ${NAMESPACE}
+  name: ${QUAYNAMESPACE}
 EOF
 
 cat <<EOF | oc apply -f -
@@ -20,10 +20,10 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: quay
-  namespace: ${NAMESPACE}
+  namespace: ${QUAYNAMESPACE}
 spec:
   targetNamespaces:
-  - ${NAMESPACE}
+  - ${QUAYNAMESPACE}
 EOF
 
 SUB=$(
@@ -32,7 +32,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: quay-operator
-  namespace: ${NAMESPACE}
+  namespace: ${QUAYNAMESPACE}
 spec:
   installPlanApproval: Automatic
   name: quay-operator
@@ -45,9 +45,9 @@ EOF
 echo "The Quay Operator subscription is $SUB"
 
 for _ in {1..60}; do
-    CSV=$(oc -n ${NAMESPACE} get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+    CSV=$(oc -n ${QUAYNAMESPACE} get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n ${NAMESPACE} get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+        if [[ "$(oc -n ${QUAYNAMESPACE} get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "Quay ClusterServiceVersion \"$CSV\" is ready"
             break
         fi

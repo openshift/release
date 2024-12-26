@@ -8,7 +8,7 @@ echo "registry current folder... ${QUAYNAMESPACE},${QUAYREGISTRY} "
 pwd
 ls -l
 
-#create secret bundle with odf/noobaa 
+#create secret bundle with odf/noobaa
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
@@ -39,16 +39,18 @@ TAG_EXPIRATION_OPTIONS:
 EOF
 
 # if env variable TLS is set and equals false, by default it is true
-if [ "$TLS" = "false" ]; then
-  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-  tls=false
-  echo "tls is $tls.."
-else [ "$TLS" = "true" ]
+if [ "$TLS" = "true" ]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=true
+  echo "tls is $tls.."
+else
+  [ "$TLS" = "false" ]
+  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
+    --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
+    config-bundle-secret
+  tls=false
   echo "tls is $tls,"
 fi
-
 
 #Deploy Quay registry, here disable monitoring component
 echo "Creating Quay registry..." >&2
@@ -83,10 +85,10 @@ for _ in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get ${QUAYREGISTRY} quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
-    oc get ${QUAYREGISTRY} quay -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    oc get ${QUAYREGISTRY} quay -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}' >"$SHARED_DIR"/quayroute || true
     quay_route=$(oc get ${QUAYREGISTRY} quay -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+      --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' >"$SHARED_DIR"/quay_oauth2_token || true
     exit 0
   fi
   sleep 15

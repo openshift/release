@@ -25,6 +25,7 @@ echo $quay_cn_wildcard_name
 echo $quay_cn_name
 
 echo "first current folder..."
+echo "provisiong tls..." > AFLAFFILR
 pwd
 temp_dir=$(mktemp -d)
 
@@ -66,7 +67,7 @@ function create_cert() {
 }
 
 #Get openshift CA Cert, include into secret bundle
-oc extract cm/kube-root-ca.crt -n openshift-apiserver || true
+oc extract cm/kube-root-ca.crt -n openshift-apiserver  --confirm 
 mv ca.crt $SHARED_DIR/build_cluster.crt || true
 echo "current folder..."
 pwd
@@ -75,6 +76,6 @@ create_cert || true
 cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key $SHARED_DIR/
 cat "$temp_dir"/ssl.cert
 ls -l "$temp_dir"|| true
-rm -rf "$temp_dir"
+# rm -rf "$temp_dir"
 ls -l $SHARED_DIR || true
 echo "tls cert successfully created..." || true
