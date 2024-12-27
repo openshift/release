@@ -18,7 +18,7 @@ function waitForReady() {
 
         # Approve CSRs if the desired node count > 250
         # https://issues.redhat.com/browse/OCPBUGS-47508
-        if [[ $1 gt 250 ]]; then
+        if [[ $1 -gt 250 ]]; then
             csrApprove
         fi
         log "Sleeping for 60 seconds"
