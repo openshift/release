@@ -71,32 +71,34 @@ tests:
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: gcp-qe
     env:
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-    cluster_profile: gcp-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-dns-peering-zone
-- as: installer-rehearse-ibmcloud
+- as: installer-rehearse-ibmcloud-15
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
     env:
-      EXTRA_SUBNETS_NUMBER: "5"
-      SLEEP_DURATION: 19h
+      SLEEP_DURATION: 5h
       USED_IN_CLUSTER: "yes"
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-mult-subnets-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-mult-subnets-provision
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-mult-subnets
+- as: installer-rehearse-ibmcloud-18
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "yes"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "3"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 zz_generated_metadata:
   branch: master
   org: openshift
