@@ -23,6 +23,9 @@ export WORKSPACE_NAME
 PATH=${PATH}:/tmp:"${IBMCLOUD_HOME}/ocp-install-dir"
 export PATH
 
+RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+export RESOURCE_GROUP
+
 ##### Functions
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
@@ -263,7 +266,7 @@ then
     exit 0
 fi
 
-if [ "${CLUSTER_TYPE}" != "ibmcloud" ]
+if [ "${CLUSTER_TYPE}" != "ibmcloud-multi-ppc64le" ]
 then
     echo "Adding workers with a different ISA for jobs using the cluster type ${CLUSTER_TYPE} is not implemented yet..."
     exit 4
