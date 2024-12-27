@@ -15,6 +15,12 @@ function waitForReady() {
         oc get machinesets -A
         log "Nodes:"
         oc get nodes --no-headers -l node-role.kubernetes.io/worker | cat -n
+
+        # Approve CSRs if the desired node count > 250
+        # https://issues.redhat.com/browse/OCPBUGS-47508
+        if [[ $1 gt 250 ]]; then
+            csrApprove
+        fi
         log "Sleeping for 60 seconds"
         sleep 60
         ((retries += 1))
@@ -54,10 +60,10 @@ function scaleMachineSets(){
     fi
 }
 
-function crdApprove() {
-    echo "Bulk Approve CSR"
+function csrApprove() {
+    log "Bulk Approve CSR"
     oc get csr | awk '/Pending/ && $1 !~ /^z/ {print $1}' | xargs -P 0 -I {} oc adm certificate approve {}
-    echo "Bulk Approved CSRs"
+    log "Bulk Approved CSRs"
 }
 
 function scaleDownMachines() {
@@ -95,7 +101,6 @@ if [[ $worker_count_num -gt 0 ]]; then
             waitForReady $worker_count_num
         else
             scaleMachineSets $worker_count_num
-            crdApprove
             waitForReady $worker_count_num
         fi
     fi
