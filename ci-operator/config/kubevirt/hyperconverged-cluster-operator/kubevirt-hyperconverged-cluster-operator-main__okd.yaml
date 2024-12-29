@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.16"
+    name: "4.17"
     namespace: origin
     tag: base-rhel9
   cli:
-    name: "4.16"
+    name: "4.17"
     namespace: origin
     tag: cli
   cli-operator-sdk:
@@ -14,7 +14,7 @@ base_images:
   hco-bundle-reg:
     name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.13.0-unstable
+    tag: 1.14.0-unstable
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
@@ -98,12 +98,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: origin
 resources:
   '*':
@@ -111,9 +111,8 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- always_run: false
-  as: hco-e2e-operator-sdk-gcp
-  optional: true
+- as: hco-e2e-operator-sdk-gcp
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
@@ -144,9 +143,8 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-gcp
-- always_run: false
-  as: hco-e2e-operator-sdk-aws
-  optional: true
+- as: hco-e2e-operator-sdk-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
@@ -177,16 +175,15 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
-- always_run: false
-  as: hco-e2e-upgrade-operator-sdk-aws
-  optional: true
+- as: hco-e2e-upgrade-operator-sdk-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.13.0
+      INITIAL_VERSION: 1.14.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
     test:
     - as: deploy-cr
@@ -231,16 +228,15 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
-- always_run: false
-  as: hco-e2e-upgrade-operator-sdk-gcp
-  optional: true
+- as: hco-e2e-upgrade-operator-sdk-gcp
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
-      INITIAL_VERSION: 1.13.0
+      INITIAL_VERSION: 1.14.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
     test:
     - as: deploy-cr
