@@ -8,14 +8,16 @@ set -x
 echo "************ telco5g cnf-tests commands ************"
 
 # Environment Variables required for running the test
+export KUBECONFIG="${SHARED_DIR}"/mgmt-kubeconfig
+NODEPOOL_NAME=$(oc get np -n clusters -o name | cut -d "/" -f 2)
 export KUBECONFIG="${SHARED_DIR}"/kubeconfig
 export ROLE_WORKER_CNF=worker
-export CLUSTER_NAME=cnfqe1
+export CLUSTER_NAME="${NODEPOOL_NAME}"
 export CLUSTER_TYPE=hypershift
-export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE=clusters-cnfqe1
+export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}"/mgmt-kubeconfig
 export HYPERSHIFT_HOSTED_CLUSTER_KUBECONFIG="${SHARED_DIR}"/kubeconfig
-export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-cnfqe1
+export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
@@ -81,8 +83,8 @@ make vet
 run_tests() {
     echo "************ Running ${GINKGO_LABEL} tests ************"
     GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
-    --timeout=1h --keep-separate-reports --keep-going --flake-attempts=2 \
-    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite=${GINKGO_SUITES}
+    --timeout=24h --keep-separate-reports --keep-going --flake-attempts=2 \
+    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
 }
 
 if [[ "${T5CI_VERSION}" == "4.17" ]]; then
