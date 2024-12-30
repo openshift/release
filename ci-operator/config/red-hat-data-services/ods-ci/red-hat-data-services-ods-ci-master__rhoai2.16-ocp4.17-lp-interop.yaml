@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: cli
   rhoai-tests:
@@ -17,21 +17,26 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     limits:
-      memory: 4Gi
+      cpu: "8"
+      memory: 32Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "8"
+      memory: 32Gi
 tests:
-- as: rhoai-interop-ibm
+- as: rhoai-interop-aws
   cron: 0 0 11 6 *
   steps:
-    cluster_profile: ibmcloud-rhoai-qe
+    cluster_profile: aws-rhoai-qe
     env:
-      BASE_DOMAIN: ibm.rh-ods.com
+      BASE_DOMAIN: aws.rh-ods.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      CONTROL_PLANE_REPLICAS: "3"
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -40,7 +45,7 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","rhoai-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","rhoai-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: apodhrad@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
@@ -51,15 +56,13 @@ tests:
             {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
-            {"name": "rhods-operator", "source": "redhat-operators", "channel": "stable-2.13", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
         ]
+      USER_TAGS: |
+        scenario rhoai
     test:
     - ref: install-operators
     - ref: rhoai-deploy-dsc
     - ref: rhoai-tests
-    workflow: firewatch-ipi-ibmcloud
-zz_generated_metadata:
-  branch: master
-  org: red-hat-data-services
-  repo: ods-ci
-  variant: rhoai2.13-ocp4.16-lp-interop
+    workflow: firewatch-ipi-aws
+  timeout: 4h0m0s
