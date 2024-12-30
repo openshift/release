@@ -314,6 +314,10 @@ cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+cp "${INSTALL_DIR}/coreos-stream.json" "${SHARED_DIR}/"
+
 echo -e "\nPower on the hosts..."
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -350,6 +354,8 @@ echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch  "${SHARED_DIR}/failure"
   # TODO
   exit 1
 fi
