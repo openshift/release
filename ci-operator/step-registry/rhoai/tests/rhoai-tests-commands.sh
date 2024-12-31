@@ -26,8 +26,5 @@ export OC_HOST
 export OCP_CONSOLE
 export RHODS_DASHBOARD
 
-# for debug
-sleep 1h
-
 # running RHOAI tests
 ./run_interop.sh
