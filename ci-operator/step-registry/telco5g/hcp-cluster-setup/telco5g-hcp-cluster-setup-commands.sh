@@ -6,7 +6,7 @@ set -o pipefail
 
 # enable for debug
 # exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+set -x
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
@@ -71,6 +71,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
+# shellcheck disable=SC2034
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno ${HOSTS_NUMBER-}"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -116,8 +117,8 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   gather_facts: false
   tasks:
 
-  - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME $RELEASE_ADD
+  # - name: Release cluster from job
+  #   command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME $RELEASE_ADD
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -304,9 +305,14 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
 EOF
 
-if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
+
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* && "$JOB_NAME" != *"nrop"* ]]; then
+    PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST -e hostedbm_secondary_node_pool_replicas=1"
+fi
+
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
