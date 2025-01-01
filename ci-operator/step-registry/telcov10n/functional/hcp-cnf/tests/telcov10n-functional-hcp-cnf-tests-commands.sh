@@ -24,6 +24,7 @@ TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH="master"
 GINKGO_LABEL="(!openshift && tier-0)"
+GINKGO_LABEL="tier-0 && !openshift"
 GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
@@ -91,6 +92,7 @@ if [[ "${T5CI_VERSION}" == "4.17" ]]; then
     run_tests
 else
     GINKGO_LABEL="(!openshift && tier-0 || tier-1)"
+    GINKGO_LABEL="(tier-0 || tier-1) && !openshift"
     GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance test/e2e/performanceprofile/functests/2_performance_update test/e2e/performanceprofile/functests/3_performance_status  test/e2e/performanceprofile/functests/7_performance_kubelet_node test/e2e/performanceprofile/functests/8_performance_workloadhints"
     run_tests
 fi
