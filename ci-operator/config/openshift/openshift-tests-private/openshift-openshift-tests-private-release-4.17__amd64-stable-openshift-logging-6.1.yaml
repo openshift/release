@@ -1,0 +1,99 @@
+base_images:
+  ansible:
+    name: "4.17"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.17"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.17"
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.17"
+  target:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-rosa-hcp-stage-critical-f7
+  cron: 54 2 3,12,19,26 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      CLO_SUB_CHANNEL: stable-6.1
+      CLO_TARGET_NAMESPACES: ""
+      LO_SUB_CHANNEL: stable-6.1
+      OPENSHIFT_VERSION: "4.17"
+    test:
+    - ref: operatorhub-subscribe-cluster-logging-operator
+    - ref: operatorhub-subscribe-loki-operator
+    workflow: rosa-aws-sts-hcp
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-stable-openshift-logging-6.1
