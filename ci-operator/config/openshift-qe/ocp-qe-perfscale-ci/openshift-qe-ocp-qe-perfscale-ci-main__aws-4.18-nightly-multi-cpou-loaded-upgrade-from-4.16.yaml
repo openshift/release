@@ -1,0 +1,79 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  intermediate:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.16"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: loaded-upgrade-multi-416to418-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      ADDITIONAL_WORKER_VM_TYPE: m7gd.metal
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5zn.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m5zn.metal
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "6"
+      MAX_UNAVAILABLE_WORKER: "3"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      OCP_ARCH: x86_64
+      PAUSED_MCP_NAME: worker infra
+      TIMEOUT: "150"
+      ZONES_COUNT: "3"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity-cpou
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.18-nightly-multi-cpou-loaded-upgrade-from-4.16
