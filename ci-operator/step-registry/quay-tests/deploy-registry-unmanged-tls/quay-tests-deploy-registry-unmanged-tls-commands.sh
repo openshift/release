@@ -43,6 +43,7 @@ if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=true
   echo "$TLS"
+  echo "$tls"
   echo  "$("$TLS" | tr -d \")"
 elif [[ "$TLS" = "false" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
@@ -51,6 +52,7 @@ elif [[ "$TLS" = "false" ]]; then
    echo "tls false..." 
    echo "$TLS"
    tls=false
+   echo "$tls"
    echo  "$("$TLS" | tr -d \")"
 fi
 
