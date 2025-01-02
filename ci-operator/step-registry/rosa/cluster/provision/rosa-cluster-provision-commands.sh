@@ -657,6 +657,10 @@ fi
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
+exit_code=$?
+
+# Used by gather steps to generate JUnit
+echo $exit_code > "${SHARED_DIR}/install-status.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"

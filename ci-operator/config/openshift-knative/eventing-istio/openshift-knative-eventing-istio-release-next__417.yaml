@@ -52,6 +52,17 @@ tests:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-istio-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -102,6 +113,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
+  timeout: 5h0m0s
 - as: e2e-tests-c
   cluster_claim:
     architecture: amd64
@@ -115,6 +127,17 @@ tests:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-istio-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -165,6 +188,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-next
   org: openshift-knative

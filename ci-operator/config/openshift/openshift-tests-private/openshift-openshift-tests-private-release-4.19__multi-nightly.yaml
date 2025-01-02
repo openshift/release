@@ -352,6 +352,38 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
+- as: aws-ipi-ovn-amd-cp-infra-to-arm-cp-infra-f7
+  cron: 45 16 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MIGRATION_CP_MACHINE_TYPE: m6g.xlarge
+      MIGRATION_INFRA_MACHINE_TYPE: m6g.xlarge
+    test:
+    - ref: ipi-conf-inframachineset
+    - ref: multiarch-migration-machine-type
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-ovn-compact-arm-cp-infra-to-amd-cp-infra-f7
+  cron: 26 0 6,13,22,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
+      INFRA_NODE_TYPE: m6g.xlarge
+      MIGRATION_ARCHITECTURE: x86_64
+      MIGRATION_CP_MACHINE_TYPE: m6i.2xlarge
+      MIGRATION_INFRA_MACHINE_TYPE: m6i.xlarge
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - ref: ipi-conf-inframachineset
+    - ref: multiarch-migration-machine-type
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-ovn-efs-fips-amd-f28-destructive-ui
   cron: 34 19 15 * *
   steps:
@@ -397,6 +429,30 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipv4-subnet-arm-f14
+  cron: 1 14 10,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
+- as: aws-ipi-ovn-ipv4-subnet-arm-f28-destructive
+  cron: 13 19 22 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
 - as: aws-ipi-proxy-sts-mini-perm-amd-f28-destructive
   cron: 24 15 29 * *
   steps:
@@ -1400,6 +1456,7 @@ tests:
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       E2E_RUN_TAGS: '@disconnected'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: arm64
       masters: "3"
       workers: "2"
