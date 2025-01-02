@@ -76,3 +76,15 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+if [ ${ADDITIONAL_NTP_SERVERS,,} = "true" ]; then
+# 4.18 feature
+echo "Creating patch file to add Additional NTP servers"
+cat > "${SHARED_DIR}/ntpservers_patch_install_config.yaml" <<EOF
+platform:
+  baremetal:
+    additionalNTPServers:
+      - 10.11.160.238
+      - 10.2.32.38
+EOF
+fi
