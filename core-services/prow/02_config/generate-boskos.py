@@ -268,9 +268,9 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
-    'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+    'openstack-rhoso-quota-slice': {
+        'titan03': 1,
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
