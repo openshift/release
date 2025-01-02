@@ -8,20 +8,23 @@ set -x
 echo "************ telco5g cnf-tests commands ************"
 
 # Environment Variables required for running the test
+export KUBECONFIG="${SHARED_DIR}"/mgmt-kubeconfig
+NODEPOOL_NAME=$(oc get np -n clusters -o name | cut -d "/" -f 2)
 export KUBECONFIG="${SHARED_DIR}"/kubeconfig
 export ROLE_WORKER_CNF=worker
-export CLUSTER_NAME=cnfqe1
+export CLUSTER_NAME="${NODEPOOL_NAME}"
 export CLUSTER_TYPE=hypershift
-export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE=clusters-cnfqe1
+export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}"/mgmt-kubeconfig
 export HYPERSHIFT_HOSTED_CLUSTER_KUBECONFIG="${SHARED_DIR}"/kubeconfig
-export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-cnfqe1
+export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH="master"
 GINKGO_LABEL="(!openshift && tier-0)"
+GINKGO_LABEL="tier-0 && !openshift"
 GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
@@ -78,10 +81,21 @@ go mod tidy
 go mod vendor
 make vet
 
-echo "************ Running ${GINKGO_LABEL} tests ************"
-GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
---timeout=1h --keep-separate-reports --keep-going --flake-attempts=2 \
---junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" --require-suite "${GINKGO_SUITES}"
+run_tests() {
+    echo "************ Running ${GINKGO_LABEL} tests ************"
+    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
+    --timeout=24h --keep-separate-reports --keep-going --flake-attempts=2 \
+    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
+}
+
+if [[ "${T5CI_VERSION}" == "4.17" ]]; then
+    run_tests
+else
+    GINKGO_LABEL="(!openshift && tier-0 || tier-1)"
+    GINKGO_LABEL="(tier-0 || tier-1) && !openshift"
+    GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance test/e2e/performanceprofile/functests/2_performance_update test/e2e/performanceprofile/functests/3_performance_status  test/e2e/performanceprofile/functests/7_performance_kubelet_node test/e2e/performanceprofile/functests/8_performance_workloadhints"
+    run_tests
+fi
 
 popd
 
