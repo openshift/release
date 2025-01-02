@@ -210,6 +210,23 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-ipi-user-provisioned-dns-mini-perm-arm-f7
+  cron: 5 16 1,8,15,22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-user-provisioned-dns
 - as: aws-ipi-additional-ca-always-arm-f14
   cron: 23 9 7,23 * *
   steps:
@@ -650,6 +667,19 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
+- as: gcp-ipi-user-provisioned-dns-arm-f7
+  cron: 21 10 6,13,20,27 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
 - as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
   cron: 15 21 18 * *
   steps:
