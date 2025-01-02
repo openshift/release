@@ -55,7 +55,7 @@ spec:
 EOF
 )
 
-for _ in {1..60}; do
+for i in {1..60}; do
   CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
     echo "ODF ClusterServiceVersion is...: \"$CSV\""
@@ -64,18 +64,10 @@ for _ in {1..60}; do
       break
     fi
   fi
-  echo "wait 10s"
-  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
-  echo "openshift-storage pod status $podstatus"
+  echo "wait $((i*10))s"
   sleep 10
 done
 echo "ODF/OCS Operator is deployed successfully"
-
-podlable=$(oc -n "$OO_INSTALL_NAMESPACE" get pod --show-labels) 
-echo "openshift-storage pod with label $podlable"
-
-podlable=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator) 
-echo "odf openshift-storage pod with label $podlable"
 
 #check odf operator pod status
 for i in {1..60}; do
@@ -88,12 +80,6 @@ for i in {1..60}; do
   podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod  -l name=ocs-operator) 
   echo "odf pod status $podstatus"
   echo "wait $((i*10))s"
-  sleep 10
-done
-
-for _ in {1..6}; do
-  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
-  echo "ODF/OCS Operator pod status $podstatus"
   sleep 10
 done
 

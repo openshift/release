@@ -4,9 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "registry current folder... ${QUAYNAMESPACE},${QUAYREGISTRY} "
-pwd
-ls -l
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
+echo "Create registry ${QUAYREGISTRY} in ns ${QUAYNAMESPACE}"
 
 #create secret bundle with odf/noobaa
 cat >>config.yaml <<EOF
@@ -38,22 +41,13 @@ TAG_EXPIRATION_OPTIONS:
   - 1d
 EOF
 
-# if env variable TLS is set and equals false, by default it is true
+# Create secret bundle upon env variable TLS, by default it is false
 if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-  tls=true
-  echo "$TLS"
-  echo "$tls"
-  echo  "$("$TLS" | tr -d \")"
 elif [[ "$TLS" = "false" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
     --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
     config-bundle-secret
-   echo "tls false..." 
-   echo "$TLS"
-   tls=false
-   echo "$tls"
-   echo  "$("$TLS" | tr -d \")"
 fi
 
 #Deploy Quay registry, here disable monitoring component
@@ -80,10 +74,12 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: $TLS
+    managed: ${TLS}
   - kind: route
     managed: true
 EOF
+
+sleep 60 #wait pod startup
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
@@ -91,11 +87,16 @@ for i in {1..60}; do
     oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry ${QUAYREGISTRY} -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}' >"$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry ${QUAYREGISTRY} -n ${QUAYNAMESPACE} -o jsonpath='{.status.registryEndpoint}') || true
+    echo "Quay Route is $quay_route"
+    curl -k $quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
+    cp "$SHARED_DIR"/quay_api_discovery "$ARTIFACT_DIR"/quay_api_discovery || true
+
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
       --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' >"$SHARED_DIR"/quay_oauth2_token || true
+    
     exit 0
   fi
   sleep 15
-  echo "wait for quay registry ready $((i*10))s"
+  echo "Wait for quay registry ready $((i*15))s"
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2

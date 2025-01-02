@@ -20,11 +20,6 @@ quay_cn_name="quay.${quay_cn_wildcard_name}"
 quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
 quay_name="${QUAYREGISTRY}-quay-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
 
-echo "first current folder..."
-echo "provisiong tls..." > AFLAFFILR
-pwd
-ls -l
-
 temp_dir=$(mktemp -d)
 
 cat >>"$temp_dir"/openssl.cnf <<EOF
@@ -62,13 +57,10 @@ function create_cert() {
 
 #Get openshift CA Cert, include into secret bundle
 oc extract cm/kube-root-ca.crt -n openshift-apiserver  --confirm 
-
 create_cert || true
 
 #Copy ssl files to SHARED_DIR 
 mv ca.crt "$SHARED_DIR"/build_cluster.crt 
 cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
 
-echo "temp dir $temp_dir"
-ls -l $temp_dir
 echo "tls cert successfully created" 
