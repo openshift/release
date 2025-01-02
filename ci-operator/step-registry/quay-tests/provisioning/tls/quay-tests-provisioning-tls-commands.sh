@@ -60,6 +60,7 @@ oc extract cm/kube-root-ca.crt -n openshift-apiserver  --confirm
 create_cert || true
 
 #Copy ssl files to SHARED_DIR 
+echo "Move tls cert to $SHARED_DIR folder" 
 mv ca.crt "$SHARED_DIR"/build_cluster.crt 
 cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
 

@@ -58,7 +58,6 @@ EOF
 for i in {1..60}; do
   CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
-    echo "ODF ClusterServiceVersion is...: \"$CSV\""
     if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       echo "ODF ClusterServiceVersion \"$CSV\" ready"
       break
@@ -69,10 +68,9 @@ for i in {1..60}; do
 done
 echo "ODF/OCS Operator is deployed successfully"
 
-#check odf operator pod status
+#Wait for odf operator pod startup
 for i in {1..60}; do
   PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
- 
   if [[ "$PStatus" == "True" ]]; then
       echo "ODF pod is running \"$PStatus\""
       break
