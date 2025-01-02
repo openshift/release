@@ -37,45 +37,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-ibmcloud-ipi-sshkey-capi
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      BASE_DOMAIN: ibmcloud.qe.devcluster.openshift.com
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      PUBLISH: External
-      SLEEP_DURATION: 5h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
 - as: installer-rehearse-ibmcloud-dis-capi
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 5h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: installer-rehearse-ibmcloud-dis-public-capi
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe-2
-    env:
       BASE_DOMAIN: ibmcloud.qe.devcluster.openshift.com
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       PUBLISH: External
+      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
       SLEEP_DURATION: 1m
     post:
     - ref: cucushift-installer-wait
@@ -83,20 +55,20 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: installer-rehearse-ibmcloud-dis-public
+- as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: ibmcloud-qe
     env:
-      BASE_DOMAIN: ibmcloud.qe.devcluster.openshift.com
-      PUBLISH: External
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       SLEEP_DURATION: 1m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
 zz_generated_metadata:
   branch: master
   org: openshift
