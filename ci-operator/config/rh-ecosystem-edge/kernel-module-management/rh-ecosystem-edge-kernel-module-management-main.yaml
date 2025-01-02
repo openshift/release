@@ -3,10 +3,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.54.2
   operator-sdk:
     name: "4.16"
     namespace: origin
@@ -150,10 +146,12 @@ tests:
     clone: true
     from: go-builder
 - as: lint
-  commands: ci/prow/lint
+  commands: |
+    unset GOFLAGS
+    ci/prow/lint
   container:
     clone: true
-    from: golangci-lint
+    from: go-builder
 - as: check-commits-count
   commands: ci/prow/check-commits-count
   container:
