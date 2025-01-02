@@ -11,6 +11,14 @@ base_images:
     name: 4.18-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
+  ocp_4.18_base-rhel9:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
@@ -30,6 +38,13 @@ images:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
+  inputs:
+    ocp_4.18_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   inputs:
@@ -39,8 +54,7 @@ images:
   to: hypershift-tests
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: 4.18-priv
@@ -51,32 +65,21 @@ releases:
       product: ocp
       stream: ci
       version: "4.18"
-  initial-417:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.18"
   latest:
     integration:
       include_built_images: true
       name: 4.18-priv
       namespace: ocp-private
-  latest-417:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.18"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.17"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -101,8 +104,9 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-- as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- always_run: false
+  as: e2e-aks
+  optional: true
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -120,19 +124,6 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
-    env:
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-17
-  run_if_changed: ^(test/e2e|hypershift-operator)
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:latest-417
-      OCP_IMAGE_N1: release:latest-417
-      OCP_IMAGE_N2: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-417
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -203,7 +194,8 @@ tests:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
       SNYK_ENABLE_DEPS_SCAN: "false"
     workflow: openshift-ci-security
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack-aws
   optional: true
   steps:
     cluster_profile: hypershift
@@ -219,7 +211,7 @@ tests:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-external
 - always_run: false
-  as: e2e-openstack-nfv
+  as: e2e-openstack-aws-nfv
   optional: true
   steps:
     cluster_profile: hypershift
@@ -235,7 +227,7 @@ tests:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-external
 - always_run: false
-  as: e2e-openstack-conformance
+  as: e2e-openstack-aws-conformance
   optional: true
   steps:
     cluster_profile: hypershift
@@ -247,24 +239,9 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-conformance
+    workflow: hypershift-openstack-aws-conformance
 - always_run: false
-  as: e2e-openstack-conformance-ingress-fip
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      INGRESS_FIP_ENABLED: "true"
-      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_SUITE: experimental/reliability/minimal
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-conformance
-- always_run: false
-  as: e2e-openstack-csi-cinder
+  as: e2e-openstack-aws-csi-cinder
   optional: true
   steps:
     cluster_profile: hypershift
@@ -277,9 +254,9 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-conformance
+    workflow: hypershift-openstack-aws-conformance
 - always_run: false
-  as: e2e-openstack-csi-manila
+  as: e2e-openstack-aws-csi-manila
   optional: true
   steps:
     cluster_profile: hypershift
@@ -292,7 +269,7 @@ tests:
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-conformance
+    workflow: hypershift-openstack-aws-conformance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

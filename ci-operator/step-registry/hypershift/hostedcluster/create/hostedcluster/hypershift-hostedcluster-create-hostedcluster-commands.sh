@@ -106,8 +106,11 @@ case "${PLATFORM}" in
     if [[ -z "${POWERVS_VPC}" ]]; then
       POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
-    if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
-      POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
+      POWERVS_TRANSIT_GATEWAY=$(jq -r '.transitGateway' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${TRANSIT_GATEWAY_LOCATION}" ]]; then
+          TRANSIT_GATEWAY_LOCATION=$(jq -r '.transitGatewayLocation' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
     if [[ -z "${POWERVS_REGION}" ]]; then
       POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -117,6 +120,18 @@ case "${PLATFORM}" in
     fi
     if [[ -z "${POWERVS_VPC_REGION}" ]]; then
       POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_RESOURCE_GROUP}" ]]; then
+      POWERVS_RESOURCE_GROUP=$(jq -r '.resourceGroupName' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_PROC_TYPE}" ]]; then
+      POWERVS_PROC_TYPE=$(jq -r '.procType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_PROCESSORS}" ]]; then
+      POWERVS_PROCESSORS=$(jq -r '.processors' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_SYS_TYPE}" ]]; then
+      POWERVS_SYS_TYPE=$(jq -r '.sysType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
 
     bin/hypershift create cluster powervs \
@@ -138,7 +153,9 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --cloud-connection ${POWERVS_CLOUD_CONNECTION} \
+      --power-edge-router true \
+      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
+      --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --debug

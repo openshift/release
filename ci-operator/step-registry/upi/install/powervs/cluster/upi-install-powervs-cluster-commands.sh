@@ -5,6 +5,7 @@ set -o nounset
 ############################################################
 # Variables
 IBMCLOUD_HOME=/tmp/ibmcloud
+export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
 ############################################################
@@ -51,6 +52,9 @@ echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
 echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
 echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
 echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
+
+WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
+export WORKSPACE_NAME
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
@@ -119,14 +123,14 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-    retry "ibmcloud plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 }
 
 # Download automation code
 function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
+    # Need to revert to ocp-power-automation
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
@@ -191,17 +195,16 @@ function cleanup_prior() {
 
     # Dev: functions don't work inline with xargs
     echo "Delete network non-'ocp-net' on PowerVS region"
-    export IBMCLOUD_HOME=${IBMCLOUD_HOME}
-    ibmcloud pi subnet ls | grep -v ocp-net | awk '{print $1}' | xargs -I {} ibmcloud pi subnet delete {} || true
+    ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
     echo "Done deleting non-'ocp-net' on PowerVS"
 
     # VPC Instances
     # VPC LBs 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    VPC_NAME="${WORKSPACE_NAME}"
+    echo "Target region - ${VPC_REGION}"
+    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
 
     echo "Cleaning up the VPC Load Balancers"
-    ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
     for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
     do
         echo "Subnet: ${SUB}"
@@ -212,12 +215,18 @@ function cleanup_prior() {
         done
 
         echo "Deleting LB in ${SUB}"
-        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[]?.name')
         do
             ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
         done
         sleep 60
     done
+
+    echo "Cleaning up the Security Groups"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        || true
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
@@ -257,16 +266,18 @@ function configure_terraform() {
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
+    VPC_NAME="${WORKSPACE_NAME}"
     echo "IC workspace :  ${WORKSPACE_NAME}"
     echo "IC VPC workspace :  ${VPC_NAME}"
-    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
     # Select the workspace ID 
     POWERVS_SERVICE_INSTANCE_ID=$(ibmcloud pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
     echo "IC: PowerVS instance ID: ${POWERVS_SERVICE_INSTANCE_ID}"
     export POWERVS_SERVICE_INSTANCE_ID
+
+    # store the powervs_service_instance_id for later
+    echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
 
     echo "Release Image used is:"
     curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
@@ -285,7 +296,7 @@ rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier5k"
-system_type         = "s922"
+system_type         = "e980"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "p2"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
@@ -305,6 +316,10 @@ ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+
+dns_forwarders = "161.26.0.10; 161.26.0.11"
+
+override_bastion_storage_pool = "General-Flash-7"
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
@@ -344,12 +359,10 @@ function build_upi_cluster() {
     fi
 
     echo "Extracting the terraformm output from the state file"
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_private_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -raw -no-color bastion_public_ip \
-            -state="${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate | \
-        tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+        -raw -no-color bastion_public_ip > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
     # public ip not shared for security reasons
     BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
@@ -363,12 +376,17 @@ function build_upi_cluster() {
     fi
 
     echo "Retrieving the SSH key"
-    scp -i "${IBMCLOUD_HOME}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 
     echo "Copying the terraform.tfstate"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+    if [ ! -f "${SHARED_DIR}"/kubeconfig ]
+    then
+        echo "kubeconfig not found install failed"
+        exit 7
+    fi
     echo "Done copying the kubeconfig"
 }
 

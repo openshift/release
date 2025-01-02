@@ -22,7 +22,8 @@ images:
   to: cluster-resource-override-admission
 promotion:
   to:
-  - name: "4.19"
+  - disabled: true
+    name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -46,13 +47,16 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: security
   optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: cluster-resource-override-admission
     workflow: openshift-ci-security
 - as: e2e-aws
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

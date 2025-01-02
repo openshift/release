@@ -32,7 +32,7 @@ declare MULTI_TENANT_CAPABLE_WORKFLOWS
 # shellcheck source=/dev/null
 source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
 
-DEFAULT_NETWORK_TYPE="single-tenant"
+DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"single-tenant"}
 for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
   if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
     log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
