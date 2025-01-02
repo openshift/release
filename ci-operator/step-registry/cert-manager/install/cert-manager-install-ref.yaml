@@ -1,18 +1,28 @@
 ref:
- as: cert-manager-install
- from_image:
-   namespace: ci
-   name: verification-tests
-   tag: latest
- grace_period: 20m
- commands: cert-manager-install-commands.sh
- cli: latest
- resources:
-   limits:
-     cpu: 500m
-     memory: 500Mi
-   requests:
-     cpu: 300m
-     memory: 200Mi
- documentation: |-
-   Install cert-manager Operator.
+  as: cert-manager-install
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 20m
+  commands: cert-manager-install-commands.sh
+  cli: latest
+  resources:
+    limits:
+      cpu: 500m
+      memory: 500Mi
+    requests:
+      cpu: 300m
+      memory: 200Mi
+  env:
+    - name: INSTALL_CATSRC
+      documentation: The name of the catalogsource to be used for the operator installation.
+      default: "qe-app-registry"
+    - name: INSTALL_CHANNEL
+      documentation: The name of the subscription channel that contains the INSTALL_CSV.
+      default: "stable-v1"
+    - name: INSTALL_CSV
+      documentation: The name of the specific CSV to install. If unset, the latest CSV of the INSTALL_CHANNEL will be installed.
+      default: ""
+  documentation: |-
+    Install the cert-manager Operator for Red Hat OpenShift by using the index image.
