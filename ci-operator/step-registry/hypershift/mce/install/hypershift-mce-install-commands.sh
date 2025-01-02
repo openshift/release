@@ -251,6 +251,7 @@ if [ "$arch" == "x86_64" ]; then
 fi
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
 
-# display HyperShift Operator Version
-oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperator-info.txt" >/dev/null; echo >> "$ARTIFACT_DIR/HyperShiftOperator-info.txt"
-oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq >> "$ARTIFACT_DIR/HyperShiftOperator-info.txt"
+# display HyperShift Operator Version and MCE version
+oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
+oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperatorImage.txt" >/dev/null; echo > "$ARTIFACT_DIR/hypershiftoperator-image"
+oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"
