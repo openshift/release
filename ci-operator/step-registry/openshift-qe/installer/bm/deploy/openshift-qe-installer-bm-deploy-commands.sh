@@ -13,6 +13,7 @@ CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
+KUBECONFIG_SRC=""
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -62,12 +63,12 @@ EOF
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 podman pull quay.io/quads/badfish:latest
-USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
+USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -123,11 +124,11 @@ if [[ "$PRE_UEFI" == "true" ]]; then
 fi
 EOF
 if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${LAB_CLOUD},${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
@@ -153,6 +154,12 @@ scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secre
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
 
+if [[ ${TYPE} == 'sno' ]]; then
+  KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
+else
+  KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
+fi
+
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
@@ -164,7 +171,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=/root/${TYPE}/kubeconfig dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
+   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate
    rm -rf .ansible
 "

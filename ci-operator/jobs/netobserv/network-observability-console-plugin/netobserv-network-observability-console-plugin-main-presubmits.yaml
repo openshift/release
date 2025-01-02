@@ -10,7 +10,7 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-netobserv-network-observability-console-plugin-main-images
     rerun_command: /test images
@@ -64,7 +64,7 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-netobserv-network-observability-console-plugin-main-plugin-cypress
     rerun_command: /test plugin-cypress
@@ -108,3 +108,72 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )plugin-cypress,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/qe-e2e-console-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-netobserv-network-observability-console-plugin-main-qe-e2e-console-tests
+    optional: true
+    rerun_command: /test qe-e2e-console-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=qe-e2e-console-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )qe-e2e-console-tests,?($|\s.*)

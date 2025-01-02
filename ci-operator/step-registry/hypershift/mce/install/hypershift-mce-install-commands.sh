@@ -233,10 +233,11 @@ metadata:
 data:
   hypershift-operator: ${OVERRIDE_HO_IMAGE}
 EOF
-  while ! [ "$(oc get deployment operator -n hypershift -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}')" == NewReplicaSetAvailable ]; do
+  while ! [[ "$(oc get deployment operator -n hypershift -o jsonpath='{.spec.template.spec.containers[*].image}')" == "$OVERRIDE_HO_IMAGE" ]]; do
       echo "wait override hypershift operator IMAGE..."
       sleep 10
   done
+  oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
 fi
 
 # display HyperShift cli version
@@ -249,3 +250,8 @@ if [ "$arch" == "x86_64" ]; then
   cd -
 fi
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+
+# display HyperShift Operator Version and MCE version
+oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
+oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperatorImage.txt" >/dev/null; echo > "$ARTIFACT_DIR/hypershiftoperator-image"
+oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"

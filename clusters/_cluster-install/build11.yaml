@@ -69,3 +69,53 @@ onboard:
   passthrough:
     exclude:
     - ci-operator/**
+  openshiftMonitoring:
+    patches:
+    - matches:
+      - kind: ConfigMap
+        name: cluster-monitoring-config
+        namespace: openshift-monitoring
+      inline:
+        data:
+          config.yaml: |
+            alertmanagerMain:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            prometheusK8s:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+              volumeClaimTemplate:
+                spec:
+                  resources:
+                    requests:
+                      storage: 100Gi
+            prometheusOperator:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                value: reserved
+                effect: NoExecute
+            metricsServer:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                value: reserved
