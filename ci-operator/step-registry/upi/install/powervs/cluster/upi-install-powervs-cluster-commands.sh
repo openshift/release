@@ -296,9 +296,9 @@ rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier5k"
-system_type         = "e980"
+system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
-cluster_id_prefix   = "p2"
+cluster_id_prefix   = "p-px"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
