@@ -42,12 +42,14 @@ EOF
 if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
   tls=true
+  echo "$TLS"
   echo  "$("$TLS" | tr -d \")"
 elif [[ "$TLS" = "false" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
     --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
     config-bundle-secret
    echo "tls false..." 
+   echo "$TLS"
    tls=false
    echo  "$("$TLS" | tr -d \")"
 fi
@@ -76,12 +78,12 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: $tls
+    managed: $TLS
   - kind: route
     managed: true
 EOF
 
-for _ in {1..60}; do
+for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
@@ -92,5 +94,6 @@ for _ in {1..60}; do
     exit 0
   fi
   sleep 15
+  echo "wait for quay registry ready $((i*10))s"
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
