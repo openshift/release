@@ -79,8 +79,6 @@ spec:
     managed: true
 EOF
 
-sleep 100 #wait pod reconcile
-
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
