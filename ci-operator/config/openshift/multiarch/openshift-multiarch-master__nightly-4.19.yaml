@@ -312,6 +312,58 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn
+- as: ocp-e2e-aws-ovn-multi-x-x-to-a-x
+  interval: 72h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      MIGRATION_CP_MACHINE_TYPE: m6g.xlarge
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| control plane machine set operator should
+        not cause an early rollout
+    test:
+    - ref: multiarch-migration-machine-type
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn
+- as: ocp-e2e-aws-ovn-multi-a-a-to-x-a
+  interval: 72h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      MIGRATION_ARCHITECTURE: x86_64
+      MIGRATION_CP_MACHINE_TYPE: m6i.xlarge
+      OCP_ARCH: arm64
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| control plane machine set operator should
+        not cause an early rollout
+    test:
+    - ref: multiarch-migration-machine-type
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-upi-ovn-multi-a-a
   interval: 72h
   steps:
