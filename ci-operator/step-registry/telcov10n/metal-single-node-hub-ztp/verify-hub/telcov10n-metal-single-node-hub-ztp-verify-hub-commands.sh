@@ -101,7 +101,9 @@ import pytest
     ("$($oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}')", 403),
 ])
 def test_http_endpoint(url):
-    response = requests.get(url[0], verify=False)
+    socks5_proxy = "${SOCKS5_PROXY}"
+    proxies = {"http": socks5_proxy, "https": socks5_proxy} if len(socks5_proxy) > 0 else None
+    response = requests.get(url[0], verify=False, proxies=proxies)
     assert response.status_code == url[1], f"Endpoint {url[0]} is not accessible. Status code: {response.status_code}"
 
 def test_cluster_version(bash):
