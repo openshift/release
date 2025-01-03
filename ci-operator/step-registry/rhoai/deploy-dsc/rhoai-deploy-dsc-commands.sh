@@ -48,7 +48,7 @@ oc_wait_for_pods() {
     local ns="${1}"
     local pods
 
-    for i in {1..60}; do
+    for _ in {1..60}; do
         echo "Waiting for pods in '${ns}' in state Running or Completed"
         pods=$(oc get pod -n "${ns}" | grep -v "Running\|Completed" | tail -n +2)
         echo "${pods}"
