@@ -56,7 +56,7 @@ fi
 
 EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
 
-if [ "$KB_WS_HCP" = "true" ] && [ -n "${HCP_MC_CLUSTER_ID}" ]; then
+if [ "$WS_HCP" = "true" ] && [ -n "${HCP_MC_CLUSTER_ID}" ]; then
   ocm get /api/clusters_mgmt/v1/clusters/${HCP_MC_CLUSTER_ID}/credentials | jq -r '.kubeconfig' > "${SHARED_DIR}/kube_burner_mc_kubeconfig"
   EXTRA_FLAGS="${EXTRA_FLAGS} --mc-kubeconfig ${SHARED_DIR}/kube_burner_mc_kubeconfig"
 fi
