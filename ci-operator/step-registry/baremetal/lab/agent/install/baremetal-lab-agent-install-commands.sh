@@ -260,6 +260,7 @@ if ! wait $!; then
   exit 1
 fi
 
+
 update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
@@ -270,5 +271,7 @@ if ! wait "$!"; then
 fi
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
 update_image_registry
+
+oc get nodes | tee "${ARTIFACT_DIR}/get_nodes.txt"
