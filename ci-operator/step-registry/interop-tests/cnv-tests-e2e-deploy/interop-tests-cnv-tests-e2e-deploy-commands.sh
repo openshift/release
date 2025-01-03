@@ -29,9 +29,11 @@ unset KUBERNETES_PORT_443_TCP_PORT
 set -x
 START_TIME=$(date "+%s")
 
+CNV_RELEASE=${CNV_RELEASE:-${OCP_VERSION}}
+
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${CNV_RELEASE}" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
