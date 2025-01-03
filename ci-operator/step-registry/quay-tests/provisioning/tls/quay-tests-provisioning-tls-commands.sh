@@ -55,17 +55,28 @@ function create_cert() {
 
 }
 
+#Create Artifact Directory
+ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+mkdir -p "$ARTIFACT_DIR"
+
+function copyCerts {
+    #Copy ssl files to SHARED_DIR
+    echo "Copy tls certs to $SHARED_DIR folder"
+    mv ca.crt "$SHARED_DIR"/build_cluster.crt
+    cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
+
+    #Archive the tls cert files
+    cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$ARTIFACT_DIR"
+
+}
+
 #Get openshift CA Cert, include into secret bundle
-oc extract cm/kube-root-ca.crt -n openshift-apiserver  --confirm 
+oc extract cm/kube-root-ca.crt -n openshift-apiserver --confirm
 create_cert || true
+echo "tls cert successfully created"
 
-#Copy ssl files to SHARED_DIR 
-echo "Move tls cert to $SHARED_DIR folder" 
-mv ca.crt "$SHARED_DIR"/build_cluster.crt 
-cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
-
-echo "tls cert successfully created" 
+#Finally Copy certs to SHARED_DIR and archive them
+trap copyCerts EXIT
 
 #Clean up temp dir
 rm -rf "$temp_dir" || true
-sleep 300
