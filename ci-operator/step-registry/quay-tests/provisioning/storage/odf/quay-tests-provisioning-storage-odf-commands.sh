@@ -75,7 +75,7 @@ for i in {1..60}; do
       echo "ODF pod is running \"$PStatus\""
       break
   fi
-  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod  -l name=ocs-operator) 
+  podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod) 
   echo "odf pod status $podstatus"
   echo "wait $((i*10))s"
   sleep 10
