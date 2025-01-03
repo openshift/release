@@ -33,8 +33,9 @@ spec:
     deviceClasses:
     - name: vg1
       deviceSelector:
-      paths:
-      - ${LVM_CLUSTER_DEVICE_PATH}
+        forceWipeDevicesAndDestroyAllData: ${LVM_CLUSTER_WIPE_DEVICE}
+        paths:
+        - ${LVM_CLUSTER_DEVICE_PATH}
       default: true
       thinPoolConfig:
         name: thin-pool-1
