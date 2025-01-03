@@ -14,25 +14,16 @@ function set_hub_cluster_kubeconfig {
 
 function clean_up {
 
-  echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
-
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
-
-  set -x
-  oc -n ${SPOKE_CLUSTER_NAME} delete agentclusterinstalls.extensions.hive.openshift.io ${SPOKE_CLUSTER_NAME} || echo
-  set +x
+  echo "************ telcov10n Clean up Policies related Spoke namespace ************"
 }
+
 
 function main {
   set_hub_cluster_kubeconfig
   clean_up
 
   echo
-  echo "Success!!! The SNO Spoke cluster related objects have been removed correctly."
+  echo "Success!!! The Policies have been removed correctly."
 }
 
 main
