@@ -32,9 +32,11 @@ releases:
       stream: nightly
       version: "4.18"
   target:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -50,11 +52,32 @@ tests:
       ENABLE_IDMS: "yes"
       MIRROR_BIN: oc-mirror
       SLEEP_DURATION: 30m
+      OUTBOUND_TYPE: "UserDefinedRouting"
+      PUBLISH: "Internal"
+      RESTRICTED_NETWORK: "yes"
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
+      ENABLE_FIREWALL_FULLLIST: "no"
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall-provision
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - ref: azure-provision-vnet-firewall-route
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: openshift-cluster-bot-rbac
+    - chain: mirror-images-payload
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-mirror
+    - ref: ipi-conf-azure-provisionednetwork
+    - ref: ipi-install-install-stableinitial
+    - ref: ipi-install-times-collection
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: mirror-images-tag-images
+    - ref: set-sample-operator-disconnected
+    - chain: cucushift-installer-check
+    - chain: cucushift-installer-check-azure-fullyprivate
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
