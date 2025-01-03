@@ -48,6 +48,23 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+if [ x"${DISCONNECTED}" == x"true" ] && [ "${PLATFORM}" == "baremetal" ]; then
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  set -o nounset
+  set -o errexit
+  INTERNAL_NET_CIDR="${1}"
+  IP_ARRAY="${@:2}"
+  for ip in $IP_ARRAY; do
+    iptables -A INPUT -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d 192.168.70.0/24 -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d 10.11.160.238 -j ACCEPT
+    iptables -A FORWARD -s ${ip} -d 192.168.70.0/24 -j ACCEPT
+  done
+EOF
+fi
+
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
   set -o nounset

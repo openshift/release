@@ -76,3 +76,13 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+echo "Creating patch file to use NTP servers"
+
+cat > "${SHARED_DIR}/ntpservers_patch_install_config.yaml" <<EOF
+platform:
+  baremetal:
+    additionalNTPServers:
+      - 10.11.160.238
+      - 10.2.32.38
+EOF
