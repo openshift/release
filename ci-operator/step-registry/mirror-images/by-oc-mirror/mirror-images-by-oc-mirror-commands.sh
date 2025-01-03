@@ -1,4 +1,5 @@
 #!/bin/bash
+#
 
 set -o nounset
 set -o errexit
@@ -36,9 +37,7 @@ echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 # target release
-target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
-target_release_image_repo="${target_release_image%:*}"
-target_release_image_repo="${target_release_image_repo%@sha256*}"
+target_release_image_repo="${MIRROR_REGISTRY_HOST}/ocmirrorrelease"
 echo "target_release_image_repo: $target_release_image_repo"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
