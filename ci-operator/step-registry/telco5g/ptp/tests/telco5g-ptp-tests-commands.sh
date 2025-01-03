@@ -274,6 +274,8 @@ git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-
 
 cd ptp-operator-conformance-test
 
+echo "DZK"
+
 # configuration
 cat <<'EOF' > ${SHARED_DIR}/test-config.yaml
 ---
