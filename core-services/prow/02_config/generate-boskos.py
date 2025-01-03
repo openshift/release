@@ -158,6 +158,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azurestack-dev-quota-slice': {
+        'mtcazs': 4
+    },
     'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
@@ -376,6 +379,9 @@ CONFIG = {
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
     },
+    'oci-agent-qe-quota-slice': {
+        'default': 50,
+    },
     'oci-edge-quota-slice': {
         'default': 50,
     },
@@ -476,6 +482,9 @@ CONFIG = {
     'aws-managed-osd-rhoai-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
+    },
+    'ibmcloud-rhoai-qe-quota-slice': {
+        'us-east': 40,
     }
 }
 

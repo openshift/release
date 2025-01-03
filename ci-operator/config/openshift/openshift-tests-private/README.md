@@ -10,11 +10,14 @@ There are two types of Prow configuration files under *openshift-tests-private*:
   - These files are used to setup test environment, like creating images in image stream
   - There are two types of infrastructure files:
     - Pre-merge files: these files will be triggered when image file changes are submitted, it will generate new images or update existing images in image stream against the change in image file. Pre-merge file name like: *openshift-openshift-tests-private-release-4.15.yaml*
+      Note: medodi, xia-zhao-rh, phaow and geliu2016 are approver of presubmit job, i.e yaml files -master.yaml and -<release branch>.yaml
     - Image files: these files define images,and export images into image stream. Image file name like: *openshift-openshift-tests-private-release-4.15__images.yaml*
+      Note: qe-productivtiy team approve these yaml files.
 - Test case config file
   - We define test cases in these kind of files.
   - There are two kind of test files: E2E tests and Upgrade Tests.
   - Tests will be triggered periodically against its settings.
+    Note: qe-productivtiy team approve these yaml files.
 
 ## E2E Test File Naming
 All E2E jobs under the job configuration location should have a consistent file naming rule as openshift-openshift-tests-private-release-VERSION__ARCH-STREAM.yaml, we will break down this to detail:

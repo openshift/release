@@ -314,18 +314,10 @@ EOF
 		create_get_actions_py
 		python3 $GET_ACTIONS_PY ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json > ${PERMISION_LIST}
 
-		# A temporary workaround for shared-vpc cluster https://issues.redhat.com/browse/OCPBUGS-45807
-		# If shared-vpc cluster, sts:AssumeRole permission is required.
-		# the configuration of shared-vpc cluster:
-		# platform:
-		#   aws:
-		#     hostedZone:
-		#     hostedZoneRole:
-
-		if grep -qE "hostedZone:" "${SHARED_DIR}/install-config.yaml" && grep -qE "hostedZoneRole:" "${SHARED_DIR}/install-config.yaml"; then
-			echo "This is a Shared-VPC (PHZ) cluster,  adding sts:AssumeRole permission to the list."
-			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
-		fi
+		# temp workaround for
+		#  https://issues.redhat.com/browse/OCPBUGS-45218
+		#  https://issues.redhat.com/browse/OCPBUGS-46596 
+		echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
 
 		rm -rf "${dir}"
 	fi
