@@ -41,7 +41,8 @@ TAG_EXPIRATION_OPTIONS:
   - 1d
 EOF
 
-# Create secret bundle upon env variable TLS, by default it is false
+# Create secret bundle upon env variable TLS, by default it is false.
+# tls certs get from $SHARED_DIR folder
 if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
 elif [[ "$TLS" = "false" ]]; then

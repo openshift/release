@@ -65,3 +65,7 @@ mv ca.crt "$SHARED_DIR"/build_cluster.crt
 cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
 
 echo "tls cert successfully created" 
+
+#Clean up temp dir
+rm -rf "$temp_dir" || true
+sleep 300
