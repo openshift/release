@@ -20,6 +20,12 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
   latest:
     candidate:
       product: ocp
@@ -31,6 +37,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -40,22 +52,41 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe-c3-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    cluster_profile: azure-qe
     env:
-      COMPUTE_DISK_TYPE: hyperdisk-balanced
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: c3-highcpu-192-metal
-      CONFIDENTIAL_COMPUTE: Disabled
-      CONTROL_PLANE_NODE_TYPE: n2-standard-4
-      ON_HOST_MAINTENANCE: Terminate
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_FIREWALL_FULLLIST: "no"
+      ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
+      OUTBOUND_TYPE: UserDefinedRouting
+      PUBLISH: Internal
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
+      RESTRICTED_NETWORK: "yes"
       SLEEP_DURATION: 30m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
+    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - ref: azure-provision-vnet-firewall-route
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: openshift-cluster-bot-rbac
+    - ref: mirror-images-check-registry-service
+    - ref: ipi-install-rbac
+    - ref: mirror-images-by-oc-mirror
+    - ref: mirror-images-by-oc-mirror-conf-mirror
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-mirror
+    - ref: ipi-conf-azure-provisionednetwork
+    - ref: ipi-install-install-stabletarget
+    - ref: ipi-install-times-collection
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: mirror-images-tag-images
+    - ref: set-sample-operator-disconnected
+    - chain: cucushift-installer-check
+    - chain: cucushift-installer-check-azure-fullyprivate
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
