@@ -1,12 +1,23 @@
 ref:
-  as: telcov10n-metal-single-node-hub-ztp-verify-hub
-  commands: telcov10n-metal-single-node-hub-ztp-verify-hub-commands.sh
+  as: telcov10n-virtualised-single-node-hub-ztp-deploy-hub
+  commands: telcov10n-virtualised-single-node-hub-ztp-deploy-hub-commands.sh
   from: src
+  grace_period: 10s
+  timeout: 72h0m0s
   resources:
     requests:
       cpu: 1000m
       memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ztp-left-shifting
+    mount_path: /var/run/telcov10n-ztp-left-shifting
   env:
+  - name: TIMEOUT
+    default: "+3 hours"
+    documentation: |-
+      Set the amount of time, the step must wait at most, before unconditionally forcing the workflow to continue
+      with the next steps (MIN: "1 min", default: "+3 hours", MAX: "72 hours").
   - name: SHARED_HUB_CLUSTER_PROFILE
     default: "ztp-hub-preserved-prod-cluster_profile_dir"
     documentation: |-
@@ -24,10 +35,6 @@ ref:
     default: "-vv -s"
     documentation: |-
       pytest trace level
-  - name: SOCKS5_PROXY
-    default: ""
-    documentation: |-
-      If cluster endpoints are reachables through a socks5 proxy
   - name: MCH_NAMESPACE
     default: "ocm"
     documentation: |-
