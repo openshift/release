@@ -17,7 +17,11 @@ function run_tests {
 
   oc get managedcluster || echo "No ready..."
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
   secret_kubeconfig=${SPOKE_CLUSTER_NAME}-admin-kubeconfig
   secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
 

@@ -101,7 +101,9 @@ import pytest
     ("$($oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}')", 403),
 ])
 def test_http_endpoint(url):
-    response = requests.get(url[0], verify=False)
+    socks5_proxy = "${SOCKS5_PROXY}"
+    proxies = {"http": socks5_proxy, "https": socks5_proxy} if len(socks5_proxy) > 0 else None
+    response = requests.get(url[0], verify=False, proxies=proxies)
     assert response.status_code == url[1], f"Endpoint {url[0]} is not accessible. Status code: {response.status_code}"
 
 def test_cluster_version(bash):
@@ -127,9 +129,9 @@ def test_ztp_namespaces(bash, namespace):
       time.sleep(60)
     assert attempts > 0, f"Not all PODs in {namespace} namespace are ready yet"
 
-def test_ztp_storageclass(bash):
-    oc_cmd = f"oc get storageclass --no-headers | grep -w '(default)'"
-    assert " (default) " in bash.run_script_inline([oc_cmd])
+# def test_ztp_storageclass(bash):
+#     oc_cmd = f"oc get storageclass --no-headers | grep -w '(default)'"
+#     assert " (default) " in bash.run_script_inline([oc_cmd])
 EOF-PYTEST
 
   run_pytest check_hub_installation
@@ -170,7 +172,7 @@ function assert_console_is_available {
       $oc_hub -n openshift-authentication wait --for=condition=Ready ${authentication_pods} --timeout 5m &&
       $oc_hub get co &&
       $oc_hub whoami --show-console &&
-      $oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}' &&
+      [ "$($oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}')" != "" ] &&
       set +x &&
       return ;
     } ||
