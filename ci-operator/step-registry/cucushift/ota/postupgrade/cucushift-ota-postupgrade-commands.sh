@@ -294,6 +294,20 @@ function post-OCP-23799(){
     fi
 }
 
+function post-OCP-32747(){
+    local token url alert state
+    sleep 1h
+    token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+    url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+    alert="$(curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/v1/alerts" | jq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+
+    state="$(echo "${alert}" | jq -r ".state")"
+    if [[ "${state}" != "firing" ]]; then
+        echo "state is incorrect, expected is firing, but observed is ${state}"
+        return 1
+    fi
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
