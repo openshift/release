@@ -7,4 +7,4 @@ set -x
 bastion=$(cat "/secret/address")
 
 ping -c 5 $bastion
-echo "hi" | nc 10.1.56.22 6443
+echo "hi" | nc 10.6.66.1 6443
