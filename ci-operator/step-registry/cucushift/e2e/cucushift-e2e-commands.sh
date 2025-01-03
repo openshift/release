@@ -238,7 +238,17 @@ function filter_test_by_capability() {
     done
     echo_e2e_tags
 }
+function filter_test_by_profile() {
+    local featureset
+    featureset="$(oc get featuregate cluster -o yaml | yq '.spec.featureSet')"
+    if ! (grep --ignore-case --quiet 'VSphereMultiVCenters' <<< "$featureset") ; then
+        export E2E_RUN_TAGS="not @storage and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+    oc get featuregate cluster -o yaml | yq '.spec'
+}
 function filter_tests() {
+    filter_test_by_profile
     filter_test_by_capability
     filter_test_by_fips
     filter_test_by_hypershift
