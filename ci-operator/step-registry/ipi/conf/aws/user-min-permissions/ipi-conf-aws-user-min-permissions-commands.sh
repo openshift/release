@@ -317,7 +317,7 @@ EOF
 		# temp workaround for
 		#  https://issues.redhat.com/browse/OCPBUGS-45218
 		#  https://issues.redhat.com/browse/OCPBUGS-46596 
-		echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
+		# echo "ec2:DescribeInstanceTypeOfferings" >> ${PERMISION_LIST}
 
 		rm -rf "${dir}"
 	fi
