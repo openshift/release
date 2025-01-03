@@ -3,53 +3,70 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
-set +e
-
-CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
-
 function check_ip_resolves() {
-  lookup=$(nslookup $2)
-  if [[ $? -eq 0 ]]; then
-    if [[ ${lookup} =~ $1 ]]; then
-      echo $2 resolves to $1
-      return 0
+    local ip=$1
+    local domain=$2
+
+    local lookup
+    lookup=$(nslookup "$domain" 2>/dev/null)
+    if [[ $? -eq 0 ]] && [[ ${lookup} =~ $ip ]]; then
+        echo "$domain resolves to $ip"
+        return 0
+    else
+        echo "$domain does not resolve to $ip"
+        return 1
     fi
-  fi
-  echo $2 does not resolv to $1
-  return 1
 }
 
+function verify_resolution() {
+    local cluster_name=$1
+    declare -n ipmap=$2
+    local base_domain=$3
+    local sleep_time=$4
+    local try_count=$5
 
-API_IP=$(<"${SHARED_DIR}"/API_IP)
-INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
+    for name in "${!ipmap[@]}"; do
+        local ip=${ipmap[$name]}
+        for try in $(seq 1 $try_count); do
+            echo "Attempt $try to verify we can resolve $name.$cluster_name.$base_domain"
+            if check_ip_resolves "$ip" "$name.$cluster_name.$base_domain"; then
+                echo "$name.$cluster_name.$base_domain resolves correctly to $ip"
+                break
+            fi
+            sleep $sleep_time
 
-SLEEP_TIME=${WAIT_TIME}
-COUNT=$(seq ${TRY_COUNT})
-
-
-declare -A ipmap
-ipmap["api"]=${API_IP}
-ipmap["ingress.apps"]=${INGRESS_IP}
-
-for key in "${!ipmap[@]}"
-do
-    NAME=${key}
-    IP=${ipmap[${key}]}
-    for TRY in ${COUNT}
-    do
-        sleep ${SLEEP_TIME}
-        echo Attempt ${TRY} to verify we can resolve ${NAME}.${CLUSTER_NAME}.${BASE_DOMAIN}
-        check_ip_resolves "${IP}" "${NAME}.${CLUSTER_NAME}.${BASE_DOMAIN}"
-        if [[ "$?" -eq "0" ]] ; then
-            echo ${NAME}.${CLUSTER_NAME}.${BASE_DOMAIN} resolves correctly to ${IP}
-            EXIT_CODE=0
-            break
-        fi
-        EXIT_CODE=1
+            if [[ $try -eq $try_count ]]; then
+                echo "FAILED: After $try_count tries, $name.$cluster_name.$base_domain did not resolve to $ip"
+                exit 1
+            fi
+        done
     done
-    if [[ ${EXIT_CODE} -ne 0 ]]; then
-        echo "FAILED: After ${TRY_COUNT} tries, ${NAME}.${CLUSTER_NAME}.${BASE_DOMAIN} did not resolve to ${IP}"
-        exit ${EXIT_CODE}
-    fi
-done
+}
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
+API_IP=$(<"${SHARED_DIR}/API_IP")
+INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
+SLEEP_TIME=${WAIT_TIME}
+TRY_COUNT=${TRY_COUNT}
+BASE_DOMAIN=${BASE_DOMAIN}
+
+declare -A ipmap=(
+    ["api"]=$API_IP
+    ["ingress.apps"]=$INGRESS_IP
+)
+
+verify_resolution "$CLUSTER_NAME" ipmap "$BASE_DOMAIN" "$SLEEP_TIME" "$TRY_COUNT"
+
+if [[ -f "${SHARED_DIR}/HIVE_FIP_API" && -f "${SHARED_DIR}/HIVE_FIP_INGRESS" ]]; then
+    HIVE_FIP_API=$(<"${SHARED_DIR}/HIVE_FIP_API")
+    HIVE_FIP_INGRESS=$(<"${SHARED_DIR}/HIVE_FIP_INGRESS")
+    HIVE_CLUSTER_NAME=$(<"${SHARED_DIR}/HIVE_CLUSTER_NAME")
+
+    # shellcheck disable=SC2034
+    declare -A ipmap_hive=(
+        ["api"]=$HIVE_FIP_API
+        ["ingress.apps"]=$HIVE_FIP_INGRESS
+    )
+
+    verify_resolution "$HIVE_CLUSTER_NAME" ipmap_hive "$BASE_DOMAIN" "$SLEEP_TIME" "$TRY_COUNT"
+fi
