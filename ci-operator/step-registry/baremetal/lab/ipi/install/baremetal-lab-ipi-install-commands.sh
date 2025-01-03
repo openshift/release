@@ -219,6 +219,10 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+cp "${INSTALL_DIR}/coreos-stream.json" "${SHARED_DIR}/"
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 # The installer's terraform template using the ironic provider needs to reach the ironic endpoint in the bootstrap VM
@@ -237,6 +241,8 @@ echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again.
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch "${SHARED_DIR}/failure"
   exit 1
 fi
 update_image_registry
