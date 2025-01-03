@@ -1,0 +1,267 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
+binary_build_commands: echo "no need to build"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h30m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        OO_NAMESPACE="cert-manager-operator"
+        oc create namespace "$OO_NAMESPACE"
+
+        # OO_CHANNEL="stable-v1"
+        # OO_INIT_VERSION="v1.14.0"
+        # # Using this method of installation fails the run bundle-upgrade command later
+        # oc create -f - << EOF
+        # apiVersion: operators.coreos.com/v1
+        # kind: OperatorGroup
+        # metadata:
+        #   name: openshift-cert-manager-operator
+        #   namespace: cert-manager-operator
+        # spec:
+        #   targetNamespaces:
+        #   - "cert-manager-operator"
+        # ---
+        # apiVersion: operators.coreos.com/v1alpha1
+        # kind: Subscription
+        # metadata:
+        #   name: openshift-cert-manager-operator
+        #   namespace: cert-manager-operator
+        # spec:
+        #   channel: ${OO_CHANNEL}
+        #   name: openshift-cert-manager-operator
+        #   source: redhat-operators
+        #   sourceNamespace: openshift-marketplace
+        #   installPlanApproval: Automatic
+        #   startingCSV: cert-manager-operator.${OO_INIT_VERSION}
+        # EOF
+        
+        OO_INIT_VERSION="v1.14.1"
+        OO_BUNDLE="registry.redhat.io/cert-manager/cert-manager-operator-bundle:$OO_INIT_VERSION"
+
+        export REGISTRY_AUTH_FILE=/tmp/import-secret/.dockerconfigjson
+        # operator-sdk uses google/go-containerregistry@v0.19.1 which does not support REGISTRY_AUTH_FILE usage
+        # using DOCKER_CONFIG dir instead, pull-secret should be present at $DOCKER_CONFIG/config.json
+        # for crane to be able to pull it.
+        export DOCKER_CONFIG=/tmp/.docker
+        mkdir -p $DOCKER_CONFIG
+        cp $REGISTRY_AUTH_FILE $DOCKER_CONFIG/config.json
+
+        cd /tmp
+        operator-sdk run bundle -n "$OO_NAMESPACE" --verbose --security-context-config restricted "$OO_BUNDLE"
+
+        is_deployment_available() {
+          DEPLOYMENT_NAME="$1"
+          NAMESPACE="$2"
+
+          TIMEOUT=1800
+          INTERVAL=15
+
+          START_TIME=$(date +%s)
+
+          while true; do
+              if oc get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" ; then
+                  echo "Deployment is Available"
+                  oc wait --for condition=Available -n "$NAMESPACE" deployment "$DEPLOYMENT_NAME"
+                  break
+              else
+                  echo "Deployment is not Available yet. Retrying..."
+              fi
+
+              CURRENT_TIME=$(date +%s)
+              ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+              
+              if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+                  echo "Timeout reached after 1 hour. Exiting."
+                  break
+              fi
+
+              sleep $INTERVAL
+          done
+        }
+
+        is_deployment_available "cert-manager-operator-controller-manager" "cert-manager-operator"
+        is_deployment_available "cert-manager-cainjector" "cert-manager"
+        is_deployment_available "cert-manager-webhook" "cert-manager"
+        is_deployment_available "cert-manager" "cert-manager"
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: apply-icsp
+      commands: |
+        oc create -f - << EOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ImageContentSourcePolicy
+        metadata:
+          name: cert-manager-konflux-quay-mirror
+        spec:
+          repositoryDigestMirrors:
+          # registry RH prod
+          - mirrors:
+            - registry.stage.redhat.io/cert-manager/cert-manager-operator-bundle
+            - quay.io/redhat-user-workloads/cert-manager-oape-tenant/cert-manager-operator-1-15/cert-manager-operator-bundle-1-15
+            source: registry.redhat.io/cert-manager/cert-manager-operator-bundle
+          - mirrors:
+            - registry.stage.redhat.io/cert-manager/cert-manager-operator-rhel9
+            - quay.io/redhat-user-workloads/cert-manager-oape-tenant/cert-manager-operator-1-15/cert-manager-operator-1-15
+            source: registry.redhat.io/cert-manager/cert-manager-operator-rhel9
+          - mirrors:
+            - registry.stage.redhat.io/cert-manager/jetstack-cert-manager-rhel9
+            - quay.io/redhat-user-workloads/cert-manager-oape-tenant/jetstack-cert-manager-1-15/jetstack-cert-manager-1-15
+            source: registry.redhat.io/cert-manager/jetstack-cert-manager-rhel9
+          - mirrors:
+            - registry.stage.redhat.io/cert-manager/jetstack-cert-manager-acmesolver-rhel9
+            - quay.io/redhat-user-workloads/cert-manager-oape-tenant/jetstack-cert-manager-1-15/jetstack-cert-manager-acmesolver-1-15
+            source: registry.redhat.io/cert-manager/jetstack-cert-manager-acmesolver-rhel9
+        EOF
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 50m
+    - as: check-bundle
+      commands: |
+        #!/bin/bash
+        IMAGE_REGISTRY="quay.io"
+        IMAGE_REPO="/redhat-user-workloads/cert-manager-oape-tenant/cert-manager-operator-1-15/cert-manager-operator-bundle-1-15"
+        IMAGE_TAG_PREFIX="on-pr"
+
+        TIMEOUT=3600
+        INTERVAL=15
+
+        COMMIT=${PULL_PULL_SHA}
+        IMAGE_TAG="$IMAGE_TAG_PREFIX-$COMMIT"
+
+        START_TIME=$(date +%s)
+
+        while true; do
+            HTTP_CODE=$(curl -s -L --output /dev/null --write-out "%{http_code}" https://$IMAGE_REGISTRY/v2/$IMAGE_REPO/manifests/$IMAGE_TAG)
+            if [ "$HTTP_CODE" = "200" ]; then
+                echo "Bundle is Available"
+                break
+            else
+                echo "Bundle is not Available yet. Retrying..."
+            fi
+
+            CURRENT_TIME=$(date +%s)
+            ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+            
+            if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+                echo "Timeout reached after 1 hour. Exiting."
+                break
+            fi
+
+            sleep $INTERVAL
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        COMMIT=${PULL_PULL_SHA}
+
+        OO_BUNDLE="quay.io/redhat-user-workloads/cert-manager-oape-tenant/cert-manager-operator-1-15/cert-manager-operator-bundle-1-15:on-pr-$COMMIT"
+        
+        export REGISTRY_AUTH_FILE=/tmp/import-secret/.dockerconfigjson
+        # operator-sdk uses google/go-containerregistry@v0.19.1 which does not support REGISTRY_AUTH_FILE usage
+        # using DOCKER_CONFIG dir instead, pull-secret should be present at $DOCKER_CONFIG/config.json
+        # for crane to be able to pull it.
+        export DOCKER_CONFIG=/tmp/.docker
+        mkdir -p $DOCKER_CONFIG
+        cp $REGISTRY_AUTH_FILE $DOCKER_CONFIG/config.json
+
+        cd /tmp
+        operator-sdk run bundle-upgrade -n cert-manager-operator --verbose --security-context-config restricted "$OO_BUNDLE"
+        
+        is_deployment_available() {
+          DEPLOYMENT_NAME="$1"
+          NAMESPACE="$2"
+
+          TIMEOUT=1800
+          INTERVAL=15
+
+          START_TIME=$(date +%s)
+
+          while true; do
+              if oc get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" ; then
+                  echo "Deployment is Available"
+                  oc wait --for condition=Available -n "$NAMESPACE" deployment "$DEPLOYMENT_NAME"
+                  break
+              else
+                  echo "Deployment is not Available yet. Retrying..."
+              fi
+
+              CURRENT_TIME=$(date +%s)
+              ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+              
+              if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+                  echo "Timeout reached after 1 hour. Exiting."
+                  break
+              fi
+
+              sleep $INTERVAL
+          done
+        }
+
+        is_deployment_available "cert-manager-operator-controller-manager" "cert-manager-operator"
+        is_deployment_available "cert-manager-cainjector" "cert-manager"
+        is_deployment_available "cert-manager-webhook" "cert-manager"
+        is_deployment_available "cert-manager" "cert-manager"
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        git submodule update --init --recursive
+        cd cert-manager-operator
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-1.15
+  org: openshift
+  repo: cert-manager-operator-release
