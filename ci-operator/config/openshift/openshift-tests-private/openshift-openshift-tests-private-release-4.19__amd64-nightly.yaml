@@ -120,6 +120,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-c2s-ipi-disc-priv-fips-f28-tp-longduration-cloud
+  cron: 15 9 13 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@disconnected'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-ipi-disc-priv-f28-ota
   cron: 14 10 13 * *
   steps:
@@ -758,6 +771,18 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
+- as: aws-ipi-pri-sharevpc-phz-sts-min-perm-f28-longduration-cloud
+  cron: 55 2 13 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
 - as: aws-ipi-proxy-fips-f14-fips-check
   cron: 18 22 7,21 * *
@@ -1674,6 +1699,15 @@ tests:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: azure-mag-ipi-fullyprivate-f28-longduration-cloud
+  cron: 34 0 5 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-stack-ipi-f28
   cluster: build01
@@ -2666,6 +2700,15 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: ibmcloud-ipi-proxy-private-rt-f28-longduration-cloud
+  cron: 22 11 22 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: ibmcloud-ipi-tp-f28
   cron: 8 3 27 * *
   steps:
@@ -2878,6 +2921,18 @@ tests:
       LB_TYPE: UserManaged
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
+- as: nutanix-ipi-zones-external-lb-f28-longduration-cloud
+  cluster: build01
+  cron: 31 13 4 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      BASTION_SUBNET_UUID: 512c1d6f-c6e7-4746-8ae2-9c3e1db2aba6
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      LB_TYPE: UserManaged
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
 - as: nutanix-ipi-zones-f28
   cluster: build01
@@ -3271,6 +3326,15 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
+- as: vsphere-ipi-ovn-dualstack-f28-longduration-cloud
+  cron: 23 22 29 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      IP_FAMILIES: DualStackIPv6Primary
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-ipsec-mininal-permission-f28
   cron: 4 4 13 * *
   steps:
@@ -3439,13 +3503,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
-- as: vsphere-ipi-zones-f28-longduration-cloud
-  cron: 43 1 17 * *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - chain: openshift-e2e-test-clusterinfra-qe-longrun
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-ipi-zones-multisubnets-external-lb-f28
   cron: 32 7 12 * *
   steps:

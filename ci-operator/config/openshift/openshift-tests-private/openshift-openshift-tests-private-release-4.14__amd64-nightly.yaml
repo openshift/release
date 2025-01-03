@@ -190,18 +190,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-f28-longduration-cloud
-  cron: 43 16 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sdn-rhcos-rhel8-f28
   cron: 53 23 24 * *
   steps:
@@ -1493,17 +1481,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
-- as: azure-mag-ipi-fullyprivate-f28-longduration-cloud
-  cron: 54 12 2 * *
-  steps:
-    cluster_profile: azuremag-qe
-    env:
-      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-stack-ipi-f28
   cluster: build01
   cron: 21 12 22 * *
@@ -2196,16 +2173,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-private-f28-longduration-cloud
-  cron: 24 19 27 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: gcp-ipi-proxy-etcd-encryption-f28-compliance
   cron: 32 9 27 * *
   steps:
@@ -2316,6 +2283,13 @@ tests:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
+- as: ibmcloud-ipi-ovn-ipsec-f60-longduration-cloud
+  cron: 24 22 18 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: ibmcloud-ipi-ovn-mtu-migrate-f28
   cron: 36 7 24 * *
@@ -2484,6 +2458,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+- as: nutanix-ipi-proxy-fips-f60-longduration-cloud
+  cluster: build01
+  cron: 4 16 1 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: nutanix-ipi-tp-f28
   cluster: build01
   cron: 12 4 17 * *
@@ -2505,19 +2490,6 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-tp-f28-longduration-cloud
-  cluster: build01
-  cron: 23 21 13 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: vsphere-agent-compact-fips-f28
   cron: 35 18 27 * *
@@ -2749,6 +2721,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-f60-longduration-cloud
+  cron: 31 14 14 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f28
   cron: 26 6 14 * *
   steps:
@@ -2889,16 +2873,6 @@ tests:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: vsphere-ipi-zones-f28-longduration-cloud
-  cron: 26 6 10 * *
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-ipi-zones-multisubnets-external-lb-f28
   cron: 54 19 19 * *
