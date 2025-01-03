@@ -296,9 +296,9 @@ rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier5k"
-system_type         = "e980"
+system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
-cluster_id_prefix   = "p2"
+cluster_id_prefix   = "p-px"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
@@ -316,6 +316,8 @@ ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+
+dns_forwarders = "161.26.0.10; 161.26.0.11"
 
 override_bastion_storage_pool = "General-Flash-7"
 EOF
