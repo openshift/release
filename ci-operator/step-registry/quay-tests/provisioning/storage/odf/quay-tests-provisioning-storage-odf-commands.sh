@@ -81,6 +81,8 @@ for i in {1..60}; do
   sleep 10
 done
 
+sleep 100 # Wait for all ODF service to be ready
+
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
