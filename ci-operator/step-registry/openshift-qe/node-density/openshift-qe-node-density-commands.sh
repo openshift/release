@@ -34,6 +34,10 @@ ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+# When test was triggered from a PR in the openshift/release repository
+if [[ -n ${PULL_NUMBER:-} ]] && [[ ${REPO_OWNER} == "openshift" ]] && [[ ${REPO_NAME} == "release" ]]; then
+  export ES_INDEX="kube-burner-rehearsal"
+fi
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
