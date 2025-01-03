@@ -99,10 +99,10 @@ if ! retry 60 5 ssh_via_proxy "uname -a"; then
     openstack console log show ${server_id}
 		exit 1
 fi
+PASSWORD="$(< /var/run/bastionproxy/secret)"
+MIRROR_REGISTRY_CREDENTIALS="${CLUSTER_NAME}:${PASSWORD}"
 
 MIRROR_REGISTRY_DNS_NAME="mirror-registry.${CLUSTER_NAME}.${BASE_DOMAIN}"
-MIRROR_REGISTRY_CREDENTIALS=$(<"/var/run/vault/mirror-registry/registry_creds")
-scp_via_proxy "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" $BASTION_USER@$mirror_ipv4:/tmp/htpasswd
 
 echo "Deploying the mirror registry"
 >&2 cat << EOF > $WORK_DIR/deploy_mirror.sh
@@ -112,22 +112,12 @@ sudo mkfs.xfs /dev/vdc
 sudo mkdir -p /opt/registry/{auth,certs,data}
 sudo mount /dev/vdc /opt/registry/data
 sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /opt/registry/certs/domain.key -x509 -days 1 -subj "/CN=mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -addext "subjectAltName=DNS:$MIRROR_REGISTRY_DNS_NAME,DNS:mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -out /opt/registry/certs/domain.crt
-sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt   
-sudo mv /tmp/htpasswd /opt/registry/auth/htpasswd
+sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt
 sudo update-ca-trust
 sudo dnf install -y podman
-sudo podman create --name registry -p 5000:5000 --net host \
-    -e "REGISTRY_AUTH=htpasswd" \
-    -e "REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd" \
-    -e "REGISTRY_AUTH_HTPASSWD_REALM='Registry Realm'" \
-    -v /opt/registry/auth:/auth:Z \
-    -v /opt/registry/certs:/certs:Z \
-    -v /opt/registry/data:/var/lib/registry:z \
-    -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
-    -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
-    quay.io/libpod/registry:2.8.2
-sudo podman start registry
-curl -u "$MIRROR_REGISTRY_CREDENTIALS" --connect-timeout 5 --max-time 10 --retry 5 --retry-delay 0 --retry-max-time 40 https://mirror-$CLUSTER_NAME-${CONFIG_TYPE}:5000/v2/_catalog
+curl -L -o mirror-registry.tar.gz https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz --retry 12
+tar -xzvf mirror-registry.tar.gz
+./mirror-registry install --quayHostname ${MIRROR_REGISTRY_DNS_NAME} --initPassword ${PASSWORD} --initUser ${CLUSTER_NAME} -v
 EOF
 
 scp_via_proxy $WORK_DIR/deploy_mirror.sh $BASTION_USER@$mirror_ipv4:/tmp
