@@ -33,11 +33,26 @@ resources:
       memory: 200Mi
 tests:
 - as: verify
-  commands: |
-    export GOLANGCI_LINT_CACHE=$(mktemp -d)
-    make verify
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify
+      cli: latest
+      commands: |
+        export GOLANGCI_LINT_CACHE=$(mktemp -d)
+        export REGISTRY_AUTH_FILE=/var/secrets/ci-pull-credentials/.dockerconfigjson
+        export BUNDLE_IMG="registry.ci.openshift.org/${OO_BUNDLE#*/}"
+        make verify
+      credentials:
+      - mount_path: /var/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - as: unit
   commands: |
     export XDG_CACHE_HOME=$(mktemp -d)
