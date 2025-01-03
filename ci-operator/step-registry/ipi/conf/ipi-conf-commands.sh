@@ -82,6 +82,5 @@ echo "Creating patch file to use custom rhcos image"
 cat > "${SHARED_DIR}/clusterosimage_patch_install_config.yaml" <<EOF
 platform:
   baremetal:
-    bootstrapOSImage: http://openshift-qe-metal-ci.arm.eng.rdu2.redhat.com/rhcos-9.4.202501022123.0-qemu.aarch64.qcow2.gz?sha256=c952fbdaa9c456b32437e142a52587e6d77e462c2ff0cf3ca8fe1646b1f8d973
     clusterOSImage: http://openshift-qe-metal-ci.arm.eng.rdu2.redhat.com/rhcos-9.4.202501022123.0-qemu.aarch64.qcow2.gz?sha256=c952fbdaa9c456b32437e142a52587e6d77e462c2ff0cf3ca8fe1646b1f8d973
 EOF
