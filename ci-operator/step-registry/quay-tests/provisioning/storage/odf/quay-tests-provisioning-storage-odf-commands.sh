@@ -102,4 +102,4 @@ spec:
 EOF
 
 echo "Waiting for NooBaa Storage to be ready..." >&2
-oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s || true
+oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=240s || true
