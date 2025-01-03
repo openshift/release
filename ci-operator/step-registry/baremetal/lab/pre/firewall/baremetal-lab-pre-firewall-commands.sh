@@ -59,6 +59,7 @@ if [ x"${DISCONNECTED}" == x"true" ] && [ "${PLATFORM}" == "baremetal" ]; then
     iptables -A INPUT -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
     iptables -A FORWARD -s ${ip} -p udp --dport 123 -d "${INTERNAL_NET_CIDR}" -j DROP
     iptables -A FORWARD -s ${ip} -p udp --dport 123 -d 192.168.70.0/24 -j DROP
+    iptables -A FORWARD -s ${ip} -p udp --dport 123 -d 10.11.160.238 -j ACCEPT
     iptables -A FORWARD -s ${ip} -d 192.168.70.0/24 -j ACCEPT
   done
 EOF
