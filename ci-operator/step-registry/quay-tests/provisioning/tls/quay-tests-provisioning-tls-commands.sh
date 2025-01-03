@@ -68,6 +68,9 @@ function copyCerts {
     #Archive the tls cert files
     cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$ARTIFACT_DIR"
 
+    #Clean up temp dir
+    rm -rf "$temp_dir" || true
+
 }
 
 #Get openshift CA Cert, include into secret bundle
@@ -77,6 +80,3 @@ echo "tls cert successfully created"
 
 #Finally Copy certs to SHARED_DIR and archive them
 trap copyCerts EXIT
-
-#Clean up temp dir
-rm -rf "$temp_dir" || true
