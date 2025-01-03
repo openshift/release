@@ -70,7 +70,6 @@ function copyCerts {
 
     #Clean up temp dir
     rm -rf "$temp_dir" || true
-
 }
 
 #Get openshift CA Cert, include into secret bundle
