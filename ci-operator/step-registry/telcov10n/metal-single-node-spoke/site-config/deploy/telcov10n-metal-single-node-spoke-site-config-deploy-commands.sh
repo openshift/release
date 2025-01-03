@@ -127,7 +127,11 @@ function generate_site_config {
       exit 1
     fi
 
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
+    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+    else
+      SPOKE_CLUSTER_NAME=${NAMESPACE}
+    fi
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
@@ -229,7 +233,7 @@ git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 mkdir -pv \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
-mkdir -pv \${ztp_repo_dir}/site-policies
+mkdir -pv \${ztp_repo_dir}/site-policies/${SPOKE_CLUSTER_NAME}
 cat <<EOS > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/site-config.yaml
 $(cat ${site_config_file})
 EOS
@@ -255,6 +259,8 @@ resources:
   - ${SPOKE_CLUSTER_NAME}
 EOK
 fi
+
+cat \${ztp_repo_dir}/site-configs/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
 
 cd \${ztp_repo_dir}
 git add .
@@ -412,6 +418,8 @@ function wait_until_assisted_service_is_ready {
     oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
   } || {
     oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service ;
+    echo ;
     oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
     exit 1 ;
   }

@@ -16,7 +16,11 @@ function set_hub_cluster_kubeconfig {
 
 function remove_related_git_info {
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+    else
+      SPOKE_CLUSTER_NAME=${NAMESPACE}
+    fi
 
   echo "************ telcov10n Removing related Git into for the ${SPOKE_CLUSTER_NAME} spoke cluster ************"
 
@@ -43,9 +47,17 @@ if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
   sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/site-configs/kustomization.yaml
 fi
 
+if [ -f \${ztp_repo_dir}/site-policies/kustomization.yaml ]; then
+  sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/site-policies/kustomization.yaml
+fi
+
 cd \${ztp_repo_dir}
+# The below line is to force the commit always push something
+# even when you run this twice for exactly the same cluster
+touch .${SPOKE_CLUSTER_NAME}-deleted-at-$(date -u +%s%N)
 git add .
 git rm -r site-configs/${SPOKE_CLUSTER_NAME}
+git rm -r site-policies/${SPOKE_CLUSTER_NAME}
 git commit -m 'Delete Related ${SPOKE_CLUSTER_NAME} spoke cluster GitOps files'
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
