@@ -2,6 +2,17 @@
 
 set -euo pipefail
 
+function check_operator() {
+    echo "Ckecking the persence of the cert-manager operator as prerequisite..."
+    local output=$(oc wait deployment cert-manager-operator-controller-manager -n cert-manager-operator --for=condition=Available --timeout=0 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "Operator is ready to use"
+    else
+        echo "$output. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
 function create_azure_dns_clusterissuer() {
     # Create secret containing Azure client secret
     (
@@ -19,7 +30,7 @@ spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
-      name: $PRIVATE_KEY_SECRET_NAME
+      name: acme-dns01-account-key
     solvers:
     # For ingress
     - selector:
@@ -83,26 +94,18 @@ HYPERSHIFT_EXTERNAL_DNS_DOMAIN="$(cut -d '.' -f 1 --complement <<< "$KAS_ROUTE_H
 # CM configurations
 CLIENT_SECRET_KEY="client-secret"
 CLIENT_SECRET_NAME="azuredns-config"
-CLUSTERISSUER_NAME="cluster-certs-clusterissuer" # referenced by the 'cert-manager-custom-apiserver-cert' and 'cert-manager-custom-ingress-cert' steps
-OPERATOR_NAMESPACE="cert-manager-operator"
 OPERAND_NAMESPACE="cert-manager"
-PRIVATE_KEY_SECRET_NAME="acme-dns01-account-key"
-SUB="openshift-cert-manager-operator"
 
 # Check if CM is installed
-INSTALLED_CSV="$(oc get subscription "$SUB" -n "$OPERATOR_NAMESPACE" -o=jsonpath='{.status.installedCSV}')"
-if [[ -z "${INSTALLED_CSV}" ]]; then
-    echo "CM not installed. Invoke cert-manager-install first." >&2
-    exit 1
-fi
+check_operator
 
 # Creat clusterissuer
-case "${CLUSTER_TYPE,,}" in
+case "${CLUSTER_TYPE}" in
 *azure*)
     create_azure_dns_clusterissuer
     ;;
 *)
-    echo "Cluster type ${CLUSTER_TYPE} unsupported, exiting" >&2
+    echo "Cluster type '${CLUSTER_TYPE}' unsupported, exiting..." >&2
     exit 1
     ;;
 esac
