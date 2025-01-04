@@ -34,6 +34,17 @@ function wait_for_hc_readiness() {
     wait "${pids_to_wait[@]}"
 }
 
+function check_clusterissuer() {
+    echo "Ckecking the persence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
+    local output=$(oc wait clusterissuer "$CLUSTERISSUER_NAME" --for=condition=Ready --timeout=0 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "ClusterIssuer is ready to use"
+    else
+        echo "$output. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
 function create_aggregated_cert() {
     oc create -f - << EOF
 apiVersion: cert-manager.io/v1
@@ -134,8 +145,7 @@ fi
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
 
 # Check clusterissuer readiness
-CLUSTERISSUER_NAME=cluster-certs-clusterissuer
-oc wait clusterissuer "$CLUSTERISSUER_NAME" --for=condition=Ready=True --timeout=0
+check_clusterissuer
 
 # Get CP service hostnames
 KAS_ROUTE_HOSTNAME="$(mgmt oc get hc -A -o jsonpath='{.items[0].spec.services[?(@.service=="APIServer")].servicePublishingStrategy.route.hostname}')"
