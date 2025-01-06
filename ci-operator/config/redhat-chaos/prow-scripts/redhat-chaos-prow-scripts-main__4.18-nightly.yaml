@@ -71,12 +71,11 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
-- as: krkn-hub-tests-compact
+- as: gcp-fipsetcd-krkn-hub-tests
   cron: 0 4 * * 1
   steps:
-    cluster_profile: aws-chaos
+    cluster_profile: gcp-chaos
     env:
-      BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.18
     observers:
@@ -84,22 +83,24 @@ tests:
       - redhat-chaos-cerberus
     test:
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-aws-compact
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
-- as: krkn-hub-node-tests-compact
+- as: gcp-fipsetcd-krkn-hub-node-tests
   cron: 0 4 * * 1
   steps:
-    cluster_profile: aws-chaos
+    cluster_profile: gcp-chaos
     env:
-      BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.18
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
-    - chain: redhat-chaos-krkn-hub-node-tests
-    workflow: openshift-qe-installer-aws-compact
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
 - as: krkn-hub-tests-418-azure-node
   cron: 29 5 * * 2
@@ -141,6 +142,35 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+- as: krkn-hub-tests-compact
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-aws-compact
+  timeout: 6h0m0s
+- as: krkn-hub-node-tests-compact
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: openshift-qe-installer-aws-compact
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
