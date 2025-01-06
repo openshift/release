@@ -33,14 +33,28 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+JOB="$(echo "${JOB_SPEC}" | jq '.job')"
+BOOTSTRAP_IP=""
+
+if [[ "$JOB" =~ "baremetal-ipi" ]]; then
+  BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address")"
+fi
+
 echo 'Deprovisioning firewall configuration'
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" "${BOOTSTRAP_IP}" << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
+  BOOTSTRAP_IP="${3}"
   for ip in $IP_ARRAY; do
+    # TODO: change to firewalld or nftables
     iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
+    iptables -D FORWARD -s ${ip} -d 192.168.70.0/24 -j ACCEPT
   done
+  if [ -n "${BOOTSTRAP_IP}" ]; then
+    iptables -D FORWARD -s ${BOOTSTRAP_IP} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -D FORWARD -s ${BOOTSTRAP_IP} -d 192.168.70.0/24 -j ACCEPT
+  fi
 EOF
