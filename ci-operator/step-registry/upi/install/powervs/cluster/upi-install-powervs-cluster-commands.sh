@@ -240,7 +240,8 @@ function cleanup_prior() {
 
 # creates the var file
 function configure_terraform() {
-    export IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IBMCLOUD_API_KEY
 
     echo "IC: Resource Group is ${RESOURCE_GROUP}"
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
