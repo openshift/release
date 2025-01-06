@@ -30,6 +30,12 @@ chain:
     - name: HYPERSHIFT_AZURE_CP_MI
       default: "false"
       documentation: Specifies whether control plane components should authenticate to Azure using managed identities.
+    - name: HYPERSHIFT_AZURE_DNS_ZONE_RG_NAME
+      default: ""
+      documentation: "The name of the resource group where the DNS Zone resides. This is needed for the ingress controller. This is just the name and not the full ID of the resource group."
+    - name: HYPERSHIFT_AZURE_ASSIGN_SERVICE_PRINCIPAL_ROLES
+      default: "false"
+      documentation: "Assign the service principal roles to the managed identities."
     - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
       default: ""
       documentation: "Specifies the type of storage account for storing diagnostics data."
@@ -170,6 +176,11 @@ chain:
       
       if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
         COMMAND+=(--managed-identities-file "${SHARED_DIR}"/hypershift_azure_mi_file.json)
+      fi
+      
+      if [[ $HYPERSHIFT_AZURE_ASSIGN_SERVICE_PRINCIPAL_ROLES == "true" ]] && [[ -n $HYPERSHIFT_AZURE_DNS_ZONE_RG_NAME ]] ; then
+        COMMAND+=(--assign-service-principal-roles)
+        COMMAND+=(--dns-zone-rg-name=${HYPERSHIFT_AZURE_DNS_ZONE_RG_NAME})
       fi
       
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
