@@ -6,7 +6,6 @@ set -o pipefail
 
 
 #Create Azure Storage Account and Storage Container
-QUAY_AZURE_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
 QUAY_AZURE_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
 QUAY_AZURE_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
 QUAY_AZURE_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
