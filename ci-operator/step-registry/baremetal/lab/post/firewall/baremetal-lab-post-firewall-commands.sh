@@ -33,14 +33,31 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+if [[ -f "${SHARED_DIR}/ipi_bootstrap_ip_address" ]]; then
+  BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address")"
+fi
+
 echo 'Deprovisioning firewall configuration'
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" "${BOOTSTRAP_IP}" << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
+  BOOTSTRAP_IP="${3}"
   for ip in $IP_ARRAY; do
-    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
+    # TODO: change to firewalld or nftables
+    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    rule=$(iptables -S FORWARD | grep "${ip}"| grep "${BMC_NETWORK}" | grep ACCEPT | sed 's/^-A /-D /')
+    [[ -n "${rule}" ]] && read -r -a RULE <<< "${rule}"
+    [[ $RULE =~ D.*$ip.*ACCEPT ]] && iptables "${RULE[@]}"
   done
+  if [ -n "${BOOTSTRAP_IP}" ]; then
+    rule=$(iptables -S FORWARD | grep "${BOOTSTRAP_IP}"| grep DROP | sed 's/^-A /-D /')
+    read -r -a RULE <<< "${rule}"
+    [[ $RULE =~ D.*$BOOTSTRAP_IP.*DROP ]] && iptables "${RULE[@]}"
+    rule=$(iptables -S FORWARD | grep "${BOOTSTRAP_IP}"| grep ACCEPT | sed 's/^-A /-D /')
+    read -r -a RULE <<< "${rule}"
+    [[ $RULE =~ D.*$BOOTSTRAP_IP.*ACCEPT ]] && iptables "${RULE[@]}"
+  fi
 EOF
