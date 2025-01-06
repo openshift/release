@@ -1,18 +1,25 @@
 ref:
- as: cert-manager-install
- from_image:
-   namespace: ci
-   name: verification-tests
-   tag: latest
- grace_period: 20m
- commands: cert-manager-install-commands.sh
- cli: latest
- resources:
-   limits:
-     cpu: 500m
-     memory: 500Mi
-   requests:
-     cpu: 300m
-     memory: 200Mi
- documentation: |-
-   Install cert-manager Operator.
+  as: cert-manager-install
+  from: upi-installer
+  cli: latest
+  commands: cert-manager-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - namespace: test-credentials
+      name: openshift-custom-mirror-registry
+      mount_path: /var/run/vault/mirror-registry
+  env:
+    - name: INDEX_IMG
+      documentation: The index image to use for the custom catalog source creation. If unset, it indicates to use the default 'redhat-operators' catalog source.
+      default: ""
+    - name: CHANNEL
+      documentation: The name of the operator channel to track.
+      default: "stable-v1"
+    - name: TARGET_NAMESPACES
+      documentation: A comma-separated list of namespaces the operator will target. Special, value '!all' means that all namespaces will be targeted. 
+      default: "cert-manager-operator"
+  documentation: |-
+    Install the cert-manager Operator for Red Hat OpenShift from catalog source (supports both default and BYO catalogs).
