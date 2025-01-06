@@ -43,14 +43,18 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      CLO_SUB_CHANNEL: stable-6.0
-      CLO_TARGET_NAMESPACES: ""
       COMPUTE_NODE_TYPE: e2-standard-8
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-6.0
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.0
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
+        ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
       TEST_IMPORTANCE: ""
@@ -60,8 +64,7 @@ tests:
       TEST_TIMEOUT: "15"
     test:
     - ref: enable-qe-catalogsource-logging
-    - ref: operatorhub-subscribe-cluster-logging-operator
-    - ref: operatorhub-subscribe-loki-operator
+    - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 zz_generated_metadata:

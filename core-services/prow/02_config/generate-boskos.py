@@ -87,6 +87,9 @@ CONFIG = {
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
+    'metal-perfscale-telco-quota-slice': {
+        'metal-perfscale-telco-rdu2': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -157,6 +160,9 @@ CONFIG = {
     },
     'azurestack-quota-slice': {
         'ppe3': 2
+    },
+    'azurestack-dev-quota-slice': {
+        'mtcazs': 4
     },
     'azurestack-qe-quota-slice': {
         'mtcazs': 4
@@ -479,6 +485,9 @@ CONFIG = {
     'aws-managed-osd-rhoai-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
+    },
+    'ibmcloud-rhoai-qe-quota-slice': {
+        'us-east': 40,
     }
 }
 
