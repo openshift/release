@@ -138,6 +138,13 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
     export OPENSTACK_IMG=${OPENSTACK_IMG_BASE_RELEASE:="quay.io/openstack-k8s-operators/openstack-operator-index:87ab1f1fa16743cad640f994f459ef14c5d2b9ca"}
     export TIMEOUT=${TIMEOUT:="600s"}
     make openstack_wait || exit 1
+
+    # if the new initialization resource exists install it
+    # this will also wait for operators to deploy
+    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+      make openstack_init
+    fi
+
     make openstack_wait_deploy || exit 1
     make openstack_cleanup || exit 1
 
@@ -145,6 +152,11 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
     export OPENSTACK_IMG=${OPENSTACK_IMG_BKP}
     make openstack_wait || exit 1
     sleep 10
+    # if the new initialization resource exists install it
+    # this will also wait for operators to deploy
+    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+      make openstack_init
+    fi
     make openstack_patch_version || exit 1
     oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
 
