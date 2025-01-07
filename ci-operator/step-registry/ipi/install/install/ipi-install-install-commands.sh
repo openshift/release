@@ -759,6 +759,10 @@ case $JOB_NAME in
     # Do not retry because azure resources always collide when re-using installer assets
     max=1
     ;;
+  *ibmcloud*)
+    # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
+    max=1
+    ;;
   *)
     max=3
     ;;
