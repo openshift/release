@@ -66,7 +66,7 @@ fi
 
 MI_ARGS=""
 if [[ "${AUTH_THROUGH_CERTS}" == "true" && "${TECH_PREVIEW_NO_UPGRADE}" == "true" ]]; then
-  MI_ARGS="-e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
+  MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
 fi
 
 hack/ci-test-e2e.sh -test.v \

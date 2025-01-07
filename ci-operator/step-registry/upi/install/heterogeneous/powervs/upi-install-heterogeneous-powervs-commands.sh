@@ -23,7 +23,7 @@ export WORKSPACE_NAME
 PATH=${PATH}:/tmp:"${IBMCLOUD_HOME}/ocp-install-dir"
 export PATH
 
-RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
 export RESOURCE_GROUP
 
 ##### Functions

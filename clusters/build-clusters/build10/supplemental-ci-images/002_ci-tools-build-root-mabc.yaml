@@ -10,21 +10,19 @@ spec:
     output:
       to:
         kind: ImageStreamTag
-        name: ci-tools-build-root:1.22
+        name: ci-tools-build-root:1.23
         namespace: ci
     source:
       images:
       - from:
-          kind: ImageStreamTag
-          name: boskos:latest
-          namespace: ci
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:ci_boskos_latest
         paths:
         - destinationDir: .
           sourcePath: /app
       - from:
-          kind: ImageStreamTag
-          name: prometheus:latest
-          namespace: ci
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:ci_prometheus_latest
         paths:
         - destinationDir: .
           sourcePath: /bin/prometheus
@@ -36,7 +34,7 @@ spec:
 
         COPY --from=builder /manifest-tool /usr/bin/manifest-tool
 
-        ENV VERSION=1.22.4 \
+        ENV VERSION=1.23.4 \
             GOCACHE=/go/.cache \
             GOARM=5 \
             GOPATH=/go \
@@ -98,17 +96,9 @@ spec:
     strategy:
       dockerStrategy:
         from:
-          kind: ImageStreamTag
-          name: centos:stream9
-          namespace: openshift
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
         imageOptimizationPolicy: SkipLayers
       type: Docker
-    triggers:
-    - imageChange:
-        from:
-          kind: ImageStreamTag
-          name: centos:stream9
-          namespace: openshift
-      type: ImageChange
   external_registries:
   - registry.ci.openshift.org
