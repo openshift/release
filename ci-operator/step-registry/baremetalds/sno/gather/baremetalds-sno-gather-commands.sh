@@ -69,7 +69,7 @@ oc adm must-gather \
   --insecure-skip-tls-verify \
   --dest-dir "${must_gather_dir}" > "${must_gather_dir}/must-gather.log"
 
-find "${must_gather_dir}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
+find "${must_gather_dir}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1"' _ {} \;
 
 
 EOF

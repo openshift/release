@@ -38,7 +38,10 @@ chmod +x ${YQ_PATH}
 yq -i 'select(.kind == "BareMetalHost").spec.automatedCleaningMode = "disabled"' ocp/ostest/extra_host_manifests.yaml
 yq -i 'select(.kind == "BareMetalHost").spec.externallyProvisioned = env(BMH_EXTERNALLY_PROVISIONED)' ocp/ostest/extra_host_manifests.yaml
 oc create -f ocp/ostest/extra_host_manifests.yaml
-oc create namespace ibi-cluster
+
+# Create namespace if it doesn't exist without throwing an error code
+oc create namespace ibi-cluster --dry-run=client -oyaml | oc apply -f -
+
 oc create secret generic pull-secret -n ibi-cluster --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=${PULL_SECRET_FILE}
 
 export SEED_VERSION=$(cat /home/ib-orchestrate-vm/seed-version)
