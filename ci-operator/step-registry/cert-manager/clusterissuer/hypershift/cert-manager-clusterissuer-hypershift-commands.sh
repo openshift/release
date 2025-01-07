@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+function check_cm_operator() {
+    echo "Checking the persence of the cert-manager Operator as prerequisite..."
+    if ! oc wait deployment/cert-manager-operator-controller-manager -n cert-manager-operator --for=condition=Available --timeout=0; then
+        echo "The cert-manager Operator is not installed or unavailable. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
 function create_azure_dns_clusterissuer() {
     # Create secret containing Azure client secret
     (
@@ -10,7 +18,7 @@ function create_azure_dns_clusterissuer() {
     )
 
     # Create ClusterIssuer with Azure DNS resolver
-    oc create -f - << EOF
+    oc apply -f - << EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -19,9 +27,9 @@ spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
-      name: $PRIVATE_KEY_SECRET_NAME
+      name: acme-dns01-account-key
     solvers:
-    # For ingress
+    # For Ingress
     - selector:
         dnsZones:
         - $HYPERSHIFT_BASE_DOMAIN
@@ -83,29 +91,21 @@ HYPERSHIFT_EXTERNAL_DNS_DOMAIN="$(cut -d '.' -f 1 --complement <<< "$KAS_ROUTE_H
 # CM configurations
 CLIENT_SECRET_KEY="client-secret"
 CLIENT_SECRET_NAME="azuredns-config"
-CLUSTERISSUER_NAME="cluster-certs-clusterissuer" # referenced by the 'cert-manager-custom-apiserver-cert' and 'cert-manager-custom-ingress-cert' steps
-OPERATOR_NAMESPACE="cert-manager-operator"
 OPERAND_NAMESPACE="cert-manager"
-PRIVATE_KEY_SECRET_NAME="acme-dns01-account-key"
-SUB="openshift-cert-manager-operator"
 
 # Check if CM is installed
-INSTALLED_CSV="$(oc get subscription "$SUB" -n "$OPERATOR_NAMESPACE" -o=jsonpath='{.status.installedCSV}')"
-if [[ -z "${INSTALLED_CSV}" ]]; then
-    echo "CM not installed. Invoke cert-manager-install first." >&2
-    exit 1
-fi
+check_cm_operator
 
-# Creat clusterissuer
-case "${CLUSTER_TYPE,,}" in
+# Creat ClusterIssuer
+case "${CLUSTER_TYPE}" in
 *azure*)
     create_azure_dns_clusterissuer
     ;;
 *)
-    echo "Cluster type ${CLUSTER_TYPE} unsupported, exiting" >&2
+    echo "Cluster type '${CLUSTER_TYPE}' unsupported, exiting..." >&2
     exit 1
     ;;
 esac
 
-# Wait for the clusterissuer to be ready
-oc wait ClusterIssuer "$CLUSTERISSUER_NAME" --for=condition=Ready=True --timeout=180s
+# Wait for the ClusterIssuer to be ready
+oc wait clusterissuer "$CLUSTERISSUER_NAME" --for=condition=Ready=True --timeout=180s
