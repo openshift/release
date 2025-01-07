@@ -181,11 +181,11 @@ function attach_public_gateway_to_subnet() {
 # for verify case OCPBUGS-36185[IBMCloud] MAPI only checks first set of subnets (no pagination support)
 function checkUsedSubnets() {
     local used_subnets_file="$1" rg="$2"
-    local used_subnets TOKEN next_start subnets2
+    local used_subnets TOKEN next_start subnets2 rg_id
     readarray -t used_subnets < <(yq-go r ${used_subnets_file} | awk '{print $2}')
 
     TOKEN=$("${IBMCLOUD_CLI}" iam oauth-tokens | awk '{print $4}')
-    rg_id=$("${IBMCLOUD_CLI}" resource group $rg --output json | jq -r '.[0]|.id')
+    rg_id=$("${IBMCLOUD_CLI}" resource group $rg --id)
     filter="resource_group.id=$rg_id&generation=2&version=2024-11-05"
     echo "filter subnets with $filter"
     next_start=$(curl -s -X GET "https://$region.iaas.cloud.ibm.com/v1/subnets?${filter}" -H "Authorization: Bearer $TOKEN" | jq -r '.next.href' | awk -F 'start=' '{print $2}')
@@ -213,7 +213,8 @@ else
     echo "Did not found a provisoned resource group"
     exit 1
 fi
-"${IBMCLOUD_CLI}" target -g ${resource_group}
+rg_id=$("${IBMCLOUD_CLI}" resource group $rg --id)
+"${IBMCLOUD_CLI}" target -g ${rg_id}
 
 ## Create the VPC
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
