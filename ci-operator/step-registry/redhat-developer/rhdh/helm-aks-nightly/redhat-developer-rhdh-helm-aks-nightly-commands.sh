@@ -17,6 +17,13 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd rhdh || exit
 
 # use kubeconfig from mapt
+permissions=$(stat -c "%a" "${SHARED_DIR}/kubeconfig")
+if  [[ $permissions == 600 ]]; then
+  echo "kubeconfig already has permissions 600"
+else
+  echo "setting kubeconfig permissions to 600"
+  chmod 600 "${SHARED_DIR}/kubeconfig"
+fi
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
