@@ -19,3 +19,5 @@ mapt azure aks create \
   --conn-details-output "${SHARED_DIR}" \
   --spot \
   --enable-app-routing
+
+chmod 600 "${SHARED_DIR}/kubeconfig"
