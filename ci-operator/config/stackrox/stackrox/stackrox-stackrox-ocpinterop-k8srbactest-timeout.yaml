@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-latest
 build_root:
   image_stream_tag:
     name: apollo-ci
@@ -21,6 +25,20 @@ resources:
       memory: 8000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 6h0m0s
+- as: osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
 - as: acs-tests-aws
   cron: 0 23 31 2 *
   steps:
