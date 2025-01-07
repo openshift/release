@@ -17,13 +17,7 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd rhdh || exit
 
 # use kubeconfig from mapt
-permissions=$(stat -c "%a" "${SHARED_DIR}/kubeconfig")
-if  [[ $permissions == 600 ]]; then
-  echo "kubeconfig already has permissions 600"
-else
-  echo "setting kubeconfig permissions to 600"
-  chmod 600 "${SHARED_DIR}/kubeconfig"
-fi
+chmod 600 "${SHARED_DIR}/kubeconfig"
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
@@ -37,4 +31,9 @@ kubectl create clusterrolebinding tester-sa-2-binding \
 K8S_CLUSTER_TOKEN=$(kubectl create token tester-sa-2)
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 
+if kubectl auth whoami > /dev/null 2>&1; then
+  echo "SHOULD: Using an ephemeral AKS cluster."
+else
+  echo "SHOULD: Falling back to a long-running AKS cluster."
+fi
 bash ./.ibm/pipelines/openshift-ci-tests.sh
