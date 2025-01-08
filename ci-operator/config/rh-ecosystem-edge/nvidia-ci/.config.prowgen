@@ -3,10 +3,16 @@ slack_reporter:
   job_states_to_report:
   - failure
   - error
-  report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :warning: {{end}}'
+  - aborted
+  report_template: >
+    {{if eq .Status.State "success"}}
+      :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+    {{else}}
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{if eq .Status.State "aborted"}}
+        The job was aborted, check for orphaned cloud resources.
+      {{end}}
+    {{end}}
   job_names:
   - nvidia-gpu-operator-e2e-24-3-x
   - nvidia-gpu-operator-e2e-24-6-x

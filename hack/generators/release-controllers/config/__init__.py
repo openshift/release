@@ -24,7 +24,10 @@ class RCPaths:
 
         # The updated configuration and deployment files, to app.ci, are located here:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
-        self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
+        self.path_rc_rpms = [
+            self.path_base.joinpath('clusters/build-clusters/common/release-controller'),
+            self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
+        ]
 
         # CRT Resources
         self.path_crt_resources = self.path_base.joinpath('clusters/app.ci/crt')
