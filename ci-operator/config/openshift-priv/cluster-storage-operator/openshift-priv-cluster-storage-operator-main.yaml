@@ -8,8 +8,8 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
+    name: 4.19-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
@@ -17,6 +17,7 @@ base_images:
     tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
+canonical_go_repository: github.com/openshift/cluster-storage-operator
 images:
 - inputs:
     ocp_4.19_base-rhel9:
@@ -28,18 +29,18 @@ images:
   to: cluster-storage-operator
 promotion:
   to:
-  - name: "4.19"
-    namespace: ocp
+  - name: 4.19-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: "4.19"
-      namespace: ocp
+      name: 4.19-priv
+      namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
-      namespace: ocp
+      name: 4.19-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -210,22 +211,7 @@ tests:
     env:
       PROJECT_NAME: cluster-storage-operator
     workflow: openshift-ci-security
-- as: e2e-aws-selinux-alpha
-  interval: 24h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      FEATURE_GATES: '[''SELinuxMount=true'']'
-      FEATURE_SET: CustomNoUpgrade
-      TEST_ARGS: --run=sig-storage.*SELinux
-      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
-      TEST_SUITE: all
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-csi
 zz_generated_metadata:
-  branch: master
-  org: openshift
+  branch: main
+  org: openshift-priv
   repo: cluster-storage-operator
