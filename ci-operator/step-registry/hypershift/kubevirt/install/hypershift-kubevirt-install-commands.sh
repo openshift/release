@@ -171,3 +171,24 @@ oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
+
+
+if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "Azure" ];
+then
+  # Pin cpuModel to Broadwell in case of Azure cluster, to avoid discrepancies between the cluster nodes
+  PATCH_COMMAND="oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{\"op\": \"add\", \"path\": \"/spec/defaultCPUModel\", \"value\": \"Broadwell\"}]'"
+  MAX_RETRIES=5
+  for ((i=1; i<=MAX_RETRIES; i++)); do
+    echo "Attempt $i of $MAX_RETRIES..."
+    if eval $PATCH_COMMAND; then
+      echo "Patch succeeded."
+      exit 0
+    else
+      echo "Patch failed. Retrying in 2 seconds..."
+      sleep 2
+    fi
+  done
+
+  echo "Patch failed after $MAX_RETRIES attempts."
+  exit 1
+fi
