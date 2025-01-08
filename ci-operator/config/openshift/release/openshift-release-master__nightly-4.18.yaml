@@ -271,7 +271,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4-cgroupsv1
   timeout: 5h0m0s
-- as: e2e-metal-ipi-serial-ovn-ipv6-crun
+- as: e2e-metal-ipi-serial-ovn-ipv6-runc
   cluster: build05
   cron: '@daily'
   steps:
@@ -279,7 +279,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-serial-ovn-ipv6-crun
+    workflow: baremetalds-e2e-serial-ovn-ipv6-runc
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-serial-ipv4
   cluster: build05
@@ -385,7 +385,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4-cgroupsv1
-- as: e2e-metal-ipi-ovn-ipv6-crun-techpreview
+- as: e2e-metal-ipi-ovn-ipv6-runc-techpreview
   cluster: build05
   cron: '@daily'
   steps:
@@ -397,7 +397,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv6-crun
+    workflow: baremetalds-e2e-ovn-ipv6-runc
 - as: e2e-metal-ipi-ovn-dualstack-techpreview
   cluster: build05
   interval: 168h
@@ -420,7 +420,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-ipv6-crun
+- as: e2e-metal-ipi-ovn-ipv6-runc
   cluster: build05
   cron: '@daily'
   steps:
@@ -428,7 +428,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv6-crun
+    workflow: baremetalds-e2e-ovn-ipv6-runc
 - as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   cron: 0 0 1 1 *
@@ -477,7 +477,9 @@ tests:
     env:
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+        on the same node\|\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should
+        be able to preserve UDP traffic when server pod cycles for a LoadBalancer
+        service
     observers:
       enable:
       - observers-resource-watch
@@ -588,19 +590,17 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
-  interval: 168h
+  cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -765,9 +765,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-csi
 - as: e2e-azurestack-csi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     env:
       TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     observers:
@@ -850,7 +851,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 21 * * 0
+  cron: 0 5 */1 * *
   restrict_network_access: false
   steps:
     env:
@@ -900,7 +901,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -908,7 +909,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: aws
     test:
@@ -917,7 +918,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 23 * * 0,2,4,6
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -975,9 +976,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-upi
 - as: e2e-azurestack-ovn-upi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     observers:
       enable:
       - observers-resource-watch
@@ -1086,6 +1088,17 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
+  timeout: 5h0m0s
+- as: e2e-agent-4control-ipv4-conformance
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
@@ -1628,31 +1641,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-cgroupsv1
-- as: e2e-vsphere-ipi-ovn-crun
+- as: e2e-vsphere-ipi-ovn-runc
   cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere-crun
-- as: e2e-azure-ovn-crun
+    workflow: openshift-e2e-vsphere-runc
+- as: e2e-azure-ovn-runc
   cron: '@daily'
   steps:
     cluster_profile: azure4
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-azure-crun
-- as: e2e-gcp-ovn-crun
+    workflow: openshift-e2e-azure-runc
+- as: e2e-gcp-ovn-runc
   cron: '@daily'
   steps:
     cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-crun
-- as: e2e-aws-ovn-crun
+    workflow: openshift-e2e-gcp-runc
+- as: e2e-aws-ovn-runc
   cron: '@daily'
   steps:
     cluster_profile: aws-2
@@ -1661,8 +1674,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-crun
-- as: e2e-vsphere-ovn-serial-crun
+    workflow: openshift-e2e-aws-runc
+- as: e2e-vsphere-ovn-serial-runc
   cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
@@ -1672,7 +1685,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere-serial-crun
+    workflow: openshift-e2e-vsphere-serial-runc
 - as: e2e-vsphere-ovn-serial-cgroupsv1
   cron: '@daily'
   steps:
@@ -1684,14 +1697,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial-cgroupsv1
-- as: e2e-azure-ovn-serial-crun
+- as: e2e-azure-ovn-serial-runc
   cron: '@daily'
   steps:
     cluster_profile: azure4
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-azure-serial-crun
+    workflow: openshift-e2e-azure-serial-runc
 - as: e2e-azure-ovn-serial-cgroupsv1
   cron: '@daily'
   steps:
@@ -1700,14 +1713,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial-cgroupsv1
-- as: e2e-gcp-ovn-serial-crun
+- as: e2e-gcp-ovn-serial-runc
   cron: '@daily'
   steps:
     cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-serial-crun
+    workflow: openshift-e2e-gcp-serial-runc
 - as: e2e-gcp-ovn-serial-cgroupsv1
   cron: '@weekly'
   steps:
@@ -1716,7 +1729,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial-cgroupsv1
-- as: e2e-aws-serial-crun
+- as: e2e-aws-serial-runc
   cron: '@daily'
   steps:
     cluster_profile: aws-2
@@ -1725,7 +1738,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-serial-crun
+    workflow: openshift-e2e-aws-serial-runc
 - as: e2e-aws-serial-cgroupsv1
   cron: '@daily'
   steps:
@@ -1777,7 +1790,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-cgroupsv1
-- as: e2e-vsphere-ipi-ovn-crun-techpreview
+- as: e2e-vsphere-ipi-ovn-runc-techpreview
   cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
@@ -1786,8 +1799,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere-crun
-- as: e2e-azure-ovn-crun-techpreview
+    workflow: openshift-e2e-vsphere-runc
+- as: e2e-azure-ovn-runc-techpreview
   cron: '@daily'
   steps:
     cluster_profile: azure4
@@ -1796,8 +1809,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-azure-crun
-- as: e2e-gcp-ovn-crun-techpreview
+    workflow: openshift-e2e-azure-runc
+- as: e2e-gcp-ovn-runc-techpreview
   cron: '@daily'
   steps:
     cluster_profile: gcp-3
@@ -1806,8 +1819,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-crun
-- as: e2e-aws-ovn-crun-techpreview
+    workflow: openshift-e2e-gcp-runc
+- as: e2e-aws-ovn-runc-techpreview
   cron: '@daily'
   steps:
     cluster_profile: aws-2
@@ -1817,7 +1830,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-crun
+    workflow: openshift-e2e-aws-runc
 - as: e2e-metal-ipi-ovn-upgrade-cgroupsv1
   cluster: build05
   cron: '@daily'
@@ -1830,7 +1843,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv4-cgroupsv1
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-upgrade-crun
+- as: e2e-metal-ipi-ovn-upgrade-runc
   cluster: build05
   cron: '@daily'
   steps:
@@ -1840,7 +1853,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-upgrade-ovn-ipv6-crun
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
   timeout: 5h0m0s
 - as: e2e-rosa-sts-ovn
   cron: '@daily'
@@ -1857,6 +1870,13 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     workflow: rosa-aws-sts-hcp-conformance
+  timeout: 6h0m0s
+- as: e2e-osd-ccs-gcp
+  cluster: build09
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp-qe
+    workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master

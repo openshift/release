@@ -101,6 +101,20 @@ tests:
     workflow: openshift-qe-installer-aws-etcd-encryption
   timeout: 5h0m0s
 - always_run: false
+  as: netpol-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      KUBE_BURNER_VERSION: 1.6.0
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-netpol-v2
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
   as: conc-builds-3nodes
   steps:
     allow_skip_on_success: true
@@ -262,7 +276,6 @@ tests:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "252"
       COMPUTE_NODE_TYPE: m5.xlarge
       EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
@@ -271,9 +284,30 @@ tests:
       SIZE_VARIANT: large
       USER_TAGS: |
         TicketId 382
+      WORKER_REPLICA_COUNT: "252"
       ZONES_COUNT: "3"
     test:
+    - chain: workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
+- as: data-path-ipsec-9nodes
+  cron: 0 2 8,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      TOLERANCE: "200"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 - as: udn-density-l3-24nodes
