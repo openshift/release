@@ -74,23 +74,11 @@ tests:
       SOURCE_IMAGE_REF: cluster-permission
     workflow: ocm-ci-image-mirror
 - as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --fast-forward \
-        --confirm \
-        --config-dir=/tmp/release/ci-operator/config/stolostron/cluster-permission/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=stolostron \
-        --current-release=2.13 \
-        --future-release=2.13
-  container:
-    from: repo-brancher
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.13
+    workflow: ocm-ci-fastforward
 - as: latest-image-mirror
   postsubmit: true
   steps:
