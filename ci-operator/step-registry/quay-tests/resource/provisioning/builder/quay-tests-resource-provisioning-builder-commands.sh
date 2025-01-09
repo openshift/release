@@ -4,78 +4,92 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Create TLS Cert/Key pairs for Quay Deployment
+#env vars
 QUAYREGISTRY=${QUAYREGISTRY}
 QUAYNAMESPACE=${QUAYNAMESPACE}
+BUILDERIMAGE=${QUAY_BUILDER_IMAGE}
 
-echo "Create TLS Cert/Key pairs for Quay Deployment..." >&2
-
-ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
+echo "Deploy Quay virtual builder, unmanaged TLS is prerequisite"
 
 #In Prow, base domain is longer, like: ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
-#it's easy to meet below maxsize error if len(quay_cn_name)>64
-#encoding routines:ASN1_mbstring_ncopy:string too long:crypto/asn1/a_mbstr.c:107:maxsize=64
-quay_cn_wildcard_name="apps."$ocp_base_domain_name
-quay_cn_name="quay.${quay_cn_wildcard_name}"
-quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
-quay_name="${QUAYREGISTRY}-quay-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
+ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
+echo "Base domain name: $ocp_base_domain_name"
+
+quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.apps.$ocp_base_domain_name"
+echo "Quay builder route: $quay_builder_route"
 
 temp_dir=$(mktemp -d)
 
-cat >>"$temp_dir"/openssl.cnf <<EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
-[req_distinguished_name]
-[ v3_req ]
-basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-subjectAltName = @alt_names
-[alt_names]
-DNS.1 = ${quay_cn_name}
-DNS.2 = ${quay_builder_route}
-DNS.3 = ${quay_name}
-EOF
+#Create a new project for virtual builders
+function create_virtual_builders() {
+    oc new-project virtual-builders
+    oc create sa -n virtual-builders quay-builder
+    oc adm policy -n virtual-builders add-role-to-user edit system:serviceaccount:virtual-builders:quay-builder
+    oc adm policy -n virtual-builders add-scc-to-user anyuid -z quay-builder
 
-#Create custom tls/ssl file
-function create_cert() {
-    openssl genrsa -out "$temp_dir"/rootCA.key 2048
-    openssl req -x509 -new -nodes -key "$temp_dir"/rootCA.key -sha256 -days 1024 -out "$temp_dir"/rootCA.pem -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
-    openssl genrsa -out "$temp_dir"/ssl.key 2048
-    openssl req -new -key "$temp_dir"/ssl.key -out "$temp_dir"/ssl.csr -subj "/C=CN/ST=Beijing/L=BJ/O=Quay team/OU=Quay QE Team/CN=${quay_cn_name}"
-    openssl x509 -req -in "$temp_dir"/ssl.csr -CA "$temp_dir"/rootCA.pem -CAkey "$temp_dir"/rootCA.key -CAcreateserial -out "$temp_dir"/ssl.cert -days 356 -extensions v3_req -extfile "$temp_dir"/openssl.cnf
-    cat "$temp_dir"/rootCA.pem >>"$temp_dir"/ssl.cert
-
-    if [ -e "$temp_dir"/ssl.cert ]; then
-        echo "Create the TLS/SSL cert file successfully"
-    else
-        echo "!!! Fail to create the TLS/SSL cert file "
-        return 1
-    fi
-
+    #ocp 4.11+
+    token=$(oc create token quay-builder -n virtual-builders --duration 24h)
+    echo $token
+    # if [ -e "$temp_dir"/ssl.cert ]; then
+    #     echo "Create the TLS/SSL cert file successfully"
+    # else
+    #     echo "!!! Fail to create the TLS/SSL cert file "
+    #     return 1
+    # fi
+    echo "virtual builder successfully created"
 }
 
-#Create Artifact Directory
-ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
-mkdir -p "$ARTIFACT_DIR"
+function generate_builder_yaml() {
+    cat >>"$temp_dir"/config_builder.yaml <<EOF
+FEATURE_BUILD_SUPPORT: true
+BUILDMAN_HOSTNAME: ${quay_builder_route}:443
+BUILD_MANAGER:
+- ephemeral
+- ALLOWED_WORKER_COUNT: 20 
+  ORCHESTRATOR_PREFIX: buildman/production/
+  ORCHESTRATOR:
+    REDIS_HOST: quayregistry-quay-redis
+    REDIS_PASSWORD: ""
+    REDIS_SSL: false
+    REDIS_SKIP_KEYSPACE_EVENT_SETUP: false
+  EXECUTORS:
+  - EXECUTOR: kubernetesPodman
+    DEBUG: true
+    NAME: openshift
+    BUILDER_NAMESPACE: virtual-builders 
+    SETUP_TIME: 180
+    QUAY_USERNAME: 'quay-username'
+    QUAY_PASSWORD: quay-password
+    BUILDER_CONTAINER_IMAGE: ${BUILDERIMAGE}
+    # Kubernetes resource options
+    K8S_API_SERVER: api.$ocp_base_domain_name:6443
+    K8S_API_TLS_CA: /conf/stack/extra_ca_certs/build_cluster.crt
+    VOLUME_SIZE: 8G
+    KUBERNETES_DISTRIBUTION: openshift
+    CONTAINER_MEMORY_LIMITS: 1G 
+    CONTAINER_CPU_LIMITS: 1000m
+    CONTAINER_MEMORY_REQUEST: 1G 
+    CONTAINER_CPU_REQUEST: 500m
+    NODE_SELECTOR_LABEL_KEY: ""
+    NODE_SELECTOR_LABEL_VALUE: ""
+    SERVICE_ACCOUNT_NAME: quay-builder 
+    SERVICE_ACCOUNT_TOKEN: "$token"
+EOF
+}
 
-function copyCerts {
-    #Copy ssl files to SHARED_DIR
-    echo "Copy tls certs to $SHARED_DIR folder"
-    mv ca.crt "$SHARED_DIR"/build_cluster.crt
-    cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$SHARED_DIR"
-
-    #Archive the tls cert files
-    cp "$temp_dir"/ssl.cert "$temp_dir"/ssl.key "$ARTIFACT_DIR"
+function copy_builder_config() {
+    #Copy builder config file to SHARED_DIR
+    echo "Copy builder config file $SHARED_DIR folder"
+    cp "$temp_dir"/config_builder.yaml "$SHARED_DIR"
+    cat "$temp_dir"/config_builder.yaml
 
     #Clean up temp dir
-    rm -rf "$temp_dir" || true
+    # rm -rf "$temp_dir" || true
 }
 
 #Get openshift CA Cert, include into secret bundle
-oc extract cm/kube-root-ca.crt -n openshift-apiserver --confirm
-create_cert || true
-echo "tls cert successfully created"
+create_virtual_builders || true
+generate_builder_yaml
 
-#Finally Copy certs to SHARED_DIR and archive them
-trap copyCerts EXIT
+#Finally Copy builder config file to SHARED_DIR
+trap copy_builder_config EXIT
