@@ -4,10 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# bastion=$(cat "/secret/address")
-cnv_bastion=$(cat "/secret/cnv_address")
-
-# ping -c 5 $bastion
-ping -c 5 $cnv_bastion
-echo "hi" | nc -w $cnv_bastion 443
+ping -c 5 10.26.8.107
+echo "hi" | nc -w 10.26.8.107 443
 echo $?
