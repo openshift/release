@@ -107,12 +107,12 @@ for ((i=1; i<=60; i++)); do
   if [ "$CSVName" != "" ]; then
     break
   fi
-  sleep 10
+  sleep 20
 done
 
 _apiReady=0
 echo "* Using CSV: ${CSVName}"
-for ((i=1; i<=20; i++)); do
+for ((i=1; i<=40; i++)); do
   sleep 30
   output=$(oc get csv -n multicluster-engine $CSVName -o jsonpath='{.status.phase}' >> /dev/null && echo "exists" || echo "not found")
   if [ "$output" != "exists" ]; then
