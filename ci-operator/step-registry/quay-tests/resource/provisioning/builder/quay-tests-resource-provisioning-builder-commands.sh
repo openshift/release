@@ -81,7 +81,8 @@ function copy_builder_config() {
     #Copy builder config file to SHARED_DIR
     echo "Copy builder config file $SHARED_DIR folder"
     cp "$temp_dir"/config_builder.yaml "$SHARED_DIR"
-    cat "$temp_dir"/config_builder.yaml
+    # cat "$temp_dir"/config_builder.yaml
+    sleep 600
 
     #Clean up temp dir
     # rm -rf "$temp_dir" || true
