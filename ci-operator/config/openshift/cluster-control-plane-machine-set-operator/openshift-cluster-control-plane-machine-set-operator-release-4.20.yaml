@@ -134,6 +134,23 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-aws
+- as: e2e-aws-periodic-pre-techpreview
+  optional: true
+  run_if_changed: .*periodic.*
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
 - as: e2e-azure-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
@@ -163,6 +180,23 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-azure
+- as: e2e-azure-periodic-pre-techpreview
+  optional: true
+  run_if_changed: .*periodic.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
@@ -182,6 +216,23 @@ tests:
   run_if_changed: .*periodic.*|.*gcp.*
   steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-periodic-pre-techpreview
+  optional: true
+  run_if_changed: .*periodic.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       commands: |
