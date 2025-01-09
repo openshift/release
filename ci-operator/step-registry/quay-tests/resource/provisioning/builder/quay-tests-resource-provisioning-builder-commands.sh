@@ -30,13 +30,13 @@ function create_virtual_builders() {
     #ocp 4.11+
     token=$(oc create token quay-builder -n virtual-builders --duration 24h)
     echo $token
-    # if [ -e "$temp_dir"/ssl.cert ]; then
-    #     echo "Create the TLS/SSL cert file successfully"
-    # else
-    #     echo "!!! Fail to create the TLS/SSL cert file "
-    #     return 1
-    # fi
-    echo "virtual builder successfully created"
+    if [ -z "$token" ]; then
+        echo "!!! Fail to create virtual builder"
+        return 1
+    else
+        echo "Virtual builder successfully created"
+    fi
+    
 }
 
 function generate_builder_yaml() {
