@@ -9,7 +9,13 @@ QUAYREGISTRY=${QUAYREGISTRY}
 QUAYNAMESPACE=${QUAYNAMESPACE}
 BUILDERIMAGE=${QUAY_BUILDER_IMAGE}
 
-echo "Deploy Quay virtual builder, unmanaged TLS is prerequisite"
+#credentials
+QUAY_USERNAME=$(cat /var/run/quay-qe-quaybuilder-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quaybuilder-secret/password)
+
+echo $QUAY_USERNAME
+
+echo "Deploy Quay virtual builder, unmanaged tls is prerequisite"
 
 #In Prow, base domain is longer, like: ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
 ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
@@ -29,7 +35,7 @@ function create_virtual_builders() {
 
     #ocp 4.11+
     token=$(oc create token quay-builder -n virtual-builders --duration 24h)
-    echo $token
+    # echo $token
     if [ -z "$token" ]; then
         echo "!!! Fail to create virtual builder"
         return 1
@@ -48,7 +54,7 @@ BUILD_MANAGER:
 - ALLOWED_WORKER_COUNT: 20 
   ORCHESTRATOR_PREFIX: buildman/production/
   ORCHESTRATOR:
-    REDIS_HOST: quayregistry-quay-redis
+    REDIS_HOST: ${QUAYREGISTRY}-quay-redis
     REDIS_PASSWORD: ""
     REDIS_SSL: false
     REDIS_SKIP_KEYSPACE_EVENT_SETUP: false
@@ -58,8 +64,9 @@ BUILD_MANAGER:
     NAME: openshift
     BUILDER_NAMESPACE: virtual-builders 
     SETUP_TIME: 180
-    QUAY_USERNAME: 'quay-username'
-    QUAY_PASSWORD: quay-password
+    MINIMUM_RETRY_THRESHOLD: 0
+    QUAY_USERNAME: ${QUAY_USERNAME}
+    QUAY_PASSWORD: ${QUAY_PASSWORD}
     BUILDER_CONTAINER_IMAGE: ${BUILDERIMAGE}
     # Kubernetes resource options
     K8S_API_SERVER: api.$ocp_base_domain_name:6443
@@ -73,7 +80,7 @@ BUILD_MANAGER:
     NODE_SELECTOR_LABEL_KEY: ""
     NODE_SELECTOR_LABEL_VALUE: ""
     SERVICE_ACCOUNT_NAME: quay-builder 
-    SERVICE_ACCOUNT_TOKEN: "$token"
+    SERVICE_ACCOUNT_TOKEN: $token
 EOF
 }
 
@@ -82,10 +89,10 @@ function copy_builder_config() {
     echo "Copy builder config file $SHARED_DIR folder"
     cp "$temp_dir"/config_builder.yaml "$SHARED_DIR"
     # cat "$temp_dir"/config_builder.yaml
-    sleep 600
+    # sleep 600
 
     #Clean up temp dir
-    # rm -rf "$temp_dir" || true
+    rm -rf "$temp_dir"
 }
 
 #Get openshift CA Cert, include into secret bundle
