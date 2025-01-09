@@ -8,10 +8,7 @@ base_images:
     namespace: chaos
     tag: latest
 build_root:
-  image_stream_tag:
-    name: ci-tools-build-root
-    namespace: ci
-    tag: latest
+  from_repository: true
 images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
@@ -58,11 +55,13 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - redhat-chaos-node-disruptions-worker-outage-observer
-    test:
-    - ref: redhat-chaos-start-krkn
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
     - chain: openshift-qe-cluster-density-v2
-    - ref: openshift-qe-upgrade
-    workflow: openshift-qe-installer-aws
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
   timeout: 8h0m0s
 - as: chaos-gcp-loaded-upgrade-417to418
   cron: 0 12 5 * *
