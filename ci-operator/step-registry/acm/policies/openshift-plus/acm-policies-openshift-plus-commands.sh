@@ -36,4 +36,4 @@ for try in $(seq "${RETRIES}"); do
   fi
 done
 
-sleep 3d
+sleep 3h
