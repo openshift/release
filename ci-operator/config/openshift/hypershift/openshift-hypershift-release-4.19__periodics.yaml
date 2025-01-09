@@ -75,7 +75,9 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
+      AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   cron: 0 */6 * * *
@@ -177,14 +179,13 @@ tests:
     env:
       HYPERSHIFT_NODE_COUNT: "2"
     workflow: hypershift-kubevirt-azure-conformance
-- as: e2e-openstack
+- as: e2e-openstack-aws
   cron: 0 10 * * *
   steps:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
-      RHCOS_IMAGE_NAME: rhcos-4.19-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
@@ -192,19 +193,44 @@ tests:
     test:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-external
-- as: e2e-openstack-conformance
+- as: e2e-openstack-aws-conformance
   minimum_interval: 72h
   steps:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      RHCOS_IMAGE_NAME: rhcos-4.19-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: experimental/reliability/minimal
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-conformance
+    workflow: hypershift-openstack-aws-conformance
+- as: e2e-openstack-aws-csi-cinder
+  minimum_interval: 72h
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-aws-conformance
+- as: e2e-openstack-aws-csi-manila
+  minimum_interval: 72h
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-aws-conformance
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

@@ -3,6 +3,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
     candidate:
@@ -89,6 +93,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
@@ -158,6 +163,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-upgrade
   interval: 168h
   steps:
@@ -211,7 +217,7 @@ tests:
 - as: e2e-gcp-ovn-techpreview
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -231,7 +237,7 @@ tests:
 - as: e2e-gcp-ovn-mount-ns-hiding
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       MOUNT_NS_HIDING_ENABLED: "true"
@@ -250,11 +256,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-upgrade
   cluster: build02
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -311,7 +318,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere
-- as: e2e-azure-crun-upgrade
+- as: e2e-azure-runc-upgrade
   cron: '@daily'
   steps:
     cluster_profile: azure-2
@@ -322,8 +329,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-upgrade-azure-crun
-- as: e2e-gcp-crun-upgrade
+    workflow: openshift-upgrade-azure-runc
+- as: e2e-gcp-runc-upgrade
   cluster: build02
   cron: '@daily'
   steps:
@@ -334,8 +341,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-upgrade-gcp-crun
-- as: e2e-aws-crun-upgrade
+    workflow: openshift-upgrade-gcp-runc
+- as: e2e-aws-runc-upgrade
   cron: '@daily'
   steps:
     cluster_profile: aws-2
@@ -346,15 +353,15 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-upgrade-aws-crun
-- as: e2e-vsphere-crun-upgrade
+    workflow: openshift-upgrade-aws-runc
+- as: e2e-vsphere-runc-upgrade
   cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-upgrade-vsphere-crun
+    workflow: openshift-upgrade-vsphere-runc
 - as: e2e-azure-cgroupsv1-upgrade
   cron: '@daily'
   steps:
@@ -371,7 +378,7 @@ tests:
   cluster: build02
   cron: '@weekly'
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance

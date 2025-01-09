@@ -1,5 +1,22 @@
 #!/bin/bash
 
+set +x
+
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+    AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
+AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+
+AZURE_MANAGED_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-azurecreds/managed-identities.json"
+
+az --version
+az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+set -x
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -47,7 +64,10 @@ if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
-
+MI_ARGS=""
+if [[ "${AUTH_THROUGH_CERTS}" == "true" && "${TECH_PREVIEW_NO_UPGRADE}" == "true" ]]; then
+  MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
+fi
 
 hack/ci-test-e2e.sh -test.v \
   -test.run='^TestCreateCluster.*|^TestNodePool$' \
@@ -61,6 +81,7 @@ hack/ci-test-e2e.sh -test.v \
     ${AKS_ANNOTATIONS:-} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
+    ${MI_ARGS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
