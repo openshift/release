@@ -46,8 +46,11 @@ EOF
 if [[ "$TLS" == "true" ]]; then
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
 elif [[ "$TLS" = "false" ]]; then
+  
   #config virtual builder for quay
-  cat "$SHARED_DIR"/config_builder.yaml >> config.yaml || true
+  if [[ -e "$SHARED_DIR"/config_builder.yaml ]]; then
+    cat "$SHARED_DIR"/config_builder.yaml >> config.yaml
+  fi
 
   oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
     --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
