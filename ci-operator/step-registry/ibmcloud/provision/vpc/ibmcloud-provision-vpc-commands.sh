@@ -213,7 +213,7 @@ else
     echo "Did not found a provisoned resource group"
     exit 1
 fi
-rg_id=$("${IBMCLOUD_CLI}" resource group $rg --id)
+rg_id=$("${IBMCLOUD_CLI}" resource group $resource_group --id)
 "${IBMCLOUD_CLI}" target -g ${rg_id}
 
 ## Create the VPC
