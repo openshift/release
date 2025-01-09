@@ -1,0 +1,32 @@
+chain:
+  as: openshift-upgrade-qe-test-baremetalds-disconnected
+  env:
+  - name: UPGRADE_CHECK_RUN_TAGS
+    default: "@disconnected"
+  - name: UPGRADE_PRE_RUN_TAGS
+    default: "@disconnected"
+  - name: RUN_QE_TEST
+    default: "true"
+  - name: TEST_TYPE
+    default: "upgrade"
+  - name: TEST_SKIPS
+    default: \[sig-arch\]\[Early\] APIs for openshift\.io must have stable versions \[Suite:openshift/conformance/parallel\]
+  steps:
+  - ref: idp-htpasswd
+  - ref: cucushift-pre
+  - ref: openshift-extended-upgrade-pre
+  - ref: cucushift-upgrade-prepare
+  - ref: cucushift-upgrade-prehealthcheck
+  - ref: cucushift-ota-preupgrade
+  - ref: baremetalds-e2e-test
+  - ref: cucushift-upgrade-rhel-worker
+  - ref: cucushift-upgrade-healthcheck
+  - ref: cucushift-upgrade-check-capability
+  - ref: cucushift-ota-postupgrade
+  - ref: openshift-extended-upgrade-post
+  - ref: cucushift-upgrade-check
+  - ref: openshift-upgrade-qe-test-report
+  documentation: |-
+    The chain executes upgrade-prepare, which creates test data on a disconnected cluster;
+    then upgrade the cluster with the baremetalds e2e test script for disconnected or IPv6 clusters,
+    then execute upgrade-check, which checks the prepared test data after the upgrade
