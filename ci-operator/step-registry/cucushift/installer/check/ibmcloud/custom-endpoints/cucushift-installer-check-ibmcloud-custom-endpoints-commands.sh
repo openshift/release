@@ -88,8 +88,8 @@ fi
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 isPreVer="True"
-isPreVersion "4.17" || isPreVer="False"
-echo "is Pre 4.17 version: ${isPreVer}"
+isPreVersion "4.16" || isPreVer="False"
+echo "is Pre 4.16 version: ${isPreVer}"
 
 ret=0
 
