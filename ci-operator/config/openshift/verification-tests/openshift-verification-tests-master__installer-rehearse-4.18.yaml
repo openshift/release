@@ -68,16 +68,20 @@ tests:
   steps:
     cluster_profile: gcp-qe-c3-metal
     workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
-- as: installer-rehearse-ibmcloud-dis
+- as: installer-rehearse-aws
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: aws-1-qe
     env:
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-k7gmzl2/release:latest
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-provision
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
