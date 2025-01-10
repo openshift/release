@@ -73,6 +73,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -149,6 +150,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -225,6 +227,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -297,7 +300,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 00 12 * * 1
+  cron: '* 1 * * *'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -306,11 +309,13 @@ periodics:
     org: openshift-kni
     repo: eco-ci-cd
   labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
     ci-operator.openshift.io/cluster: build05
-    ci-operator.openshift.io/variant: slcm-4.12
+    ci-operator.openshift.io/variant: sno-hub-ztp-4.17-latest
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-slcm-4.12-eco-ci-cd
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-sno-hub-ztp-4.17-latest-telcov10n-sno-hub-ztp-f360
   reporter_config:
     slack:
       channel: '#eco-ci-cd-notifications'
@@ -328,9 +333,11 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=eco-ci-cd
-      - --variant=slcm-4.12
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-sno-hub-ztp-f360
+      - --variant=sno-hub-ztp-4.17-latest
       command:
       - ci-operator
       image: ci-operator:latest
@@ -340,6 +347,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -354,6 +367,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -365,7 +387,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 00 12 * * 1
+  cron: '* 4 * * *'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -374,11 +396,14 @@ periodics:
     org: openshift-kni
     repo: eco-ci-cd
   labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
     ci-operator.openshift.io/cluster: build05
-    ci-operator.openshift.io/variant: slcm-gitlab-project2-site3
+    ci-operator.openshift.io/variant: sno-spoke-4.18-nightly
     ci.openshift.io/generator: prowgen
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-slcm-gitlab-project2-site3-eco-ci-cd
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-sno-spoke-4.18-nightly-telcov10n-sno-spoke-f360
   reporter_config:
     slack:
       channel: '#eco-ci-cd-notifications'
@@ -396,9 +421,11 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=eco-ci-cd
-      - --variant=slcm-gitlab-project2-site3
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-sno-spoke-f360
+      - --variant=sno-spoke-4.18-nightly
       command:
       - ci-operator
       image: ci-operator:latest
@@ -408,6 +435,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -422,74 +455,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: manifest-tool-local-pusher
+    - name: boskos
       secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
       secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build05
-  cron: 00 13 * * 1
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: eco-ci-cd
-  labels:
-    ci-operator.openshift.io/cluster: build05
-    ci-operator.openshift.io/variant: slcm-lab
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-slcm-lab-slcm-lab
-  reporter_config:
-    slack:
-      channel: '#eco-ci-cd-notifications'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      - aborted
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --target=slcm-lab
-      - --variant=slcm-lab
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

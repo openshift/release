@@ -50,13 +50,6 @@ tests:
   container:
     from: bin
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: verify-deps
-  commands: |
-    make update-deps-overrides
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: bin
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
@@ -82,9 +75,11 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
-        EXAMPLE_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:cluster-proxy-addon}
-        export KUBECTL EXAMPLE_IMAGE_NAME
+        export KUBECTL
         make test-e2e
+      dependencies:
+      - env: CLUSTER_PROXY_ADDON_IMAGE
+        name: cluster-proxy-addon
       from: src
       resources:
         requests:

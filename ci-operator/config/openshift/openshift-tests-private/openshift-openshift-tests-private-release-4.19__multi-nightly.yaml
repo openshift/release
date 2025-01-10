@@ -237,20 +237,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-priv-amd-mixarch-f9-longduration-cloud
-  cron: 24 23 2,11,23 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-clusterinfra-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-arm-mixarch-f7
   cron: 33 12 7,14,21,30 * *
   steps:
@@ -352,6 +338,38 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
+- as: aws-ipi-ovn-amd-cp-infra-to-arm-cp-infra-f7
+  cron: 45 16 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MIGRATION_CP_MACHINE_TYPE: m6g.xlarge
+      MIGRATION_INFRA_MACHINE_TYPE: m6g.xlarge
+    test:
+    - ref: ipi-conf-inframachineset
+    - ref: multiarch-migration-machine-type
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-ovn-compact-arm-cp-infra-to-amd-cp-infra-f7
+  cron: 26 0 6,13,22,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
+      INFRA_NODE_TYPE: m6g.xlarge
+      MIGRATION_ARCHITECTURE: x86_64
+      MIGRATION_CP_MACHINE_TYPE: m6i.2xlarge
+      MIGRATION_INFRA_MACHINE_TYPE: m6i.xlarge
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - ref: ipi-conf-inframachineset
+    - ref: multiarch-migration-machine-type
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-ovn-efs-fips-amd-f28-destructive-ui
   cron: 34 19 15 * *
   steps:
@@ -397,6 +415,30 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipv4-subnet-arm-f14
+  cron: 1 14 10,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
+- as: aws-ipi-ovn-ipv4-subnet-arm-f28-destructive
+  cron: 13 19 22 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
 - as: aws-ipi-proxy-sts-mini-perm-amd-f28-destructive
   cron: 24 15 29 * *
   steps:
@@ -580,19 +622,6 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-amd-mixarch-f28-destructive
-  cron: 1 20 7 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f9-day2-64k-pagesize
   cron: 24 10 2,11,20 * *
   steps:
@@ -614,22 +643,6 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-arm-mixarch-f5
-  cron: 50 0 5,10,15,20,25,30 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-arm-mixarch-f14-ui
   cron: 43 6 9,25 * *
   steps:
@@ -785,20 +798,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disc-fullypriv-amd-mixarch-f9-longduration-cloud
-  cron: 44 1 1,10,22 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      E2E_RUN_TAGS: '@disconnected'
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-clusterinfra-qe-longrun
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-fullyprivate-internal-registry-amd-f28-destructive
   cron: 22 11 8 * *
   steps:
@@ -838,6 +837,17 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-arm-f28-longduration-cloud
+  cron: 32 18 4 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-ingress-controller-arm-mixarch-f5
   cron: 44 14 4,9,14,19,24,29 * *
@@ -905,6 +915,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-publish-mixed-ingress-internal
+- as: azure-ipi-mto-amd-mixarch-f28-destructive
+  cron: 45 15 21 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+    test:
+    - chain: multiarch-tuning-operator
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-mto-arm-mixarch-f7
   cron: 52 3 7,14,21,28 * *
   steps:
@@ -1506,19 +1530,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-disc-priv-amd-mixarch-f28-longduration-cloud
-  cron: 25 12 7 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
-      ADDITIONAL_WORKERS: "1"
-      COMPUTE_NODE_REPLICAS: "2"
-      E2E_RUN_TAGS: '@disconnected'
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-clusterinfra-qe-longrun
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-disk-encryption-amd-f28-destructive
   cron: 22 17 2 * *
   steps:
@@ -1660,6 +1671,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+- as: gcp-ipi-proxy-private-arm-f28-tp-longduration-cloud
+  cron: 12 18 12 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-sno-etcd-encryption-amd-f28-destructive
   cron: 5 20 5 * *
   steps:
@@ -1760,6 +1782,16 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
+- as: gcp-ipi-xpn-min-byo-zone-f28-longduration-cloud
+  cron: 28 19 4 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
 - as: gcp-ipi-xpn-oidc-amd-f28-destructive
   cron: 54 10 25 * *
