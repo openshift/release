@@ -3,8 +3,25 @@ and the [**Google Secret Manager Provider for Secret Store CSI Driver**](https:/
 in order to utilize the GCP Secret Manager.
 
 ## Changes to upstream manifests
-The Secrets Store CSI driver was deployed using the default upstream manifests as described [here](https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation#alternatively-deployment-using-yamls).
-However, the following changes needed to be done to the [upstream manifest](https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/blob/7218875135b87ca930b9bcb97231b1ede4e93e1a/deploy/provider-gcp-plugin.yaml) 
+The following modifications were made to the default upstream manifests.
+
+### Changes to Secrets Store CSI Driver
+All manifests, except for `csidriver.yaml`, were deployed as described [here](https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation#alternatively-deployment-using-yamls).
+By default, volumes backed by Container Storage Interface (CSI) drivers can only be used
+with a PersistentVolume and PersistentVolumeClaim object combination. To enable Pods to define inline volumes, 
+the following label was added to the metadata section in `csidriver.yaml`, 
+as explained in this [OpenShift documentation](https://docs.openshift.com/container-platform/4.17/storage/container_storage_interface/ephemeral-storage-csi-inline.html#overview-admission-plugin):
+```yaml
+  labels:
+     security.openshift.io/csi-ephemeral-volume-profile: baseline
+```
+This configuration allows a Pod to mount CSI inline ephemeral volumes when 
+the namespace in which the Pod is running is governed by a pod security standard (privileged/baseline/restricted) 
+that is the same or higher than the one specified by the label.
+
+
+### Changes to GCP Provider
+The following changes needed to be done to the [upstream manifest](https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/blob/7218875135b87ca930b9bcb97231b1ede4e93e1a/deploy/provider-gcp-plugin.yaml) 
 of the Google Secret Manager Provider, in order for it to run properly on our clusters:
 1. Deleted the `spec.template.spec.initContainers` stanza:
 ```yaml
