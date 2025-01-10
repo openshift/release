@@ -42,13 +42,17 @@ if [[ $ENABLE_ICSP == "true" ]]; then
   COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
 fi
 
-if [ -f "${SHARED_DIR}/INGRESS_IP" ]; then
-  INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
-  COMMAND+=(--openstack-ingress-floating-ip "${INGRESS_IP}")
+if [ -f "${SHARED_DIR}/HCP_INGRESS_IP" ]; then
+  HCP_INGRESS_IP=$(<"${SHARED_DIR}/HCP_INGRESS_IP")
+  COMMAND+=(--openstack-ingress-floating-ip "${HCP_INGRESS_IP}")
 fi
 
 if [[ -n $EXTRA_ARGS ]]; then
   COMMAND+=("${EXTRA_ARGS}")
+fi
+
+if [[ -n ${ETCD_STORAGE_CLASS} ]]; then
+  COMMAND+=(--etcd-storage-class "${ETCD_STORAGE_CLASS}")
 fi
 
 if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
@@ -62,23 +66,3 @@ export CLUSTER_NAME
 oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 bin/hypershift create kubeconfig --namespace=clusters --name="${CLUSTER_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
-
-# This block is for when we need to discover what floating IP was picked for Ingress.
-# We don't need to run this in the case of a pre-defined floating IP.
-if [ ! -f "${SHARED_DIR}/INGRESS_IP" ]; then
-  export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-  timeout 25m bash -c '
-    echo "Waiting for router-default to have an IP"
-    until [[ "$(oc -n openshift-ingress get service router-default -o jsonpath="{.status.loadBalancer.ingress[0].ip}")" != "" ]]; do
-        sleep 15
-        echo "router-default does not exist yet, retrying..."
-    done
-  '
-  INGRESS_IP=$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-  if [[ -z "${INGRESS_IP}" ]]; then
-    echo "Ingress IP was not found"
-    exit 1
-  fi
-  echo "${INGRESS_IP}" > "${SHARED_DIR}/INGRESS_IP"
-  echo "Ingress IP was found: ${INGRESS_IP}"
-fi
