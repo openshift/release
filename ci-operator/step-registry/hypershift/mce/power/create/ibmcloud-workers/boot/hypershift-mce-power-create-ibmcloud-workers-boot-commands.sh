@@ -173,6 +173,9 @@ boot_power_workers() {
 	for instance in "${HOST_NAMES[@]}"; do
 		ibmcloud pi ins act $instance -o soft-reboot
 	done
+
+	# DEBUG - Adding sleep to debug the agents not moving to Joined state issue
+	sleep 10m
 }
 
 boot_x86_vm() {
