@@ -13,8 +13,6 @@ BUILDERIMAGE=${QUAY_BUILDER_IMAGE}
 QUAY_USERNAME=$(cat /var/run/quay-qe-quaybuilder-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quaybuilder-secret/password)
 
-echo $QUAY_USERNAME
-
 echo "Deploy Quay virtual builder, unmanaged tls is prerequisite"
 
 #In Prow, base domain is longer, like: ci-op-w3ki37mj-cc978.qe.devcluster.openshift.com
