@@ -3,7 +3,7 @@ and the [**Google Secret Manager Provider for Secret Store CSI Driver**](https:/
 in order to utilize the GCP Secret Manager.
 
 ## Changes to upstream manifests
-The following modifications were made to the default upstream manifests.
+The following modifications needed to be made to the upstream manifests.
 
 ### Changes to Secrets Store CSI Driver
 All manifests, except for `csidriver.yaml`, were deployed as described [here](https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation#alternatively-deployment-using-yamls).
@@ -37,6 +37,7 @@ initContainers:
     name: providervol
 ```
 
+---
 2. Because of how the SCCs of our clusters are set up, the `spec.template.spec.containers.securityContext` stanza had to be changed from:
 ```yaml
 securityContext:
@@ -56,5 +57,21 @@ securityContext:
   privileged: true
 ```
 
-3. The credentials for the GCP Service Account are mounted as a Volume in `spec.template.spec.volumes`. 
+---
+3. Modified the `spec.template.spec.tolerations` stanza from:
+```yaml
+   tolerations:
+     - key: kubernetes.io/arch
+       operator: Equal
+       value: arm64
+       effect: NoSchedule
+```
+to:
+```yaml
+   tolerations:
+   - operator: Exists
+```
+
+---
+4. The credentials for the GCP Service Account are mounted as a Volume in `spec.template.spec.volumes`. 
    It's contents are accessible to the pod through the env var `GOOGLE_APPLICATION_CREDENTIALS`.
