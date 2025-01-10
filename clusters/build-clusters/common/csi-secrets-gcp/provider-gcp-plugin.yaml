@@ -88,14 +88,14 @@ spec:
             - name: TARGET_DIR
               value: "/etc/kubernetes/secrets-store-csi-providers"
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/gcp/sa-auth/key.json"
+              value: "/etc/gcp/sa-key/key.json"
           volumeMounts:
             - mountPath: "/etc/kubernetes/secrets-store-csi-providers"
               name: providervol
               mountPropagation: None
               readOnly: false
-            - mountPath: "/etc/gcp/sa-auth"
-              name: gcp-sa-credentials
+            - mountPath: "/etc/gcp/sa-key"
+              name: gcp-sa-key
               readOnly: true
           livenessProbe:
             failureThreshold: 3
@@ -109,13 +109,10 @@ spec:
         - name: providervol
           hostPath:
             path: /etc/kubernetes/secrets-store-csi-providers
-        - name: gcp-sa-credentials
+        - name: gcp-sa-key
           secret:
             secretName: gcp-sa-credentials
       tolerations:
-        - key: kubernetes.io/arch
-          operator: Equal
-          value: arm64
-          effect: NoSchedule
+        - operator: Exists
       nodeSelector:
         kubernetes.io/os: linux
