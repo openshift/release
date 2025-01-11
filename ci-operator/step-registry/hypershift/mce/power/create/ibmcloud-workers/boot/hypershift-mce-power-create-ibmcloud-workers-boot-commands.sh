@@ -175,7 +175,7 @@ boot_power_workers() {
 	done
 
 	# DEBUG - Adding sleep to debug the agents not moving to Joined state issue
-	sleep 10m
+	sleep 1h
 }
 
 boot_x86_vm() {
