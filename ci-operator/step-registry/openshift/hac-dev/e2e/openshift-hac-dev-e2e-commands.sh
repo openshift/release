@@ -53,6 +53,7 @@ mkdir $KUBECONFIG_DIR
 
 echo "login to Ephemeral cluster"
 oc login --token=$OC_LOGIN_TOKEN --server=$OC_LOGIN_SERVER
+EPH_CONTEXT=$(oc config current-context)
 
 # Get a namespace in the eph cluster and set vars accordingly
 NAMESPACE=$(bonfire namespace reserve -f)
@@ -122,7 +123,13 @@ npm run cy:run || TEST_RUN=1
 
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
+set -x
 echo "Releasing bonfire namespace"
+bonfire namespace describe
+# Use context from the beginning - context may be changed if other jobs run on a node
+oc config use-context $EPH_CONTEXT
+oc whoami -c
+bonfire namespace describe
 bonfire namespace release ${NAMESPACE} -f
 
 # Teardown
