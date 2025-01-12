@@ -199,6 +199,7 @@ EOF
 # Patch new setting for internalJoinSubnet and internalTransitSwitchSubnet
 oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}' 
 oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}' 
+oc patch networks.operator.openshift.io cluster --type='merge' -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipv4":{"internalMasqueradeSubnet": "100.254.0.0/17"}}}}}}'
 
 # Patch the network configuration for live migration
 oc patch Network.config.openshift.io cluster --type='merge' --patch '{"metadata":{"annotations":{"network.openshift.io/network-type-migration":""}},"spec":{"networkType":"OVNKubernetes"}}'
@@ -324,6 +325,7 @@ until
   oc get network -o yaml | grep NetworkTypeMigrationCompleted > /dev/null && \
   for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-transit-switch-port-ifaddr:" | grep "100.85";  done > /dev/null && \
   for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-gateway-router-lrp-ifaddr:" | grep "100.65";  done > /dev/null && \
+  for ovnpod in \$(oc get pod -n openshift-ovn-kubernetes  --no-headers -l app=ovnkube-node -o custom-columns=NAME:.metadata.name); do oc exec -n openshift-ovn-kubernetes \$ovnpod ip a s br-ex | grep "100.254";  done > /dev/null && \
   oc get network.config/cluster -o jsonpath='{.status.networkType}' | grep OVNKubernetes > /dev/null;
 do
   echo "Live migration is still in progress"
