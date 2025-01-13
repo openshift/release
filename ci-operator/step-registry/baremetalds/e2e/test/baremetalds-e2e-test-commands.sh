@@ -109,13 +109,13 @@ oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeo
 EOF
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
+      TEST_SKIPS="\[sig-arch\]\[Early\] APIs for openshift\.io must have stable versions \[Suite:openshift/conformance/parallel\]"
       if [[ "${RUN_QE_TEST,,}" == "true" ]]; then
-          TEST_SKIPS="\[sig-arch\]\[Early\] APIs for openshift\.io must have stable versions \[Suite:openshift/conformance/parallel\]"
-          TESTS="$(openshift-tests run-upgrade all --to-image --dry-run --provider "${TEST_PROVIDER}")" &&
+          TESTS="$(openshift-tests run-upgrade all --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --dry-run --provider "${TEST_PROVIDER}")" &&
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
           echo "Skipping check version test in QE tests:" &&
           echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
-          TEST_UPGRADE_ARGS="--file /tmp/tests ${TEST_UPGRADE_ARGS:-}"
+          TEST_UPGRADE_ARGS="${TEST_UPGRADE_ARGS} --file /tmp/tests"
           scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
       fi
     fi
