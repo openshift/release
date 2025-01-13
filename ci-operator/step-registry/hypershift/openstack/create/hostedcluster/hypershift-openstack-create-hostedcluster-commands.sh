@@ -9,6 +9,9 @@ OPENSTACK_EXTERNAL_NETWORK_ID=$(cat "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK_ID
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
+# We copy the file here so we can later modify it if needed (e.g. for NFV).
+cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/global-pull-secret.json
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -23,6 +26,9 @@ fi
 CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 echo "$CLUSTER_NAME" > "${SHARED_DIR}/CLUSTER_NAME"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+# In order to save CI resources, we use the "InPlace" upgrade type so
+# when a node needs to be replacement, we will just restart it with its
+# new configuration and not create another that will replace it.
 COMMAND=(
   /usr/bin/hcp create cluster openstack
   --name "${CLUSTER_NAME}"
@@ -30,13 +36,33 @@ COMMAND=(
   --openstack-external-network-id "${OPENSTACK_EXTERNAL_NETWORK_ID}"
   --openstack-node-flavor "${OPENSTACK_COMPUTE_FLAVOR}"
   --openstack-node-image-name "${RHCOS_IMAGE_NAME}"
+  --node-upgrade-type InPlace
   --base-domain "${HYPERSHIFT_BASE_DOMAIN}"
   --control-plane-availability-policy "${HYPERSHIFT_CP_AVAILABILITY_POLICY}"
   --infra-availability-policy "${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
-  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+  --pull-secret=/tmp/global-pull-secret.json
   --release-image "${RELEASE_IMAGE}"
   --annotations=hypershift.openshift.io/skip-release-image-validation=true
 )
+
+if [ "${NFV_NODEPOOLS}" == "true" ]; then
+  if test -f "${SHARED_DIR}/OPENSTACK_DPDK_NETWORK_ID"; then
+    OPENSTACK_DPDK_NETWORK_ID="$(<"${SHARED_DIR}/OPENSTACK_DPDK_NETWORK_ID")"
+    COMMAND+=("--openstack-node-additional-port=network-id:$OPENSTACK_DPDK_NETWORK_ID,disable-port-security:true")
+  fi
+  if test -f "${SHARED_DIR}/OPENSTACK_SRIOV_NETWORK_ID"; then
+    OPENSTACK_SRIOV_NETWORK_ID="$(<"${SHARED_DIR}/OPENSTACK_SRIOV_NETWORK_ID")"
+    COMMAND+=("--openstack-node-additional-port=network-id:$OPENSTACK_SRIOV_NETWORK_ID,vnic-type:direct,disable-port-security:true")
+  fi
+  # Use private credentials to pull CNF images for SR-IOV network operator
+  # Credentials are in shiftstack vault: shiftstack-secrets/quay-openshift-credentials
+  QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
+  QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
+  QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+  curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -o /tmp/jq && chmod +x /tmp/jq
+  /tmp/jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+  mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+fi
 
 if [[ $ENABLE_ICSP == "true" ]]; then
   COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
