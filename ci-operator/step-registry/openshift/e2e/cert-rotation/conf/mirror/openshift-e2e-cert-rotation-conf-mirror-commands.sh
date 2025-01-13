@@ -272,10 +272,13 @@ MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
 MIRRORED_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" -o template --template='{{.digest}}' )
 MUST_GATHER_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=must-gather | cut -f 2 -d '@' )
 MIRRORED_MUST_GATHER_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${MUST_GATHER_DIGEST}"
+HYPERKUBE_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=hyperkube | cut -f 2 -d '@' )
+MIRRORED_HYPERKUBE_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${HYPERKUBE_DIGEST}"
 
 echo "export RELEASE_IMAGE_LATEST=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> ~/config.sh
+echo "export HYPERKUBE_IMAGE=${MIRRORED_HYPERKUBE_IMAGE}" >> ~/config.sh
 #TODO: Fix assisted-test-infra to pass CA bundle in skipper
 echo "export OPENSHIFT_VERSION=4.14" >> ~/config.sh
 
