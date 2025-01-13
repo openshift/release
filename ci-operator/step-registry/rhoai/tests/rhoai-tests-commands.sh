@@ -26,5 +26,6 @@ export OC_HOST
 export OCP_CONSOLE
 export RHODS_DASHBOARD
 
+export TEST_SUITE='Smoke'
 # running RHOAI tests
 ./run_interop.sh
