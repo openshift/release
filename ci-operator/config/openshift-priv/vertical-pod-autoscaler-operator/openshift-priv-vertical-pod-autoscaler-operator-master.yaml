@@ -1,10 +1,6 @@
 base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.59.1
   ocp_4.18_base-rhel9:
-    name: 4.19-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
@@ -16,11 +12,11 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: 4.17-priv
+    name: 4.18-priv
     namespace: ocp-private
     tag: vertical-pod-autoscaler-operator
   ubi-python-311:
@@ -105,8 +101,7 @@ tests:
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    clone: true
-    from: golangci-lint
+    from: src
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: yamllint
   commands: IS_CONTAINER=true make yamllint
@@ -185,24 +180,13 @@ tests:
         operator-sdk run bundle --timeout=10m -n $VPA_NS --security-context-config restricted "$PREVIOUS_BUNDLE" || true
         export OLD_CSV_NAME=$(oc get csv -n $VPA_NS -o jsonpath='{.items[0].metadata.name}')
 
-        # When 4.19 is in dev, we need to change "containers/0" to "containers/1" because of new container added to the deployment.
         oc patch csv -n $VPA_NS $OLD_CSV_NAME --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
         sleep 10
 
         # Delete the deployment which will then be recreated by the subscription controller with the correct image.
         oc delete deployment -n $VPA_NS vertical-pod-autoscaler-operator
 
-        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is created by the subscription controller.
-        # "oc wait --for=create" is not available yet (ships with kubectl v1.31), so we have to poll the deployment with "oc get". https://github.com/kubernetes/kubernetes/pull/122994
-        retries=0
-        while ! oc get -n $VPA_NS deployment vertical-pod-autoscaler-operator; do
-          if [[ $retries -eq 10 ]]; then
-            echo max retries hit
-            exit 1
-          fi
-          sleep 1m
-          retries=$((retries+1))
-        done
+        oc wait --timeout=10m --for=create -n $VPA_NS deployment vertical-pod-autoscaler-operator
         oc wait --timeout=10m --for condition=Available -n $VPA_NS deployment vertical-pod-autoscaler-operator
       dependencies:
       - env: PREVIOUS_BUNDLE
