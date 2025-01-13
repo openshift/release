@@ -1,0 +1,46 @@
+workflow:
+  as: hypershift-openstack-aws-nfv
+  documentation: |-
+    Sets up all the mgmt/infra AWS cluster prerequisites necessary for hypershift openstack guest clusters.
+    Then runs NFV related tests for SR-IOV and DPDK.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      API_FIP_ENABLED: "false"
+      AWS_PROFILE: ""
+      BASE_DOMAIN: "origin-ci-int-aws.dev.rhcloud.com"
+      CONFIG_TYPE: "minimal"
+      HCP_INGRESS_FIP_ENABLED: "true"
+      HYPERSHIFT_NODE_COUNT: "1"
+      INGRESS_FIP_ENABLED: "false"
+      OPENSTACK_DPDK_NETWORK: "intel-dpdk"
+      OPENSTACK_SRIOV_NETWORK: "intel-sriov"
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: openstack-conf-resourcenames
+    - ref: openstack-conf-clouds
+    - ref: openstack-conf-proxy
+    - ref: openstack-conf-externalnetworkid
+    - ref: openstack-provision-floatingips
+    - ref: hypershift-openstack-create-hostedcluster
+    - ref: openstack-provision-dnsrecords
+    - ref: hypershift-openstack-create-wait
+    - ref: hypershift-performanceprofile
+    - ref: openstack-provision-sriov-worker
+    - ref: openstack-provision-sriov-operator
+    - ref: openstack-provision-sriov-networknodepolicy
+    test:
+    - ref: openstack-test-dpdk
+    - ref: openstack-test-sriov
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - ref: hypershift-openstack-destroy
+    - ref: openstack-deprovision-dnsrecords
+    - ref: openstack-deprovision-floatingips
+    - chain: hypershift-destroy-nested-management-cluster
