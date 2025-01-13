@@ -126,7 +126,7 @@ EOF
 IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
 
 
-winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("win")).metadata.name')
+winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("winworker")).metadata.name')
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
 echo "Waiting for Windows nodes to come up in Running state"
