@@ -14,6 +14,14 @@ then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+# If this file is present, we want to run the tests against an Hypershift HostedCluster
+# and therefore we want to load the KUBECONFIG from a specific path.
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+	export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+fi
+
 function wait_for_sriov_pods() {
     # Wait up to 15 minutes for SNO to be installed
     for _ in $(seq 1 15); do
@@ -112,16 +120,21 @@ if [ -n "${is_dev_version:-}" ]; then
         pod-security.kubernetes.io/warn=privileged \
         security.openshift.io/scc.podSecurityLabelSync=false
 
-    # Use private credentials to pull CNF images
-    # See in our vault: shiftstack-secrets/quay-openshift-credentials
-    QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
-    QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
-    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-    QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
-    mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
-    rm /tmp/global-pull-secret.json
+    # On Hypershift deployments, the CNF credentials have already been loaded when creating
+    # the HostedCluster so we don't need to do it again.
+    if ! test -f "${SHARED_DIR}/nested_kubeconfig"
+    then
+    	# Use private credentials to pull CNF images
+    	# See in our vault: shiftstack-secrets/quay-openshift-credentials
+    	QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
+    	QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
+    	oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+    	QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+    	jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+    	mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+    	oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+    	rm /tmp/global-pull-secret.json
+    fi
 
     make deploy-setup
     popd

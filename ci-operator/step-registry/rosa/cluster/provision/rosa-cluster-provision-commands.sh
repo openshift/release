@@ -244,8 +244,11 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-# add USER_TAGS to help with cloud cost
-TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
+# Add USER_TAGS to help with cloud cost and make sure to remove
+# invalid tags so that CLI usage doesn't fail later.
+# The [ and ] characters are considered invalid tags, which are
+# used by CI accounts like "renovate[bot]".
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
 if [[ -z "$TAG_Author" ]]; then
   TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
 fi
@@ -657,6 +660,10 @@ fi
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
+exit_code=$?
+
+# Used by gather steps to generate JUnit
+echo $exit_code > "${SHARED_DIR}/install-status.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"

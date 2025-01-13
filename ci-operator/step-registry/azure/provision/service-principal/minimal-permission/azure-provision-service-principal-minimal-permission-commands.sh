@@ -91,6 +91,11 @@ function create_sp_with_custom_role() {
     run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
 
+if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
+    echo "AZURE_INSTALL_USE_MINIMAL_PERMISSIONS is set to no, skip this step to create sp with minimal permission!"
+    exit 0
+fi
+
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
@@ -113,6 +118,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/installer-sp-minter.json" ]]; then
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/installer-sp-minter.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -243,6 +251,18 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/delete\",
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
+
+# optional permissions for external dns operator
+required_permissions="""
+\"Microsoft.Network/privateDnsZones/CNAME/read\",
+\"Microsoft.Network/privateDnsZones/CNAME/write\",
+\"Microsoft.Network/privateDnsZones/CNAME/delete\",
+\"Microsoft.Network/privateDnsZones/TXT/read\",
+\"Microsoft.Network/privateDnsZones/TXT/write\",
+\"Microsoft.Network/privateDnsZones/TXT/delete\",
+${required_permissions}
+"""
+
 
 # optional permission to gather bootstrap bundle log
 required_permissions="""

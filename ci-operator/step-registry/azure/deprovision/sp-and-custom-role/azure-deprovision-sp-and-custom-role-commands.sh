@@ -17,6 +17,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/installer-sp-minter.json" ]]; then
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/installer-sp-minter.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -34,7 +37,7 @@ if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
     echo "Deleting sp..."
     sp_ids=$(< "${SHARED_DIR}/azure_sp_id")
     for sp_id in ${sp_ids}; do
-        cmd="az ad sp delete --id ${sp_id}"
+        cmd="az ad app delete --id ${sp_id}"
         run_command "${cmd}"
     done
 fi

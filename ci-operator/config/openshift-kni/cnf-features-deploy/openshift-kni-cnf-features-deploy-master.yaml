@@ -1,16 +1,20 @@
 base_images:
-  base:
-    name: "4.18"
-    namespace: ocp
-    tag: base
   base-9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.19_oc-rpms:
+    name: "4.19"
+    namespace: ocp
+    tag: oc-rpms
   ocp_builder_rhel-8-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.22-openshift-4.18
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -22,11 +26,14 @@ build_root:
 images:
 - context_dir: .
   dockerfile_path: cnf-tests/Dockerfile.openshift
-  from: base
+  from: base-9
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.18:
+    ocp_4.19_oc-rpms:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/4.19:oc-rpms
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cnf-tests
 - context_dir: tools/s2i-dpdk/
   dockerfile_path: Dockerfile
@@ -42,18 +49,18 @@ images:
   to: ztp-site-generator
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.19"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -75,6 +82,7 @@ tests:
     cluster_profile: aws-telco
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch master
@@ -90,6 +98,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 4h0m0s
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ran-profile
   optional: true
@@ -97,6 +106,7 @@ tests:
     cluster_profile: aws-telco
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch master
@@ -133,7 +143,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.18"
+      T5CI_VERSION: "4.19"
     workflow: telco5g-cnf
   timeout: 6h0m0s
 - always_run: false
@@ -147,7 +157,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.18"
+      T5CI_VERSION: "4.19"
     workflow: telco5g-sno-cnf
 - always_run: false
   as: e2e-telco5g-hcp-cnftests
@@ -160,7 +170,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.18"
+      T5CI_VERSION: "4.19"
     workflow: telco5g-hcp-cnf
 zz_generated_metadata:
   branch: master
