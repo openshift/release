@@ -61,7 +61,7 @@ if [ -f "${SHARED_DIR}/HCP_INGRESS_IP" ]; then
   # Hosted Cluster name always depends on the following pattern.
   HOSTED_CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
   HCP_INGRESS_IP=$(<"${SHARED_DIR}"/HCP_INGRESS_IP)
-  if [[ "${INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  if [[ "${HCP_INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     HCP_INGRESS_RECORD_TYPE="A"
   else
     HCP_INGRESS_RECORD_TYPE="AAAA"
