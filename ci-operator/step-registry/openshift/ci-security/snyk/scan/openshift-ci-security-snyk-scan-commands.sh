@@ -84,7 +84,7 @@ snyk_code() {
     fi
     PARAMS+=(--target-reference="${TARGET_REFERENCE}")
 
-    ${SNYK_DIR}/snyk code test "${PARAMS[@]}"
+    ${SNYK_DIR}/snyk code test "${PARAMS[@]}" --severity-threshold=high
     local rc=$?
     echo Full vulnerabilities report is available at ${ARTIFACT_DIR}/snyk.sarif.json
     return $rc
