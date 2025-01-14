@@ -9,7 +9,7 @@ echo "Running Quay Automation API testing cases..."
 cd quay-api-tests
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
 echo "The Quay Route is $QUAY_ROUTE"
-QUAY_APP_HOSTNAME=${QUAY_URL#*//}
+QUAY_APP_HOSTNAME=${QUAY_ROUTE#*//}
 export CYPRESS_QUAY_ENDPOINT="$QUAY_APP_HOSTNAME"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
