@@ -19,5 +19,5 @@ NO_COLOR=1 yarn run cypress run --spec "cypress/e2e/quay_api_testing_all.cy.js" 
 
 mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
 cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_report.xml || true
-cp "Quay_API_Testing/quay_api_testing_report" $ARTIFACT_DIR/quay_api_testing_report || true
-cp "Quay_API_Testing/cypress/videos/*" $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
+cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
+cp cypress/videos/* $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
