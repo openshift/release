@@ -33,6 +33,8 @@ hosts: []
 EOF
 
 cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+additionalNTPSources:
+- ${ntp_host}
 cpuArchitecture: ${day2_arch}
 hosts: []
 EOF
