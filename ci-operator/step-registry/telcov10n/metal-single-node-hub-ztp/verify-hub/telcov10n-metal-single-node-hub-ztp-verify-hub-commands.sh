@@ -63,11 +63,8 @@ function set_hub_cluster_kubeconfig {
 
 function run_pytest {
 
-  junitxml_dir=${ARTIFACT_DIR}/junit/
-  mkdir -pv ${junitxml_dir}
-
   test_name=$1
-  test_results_xml_output=${junitxml_dir}/${test_name}-test-results.xml
+  test_results_xml_output=${ARTIFACT_DIR}/junit_${test_name}-test-results.xml
 
   pytest ${PYTEST_VERBOSITY} ${tc_file} --junitxml=${test_results_xml_output}
 }
@@ -76,7 +73,7 @@ function test_deployment_and_services {
 
   echo "************ telcov10n-vhub Generate Test results ************"
 
-  tc_file="/tmp/pytest-tc.py"
+  tc_file="/tmp/${JOB_NAME_SAFE}.py"
   cat << EOF >| ${tc_file}
 import os
 import time
