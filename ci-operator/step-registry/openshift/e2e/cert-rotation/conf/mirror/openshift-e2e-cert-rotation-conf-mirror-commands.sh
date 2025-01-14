@@ -213,10 +213,18 @@ export OCP_RELEASE=$( oc adm release -a ~/pull-secret info "${RELEASE_IMAGE_LATE
 export LOCAL_REPO='ocp/openshift4'
 
 # Mirror release
-oc adm release mirror -a ~/pull-secret \
-    --from="${RELEASE_IMAGE_LATEST}" \
-    --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
-    --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output
+set +e
+for imagestream in $(seq 1 5)
+do
+    echo "[$(date)] Retrying mirror"
+    oc adm release mirror -a ~/pull-secret \
+        --from="${RELEASE_IMAGE_LATEST}" \
+        --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
+        --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output \
+    && break
+    sleep 15
+done
+set -e
 
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
