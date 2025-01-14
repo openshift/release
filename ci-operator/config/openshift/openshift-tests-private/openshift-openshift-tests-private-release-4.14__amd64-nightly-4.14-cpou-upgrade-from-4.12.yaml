@@ -59,8 +59,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-proxy-sts-f28
+  cron: 31 7 16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: cucushift-upgrade-setedge-2hops
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-workers-rhel8-f28
-  cron: 15 20 7 * *
+  cron: 21 8 24 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -69,8 +79,21 @@ tests:
     - ref: cucushift-upgrade-setedge-2hops
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
+- as: baremetalds-ipi-ovn-ipv4-fips-f28
+  cron: 14 2 7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - ref: cucushift-upgrade-setedge-2hops
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-upi-private-xpn-sdn-f28
-  cron: 54 10 16 * *
+  cron: 54 1 27 * *
   steps:
     cluster_profile: gcp-qe
     test:
@@ -78,7 +101,7 @@ tests:
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-sdn
 - as: ibmcloud-ipi-private-fips-f28
-  cron: 15 18 26 * *
+  cron: 11 6 27 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -89,7 +112,7 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
-  cron: 38 10 29 * *
+  cron: 51 2 29 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -100,7 +123,7 @@ tests:
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-ovn-ipsec-f28
-  cron: 29 21 4 * *
+  cron: 29 18 2 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
