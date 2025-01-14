@@ -3,7 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap "sleep 30m" EXIT TERM INT SIGINT ERR
 SLACK_WEBHOOK_URL=$(cat /tmp/secrets/slack-webhook-url)
 CLEANUP_AWS__AUTH__ACCESS_KEY=$(cat /tmp/secrets/aws-access-key)
 CLEANUP_AWS__AUTH__SECRET_KEY=$(cat /tmp/secrets/aws-secret-key)
