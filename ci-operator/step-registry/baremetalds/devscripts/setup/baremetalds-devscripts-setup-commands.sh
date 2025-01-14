@@ -181,6 +181,7 @@ fi
 # even on success
 cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
 export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+export MIRROR_IMAGES=true
 EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
