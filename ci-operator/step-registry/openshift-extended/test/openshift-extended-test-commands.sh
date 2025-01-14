@@ -408,6 +408,7 @@ function run {
         echo "success"
     else
         echo "fail"
+        sleep infinity
     fi
     # summarize test results
     echo "Summarizing test results..."
