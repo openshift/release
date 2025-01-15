@@ -96,7 +96,9 @@ parameters:
 EOF
   oc -n multi-image create -f /tmp/testsec.yaml
   rm -f /tmp/sshkey /tmp/sshkey.pub /tmp/tls.crt /tmp/tls.key
-  cd /tmp; git clone https://github.com/peterducai/etcd-tools.git;sleep 20;
+  cd /tmp 
+  git clone https://github.com/peterducai/etcd-tools.git
+  sleep 20;
   echo "To check the etcd pod load status"
   #for i in {3..12500}; do oc create secret generic ${SECRET_NAME}-$i -n $NAMESPACE --from-literal=ssh-private-key="$SSH_PRIVATE_KEY" --from-literal=ssh-public-key="$SSH_PUBLIC_KEY" --from-literal=token="TOKEN_VALUE" --from-literal=tls.crt="CERTIFICATE" --from-literal=tls.key="$PRIVATE_KEY";done
   for i in {3..5}; do oc create secret generic ${SECRET_NAME}-$i -n $NAMESPACE --from-literal=ssh-private-key="$SSH_PRIVATE_KEY" --from-literal=ssh-public-key="$SSH_PUBLIC_KEY" --from-literal=token="TOKEN_VALUE" --from-literal=tls.crt="CERTIFICATE" --from-literal=tls.key="$PRIVATE_KEY";done
