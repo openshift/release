@@ -12,27 +12,36 @@ trigger_build() {
 }
 
 
+handle_job_status() {
+    local response="$1"
+    
+    return_code=$(echo "$response" | jq -r '.return_code')
+
+    if [[ "$return_code" == '200' ]] || [[ "$return_code" == '400' ]]; then
+        job_status=$(echo "$response" | jq -r '.message')
+        job_console=$(echo "$response" | jq -r '.console_logs')
+
+        echo "$job_console"
+
+        if [[ "$job_status" == 'SUCCESS' ]]; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+}
+
+# Main function to check the pull number and handle retries
 check_pull_number() {
     check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
-    
-    check_pull_number_return_code=$(echo "$check_pull_number_response" | jq -r '.return_code')
-    
-    while [ -n "$check_pull_number_response" ]; do
+
+    handle_job_status "$check_pull_number_response"
+
+    while true; do
         check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
-        check_pull_number_return_code=$(echo "$check_pull_number_response" | jq -r '.return_code')
+        
+        handle_job_status "$check_pull_number_response"
 
-        if [[ "$check_pull_number_return_code" == '200' ]] || [[ "$check_pull_number_return_code" == '400' ]]; then
-            job_status=$(echo "$check_pull_number_response" | jq -r '.message')
-	    job_console=$(echo "$check_pull_number_response" | jq -r '.console_logs')
-
-	    echo "$job_console"
-
-            if [[ "$job_status" == 'SUCCESS' ]]; then
-                exit 0
-            else    
-                exit 1
-            fi
-        fi
         sleep 300
     done
 }
