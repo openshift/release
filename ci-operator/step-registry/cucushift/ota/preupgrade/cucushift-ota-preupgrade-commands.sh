@@ -268,6 +268,106 @@ function pre-OCP-24358(){
     return 0
 }
 
+function pre-OCP-32747(){
+    local token url reason alert namespace severity description state summary retry=10
+    token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+    url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+    
+    oc patch featuregate cluster --type json -p '[{"op": "add", "path": "/spec/featureSet", "value": "TechPreviewNoUpgrade"}]'
+    while (( retry > 0 )); do
+        reason="$(curl -s -k -H "Authorization: Bearer $token" "https://$url/api/v1/label/reason/values")"
+        if [[ "${reason}" == *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+            break
+        fi
+        sleep 1m
+        retry=$((retry-1))
+    done
+    if [[ "${reason}" != *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 After waiting 10 minutes, FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade still not appears"
+        return 1
+    fi
+
+    retry=5
+    while (( retry > 0 )); do
+        alert="$(curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/v1/alerts" | jq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        namespace="$(echo "${alert}" | jq -r ".labels.namespace")"
+        severity="$(echo "${alert}" | jq -r ".labels.severity")"
+        description="$(echo "${alert}" | jq -r ".annotations.description")"
+        state="$(echo "${alert}" | jq -r ".state")"
+        if [[ "${namespace}" != "openshift-cluster-version" ]] \
+            || [[ "${severity}" != "info" ]] \
+            || [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]] \
+            || [[ "${state}" != "pending" ]]; then
+            sleep 1m
+            retry=$((retry-1))
+            continue
+        fi
+        break
+    done
+    echo -e "Alert ClusterNotUpgradeable at beginning:\n${alert}"
+    if [[ "${namespace}" != "openshift-cluster-version" ]]; then
+        echo "Error: 32747 namespace is incorrect, expected is openshift-cluster-version, but observed is ${namespace}"
+        return 1
+    fi
+    if [[ "${severity}" != "info" ]]; then
+        echo "Error: 32747 severity is incorrect, expected is info, but observed is ${severity}"
+        return 1
+    fi
+    if [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]]; then
+        echo "Error: 32747 description is incorrect, expected is 'In most cases, you will still be able to apply patch releases.', but observed is '${description}'"
+        return 1
+    fi
+    if [[ "${state}" != "pending" ]]; then
+        echo "Error: 32747 state is incorrect, expected is pending, but observed is ${state}"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable at beginning is correct"
+
+    sleep 50m   # the change only happened after 1 hour, so we can hardcode the sleep time here
+    echo "Sleep 50 minutes, then check the alert state"
+    retry=0
+    while (( retry < 40 ));do
+        # Must renew the token when the alert changed
+        token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+        url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+        alert="$(curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/v1/alerts" | jq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        state="$(echo "${alert}" | jq -r ".state")"
+        if [[ "${state}" == "firing" ]]; then
+            break
+        fi
+        echo "Attempted ${retry}"
+        sleep 1m
+        retry=$((retry+1))
+    done
+    if [ -z "${alert}" ] ; then
+        token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+        url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+        alert="$(curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/v1/alerts")"
+        echo -e "Alerts after one hour:\n${alert}"
+        return 1
+    fi
+
+    echo -e "Alert ClusterNotUpgradeable after one hour:\n${alert}"
+
+    if [[ "${state}" != "firing" ]]; then
+        echo "Error: 32747 After waiting 90 minutes, state is incorrect, expected is firing, but observed is ${state}"
+        return 1
+    fi
+
+    summary="$(echo "${alert}" | jq -r ".annotations.summary")"
+    if [[ "${summary}" != *"One or more cluster operators have been blocking minor version cluster upgrades for at least an hour."* ]]; then
+        echo "Error: 32747 When state is firing, summary is incorrect, expected is 'One or more cluster operators have been blocking minor version cluster upgrades for at least an hour.', but observed is '${summary}'"
+        return 1
+    fi
+
+    description="$(echo "${alert}" | jq -r ".annotations.description")"
+    if [[ "${description}" != *"Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 When state is firing, description is incorrect, expected is 'Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade', but observed is '${description}'"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable after one hour is correct"
+}
+
 function pre-OCP-47197(){
     echo "Test Start: ${FUNCNAME[0]}"
     local version 
