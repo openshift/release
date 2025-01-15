@@ -80,6 +80,8 @@ spec:
       privileged: true
       runAsUser: 0
     env:
+    - name: DOCKER_REGISTRY_MIRRORS
+      value: "${DOCKER_REGISTRY_MIRRORS:-}"
     - name: CI
       value: "${CI:-}"
     - name: ARTIFACTS
