@@ -80,6 +80,8 @@ spec:
       value: "${BUILD_WITH_CONTAINER:-}"
     - name: INTEGRATION_TEST_FLAGS
       value: "${INTEGRATION_TEST_FLAGS:-}"
+    - name: DOCKER_REGISTRY_MIRRORS
+      value: "${DOCKER_REGISTRY_MIRRORS:-}"
     - name: CI
       value: "${CI:-}"
     - name: ARTIFACTS
