@@ -8,52 +8,31 @@ error_handler() {
 
 trap 'error_handler $? $LINENO' ERR
 
+IBMCLOUD_HOME=/tmp/ibmcloud
+export IBMCLOUD_HOME
+
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
+PATH=${PATH}:/tmp
+export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
+
 echo "Invoking upi deprovision heterogeneous vpc"
 echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
-CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-export NAME_PREFIX="rdr-multi-arch-${CLEAN_VERSION}"
+
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)
 export WORKSPACE_NAME
 VPC_NAME="${WORKSPACE_NAME}-vpc"
 export VPC_NAME
-VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
-echo "VPC_REGION:- ${VPC_REGION}"
-export VPC_REGION
-
-
-if [ "${ADDITIONAL_WORKERS}" == "0" ]
-then
-  echo "No additional workers requested"
-  exit 0
-fi
-
-function ic() {
-  HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-}
 
 NO_OF_RETRY=${NO_OF_RETRY:-"3"}
 
-function retry {
-  cmd=$1
-  for retry in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $retry/$NO_OF_RETRY"
-    ret_code=0
-    $cmd || ret_code=$?
-    if [ $ret_code = 0 ]; then
-      break
-    elif [ "$retry" == "$NO_OF_RETRY" ]; then
-      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
-    else
-      sleep 30
-    fi
-  done
-}
-
+# Functions
+# Setup ibmcloud cli
 function setup_ibmcloud_cli() {
   if [ -z "$(command -v ibmcloud)" ]
   then
@@ -61,8 +40,17 @@ function setup_ibmcloud_cli() {
     curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
   fi
 
-  retry "ic config --check-version=false"
-  retry "ic version"
+  mkdir -p "${IBMCLOUD_HOME_FOLDER}"
+
+  ibmcloud config --check-version=false
+  ibmcloud version
+}
+
+# login to ibm cloud with vpc_region and resource_group
+function ibmcloud_login() {
+    echo "Logging into IBMCLOUD"
+    ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "$(< ${SHARED_DIR}/RESOURCE_GROUP)" -r "$(< ${SHARED_DIR}/VPC_REGION)"
+    ibmcloud plugin install -f vpc-infrastructure tg-cli power-iaas
 }
 
 function setup_terraform_cli() {
@@ -72,28 +60,31 @@ function setup_terraform_cli() {
   ${IBMCLOUD_HOME_FOLDER}/terraform version
 }
 
+# cleanup the ibmcloud vpc resources
 function cleanup_ibmcloud_vpc() {
-  cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
-  echo "Cleaning up Instances"
-  for INS in $(ic is instances --output json | jq -r '.[].id')
-  do
-    VALID_INS=$(ic is instance "${INS}" --output json | jq -r '. | select(.vpc.name == "'${VPC_NAME}'")')
-    if [ -n "${VALID_INS}" ]
+    CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+    NAME_PREFIX="multi-arch-p-px-${CLEAN_VERSION}"
+    cos_name="${NAME_PREFIX}-multi-arch-intel-cos"
+    echo "Cleaning up VPC Resources"
+    for INS in $(ibmcloud is instances --output json | jq -r '.[].id')
+    do
+        VALID_INS=$(ibmcloud is instance "${INS}" --output json | jq -r '. | select(.vpc.name == "'${VPC_NAME}'")')
+        if [ -n "${VALID_INS}" ]
+        then
+        ibmcloud is ind ${INS} --force
+        sleep 60
+        fi
+    done
+    echo "Cleaning up COS Instances"
+    VALID_COS=$(ibmcloud resource service-instances 2> /dev/null | grep "${cos_name}" || true)
+    if [ -n "${VALID_COS}" ]
     then
-      retry "ic is ind ${INS} --force"
-      sleep 60
+        for COS in $(ibmcloud resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
+        do
+        ibmcloud resource service-instance-delete "${COS}" --force --recursive
+        done
     fi
-  done
-  echo "Cleaning up COS Instances"
-   VALID_COS=$(ic resource service-instances 2> /dev/null | grep "${cos_name}" || true)
-   if [ -n "${VALID_COS}" ]
-   then
-     for COS in $(ic resource service-instance "${cos_name}" --output json -q | jq -r '.[].guid')
-     do
-       retry "ic resource service-instance-delete ${COS} --force --recursive"
-     done
-   fi
-  echo "Done cleaning up prior runs"
+    echo "Done cleaning up prior runs"
 }
 
 function setup_multi_arch_vpc_workspace(){
@@ -137,38 +128,33 @@ function clone_multi_arch_vpc_artifacts(){
   fi
 }
 
+# Delete the multi-arch VPC resources
 function destroy_multi_arch_vpc_resources() {
-  cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
-  "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file var-multi-arch-vpc.tfvars -auto-approve || true
+    if [ -d "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars ]
+    then
+        echo "Starting the delete on the multi-arch VPC resources"
+        cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
+        "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file var-multi-arch-vpc.tfvars -auto-approve
+        rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc
+    fi
 }
 
+
+
+# Main
+if [ "${ADDITIONAL_WORKERS}" == "0" ]
+then
+  echo "No additional workers requested"
+  exit 0
+fi
+
 echo "Invoking upi deprovision heterogeneous vpc for ${VPC_NAME}"
-
-PATH=${PATH}:/tmp
-mkdir -p "${IBMCLOUD_HOME_FOLDER}"
-export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
-
 setup_ibmcloud_cli
 setup_terraform_cli
 setup_multi_arch_vpc_workspace
 clone_multi_arch_vpc_artifacts
-
-echo "Logging into IBMCLOUD"
-ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${VPC_REGION}"
-retry "ic plugin install -f vpc-infrastructure tg-cli power-iaas"
-
-# transit_gateway_routes_report
-
-# Delete the multi-arch VPC resources
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars ]
-then
-  echo "Starting the delete on the multi-arch VPC resources"
-  destroy_multi_arch_vpc_resources
-  rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc
-fi
-
-# Delete the workspace created
-echo "Starting the delete on the VPC resources"
+ibmcloud_login
+destroy_multi_arch_vpc_resources
 cleanup_ibmcloud_vpc
 echo "IBM Cloud multi-arch VPC resources destroyed successfully $(date)"
 

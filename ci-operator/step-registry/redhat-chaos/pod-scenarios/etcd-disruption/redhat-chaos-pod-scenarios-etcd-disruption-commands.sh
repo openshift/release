@@ -3,13 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-
-oc config view
-
-oc projects
-python3 --version
-
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")

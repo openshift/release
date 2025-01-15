@@ -57,6 +57,9 @@ chain:
     - name: HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE
       default: "false"
       documentation: "If set to true, it sets the --node-upgrade-type flag to InPlace"
+    - name: HYPERSHIFT_SHARED_VPC
+      default: "false"
+      documentation: "If set to true, it sets the --vpc-owner-aws-creds as ${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -95,6 +98,10 @@ chain:
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" 
       )
+      
+      if [[ $HYPERSHIFT_SHARED_VPC == "true" ]]; then
+          COMMAND+=(--vpc-owner-aws-creds="${CLUSTER_PROFILE_DIR}/.awscred_shared_account")
+      fi
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")

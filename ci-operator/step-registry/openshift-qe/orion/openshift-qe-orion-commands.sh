@@ -42,6 +42,7 @@ if [ ${JUNIT} == true ]; then
   export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
   export EXTRA_FLAGS+=" --output-format junit"
   export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+  export EXTRA_FLAGS+=" --ack ack/${VERSION}_${ACK_FILE}"
   export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 

@@ -25,7 +25,10 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "olm")
     ;;
     "4.18")
-    tp_operator=("cluster-api" "olm")
+    tp_operator=("cluster-api")
+    ;;
+    "4.19")
+    tp_operator=("cluster-api")
     ;;
     *)
     tp_operator=()

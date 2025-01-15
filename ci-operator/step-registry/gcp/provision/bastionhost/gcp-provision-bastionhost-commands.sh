@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
@@ -36,7 +42,7 @@ workdir=`mktemp -d`
 # Generally we do not update boot image for bastion host very often, we just use it as a jump
 # host, mirror registry, and proxy server, these services do not have frequent update.
 # So hard-code them here.
-IMAGE_NAME="fedora-coreos-34-20210821-3-0-gcp-x86-64"
+IMAGE_NAME="fedora-coreos-41-20241122-3-0-gcp-x86-64"
 IMAGE_PROJECT="fedora-coreos-cloud"
 echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
 

@@ -7,6 +7,7 @@ set -o pipefail
 echo "TEST_TYPE=${TEST_TYPE}"
 echo "BRANCH=${BRANCH}"
 echo "ARCH=${ARCH}"
+echo "INSTALLER_TYPE=${INSTALLER_TYPE}"
 
 # List of exclude tests from conformance/serial suite
 if [ "${TEST_TYPE}" == "conformance-serial" ]; then
@@ -454,6 +455,30 @@ if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HET
 "[sig-network][Feature:Router][apigroup:route.openshift.io][apigroup:operator.openshift.io] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 "[sig-network][Feature:tuning] pod should start with all sysctl on whitelist [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
 "[sig-network][Feature:tuning] pod sysctls should not affect node [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+EOF
+fi
+
+# Skip OAUTH related tests for agent based install runs on ppc64le
+# until https://issues.redhat.com/browse/OCPBUGS-45256 is fixed
+if [ "${INSTALLER_TYPE}" == "agent" ] && [ "${ARCH}" == "ppc64le" ]; then
+echo "Adding excluded tests for agent based install runs on ppc64le"
+    cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [apigroup:user.openshift.io][apigroup:route.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [apigroup:user.openshift.io][apigroup:route.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers][apigroup:route.openshift.io][apigroup:config.openshift.io][apigroup:oauth.openshift.io] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age [apigroup:oauth.openshift.io] to generate tokens that do not expire works as expected when using a code authorization flow [apigroup:user.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age [apigroup:oauth.openshift.io] to generate tokens that do not expire works as expected when using a token authorization flow [apigroup:user.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age [apigroup:oauth.openshift.io] to generate tokens that expire shortly works as expected when using a code authorization flow [apigroup:user.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age [apigroup:oauth.openshift.io] to generate tokens that expire shortly works as expected when using a token authorization flow [apigroup:user.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] well-known endpoint should be reachable [apigroup:route.openshift.io] [apigroup:oauth.openshift.io] [Suite:openshift/conformance/parallel]"
 EOF
 fi
 

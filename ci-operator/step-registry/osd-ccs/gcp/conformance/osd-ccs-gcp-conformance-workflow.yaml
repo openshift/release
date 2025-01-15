@@ -1,0 +1,30 @@
+workflow:
+  as: osd-ccs-gcp-conformance
+  steps:
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "release:latest"
+      COMPUTE_NODES: 4
+      TEST_SKIPS: >-
+        users can manipulate groups\|
+        well-known endpoint should be reachable\|
+        builds installing subscription content\|
+        The HAProxy router should expose prometheus metrics for a route\|
+        oc adm must-gather runs successfully for audit logs\|
+        OAuth server has the correct token and certificate fallback semantics\|
+        OAuthClientWithRedirectURIs must validate request URIs according to oauth-client definition\|
+        should be present on all masters and work\|
+        when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
+        API LBs follow \/readyz of kube-apiserver and stop sending requests before server shutdowns for external clients
+    pre:
+    - ref: osd-ccs-cluster-provision-gcp
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather
+    - ref: osd-ccs-cluster-deprovision
+  documentation: |-
+    This workflow installs an OSD GCP cluster and performs openshift-tests conformance testing.

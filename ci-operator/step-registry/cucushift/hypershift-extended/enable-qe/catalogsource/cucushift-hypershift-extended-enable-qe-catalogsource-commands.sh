@@ -61,6 +61,8 @@ kind: CatalogSource
 metadata:
   name: qe-app-registry
   namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}

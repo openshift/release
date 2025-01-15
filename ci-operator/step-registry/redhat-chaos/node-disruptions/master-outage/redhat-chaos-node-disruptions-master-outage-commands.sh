@@ -3,10 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
@@ -14,8 +10,6 @@ export ES_PASSWORD
 export ES_USERNAME
 
 export ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-
-
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -25,8 +19,6 @@ export KRKN_KUBE_CONFIG=$KUBECONFIG
 
 # read passwords from vault
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
-#aws_access_key_id=$(cat "/secret/telemetry/aws_access_key_id")
-#aws_secret_access_key=$(cat "/secret/telemetry/aws_secret_access_key")
 
 # set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
@@ -75,9 +67,6 @@ elif [ "$platform" = "IBMCloud" ]; then
     export TIMEOUT=320
 
 fi
-
-
-ls node-disruptions
 
 ./node-disruptions/prow_run.sh
 rc=$?

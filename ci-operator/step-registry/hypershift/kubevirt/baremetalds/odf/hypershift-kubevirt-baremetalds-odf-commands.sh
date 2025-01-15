@@ -6,7 +6,11 @@ set -o pipefail
 set -x
 
 # Make the masters schedulable so we have more capacity to run ODF and VMs
-oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
+then
+  oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+fi
 
 echo "Preparing nodes"
 oc label nodes node-role.kubernetes.io/worker='' --selector='node-role.kubernetes.io/control-plane' --overwrite

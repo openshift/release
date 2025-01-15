@@ -16,6 +16,15 @@ function ibmcloud_login {
     "${IBMCLOUD_CLI}" login -r ${region} -g ${rg} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
+configFile="${SHARED_DIR}/install-config.yaml"
+PUBLISH=$(yq-go r "${configFile}" "publish")
+echo "publish: ${PUBLISH}"
+
+if [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
+    echo "skipping checking for External cluster"
+    exit 0
+fi
+
 RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
 
 ibmcloud_login ${RESOURCE_GROUP}

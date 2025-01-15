@@ -26,7 +26,7 @@ vpc_tpl="/tmp/vpc_tpl.yaml"
 
 cat > ${vpc_tpl} << EOF
 AWSTemplateFormatVersion: 2010-09-09
-Description: Template for Best Practice VPC with 1-3 AZs
+Description: Created by aws-provision-vpc-disconnected
 
 Parameters:
   VpcCidr:

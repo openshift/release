@@ -18,7 +18,7 @@ if [ -z "${CLUSTER_NAME:-}" ]; then
 fi
 set +e
 export CLUSTER_NAME
-timeout 25m bash -c '
+timeout 30m bash -c '
   until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
       sleep 15
   done

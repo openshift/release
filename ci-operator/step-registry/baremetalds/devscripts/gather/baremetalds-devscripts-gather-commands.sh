@@ -46,12 +46,18 @@ tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --trans
 . network.sh
 . utils.sh
 
+INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+)
+
 echo "Get the bootstrap logs if it is around and we didn't already collect them..."
 if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
 then
   # Collect log bundle
-  ssh "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
-  scp "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
+  scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
 fi
 
 echo "Get the proxy logs..."
@@ -87,12 +93,6 @@ do
   node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
     NODE_IPS+=("\$node_ip")
 done
-
-INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-)
 
 # Collect sos report from each known node
 for NODE_IP in \${NODE_IPS[@]}; do
