@@ -650,6 +650,19 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
+- as: gcp-ipi-user-provisioned-dns-arm-f7
+  cron: 5 8 7,16,23,30 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
 - as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
   cron: 56 13 10 * *
   steps:
