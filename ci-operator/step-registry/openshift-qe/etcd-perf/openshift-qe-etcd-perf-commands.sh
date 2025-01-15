@@ -1,7 +1,7 @@
 #!/bin/bash
-set -o errexit
+#set -o errexit
 set -o nounset
-set -o pipefail
+#set -o pipefail
 oc get route -A |grep ditty
 NAME=${NAME:=""}
   #CASE 01 create 100 projects in the batches of 500
