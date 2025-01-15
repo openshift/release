@@ -57,6 +57,7 @@ if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
     INTERNAL=true
     INTERNAL_ONLY=true
     CL_SEARCH="computeqe"
+    HOSTS_NUMBER=" --number 2"
 fi
 
 echo $CL_SEARCH
@@ -70,7 +71,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
-ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
+ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno ${HOSTS_NUMBER-}"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -99,9 +100,14 @@ EOF
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV ADD_BM_HOST <<< "$(cat ${SHARED_DIR}/cluster_name)"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 SNO_NAME=sno-${CLUSTER_NAME}
+# if ADD_BM_HOST is not empty, include it in release
+RELEASE_ADD=""
+if [[ -n "$ADD_BM_HOST" ]]; then
+    RELEASE_ADD="--release-cluster $ADD_BM_HOST"
+fi
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -111,7 +117,7 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME $RELEASE_ADD
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -298,6 +304,9 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
 EOF
 
+if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
+fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
@@ -309,6 +318,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e vsno_ip=$SNO_IP \
     -e hostedbm_inject_dns=true \
     -e sno_tag=$MGMT_VERSION \
+    -e vsno_wait_minutes=150 \
     -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
     -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
