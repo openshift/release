@@ -10,10 +10,10 @@ QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secre
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
 # env variables from shared dir for single ns test cases
-QUAY_REDIS_IP_ADDRESS=$(cat ${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS) || true
-QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(cat ${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS) || true
-QUAY_AWS_S3_BUCKET=$(cat ${SHARED_DIR}/QUAY_AWS_S3_BUCKET) || true
-CLAIR_ROUTE_NAME=$(cat ${SHARED_DIR}/CLAIR_ROUTE_NAME) || true
+QUAY_REDIS_IP_ADDRESS=$([ -f "${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS" ] && cat "${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS" || echo "")
+QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$([ -f "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS" ] && cat "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS" || echo "") 
+QUAY_AWS_S3_BUCKET=$([ -f "${SHARED_DIR}/QUAY_AWS_S3_BUCKET" ] && cat "${SHARED_DIR}/QUAY_AWS_S3_BUCKET" || echo "")
+CLAIR_ROUTE_NAME=$([ -f "${SHARED_DIR}/CLAIR_ROUTE_NAME" ] && cat "${SHARED_DIR}/CLAIR_ROUTE_NAME" || echo "")
 
 #export env variabels for Go test cases
 export quayregistry_postgresql_db_hostname=${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}
