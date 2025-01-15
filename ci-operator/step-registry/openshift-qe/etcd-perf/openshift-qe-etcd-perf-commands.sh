@@ -96,7 +96,7 @@ parameters:
 EOF
   oc -n multi-image create -f /tmp/testsec.yaml
   rm -f /tmp/sshkey /tmp/sshkey.pub /tmp/tls.crt /tmp/tls.key
-  cd /tmp 
+  cd /tmp || exit
   git clone https://github.com/peterducai/etcd-tools.git
   sleep 20;
   echo "To check the etcd pod load status"
