@@ -109,7 +109,8 @@ set_power_configs() {
   if [ ${IS_HETEROGENEOUS} == "yes" ]; then
       # NOTE: Using e980 as a workaround for VPC Load Balancer connectivity issues with
       # s922 in heterogeneous node pools, until a permanent fix.
-      POWERVS_VSI_SYS_TYPE="e980"
+      # Test if it is working now with s922?
+      POWERVS_VSI_SYS_TYPE="s922"
   else
       POWERVS_VSI_SYS_TYPE="s922"
   fi
