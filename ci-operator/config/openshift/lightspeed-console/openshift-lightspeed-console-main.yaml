@@ -8,9 +8,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/nodejs-18:latest
       USER root
-      RUN yum -y install git
       RUN mkdir /go && chmod 777 /go
-      RUN npm install --global yarn
       USER 1001
 images:
 - dockerfile_path: Dockerfile
@@ -41,7 +39,17 @@ tests:
   steps:
     test:
     - as: lint
-      commands: yarn install && yarn run lint
+      commands: npm install && npm run lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: i18n
+  steps:
+    test:
+    - as: i18n
+      commands: npm install && npm run i18n
       from: src
       resources:
         requests:
