@@ -100,17 +100,23 @@ tests:
       MAX_UNAVAILABLE: "5"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
-      PROFILE_TYPE: reporting
-      SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "24"
-    test:
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
     - ref: ipi-conf-azure-custom-region
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
     - ref: ipi-install-heterogeneous
     - chain: workers-scale
     - ref: openshift-qe-kube-burner-index
     - chain: openshift-qe-cluster-density-v2
-    - chain: openshift-qe-upgrade
-    workflow: openshift-qe-installer-azure
+    workflow: openshift-qe-upgrade
   timeout: 8h0m0s
 - always_run: false
   as: multi-loaded-upgrade-417to418-120nodes
