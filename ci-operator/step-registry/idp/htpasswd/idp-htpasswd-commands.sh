@@ -15,14 +15,13 @@ function check_if_hypershift_env () {
     MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
     if [ -f "${MC_KUBECONFIG_FILE}" ]; then
         export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
-        _jsonpath="{.items[?(@.metadata.name==\"$(cat ${SHARED_DIR}/cluster-name)\")].metadata.namespace}"
-        HYPERSHIFT_NAMESPACE=$(oc get hostedclusters -A -ojsonpath="$_jsonpath")
     elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
         export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
     else
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
-    
+
+    HYPERSHIFT_NAMESPACE=$(oc get hostedclusters -A -ojsonpath="{.items[?(@.metadata.name==\"$(cat ${SHARED_DIR}/cluster-name)\")].metadata.namespace}")
     count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
     echo "hostedcluster count: $count"
     if [ "$count" -lt 1 ]  ; then
