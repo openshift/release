@@ -1,24 +1,13 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
-images:
-- context_dir: infra/feast-operator
-  dockerfile_path: Dockerfile
-  to: feast
-promotion:
-  to:
-  - name: "4.19"
-    namespace: ocp
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN dnf install -y --nodocs make git
+      RUN dnf list golang --showduplicates
+      RUN dnf install -y --nodocs golang-1.21
 releases:
-  initial:
-    integration:
-      name: "4.19"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
       name: "4.19"
       namespace: ocp
 resources:
@@ -29,12 +18,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-tests
+- as: e2e-in-cluster-build
   steps:
     cluster_profile: aws-opendatahub
     test:
-    - as: run-e2e-tests
-      commands: ./infra/feast-operator/make test-e2e
+    - as: run tests
+      cli: latest
+      commands: |
+        cd infra/feast-operator
+        make install && make deploy IMG=feast-operator
+        oc wait --for condition=Available -n default deployment feast-operator # wait until the operator is ready
+        make test-e2e
       from: src
       resources:
         requests:
