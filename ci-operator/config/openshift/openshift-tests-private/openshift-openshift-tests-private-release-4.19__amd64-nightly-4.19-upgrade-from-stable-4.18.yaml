@@ -387,11 +387,13 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_MIN_PERMISSION_FOR_MARKETPLACE: "true"
       OS_IMAGE_VERSION: 413.92.2023101700
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-marketplace-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-marketplace
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28
   cron: 48 13 16 * *
   steps:
@@ -565,8 +567,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28
-  cron: 12 8 20 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -890,13 +892,10 @@ tests:
 - as: vsphere-ipi-multisubnets-elb-usermanaged-f28
   cron: 3 10 13 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       LB_TYPE: UserManaged
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
@@ -993,11 +992,9 @@ tests:
 - as: vsphere-ipi-zones-multisubnets-external-lb-f28
   cron: 33 19 27 * *
   steps:
-    cluster_profile: vsphere-multizone-2
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+    cluster_profile: vsphere-elastic
+    env:
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
@@ -1040,7 +1037,7 @@ tests:
 - as: vsphere-upi-zones-canary-f28
   cron: 35 1 25 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
