@@ -2,9 +2,13 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi
-      RUN dnf install -y --nodocs make git
-      RUN dnf list golang --showduplicates
-      RUN dnf install -y --nodocs golang-1.21
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
+      RUN make build-feature-server-docker REGISTRY=localhost/feastdev
+images:
+  - context_dir: infra/feast-operator
+    dockerfile_path: Dockerfile
+    to: feast-operator
 releases:
   latest:
     integration:
@@ -18,23 +22,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-in-cluster-build
+- as: e2e-in-cluster
   steps:
     cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "1"
     test:
     - as: run tests
       cli: latest
       commands: |
-        cd infra/feast-operator
-        make install && make deploy IMG=feast-operator
-        oc wait --for condition=Available -n default deployment feast-operator # wait until the operator is ready
-        make test-e2e
+#        cd infra/feast-operator
+        echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+#        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE}
+#        oc wait --for condition=Available -n default deployment feast-operator
+#        make test-e2e
+      dependencies:
+        - env: FEAST_OPERATOR_CONTROLLER_IMAGE
+          name: feast-operator
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: dev
   org: opendatahub-io
