@@ -1,8 +1,11 @@
 #!/bin/bash
 #set -o errexit
-set -o nounset
+#set -o nounset
 #set -o pipefail
-oc get route -A |grep ditty
+
+echo "sleep 180"
+sleep 180
+#oc get route -A |grep ditty
 NAME=${NAME:=""}
   #CASE 01 create 100 projects in the batches of 500
   #for i in {1..100}; do oc new-project project-$i;oc create configmap project-$i --from-file=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt; done
