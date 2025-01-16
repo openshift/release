@@ -41,22 +41,27 @@ function load_env {
   NETWORK_BRIDGE_NAME="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bridge_name)"
   export NETWORK_BRIDGE_NAME
 
-  NETWORK_BRIDGE_GW_IP="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bridge_gateway)"
-  export NETWORK_BRIDGE_GW_IP
+  NETWORK_IPv4_SUBNET="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_subnet)"
+  export NETWORK_IPv4_SUBNET
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_GW_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_GW_IPv4
 
   #### VM
   VM_HUB_ZTP_POOL_PATH="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
   export VM_HUB_ZTP_POOL_PATH
 
   # shellcheck disable=SC2089
-  VM_BOOTSTRAP_IP="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') | ansible.utils.ipaddr('add', 1) }}"
+  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('2') }}"
   # shellcheck disable=SC2090
-  export VM_BOOTSTRAP_IP
+  export VM_BOOTSTRAP_IPv4
 
   # shellcheck disable=SC2089
-  VM_CONTROL_PLANE_0_IP="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') | ansible.utils.ipaddr('add', 2) }}"
+  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('3') }}"
   # shellcheck disable=SC2090
-  export VM_CONTROL_PLANE_0_IP
+  export VM_CONTROL_PLANE_0_IPv4
 
   VM_BOOTSTRAP_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bootstrap_mac_address)"
   export VM_BOOTSTRAP_MAC
@@ -65,36 +70,51 @@ function load_env {
   export VM_CONTROL_PLANE_0_MAC
 
   #### Hub cluster
-  CLUSTER_NAME="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_name)"
-  export CLUSTER_NAME
+  HUB_CLUSTER_NAME="hub-${NAMESPACE}"
+  export HUB_CLUSTER_NAME
 
-  CLUSTER_VERSION="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_version)"
-  export CLUSTER_VERSION
+  HUB_CLUSTER_VERSION="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_version)"
+  export HUB_CLUSTER_VERSION
 
-  CLUSTER_TAG="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_tag)"
-  export CLUSTER_TAG
+  HUB_CLUSTER_TAG="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_tag)"
+  export HUB_CLUSTER_TAG
 
-  CLUSTER_HUB_ZTP_DOMAIN="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
-  export CLUSTER_HUB_ZTP_DOMAIN
-
-  # shellcheck disable=SC2089
-  CLUSTER_HUB_ZTP_API_IP="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') | ansible.utils.ipaddr('add', 3) }}"
-  # shellcheck disable=SC2090
-  export CLUSTER_HUB_ZTP_API_IP
+  CLUSTER_BASE_DOMAIN="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
+  export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
-  CLUSTER_HUB_ZTP_INGRESS_IP="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') | ansible.utils.ipaddr('add', 4) }}"
+  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('4') }}"
   # shellcheck disable=SC2090
-  export CLUSTER_HUB_ZTP_INGRESS_IP
-
-  CLUSTER_SPOKE_NIC_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
-  export CLUSTER_SPOKE_NIC_MAC
+  export HUB_CLUSTER_API_IPv4
 
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IP="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') | ansible.utils.ipaddr('add', 5) }}"
+  HUB_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('5') }}"
   # shellcheck disable=SC2090
-  export BAREMETAL_SPOKE_IP
+  export HUB_CLUSTER_INGRESS_IPv4
 
+  #### Spoke cluster
+  SPOKE_CLUSTER_NAME="spoke-${NAMESPACE}"
+  export SPOKE_CLUSTER_NAME
+
+  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
+  export BAREMETAL_SPOKE_CLUSTER_NIC_MAC
+
+  # shellcheck disable=SC2089
+  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('6') }}"
+  # shellcheck disable=SC2090
+  export BAREMETAL_SPOKE_IPv4
+
+  # shellcheck disable=SC2089
+  SPOKE_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('7') }}"
+  # shellcheck disable=SC2090
+  export SPOKE_CLUSTER_API_IPv4
+
+  # shellcheck disable=SC2089
+  SPOKE_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('8') }}"
+  # shellcheck disable=SC2090
+  export SPOKE_CLUSTER_INGRESS_IPv4
+
+  #### Proxy access
   SOCKS5_PROXY_PORT="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_socks5_port)"
   export SOCKS5_PROXY_PORT
 }
@@ -127,7 +147,7 @@ all:
           #   dest: /usr/local/bin
           # kcli_wrp_libvirt:
           #  pool:
-          #    name: "{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}"
+          #    name: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}"
           #    path: "{{ lookup('ansible.builtin.env', 'VM_HUB_ZTP_POOL_PATH') }}"
           kcli_wrp:
             networks:
@@ -135,15 +155,15 @@ all:
               bridge: true
               bridgename: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
               nic: "{{ lookup('ansible.builtin.env', ' NETWORK_NIC') }}"
-              bridge_ip: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') }}"
+              bridge_ip: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IPv4') }}"
             clusters:
             - type: openshift
               force_installation: true
               parameters:
-                cluster: "{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}"
-                version: "{{ lookup('ansible.builtin.env', 'CLUSTER_VERSION') }}"
-                tag: "{{ lookup('ansible.builtin.env', 'CLUSTER_TAG') }}"
-                domain: "{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}"
+                cluster: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}"
+                version: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_VERSION') }}"
+                tag: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_TAG') }}"
+                domain: "{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}"
                 pool: "{{kcli_wrp_libvirt.pool.name}}"
                 nets:
                   - "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
@@ -160,8 +180,8 @@ all:
                   - 100
                   - 100
                 base64_pull_secret: "{{ lookup('ansible.builtin.env', 'CLUSTER_B64_PULL_SECRET') }}"
-                api_ip: "${CLUSTER_HUB_ZTP_API_IP}"
-                ingress_ip: "${CLUSTER_HUB_ZTP_INGRESS_IP}"
+                api_ip: "${HUB_CLUSTER_API_IPv4}"
+                ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
                 apps:
                   # - local-storage-operator
                   - lvms-operator
@@ -187,9 +207,9 @@ all:
           kcli_wrp_dnsmasq:
             use_nm_plugin: true
             drop_in_files:
-              - path: /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}.conf
+              - path: /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}.conf
                 content: |
-                  # /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}.conf
+                  # /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}.conf
 
                   log-dhcp
                   log-queries
@@ -202,28 +222,38 @@ all:
                   # except-interface=lo # <--- To check local resolves
                   interface="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
 
-                  listen-address=127.0.0.1,{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('address') }}
+                  listen-address=127.0.0.1,{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IPv4') }}
 
-                  dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('network') }},static
+                  dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('network') }},static
                   dhcp-no-override
                   # dhcp-authoritative <---- No needed
-                  # dhcp-lease-max=253
 
                   # Bridge setup:
-                  # dhcp-option=121,{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IP') | ansible.utils.ipaddr('subnet') }}
-                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},${VM_BOOTSTRAP_IP},{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}-bootstrap.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},${VM_BOOTSTRAP_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # Virtualised SNO Hub main NIC
-                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IP},{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}-ctlplane-0.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # SNO Spoke main NIC
-                  dhcp-host={{ lookup('ansible.builtin.env', 'CLUSTER_SPOKE_NIC_MAC') }},${BAREMETAL_SPOKE_IP}
+                  dhcp-host={{ lookup('ansible.builtin.env', 'BAREMETAL_SPOKE_CLUSTER_NIC_MAC') }},${BAREMETAL_SPOKE_IPv4}
 
                   # This file sets up the local OCP cluster domain and defines some aliases and a wildcard.
-                  local=/{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}/
-                  # OCP cluster API
-                  address=/api.{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}/${CLUSTER_HUB_ZTP_API_IP}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}/${CLUSTER_HUB_ZTP_API_IP}
-                  # OCP cluster INGRESS
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_HUB_ZTP_DOMAIN') }}/${CLUSTER_HUB_ZTP_INGRESS_IP}
+                  # local=/{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/
+                  local=/{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/
+                  #
+                  # OCP HUB cluster
+                  #
+                  # OCP HUB cluster API
+                  address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_API_IPv4}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_API_IPv4}
+                  # OCP HUB cluster INGRESS
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_INGRESS_IPv4}
+                  #
+                  # OCP SPOKE cluster API
+                  #
+                  # OCP SPOKE cluster
+                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_API_IPv4}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_API_IPv4}
+                  # OCP HUB cluster INGRESS
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_INGRESS_IPv4}
           kcli_wrp_firewalld:
             zone_files:
               - path: /etc/firewalld/zones/public.xml
@@ -249,6 +279,13 @@ all:
             listen_port: "{{ lookup('ansible.builtin.env', 'SOCKS5_PROXY_PORT') }}"
             ssh_options: "-4"
 EOF
+
+  echo "--------- Inventory File ---------------------"
+  echo "${inventory_file}"
+  echo "----------------------------------------------"
+  cat $inventory_file
+  echo "----------------------------------------------"
+  echo
 }
 
 function install_ansible_collections {
@@ -257,14 +294,13 @@ function install_ansible_collections {
 
 function install_virtualised_hub_cluster {
 
-    # cat $inventory_file
     ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml -vvv
 }
 
 function verify_virtualised_hub_cluster_installed {
     echo
-    echo ${CLUSTER_PROFILE_DIR}
-    ls -lRhtr ${CLUSTER_PROFILE_DIR}
+    echo ${HUB_CLUSTER_PROFILE_DIR}
+    ls -lRhtr ${HUB_CLUSTER_PROFILE_DIR}
     echo
     echo ${SHARED_DIR}
     ls -lRhtr ${SHARED_DIR}
@@ -288,41 +324,44 @@ function main {
     verify_virtualised_hub_cluster_installed
 }
 
-# function pr_debug_mode_waiting {
+function pr_debug_mode_waiting {
 
-#   ext_code=$? ; [ $ext_code -eq 0 ] && return
+  ext_code=$? ; [ $ext_code -eq 0 ] && return
 
-#   echo "################################################################################"
-#   echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
-#   echo "################################################################################"
+  cp -v $inventory_file "${SHARED_DIR}/$(basename ${inventory_file})"
+  env > "${SHARED_DIR}/$(basename ${inventory_file}).env"
 
-#   TZ=UTC
-#   END_TIME=$(date -d "${TIMEOUT}" +%s)
-#   debug_done=/tmp/debug.done
+  echo "################################################################################"
+  echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
+  echo "################################################################################"
 
-#   while sleep 1m; do
+  TZ=UTC
+  END_TIME=$(date -d "${TIMEOUT}" +%s)
+  debug_done=/tmp/debug.done
 
-#     test -f ${debug_done} && break
-#     echo
-#     echo "-------------------------------------------------------------------"
-#     echo "'${debug_done}' not found. Debugging can continue... "
-#     now=$(date +%s)
-#     if [ ${END_TIME} -lt ${now} ] ; then
-#       echo "Time out reached. Exiting by timeout..."
-#       break
-#     else
-#       echo "Now:     $(date -d @${now})"
-#       echo "Timeout: $(date -d @${END_TIME})"
-#     fi
-#     echo "Note: To exit from debug mode before the timeout is reached,"
-#     echo "just run the following command from the POD Terminal:"
-#     echo "$ touch ${debug_done}"
+  while sleep 1m; do
 
-#   done
+    test -f ${debug_done} && break
+    echo
+    echo "-------------------------------------------------------------------"
+    echo "'${debug_done}' not found. Debugging can continue... "
+    now=$(date +%s)
+    if [ ${END_TIME} -lt ${now} ] ; then
+      echo "Time out reached. Exiting by timeout..."
+      break
+    else
+      echo "Now:     $(date -d @${now})"
+      echo "Timeout: $(date -d @${END_TIME})"
+    fi
+    echo "Note: To exit from debug mode before the timeout is reached,"
+    echo "just run the following command from the POD Terminal:"
+    echo "$ touch ${debug_done}"
 
-#   echo
-#   echo "Exiting from Pull Request debug mode..."
-# }
+  done
 
-# trap pr_debug_mode_waiting EXIT
+  echo
+  echo "Exiting from Pull Request debug mode..."
+}
+
+trap pr_debug_mode_waiting EXIT
 main
