@@ -93,7 +93,7 @@ export INSTALL_NNCP=false
 export INSTALL_NMSTATE=false
 
 # Deploy openstack operator
-make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
+make openstack_wait OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
 
 # Wait until OLM installs openstack CRDs
 n=0
