@@ -14,6 +14,8 @@ export CLUSTER_NAME="osd-$job_id"
 export OSD_VERSION="4.17.10"
 
 bash ./.ibm/pipelines/cluster/osd-gcp/create-osd.sh
+export KUBECONFIG=/tmp/osdcluster/kubeconfig
+
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
