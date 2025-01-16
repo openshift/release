@@ -32,7 +32,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "Tag name: $TAG_NAME"
-    IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
+    IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
 fi
 
 PR_CHANGESET=$(git diff --name-only release-1.3)
@@ -63,7 +63,7 @@ else
 
     while true; do
         # Check image availability
-        response=$(curl -s "https://quay.io/api/v1/repository/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/tag/?specificTag=$TAG_NAME")
+        response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
 
         # Use jq to parse the JSON and see if the tag exists
         tag_count=$(echo $response | jq '.tags | length')

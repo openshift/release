@@ -551,9 +551,12 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-azure-post
     pre:
+    - ref: azure-provision-service-principal-minimal-permission
     - ref: ipi-conf
     - ref: ipi-conf-azure-default
     - chain: ipi-install
@@ -563,6 +566,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -575,6 +579,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -587,12 +592,16 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
   timeout: 6h0m0s
 - always_run: false
@@ -1127,6 +1136,8 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: azure4
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      ENABLE_MIN_PERMISSION_FOR_MARKETPLACE: "true"
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
       OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
@@ -1134,7 +1145,9 @@ tests:
     - chain: gather-network
     - chain: gather-core-dump
     - chain: ipi-deprovision
+    - ref: azure-deprovision-sp-and-custom-role
     pre:
+    - ref: azure-provision-service-principal-minimal-permission
     - chain: ipi-conf-azure
     - ref: ipi-conf-azure-osimage
     - ref: ovn-conf

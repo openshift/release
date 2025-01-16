@@ -275,58 +275,6 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
-- as: e2e-kind
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: e2e-kind
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "export TAG=PR-${PULL_NUMBER} && \
-          cd /work && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export VERSIONS_YAML_FILE=versions.yaml && \
-          # generate everything using versions.yaml not ossm/versions.yaml
-          make gen && \
-          make test.e2e.kind"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
 - as: scorecard
   steps:
     cluster_profile: ossm-aws

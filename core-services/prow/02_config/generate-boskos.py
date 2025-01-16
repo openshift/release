@@ -266,7 +266,7 @@ CONFIG = {
         'default': 2,
     },
     'openstack-hwoffload-quota-slice': {
-        'default': 5,
+        'default': 3,
     },
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
@@ -278,10 +278,10 @@ CONFIG = {
         'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},

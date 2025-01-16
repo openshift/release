@@ -22,6 +22,32 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
+- as: sync-upstream-istio-release-1-24
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=istio \
+    --branch=release-1.24 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge,auto-merge" \
+    --modifier=merge_upstream_istio_release_1_24 \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=release-1.24 \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+  timeout: 20m0s
 - as: lint
   commands: |
     make lint \
