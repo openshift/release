@@ -57,26 +57,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-arm-mixarch-f28-day2-64k-pagesize
-  cron: 4 3 5 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "64k-pages", "mcp_node_num": "1", "mcp_node_label":
-        "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'
-      MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
-      MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
-      OCP_ARCH: arm64
-    test:
-    - chain: ipi-install-heterogeneous-day2-kerneltype
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-byo-iam-profile-arm-f28
   cron: 52 21 26 * *
   steps:
@@ -191,24 +171,6 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-arm-mixarch-day2-f28
-  cron: 42 1 16 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
-    test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-ovn-ipv4-subnet-arm-f28
   cron: 16 11 24 * *
@@ -447,23 +409,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
-- as: azure-ipi-ovn-ipsec-arm-mixarch-day2-f28
-  cron: 55 11 9 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
-    test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 - as: azure-ipi-ovn-ipsec-azurefile-csi-arm-canary-f28
   cron: 5 17 5 * *
   steps:
@@ -630,8 +575,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: baremetal-lab-upi-install-disconnected
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28
-  cron: 16 8 28 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
