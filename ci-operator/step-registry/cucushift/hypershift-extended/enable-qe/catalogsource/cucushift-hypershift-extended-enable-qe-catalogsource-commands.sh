@@ -53,6 +53,7 @@ function create_catalog_sources() {
         MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
         index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
     fi
+    index_image_repo=`echo "${index_image%%:*}"`
 
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
@@ -62,7 +63,7 @@ metadata:
   name: qe-app-registry
   namespace: openshift-marketplace
   annotations:
-    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
+    olm.catalogImageTemplate: "${index_image_repo}:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}
