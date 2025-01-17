@@ -120,7 +120,7 @@ sudo update-ca-trust
 sudo dnf install -y podman
 curl -L -o mirror-registry.tar.gz https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz --retry 12
 tar -xzvf mirror-registry.tar.gz
-./mirror-registry install --quayHostname ${MIRROR_REGISTRY_DNS_NAME} --initPassword ${PASSWORD} --initUser ${USER}
+./mirror-registry install --sslCert /opt/registry/certs/domain.crt --sslKey /opt/registry/certs/domain.key --quayHostname ${MIRROR_REGISTRY_DNS_NAME} --initPassword ${PASSWORD} --initUser ${USER}
 podman login -u ${USER} -p ${PASSWORD} ${MIRROR_REGISTRY_DNS_NAME}:8443"
 EOF
 
