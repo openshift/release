@@ -100,8 +100,10 @@ if ! retry 60 5 ssh_via_proxy "uname -a"; then
 		exit 1
 fi
 MIRROR_REGISTRY_CREDENTIALS=$(<"/var/run/vault/mirror-registry/registry_creds")
-USER="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f1 )"
-PASSWORD="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f2 )"
+USER="foo"
+PASSWORD="foo"
+#USER="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f1 )"
+#PASSWORD="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f2 )"
 
 MIRROR_REGISTRY_DNS_NAME="mirror-registry.${CLUSTER_NAME}.${BASE_DOMAIN}"
 
