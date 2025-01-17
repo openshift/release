@@ -401,13 +401,12 @@ fi
 
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
-# squid needs to be restarted after network changes
-podman restart --time 1 external-squid || true
-
 set +e
 timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
+# squid needs to be restarted after network changes
+podman restart --time 1 external-squid || true
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # This needs to happen even if dev-scripts fails so that the cluster can be accessed via the proxy
