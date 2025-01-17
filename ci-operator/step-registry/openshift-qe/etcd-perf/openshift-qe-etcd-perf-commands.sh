@@ -107,7 +107,10 @@ EOF
   echo "to check endpoint health after creating many secrets"
 
   for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
-  
+  export KUBECONFIG=/tmp/secret/kubeconfig
+  if [[ -s /tmp/secret/kubeadmin-password ]];then adminpassword=`cat /tmp/secret/kubeadmin-password'; fi
+  APIURL=`grep 'server:' /tmp/secret/kubeconfig | awk -F 'server:' '{print $2}'`
+  oc login $APIURL -u kubeadmin -p $adminpassword
   date;oc adm top node;date;ls -lrt /tmp/etcd-tools ;etcd-tools/etcd-analyzer.sh;date
   echo "-----------------------Fio Test STARTS...........................................................................!"
   etcd-tools/fio_suite.sh
