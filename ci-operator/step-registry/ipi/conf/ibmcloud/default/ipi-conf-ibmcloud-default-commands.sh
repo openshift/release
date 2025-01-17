@@ -19,7 +19,6 @@ cat > "${PATCH}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   ibmcloud:
-    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
     region: ${REGION}
 controlPlane:
   architecture: ${ocp_arch}
