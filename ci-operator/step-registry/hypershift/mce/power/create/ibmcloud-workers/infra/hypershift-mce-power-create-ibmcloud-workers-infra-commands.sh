@@ -23,9 +23,9 @@ set_x86_configs() {
   # The instance profile, which defines the compute resources allocated to the VSI
   PROFILE_NAME="bx2-2x8"
   # The ID of the image used to create the VSI. NOTE: It should be the ID of an image available in your IBM Cloud account
-  IMAGE_ID="r034-33250be2-61bb-4837-9cd5-6ef83c2ccb2c"
+  IMAGE_ID="r022-c1e4475a-ac9f-4547-a1e8-1230d31e58be"
   # The ID of the SSH key you want to inject into the VSI
-  SSH_KEY_ID="r034-55ccc38b-cad7-4244-bad0-6bb4c25cf0e7"
+  SSH_KEY_ID="r022-8e58145d-5109-4663-803c-232a2c35b432"
 
   # Fetching Resource Group
   if [[ -z "${RESOURCE_GROUP_NAME}" ]]; then
@@ -109,8 +109,7 @@ set_power_configs() {
   if [ ${IS_HETEROGENEOUS} == "yes" ]; then
       # NOTE: Using e980 as a workaround for VPC Load Balancer connectivity issues with
       # s922 in heterogeneous node pools, until a permanent fix.
-      # Test if it is working now with s922?
-      POWERVS_VSI_SYS_TYPE="s922"
+      POWERVS_VSI_SYS_TYPE="e980"
   else
       POWERVS_VSI_SYS_TYPE="s922"
   fi
