@@ -220,6 +220,10 @@ rg_id=$("${IBMCLOUD_CLI}" resource group $resource_group --id)
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
 declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+if (( ZONES_COUNT < ${#ZONES[@]} )); then
+    ZONES=("${ZONES[@]:0:ZONES_COUNT}")
+    echo "Adjusted ZONES to ${#ZONES[@]} based on ZONES_COUNT: ${ZONES_COUNT}."
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
