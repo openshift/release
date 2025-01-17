@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -13,7 +13,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -49,8 +49,35 @@ tests:
     test:
     - chain: openshift-svt-regression-one
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: ingress-scale-test
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/router-scale/ingress-scale.sh
+      SCRIPT_1: perfscale_regression_ci/scripts/scalability/router-scale/ingress-tunning-options.sh
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: openshift-svt-regression-one
+    - as: wait
+      commands: cp /tmp/secret/kubeconfig /tmp/admin.kubeconfig; sleep 3000 & wait
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-qe-installer-aws
+    timeout: 14h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: svt
-  variant: regression-aws-4.17-nightly-x86
+  variant: regression-aws-4.18-nightly-x86
