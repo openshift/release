@@ -45,7 +45,12 @@ function load_env {
   export NETWORK_IPv4_SUBNET
 
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_GW_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') }}"
+  NETWORK_BRIDGE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv4
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_GW_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_GW_IPv4
 
@@ -54,68 +59,75 @@ function load_env {
   export VM_HUB_ZTP_POOL_PATH
 
   # shellcheck disable=SC2089
-  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('2') }}"
+  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('2') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_BOOTSTRAP_IPv4
 
   # shellcheck disable=SC2089
-  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('3') }}"
+  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('3') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_CONTROL_PLANE_0_IPv4
 
-  VM_BOOTSTRAP_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bootstrap_mac_address)"
+  oct_net="$(echo ${NETWORK_IPv4_SUBNET} | cut -d'.' -f3)"
+  hex_net="$(printf '%x' ${oct_net})"
+  VM_BOOTSTRAP_MAC="cc:a4:de:aa:${hex_net}:01"
   export VM_BOOTSTRAP_MAC
 
-  VM_CONTROL_PLANE_0_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_control_plane_0_mac_address)"
+  VM_CONTROL_PLANE_0_MAC="cc:a4:de:aa:${hex_net}:02"
   export VM_CONTROL_PLANE_0_MAC
 
   #### Hub cluster
-  HUB_CLUSTER_NAME="hub-${NAMESPACE}"
+  HUB_CLUSTER_NAME="hub-${OCP_HUB_VERSION//./-}"
   export HUB_CLUSTER_NAME
 
-  HUB_CLUSTER_VERSION="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_version)"
+  HUB_CLUSTER_VERSION="stable"
   export HUB_CLUSTER_VERSION
 
-  HUB_CLUSTER_TAG="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_tag)"
+  HUB_CLUSTER_TAG="${OCP_HUB_VERSION}"
   export HUB_CLUSTER_TAG
 
   CLUSTER_BASE_DOMAIN="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
   export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
-  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('4') }}"
+  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('4') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_API_IPv4
 
   # shellcheck disable=SC2089
-  HUB_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('5') }}"
+  HUB_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('5') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_INGRESS_IPv4
 
+  # shellcheck disable=SC2089
+  HUB_CLUSTER_OPERATORS="$(echo ${OPERATORS} | jq --compact-output '[.[].name]')"
+  # shellcheck disable=SC2090
+  export HUB_CLUSTER_OPERATORS
+
   #### Spoke cluster
-  SPOKE_CLUSTER_NAME="spoke-${NAMESPACE}"
+  SPOKE_CLUSTER_NAME="spoke-${OCP_SPOKE_VERSION//./-}"
   export SPOKE_CLUSTER_NAME
 
   BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
   export BAREMETAL_SPOKE_CLUSTER_NIC_MAC
 
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('6') }}"
+  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('6') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export BAREMETAL_SPOKE_IPv4
 
   # shellcheck disable=SC2089
-  SPOKE_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('7') }}"
+  SPOKE_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('7') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export SPOKE_CLUSTER_API_IPv4
 
   # shellcheck disable=SC2089
-  SPOKE_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('8') }}"
+  SPOKE_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('8') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export SPOKE_CLUSTER_INGRESS_IPv4
 
   #### Proxy access
-  SOCKS5_PROXY_PORT="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_socks5_port)"
+  SOCKS5_PROXY_PORT="${SOCKS5_PROXY##*:}"
   export SOCKS5_PROXY_PORT
 }
 
@@ -155,7 +167,7 @@ all:
               bridge: true
               bridgename: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
               nic: "{{ lookup('ansible.builtin.env', ' NETWORK_NIC') }}"
-              bridge_ip: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IPv4') }}"
+              bridge_ip: "${NETWORK_BRIDGE_IPv4}"
             clusters:
             - type: openshift
               force_installation: true
@@ -182,20 +194,20 @@ all:
                 base64_pull_secret: "{{ lookup('ansible.builtin.env', 'CLUSTER_B64_PULL_SECRET') }}"
                 api_ip: "${HUB_CLUSTER_API_IPv4}"
                 ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
-                apps:
+                apps: ${HUB_CLUSTER_OPERATORS}
                   # - local-storage-operator
-                  - lvms-operator
-                  - openshift-gitops-operator
-                  - advanced-cluster-management
-                  - topology-aware-lifecycle-manager
-                  - multicluster-engine
+                  # - lvms-operator
+                  # - openshift-gitops-operator
+                  # - advanced-cluster-management
+                  # - topology-aware-lifecycle-manager
+                  # - multicluster-engine
                 vmrules:
-                - vhub-bootstrap:
+                - ${HUB_CLUSTER_NAME}-bootstrap:
                     rootpassword: "{{ lookup('ansible.builtin.env', 'VM_PASSWD') }}"
                     nets:
                       - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
-                        mac: "${VM_BOOTSTRAP_MAC}"
-                - vhub-ctlplane-0:
+                        mac: "{{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }}"
+                - ${HUB_CLUSTER_NAME}-ctlplane-0:
                     rootpassword: "{{ lookup('ansible.builtin.env', 'VM_PASSWD') }}"
                     nets:
                       - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
@@ -222,7 +234,7 @@ all:
                   # except-interface=lo # <--- To check local resolves
                   interface="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
 
-                  listen-address=127.0.0.1,{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_GW_IPv4') }}
+                  listen-address=127.0.0.1,${NETWORK_BRIDGE_GW_IPv4}
 
                   dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('network') }},static
                   dhcp-no-override
@@ -299,8 +311,8 @@ function install_virtualised_hub_cluster {
 
 function verify_virtualised_hub_cluster_installed {
     echo
-    echo ${HUB_CLUSTER_PROFILE_DIR}
-    ls -lRhtr ${HUB_CLUSTER_PROFILE_DIR}
+    echo ${CLUSTER_PROFILE_DIR}
+    ls -lRhtr ${CLUSTER_PROFILE_DIR}
     echo
     echo ${SHARED_DIR}
     ls -lRhtr ${SHARED_DIR}
