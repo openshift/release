@@ -6,7 +6,7 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 # time before we run our e2e tests.
 function check_clusteroperators_status() {
     echo "$(date) - waiting for clusteroperators to finish progressing..."
-    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    oc wait clusteroperators --all --for=condition=Progressing=False --timeout=20m
     echo "$(date) - all clusteroperators are done progressing."
 }
 
