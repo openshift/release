@@ -413,6 +413,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   pool_passwords[$VCENTER]=${vsphere_password}
 
   name=$(jq -r '.spec.name' < /tmp/pool.json)
+  shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
   server=$(jq -r '.spec.server' < /tmp/pool.json)
   region=$(jq -r '.spec.region' < /tmp/pool.json)
   zone=$(jq -r '.spec.zone' < /tmp/pool.json)
@@ -435,7 +436,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
   if [[ $failure_domain_count == 0 ]]; then
     add_failure_domain=1
-  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$name" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$shortName" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
     add_failure_domain=1
   fi
 
@@ -443,7 +444,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
     if [ -n "${MULTI_NIC_IPI}" ]; then
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
-    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${shortName}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
   fi
 
   # Add / Update vCenter list

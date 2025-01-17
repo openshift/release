@@ -16,10 +16,18 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 BASE_DOMAIN_RESOURCE_GROUP_NAME=$(fgrep 'baseDomainResourceGroupName:' ${CONFIG} | cut -d ":" -f2 | tr -d " ")
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-if [[ -f "${SHARED_DIR}/azure_minimal_permission_sts" ]]; then
-    echo "Setting AZURE credential with minimal permissions for CCO"
-    AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission_sts"
+if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
+    if [[ -f "${SHARED_DIR}/azure_minimal_permission_sts" ]]; then
+        echo "Setting AZURE credential with minimal permissions for ccoctl"
+        AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission_sts"
+    else
+        echo "ERROR: ENABLE_MIN_PERMISSION_FOR_STS is enabled, but the credential file \"azure_minimal_permission_sts\" is missing."
+        echo "ERROR: Note, the credential file is created by step \"azure-provision-service-principal-minimal-permission\", please check."
+        echo "Exit now."
+        exit 1
+    fi
 fi
+
 if [ ! -f "$AZURE_AUTH_LOCATION" ]; then
     echo "File not found: $AZURE_AUTH_LOCATION"
     exit 1
