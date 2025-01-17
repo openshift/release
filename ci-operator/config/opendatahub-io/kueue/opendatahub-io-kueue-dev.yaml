@@ -2,7 +2,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: golang-1.22
+images:
+- build_args:
+  - name: GOLANG_IMAGE
+    value: registry.access.redhat.com/ubi9/go-toolset:1.22.9
+  dockerfile_path: Dockerfile.rhoai
+  to: kueue-operator
 releases:
   latest:
     release:
@@ -31,11 +37,11 @@ tests:
         oc create namespace opendatahub
         if [[ "${REPO_OWNER}" == "openshift" ]]; then
           echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest dev for kueue manifest \n"
-          oc apply --server-side -k "github.com/opendatahub-io/kueue/config/rhoai?ref=dev"
         else
           echo -e "Running PR ${PULL_NUMBER} \n"
-          oc apply --server-side -k "github.com/opendatahub-io/kueue/config/rhoai?ref=pull/${PULL_NUMBER}/head"
         fi
+        sed -i "s|odh-kueue-controller-image=.*|odh-kueue-controller-image=${KUEUE_CONTROLLER_IMAGE}|g" config/rhoai/params.env
+        oc apply --server-side -k ./config/rhoai
         oc apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/latest/download/manifests.yaml
         echo "Adding label on worker node ..."
         oc label node --selector=node-role.kubernetes.io/worker instance-type=on-demand
@@ -45,6 +51,9 @@ tests:
         ginkgo version
         export NAMESPACE=opendatahub
         ginkgo --focus-file=e2e_test.go -v ./test/e2e/singlecluster/
+      dependencies:
+      - env: KUEUE_CONTROLLER_IMAGE
+        name: kueue-operator
       from: src
       resources:
         requests:

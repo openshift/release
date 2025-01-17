@@ -3,6 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
@@ -203,6 +207,30 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-vsphere
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      VSPHERE_ADDITIONAL_CLUSTER: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        source $SHARED_DIR/vsphere_context.sh
+        source $SHARED_DIR/govc.sh
+        source $SHARED_DIR/additional_cluster.sh
+        GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift
