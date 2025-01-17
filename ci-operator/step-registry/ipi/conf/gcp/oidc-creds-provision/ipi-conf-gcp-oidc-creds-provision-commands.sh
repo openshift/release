@@ -4,6 +4,25 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function backoff() {
+  local attempt=0
+  local failed=0
+  echo "Running Command '$*'"
+  while true; do
+    eval "$@" && failed=0 || failed=1
+    if [[ $failed -eq 0 ]]; then
+      break
+    fi
+    attempt=$(( attempt + 1 ))
+    if [[ $attempt -gt 5 ]]; then
+      break
+    fi
+    echo "command failed, retrying in $(( 2 ** attempt )) seconds"
+    sleep $(( 2 ** attempt ))
+  done
+  return $failed
+}
+
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
@@ -73,7 +92,8 @@ fi
 
 ccoctl_ouptut="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
-ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee "${ccoctl_ouptut}"
+CMD="ccoctl gcp create-all --name=${infra_name} --project=${PROJECT} --region=${LEASED_RESOURCE} --credentials-requests-dir='/tmp/credrequests' --output-dir='/tmp' ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee ${ccoctl_ouptut}"
+backoff "${CMD}"
 
 # oidc_pool and oidc_provider is using the same name as infra_name, so not have to enable the follwoing lines yet
 # save oidc_provider info for upgrade
