@@ -814,7 +814,7 @@ do
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
-
+  sleep 10800
   tries=$((tries+1))
 done
 set -o errexit
