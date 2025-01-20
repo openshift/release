@@ -12,10 +12,15 @@ BASTION_ADDRESS="$(cat /var/run/bastion1/bastion-address)"
 VPN_URL="$(cat /var/run/bastion1/vpn-url)"
 VPN_USERNAME="$(cat /var/run/bastion1/vpn-username)"
 # For password with special characters
-VPN_PASSWORD=`cat /var/run/bastion1/vpn-password`
-SSH_KEY_PATH=/var/run/ssh-key/ssh-key
+VPN_PASSWORD=$(cat /var/run/bastion1/vpn-password)
+
+SSH_KEY_PATH=/var/run/telcov10n/ansible_ssh_private_key
 SSH_KEY=~/key
+
 JUMP_SERVER_ADDRESS="$(cat /var/run/bastion1/jump-server)"
+JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
+
+
 IFNAME=tun20
 REMOTE_ARTIFACTS_DIR=/home/kni/test_results/
 
@@ -30,7 +35,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${SSH_KEY}")
 
 # Run commands from the bastion
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "kni@${JUMP_SERVER_ADDRESS}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" bash -s -- \
   "'${VPN_URL}'" "'${VPN_USERNAME}'" "'${VPN_PASSWORD}'" "'${IFNAME}'" "'${BASTION_ADDRESS}'" "'${REMOTE_ARTIFACTS_DIR}'"  << 'EOF'
     set -o nounset
     set -o errexit
