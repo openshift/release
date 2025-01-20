@@ -114,19 +114,25 @@ set -e
 sudo mkfs.xfs /dev/vdc
 sudo mkdir -p /opt/registry/{auth,certs,data}
 sudo mount /dev/vdc /opt/registry/data
-sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /opt/registry/certs/domain.key -x509 -days 1 -subj "/CN=mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -addext "subjectAltName=DNS:$MIRROR_REGISTRY_DNS_NAME,DNS:mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -out /opt/registry/certs/domain.crt
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 1 -subj "/CN=mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -addext "subjectAltName=DNS:$MIRROR_REGISTRY_DNS_NAME,DNS:mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -out domain.crt
+sudo cp domain.crt /opt/registry/certs/domain.crt
+sudo cp domain.key /opt/registry/certs/domain.key
 sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt
 sudo update-ca-trust
 sudo dnf install -y podman
 curl -L -o mirror-registry.tar.gz https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz --retry 12
 tar -xzvf mirror-registry.tar.gz
-./mirror-registry install --sslCert /opt/registry/certs/domain.crt --sslKey /opt/registry/certs/domain.key --quayHostname ${MIRROR_REGISTRY_DNS_NAME} --initPassword ${PASSWORD} --initUser ${USER}
+echo "Running the mirror registry"
+./mirror-registry install --sslCert domain.crt --sslKey domain.key --quayHostname ${MIRROR_REGISTRY_DNS_NAME} --initPassword ${PASSWORD} --initUser ${USER} -v
+echo "Finished the mirror registry"
 podman login -u ${USER} -p ${PASSWORD} ${MIRROR_REGISTRY_DNS_NAME}:8443"
 EOF
 
 scp_via_proxy $WORK_DIR/deploy_mirror.sh $BASTION_USER@$mirror_ipv4:/tmp
 ssh_via_proxy "chmod +x /tmp/deploy_mirror.sh"
 ssh_via_proxy "bash -c /tmp/deploy_mirror.sh"
+
+echo "Finished running mirror"
 
 echo "${MIRROR_REGISTRY_DNS_NAME}:8443" >"${SHARED_DIR}/mirror_registry_url"
 scp_via_proxy $BASTION_USER@$mirror_ipv4:/opt/registry/certs/domain.crt ${SHARED_DIR}/additional_trust_bundle
