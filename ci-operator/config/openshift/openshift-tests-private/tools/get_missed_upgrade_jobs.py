@@ -45,6 +45,7 @@ def get_jobs(yaml_file, mode='y'):
         'disasterrecovery',
         'disconnecting',
         'fips-check',
+        'freeipa',
         '-hive',
         'hypershift',
         '-image-registry',
