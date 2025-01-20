@@ -42,6 +42,10 @@ tests:
       commands: |
         echo "Using feast server image ${FEAST_FEATURE_SERVER_IMAGE}"
         echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+        cd infra/feast-operator
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE}
+        oc wait --for condition=Available -n default deployment feast-operator
+        make test-e2e
       dependencies:
       - env: FEAST_OPERATOR_CONTROLLER_IMAGE
         name: feast-operator
