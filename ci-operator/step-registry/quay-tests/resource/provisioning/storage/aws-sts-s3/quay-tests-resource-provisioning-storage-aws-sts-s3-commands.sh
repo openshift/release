@@ -32,6 +32,21 @@ default = "quay_prow_automation"
 
 EOF
 
+cat >>assume_role_policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::301721915996:user/${aws_iam_user.quay.name}"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
 cat >>create_aws_sts.tf <<EOF
 provider "aws" {
   region = "us-east-2"
@@ -74,20 +89,7 @@ resource "aws_iam_access_key" "quay" {
 resource "aws_iam_role" "quay_ci_role" {
 
   name = var.aws_sts_role_name
-  assume_role_policy = <<EOF2
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::301721915996:user/${aws_iam_user.quay.name}"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF2
+  assume_role_policy = $(cat assume_role_policy.json)
 }
 
 resource "aws_iam_role_policy_attachment" "policy_attachment" {
