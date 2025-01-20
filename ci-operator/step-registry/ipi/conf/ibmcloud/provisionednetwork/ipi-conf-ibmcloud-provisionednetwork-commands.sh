@@ -11,7 +11,7 @@ vpcSubnetsFile="${SHARED_DIR}/customer_vpc_subnets.yaml"
 cat "${vpcSubnetsFile}"
 region="${LEASED_RESOURCE}"
 declare -a zones=("${region}-1" "${region}-2" "${region}-3")
-if (( zones_COUNT -le 3 )); then
+if (( zones_COUNT -lt 3 )); then
     zones=("${zones[@]:0:zones_COUNT}")
     echo "Adjusted zones to ${#zones[@]} based on zones_COUNT: ${zones_COUNT}."
 #     readarray -t control_plane_subnets < <(yq-go r -j ${vpcSubnetsFile}  'platform.ibmcloud.controlPlaneSubnets(test)')
