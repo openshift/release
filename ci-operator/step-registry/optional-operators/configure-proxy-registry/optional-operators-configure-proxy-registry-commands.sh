@@ -42,6 +42,17 @@ echo "[$(date --utc +%FT%T.%3NZ)] Configuring proxy registry : \"$OO_CONFIGURE_P
 # step-3: Disable the default OperatorSources/Sources (for redhat-operators, certified-operators, and community-operators) on your 4.5 cluster (or default CatalogSources in 4.6+) with the following command:
 echo "[$(date --utc +%FT%T.%3NZ)] Disabling Default Catalog Sources on Cluster"
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
+if [[ "X${major_version}" == "X4" && -n "${minor_version}" && "${minor_version}" -gt 17 ]]; then
+    echo "disable olmv1 default clustercatalog"
+    oc patch clustercatalog openshift-certified-operators -p '{"spec": {"availabilityMode": "Unavailable"}}' --type=merge
+    oc patch clustercatalog openshift-redhat-operators -p '{"spec": {"availabilityMode": "Unavailable"}}' --type=merge
+    oc patch clustercatalog openshift-redhat-marketplace -p '{"spec": {"availabilityMode": "Unavailable"}}' --type=merge
+    oc patch clustercatalog openshift-community-operators -p '{"spec": {"availabilityMode": "Unavailable"}}' --type=merge
+fi
+
 
 # Sleep for 2 minutes to allow for the nodes to begin restarting
 echo "[$(date --utc +%FT%T.%3NZ)] Sleeping for 2 minutes to allow nodes to Restart"
