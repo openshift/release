@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shellcheck *.sh
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -59,7 +61,7 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
   acl    = "private"
 }
 
-#sts role
+#sts user
 resource "aws_iam_user" "quay" {
   name = var.aws_sts_user_name
   path = "/"
@@ -70,6 +72,7 @@ resource "aws_iam_access_key" "quay" {
   depends_on = [aws_iam_user.quay]
 }
 
+#sts role
 resource "aws_iam_role" "quay_ci_role" {
 
   name = var.aws_sts_role_name
