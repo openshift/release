@@ -153,7 +153,6 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --power-edge-router true \
       --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
