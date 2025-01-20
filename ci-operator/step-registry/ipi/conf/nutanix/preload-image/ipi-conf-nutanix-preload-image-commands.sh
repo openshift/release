@@ -45,10 +45,9 @@ task_uuid=$(echo "${import_image_json}" | jq -r ".status.execution_context.task_
 # image_uuid=$(echo "${import_image_json}" | jq -r ".metadata.uuid")
 
 api_ep="${pc_url}/api/nutanix/v3/tasks/$task_uuid"
-
+echo "task uuid: api_ep"
 # api_ep="${pc_url}/api/nutanix/v3/images/$image_uuid"
 # delete_image_json=$(curl -ks -u "${un}":"${pw}" -X DELETE ${api_ep} -H "Content-Type: application/json")
-sleep 3600
 loops=0
 max_loops=10
 sleep_seconds=60
@@ -56,6 +55,7 @@ while true
 do
   task_json=$(curl -ks -u "${un}":"${pw}" -X GET "${api_ep}" -H "Content-Type: application/json")
   task_status=$(echo "${task_json}" | jq -r ".status")
+  echo "task status: $task_status"
   if [ "$task_status" == "SUCCEEDED" ]; then
     echo "Image preload succeeded"
     break
@@ -73,7 +73,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 PATCH="${SHARED_DIR}/install-config-patch-preloadedOSImageName.yaml"
 
-if [[ "${PROJECT_NAME}" != "" ]]; then
+if [[ "${preload_image_name}" != "" ]]; then
     cat >"${PATCH}" <<EOF
 platform:
   nutanix:
