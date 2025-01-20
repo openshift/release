@@ -7,6 +7,7 @@ set -o pipefail
 
 #Create AWS S3 Storage Bucket
 QUAY_AWS_STS_S3_BUCKET="quayprowsts$RANDOM"
+echo $QUAY_AWS_STS_S3_BUCKET 
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
@@ -114,12 +115,14 @@ echo "quay aws s3 bucket name is ${QUAY_AWS_STS_S3_BUCKET}"
 export TF_VAR_aws_bucket="${QUAY_AWS_STS_S3_BUCKET}"
 export TF_VAR_aws_sts_role_name="quay_prow_role${RANDOM}"
 export TF_VAR_aws_sts_user_name="quay_prow_automation${RANDOM}"
+echo $TF_VAR_aws_sts_role_name
 
 terraform init
 terraform apply -auto-approve || true
 terraform output role > sts_role_arn
 terraform output accesskey > sts_accesskey
 terraform output secretkey > sts_secretkey
+cat sts_accesskey
 
 #Share Terraform Var and Terraform Directory
 echo "${QUAY_AWS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
