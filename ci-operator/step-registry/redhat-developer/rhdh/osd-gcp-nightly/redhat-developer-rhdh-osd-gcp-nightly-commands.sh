@@ -5,16 +5,11 @@ HOME=/tmp
 WORKSPACE=/tmp
 cd /tmp || exit
 
-git clone "https://github.com/subhashkhileri/rhdh.git"
-cd rhdh || exit
-git checkout osd-nightly-job || exit
-
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export CLUSTER_NAME="osd-$job_id"
-export OSD_VERSION="4.17.10"
+echo "CLUSTER_NAME IN job : $CLUSTER_NAME"
 
-bash ./.ibm/pipelines/cluster/osd-gcp/create-osd.sh
-export KUBECONFIG=/tmp/rhdh/osdcluster/kubeconfig
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 oc whoami 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
