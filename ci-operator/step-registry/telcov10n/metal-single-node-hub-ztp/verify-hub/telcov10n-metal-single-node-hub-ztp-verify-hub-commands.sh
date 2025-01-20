@@ -62,16 +62,19 @@ function set_hub_cluster_kubeconfig {
 ##############################################################################################################
 
 function run_pytest {
-
   test_name=$1
   test_results_xml_output=${ARTIFACT_DIR}/junit_${test_name}-test-results.xml
-
   pytest ${PYTEST_VERBOSITY} ${tc_file} --junitxml=${test_results_xml_output}
 }
 
 function test_deployment_and_services {
 
   echo "************ telcov10n-vhub Generate Test results ************"
+
+  cat <<EOF > /tmp/pytest.ini
+[pytest]
+junit_suite_name = telco-verification
+EOF
 
   tc_file="/tmp/${JOB_NAME_SAFE}.py"
   cat << EOF >| ${tc_file}
@@ -119,15 +122,59 @@ EOF
   run_pytest check_hub_installation
 }
 
+function assert_expected_resources_are_available {
+
+  echo "************ telcov10n Assert the expected resources are available ************"
+
+  set -x
+  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
+    {
+      $oc_hub get no,clusterversion,mcp,co,sc,pv &&
+      $oc_hub get subscriptions.operators,OperatorGroup,pvc -A &&
+      $oc_hub get managedcluster &&
+      set +x &&
+      return ;
+    } ||
+    sleep 1m
+  done
+
+  echo "[FAIL] Not all expected resources are available..."
+  exit 1
+}
+
+function assert_console_is_available {
+
+  echo "************ telcov10n Assert the console is available ************"
+
+  set -x
+  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
+    {
+      console_pods="$($oc_hub -n openshift-console get pod -oname)" &&
+      $oc_hub -n openshift-console wait --for=condition=Ready ${console_pods} --timeout 5m &&
+      router_pods="$($oc_hub -n openshift-ingress get pod -oname)" &&
+      $oc_hub -n openshift-ingress wait --for=condition=Ready ${router_pods} --timeout 5m &&
+      authentication_pods="$($oc_hub -n openshift-authentication get pod -oname)" &&
+      $oc_hub -n openshift-authentication wait --for=condition=Ready ${authentication_pods} --timeout 5m &&
+      $oc_hub get co &&
+      $oc_hub whoami --show-console &&
+      $oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}' &&
+      set +x &&
+      return ;
+    } ||
+    sleep 1m
+  done
+
+  echo "[FAIL] Console not reachable..."
+  exit 1
+}
+
 function test_hub_cluster_deployment {
+
+  echo "************ telcov10n Test Hub deployment ************"
 
   set -x
   diff -u ${KUBECONFIG} ${hub_kubeconfig} || \
     ( echo "Wrong KUBECONFIG file retreived!!! Exiting..." && exit 1 )
-  $oc_hub get no,clusterversion,mcp,co,sc,pv
-  $oc_hub get subscriptions.operators,OperatorGroup,pvc -A
-  $oc_hub whoami --show-console
-  $oc_hub get managedcluster
   set +x
 
   echo "Current namespace is ${NAMESPACE}"
@@ -144,6 +191,8 @@ function main {
   append_pr_tag_cluster_profile_artifacts
   get_hub_cluster_profile_artifacts
   set_hub_cluster_kubeconfig
+  assert_expected_resources_are_available
+  assert_console_is_available
   test_hub_cluster_deployment
 }
 
