@@ -5,8 +5,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+random=$RANDOM
 #Create AWS S3 Storage Bucket
-QUAY_AWS_STS_S3_BUCKET="quayprowsts$RANDOM"
+QUAY_AWS_STS_S3_BUCKET="quayprowsts$random"
 echo $QUAY_AWS_STS_S3_BUCKET 
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
@@ -46,6 +47,8 @@ cat >>assume_role_policy.json <<EOF
   ]
 }
 EOF
+
+cat assume_role_policy.json
 
 cat >>create_aws_sts.tf <<EOF
 provider "aws" {
@@ -89,7 +92,7 @@ resource "aws_iam_access_key" "quay" {
 resource "aws_iam_role" "quay_ci_role" {
 
   name = var.aws_sts_role_name
-  assume_role_policy = $(cat assume_role_policy.json)
+  assume_role_policy = jsonencode($(cat assume_role_policy.json))
 }
 
 resource "aws_iam_role_policy_attachment" "policy_attachment" {
@@ -115,11 +118,12 @@ EOF
 
 echo "quay aws s3 bucket name is ${QUAY_AWS_STS_S3_BUCKET}"
 export TF_VAR_aws_bucket="${QUAY_AWS_STS_S3_BUCKET}"
-export TF_VAR_aws_sts_role_name="quay_prow_role${RANDOM}"
-export TF_VAR_aws_sts_user_name="quay_prow_automation${RANDOM}"
+export TF_VAR_aws_sts_role_name="quay_prow_role${random}"
+export TF_VAR_aws_sts_user_name="quay_prow_automation${random}"
 echo $TF_VAR_aws_sts_role_name
 
 terraform init
+terraform plan
 terraform apply -auto-approve || true
 terraform output role > sts_role_arn
 terraform output accesskey > sts_accesskey
@@ -127,7 +131,7 @@ terraform output secretkey > sts_secretkey
 cat sts_accesskey
 
 #Share Terraform Var and Terraform Directory
-echo "${QUAY_AWS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
+echo "${QUAY_AWS_STS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
 terraform output role  > "${SHARED_DIR}/QUAY_AWS_STS_STS_ROLE"
 terraform output accesskey  > "${SHARED_DIR}/QUAY_AWS_STS_STS_ACCESSKEY"
 
