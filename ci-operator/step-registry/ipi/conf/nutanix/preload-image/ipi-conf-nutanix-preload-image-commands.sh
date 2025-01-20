@@ -48,7 +48,7 @@ api_ep="${pc_url}/api/nutanix/v3/tasks/$task_uuid"
 
 # api_ep="${pc_url}/api/nutanix/v3/images/$image_uuid"
 # delete_image_json=$(curl -ks -u "${un}":"${pw}" -X DELETE ${api_ep} -H "Content-Type: application/json")
-
+sleep 3600
 loops=0
 max_loops=10
 sleep_seconds=60
