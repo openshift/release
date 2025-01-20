@@ -64,6 +64,9 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+export MULTI_RELEASE_IMAGE="quay.io/sgoveas/custom-release:v4.17"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/sgoveas/custom-release:v4.17"
+
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 
