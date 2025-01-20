@@ -60,7 +60,6 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
 }
 
 #sts user
-# shellcheck disable=SC2154
 resource "aws_iam_user" "quay" {
   name = var.aws_sts_user_name
   path = "/"
@@ -82,6 +81,7 @@ resource "aws_iam_role" "quay_ci_role" {
     {
       "Effect": "Allow",
       "Principal": {
+        # shellcheck disable=SC2154
         "AWS": "arn:aws:iam::301721915996:user/${aws_iam_user.quay.name}"
       },
       "Action": "sts:AssumeRole"
