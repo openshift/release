@@ -6,8 +6,6 @@ set -o errexit
 set -o pipefail
 
 #Create AWS S3 Storage Bucket
-QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
-QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_AWS_STS_S3_BUCKET="quayprowsts$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
