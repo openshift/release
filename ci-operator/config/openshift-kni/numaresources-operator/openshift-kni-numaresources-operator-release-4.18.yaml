@@ -7,6 +7,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  numaresources-operator-bundle-4.17:
+    name: numaresources-operator-4.17
+    namespace: ocp-kni
+    tag: numaresources-operator-bundle
   os-min9:
     name: ubi-minimal
     namespace: ocp
@@ -68,6 +72,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
+  previous:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -189,6 +198,50 @@ tests:
     env:
       PROJECT_NAME: numaresources-operator
     workflow: openshift-ci-security
+- as: e2e-operator-upgrade
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle-4.17
+      OO_BUNDLE_NEW: numaresources-operator-bundle
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      DELETE_MC: "false"
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_OPTIONS: ""
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.18
+        ci-job-fullname openshift-kni-e2e-operator-upgrade-numaresources-operator-release-4.18
+        ci-job-type e2e-operator-upgrade
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - ref: openshift-e2e-test
+    - ref: optional-operators-operator-sdk
+    - as: test-install-e2e
+      cli: latest
+      commands: make test-install-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - ref: telco5g-nrop-upgrade
+    - as: test-upgrade-e2e
+      cli: latest
+      commands: make test-upgrade-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: telco5g-nrop
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-kni
