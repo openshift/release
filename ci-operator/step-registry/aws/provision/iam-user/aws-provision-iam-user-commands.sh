@@ -101,6 +101,26 @@ EOF
 POLICY_FILE_INSTALLER="${SHARED_DIR}/aws-permissions-policy-creds.json"
 POLICY_FILE_CCOCTL="${SHARED_DIR}/aws-permissions-policy-creds-ccoctl.json"
 
+
+# # ----------------------------------------
+# # SCP test
+# # ---------------------------------------- START
+# policy_with_scp=$(mktemp)
+# jq '.Statement += [{
+#   "Effect": "Deny",
+#   "Action": [
+#     "ec2:RunInstances"
+#   ],
+#   "Condition": {
+#     "Bool": {
+#       "ec2:AssociatePublicIpAddress": "true"
+#     }
+#   },
+#   "Resource": "*",
+# }]' ${POLICY_FILE_INSTALLER} > $policy_with_scp
+# mv $policy_with_scp $POLICY_FILE_INSTALLER
+# # ---------------------------------------- END
+
 if [ -f "${POLICY_FILE_INSTALLER}" ]; then
 
 	USER_NAME="${CLUSTER_NAME}-minimal-perm-installer"
