@@ -1,7 +1,5 @@
 #!/bin/bash
 
-shellcheck *.sh
-
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -62,6 +60,7 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
 }
 
 #sts user
+# shellcheck disable=SC2154
 resource "aws_iam_user" "quay" {
   name = var.aws_sts_user_name
   path = "/"
