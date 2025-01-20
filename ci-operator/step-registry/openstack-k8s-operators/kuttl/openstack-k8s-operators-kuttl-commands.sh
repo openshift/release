@@ -146,6 +146,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
     fi
 
     make openstack_wait_deploy || exit 1
+    # Create the dataplane CRs to check their update
+    make edpm_deploy_baremetal || exit 1
     make openstack_cleanup || exit 1
 
     # update operators and ctlplane to the PR
@@ -158,10 +160,11 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
       make openstack_init
     fi
     make openstack_patch_version || exit 1
+    sleep 10
     oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
 
     # cleanup to run kuttl
-    make openstack_deploy_cleanup && \
+    make edpm_deploy_cleanup openstack_deploy_cleanup && \
     oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
     storage_cleanup && storage_create
   fi
