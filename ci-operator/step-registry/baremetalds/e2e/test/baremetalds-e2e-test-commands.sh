@@ -58,7 +58,7 @@ function set_test_provider() {
     # Currently all v6 deployments are disconnected, so we have to tell
     # openshift-tests to exclude those tests that require internet
     # access.
-    if [[ "${DS_IP_STACK}" != "v6" ]];
+    if [[ ! "${DS_IP_STACK}" =~ ^v6 ]];
     then
         export TEST_PROVIDER='{"type":"baremetal"}'
     else
@@ -69,9 +69,11 @@ function set_test_provider() {
 function mirror_release_image_for_disconnected_upgrade() {
     # All IPv6 clusters are disconnected and
     # release image should be mirrored for upgrades.
-    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+    if [[ "${DS_IP_STACK}" =~ ^v6 ]]; then
       # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+podman restart --time 1 external-squid || true
+
 MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
 RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
@@ -107,6 +109,15 @@ oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeo
 EOF
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
+      TEST_SKIPS="\[sig-arch\]\[Early\] APIs for openshift\.io must have stable versions \[Suite:openshift/conformance/parallel\]"
+      if [[ "${RUN_QE_TEST,,}" == "true" ]]; then
+          TESTS="$(openshift-tests run-upgrade all --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --dry-run --provider "${TEST_PROVIDER}")" &&
+          echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+          echo "Skipping check version test in QE tests:" &&
+          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
+          TEST_UPGRADE_ARGS="${TEST_UPGRADE_ARGS} --file /tmp/tests"
+          scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
+      fi
     fi
 }
 

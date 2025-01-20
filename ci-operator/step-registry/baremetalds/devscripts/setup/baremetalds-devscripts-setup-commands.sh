@@ -57,6 +57,8 @@ trap finished EXIT TERM
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
 
+sed -i 's/6230-6240.*/&\n  sudo firewall-cmd --policy=libvirt-to-host --add-port=123\/udp/' 06_create_cluster.sh
+
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
