@@ -5,18 +5,16 @@ build_root:
       RUN yum install -y --nodocs make git golang
       RUN ln -s /cli/oc /usr/bin/kubectl
 images:
+- build_args:
+    - name: VERSION
+      value: 0.42.0
+    - name: REGISTRY
+      value: localhost/feastdev
 - context_dir: infra/feast-operator
   dockerfile_path: Dockerfile
   to: feast-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19
-    RUN yum install -y --nodocs make git
-    RUN ln -s /cli/oc /usr/bin/kubectl
-    RUN git clone -b dev https://github.com/opendatahub-io/feast.git feast
-    WORKDIR /feast
-    RUN pwd
-    RUN ls -la
-    RUN make build-feature-server-docker REGISTRY=localhost/feastdev
+- context_dir: sdk/python/feast/infra/feature_servers/multicloud/Dockerfile
+  dockerfile_path: Dockerfile
   to: feast-feature-server
 releases:
   latest:
