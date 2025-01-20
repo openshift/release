@@ -11,24 +11,17 @@ vpcSubnetsFile="${SHARED_DIR}/customer_vpc_subnets.yaml"
 cat "${vpcSubnetsFile}"
 region="${LEASED_RESOURCE}"
 declare -a zones=("${region}-1" "${region}-2" "${region}-3")
-if [[ ${ZONES_COUNT} -lt 3 ]]; then
-    zones=("${zones[@]:0:ZONES_COUNT}")
-    echo "Adjusted zones to ${#zones[@]} based on zones_COUNT: ${ZONES_COUNT}."
-#     readarray -t control_plane_subnets < <(yq-go r -j ${vpcSubnetsFile}  'platform.ibmcloud.controlPlaneSubnets(test)')
-#     echo ${control_plane_subnets[@]}
-# yq-go r ${vpcSubnetsFile} '.platform.ibmcloud.controlPlaneSubnets |= map(select(test("'"${zones[0]}""))) |
-# .platform.ibmcloud.computeSubnets |= map(select(test("'"${zones[0]}"")))
-# ' ${vpcSubnetsFile} > "$output_file"
-
-#     control_plane_subnets=($(yq-go e '.controlPlaneSubnets[]' "$vpcSubnetsFile"))
-#     compute_subnets=($(yq-go e '.computeSubnets[]' "$vpcSubnetsFile"))
-#     yq-go e "
-# .controlPlaneSubnets |= map(select(test(\"^.*${zone}.*$\"))) |
-# .computeSubnets |= map(select(test(\"^.*${zone}.*$\")))
-# " "$vpcSubnetsFile" > "$vpcSubnetsFile"
+if [[ ${ZONES_COUNT} -eq 1 ]]; then
+    zone=${zones[0]}
+    echo "Adjusted zones to ${zone} based on ZONES_COUNT: ${ZONES_COUNT}."
+    temp_file=$(mktemp)
+    cp ${vpcSubnetsFile} ${temp_file}
+    yq-go r "$temp_file" "platform.ibmcloud.controlPlaneSubnets" -j | jq --arg zone "$zone" '.[] | select(test($zone))' | yq-go w -i "$temp_file" 'platform.ibmcloud.controlPlaneSubnets' "$(cat)"
+    yq-go r "$temp_file" "platform.ibmcloud.computeSubnets" -j | jq --arg zone "$zone" '.[] | select(test($zone))' | yq-go w -i "$temp_file" 'platform.ibmcloud.computeSubnets' "$(cat)"
+    cat $temp_file
+    yq-go m -x -i "${CONFIG}" "${vpcSubnetsFile}"
+else
+    yq-go m -x -i "${CONFIG}" "${vpcSubnetsFile}"
 fi
-
-yq-go m -x -i "${CONFIG}" "${vpcSubnetsFile}"
-
-
-sleep 2h
+echo "$CONFIG ======================"
+cat ${CONFIG}
