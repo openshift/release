@@ -22,7 +22,7 @@ JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
 
 
 IFNAME=tun20
-REMOTE_ARTIFACTS_DIR=/home/kni/test_results/
+REMOTE_ARTIFACTS_DIR="/home/${JUMP_SERVER_USER}/test_results/"
 
 cp $SSH_KEY_PATH $SSH_KEY
 chmod 600 $SSH_KEY
@@ -36,7 +36,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 # Run commands from the bastion
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" bash -s -- \
-  "'${VPN_URL}'" "'${VPN_USERNAME}'" "'${VPN_PASSWORD}'" "'${IFNAME}'" "'${BASTION_ADDRESS}'" "'${REMOTE_ARTIFACTS_DIR}'"  << 'EOF'
+  "'${VPN_URL}'" "'${VPN_USERNAME}'" "'${VPN_PASSWORD}'" "'${IFNAME}'" "'${BASTION_ADDRESS}'" "'${REMOTE_ARTIFACTS_DIR}'" << 'EOF'
     set -o nounset
     set -o errexit
     set -o pipefail
@@ -91,4 +91,4 @@ END_INVENTORY
     PIDS=$(pgrep openconnect) && [ -n "$PIDS" ] && sudo kill -9 $PIDS || true
 EOF
 
-rsync -a -e "ssh ${SSHOPTS[*]}" "kni@${JUMP_SERVER_ADDRESS}:${REMOTE_ARTIFACTS_DIR}" "${ARTIFACTS_DIR}/compliance_test_results"
+rsync -a -e "ssh ${SSHOPTS[*]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}:${REMOTE_ARTIFACTS_DIR}" "${ARTIFACTS_DIR}/compliance_test_results"
