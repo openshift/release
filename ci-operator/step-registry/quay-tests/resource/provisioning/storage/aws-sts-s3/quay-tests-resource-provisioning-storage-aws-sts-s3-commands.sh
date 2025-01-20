@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 
 set -o nounset
 set -o errexit
@@ -81,7 +82,6 @@ resource "aws_iam_role" "quay_ci_role" {
     {
       "Effect": "Allow",
       "Principal": {
-        # shellcheck disable=SC2154
         "AWS": "arn:aws:iam::301721915996:user/${aws_iam_user.quay.name}"
       },
       "Action": "sts:AssumeRole"
