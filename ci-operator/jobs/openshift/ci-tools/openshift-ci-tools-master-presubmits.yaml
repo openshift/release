@@ -62,22 +62,22 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build10
-    context: ci/prow/checkconfig
+    context: ci/prow/checkconfig-changed-name
     decorate: true
     labels:
       capability/arm64: arm64
       ci-operator.openshift.io/cluster: build10
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ci-tools-master-checkconfig
-    rerun_command: /test checkconfig
+    name: pull-ci-openshift-ci-tools-master-checkconfig-changed-name
+    rerun_command: /test checkconfig-changed-name
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=checkconfig
+        - --target=checkconfig-changed-name
         command:
         - ci-operator
         image: ci-operator:latest
@@ -110,7 +110,62 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )checkconfig,?($|\s.*)
+    trigger: (?m)^/test( | .* )checkconfig-changed-name,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/checkconfig-new
+    decorate: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/cluster: build10
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-checkconfig-new
+    rerun_command: /test checkconfig-new
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=checkconfig-new
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )checkconfig-new,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
