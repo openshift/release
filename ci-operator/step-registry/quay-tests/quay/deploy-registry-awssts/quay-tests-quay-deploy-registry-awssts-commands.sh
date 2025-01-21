@@ -15,10 +15,9 @@ QUAY_AWS_STS_ROLE_ARN=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN" ] && cat "${S
 QUAY_AWS_STS_ACCESSKEY=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY" || echo "")
 QUAY_AWS_STS_SECRETKEY=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY" || echo "")
 
-
 echo "Create registry ${QUAYREGISTRY} in ns ${QUAYNAMESPACE}"
 
-#create secret bundle with odf/noobaa
+#create secret bundle with aws sts s3
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
@@ -62,7 +61,6 @@ DISTRIBUTED_STORAGE_CONFIG:
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 EOF
-
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
 

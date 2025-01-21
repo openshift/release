@@ -5,13 +5,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-random=$RANDOM
-#Create AWS S3 Storage Bucket
-QUAY_AWS_STS_S3_BUCKET="quayprowsts$random"
-echo $QUAY_AWS_STS_S3_BUCKET 
-
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
+
+random=$RANDOM
+
+#Create AWS S3 Storage Bucket
+QUAY_AWS_STS_S3_BUCKET="quayprowsts$random"
 
 mkdir -p QUAY_AWSSTS && cd QUAY_AWSSTS
 cat >>variables.tf <<EOF
@@ -33,6 +33,7 @@ default = "quay_prow_automation"
 
 EOF
 
+# role policy
 cat >>assume_role_policy.json <<EOF
 {
   "Version": "2012-10-17",
@@ -47,8 +48,6 @@ cat >>assume_role_policy.json <<EOF
   ]
 }
 EOF
-
-cat assume_role_policy.json
 
 cat >>create_aws_sts.tf <<EOF
 provider "aws" {
@@ -90,13 +89,11 @@ resource "aws_iam_access_key" "quay" {
 
 #sts role
 resource "aws_iam_role" "quay_ci_role" {
-
   name = var.aws_sts_role_name
   assume_role_policy = jsonencode($(cat assume_role_policy.json))
 }
 
 resource "aws_iam_role_policy_attachment" "policy_attachment" {
-
   role       = aws_iam_role.quay_ci_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 
@@ -113,7 +110,6 @@ output "secretkey" {
   sensitive = true
   value = aws_iam_access_key.quay.secret
 }
-
 EOF
 
 echo "quay aws s3 bucket name is ${QUAY_AWS_STS_S3_BUCKET}"
@@ -123,20 +119,15 @@ export TF_VAR_aws_sts_user_name="quay_prow_automation${random}"
 echo $TF_VAR_aws_sts_role_name
 
 terraform init
-terraform plan
 terraform apply -auto-approve || true
-terraform output role > sts_role_arn
-terraform output accesskey > sts_accesskey
-terraform output secretkey > sts_secretkey
-cat sts_accesskey
 
 #Share Terraform Var and Terraform Directory
+echo "$random"  > "${SHARED_DIR}/QUAY_AWS_STS_RANDOM"
 echo "${QUAY_AWS_STS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
 terraform output role  > "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN"
 terraform output accesskey  > "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY"
 terraform output secretkey  > "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY"
-echo "$random"  > "${SHARED_DIR}/QUAY_AWS_STS_RANDOM"
 
 
 tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz ${SHARED_DIR}
+cp terraform.tgz "${SHARED_DIR}/"
