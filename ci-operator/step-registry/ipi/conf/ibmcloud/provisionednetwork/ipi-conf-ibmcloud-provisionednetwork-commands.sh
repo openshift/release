@@ -16,8 +16,12 @@ if [[ ${ZONES_COUNT} -eq 1 ]]; then
     echo "Adjusted zones to ${zone} based on ZONES_COUNT: ${ZONES_COUNT}."
     # temp_file=$(mktemp)
     # cp ${vpcSubnetsFile} ${temp_file}
-    yq-go r "$vpcSubnetsFile" "platform.ibmcloud.controlPlaneSubnets" -j | jq --arg zone "$zone" '.[] | select(test($zone))' | yq-go w -i "$vpcSubnetsFile" 'platform.ibmcloud.controlPlaneSubnets' "$(cat)"
-    yq-go r "$vpcSubnetsFile" "platform.ibmcloud.computeSubnets" -j | jq --arg zone "$zone" '.[] | select(test($zone))' | yq-go w -i "$vpcSubnetsFile" 'platform.ibmcloud.computeSubnets' "$(cat)"
+    control_plane_subnets=$(yq-go r "$vpcSubnetsFile" "platform.ibmcloud.controlPlaneSubnets" -j | jq --arg zone "$zone" 'select(test($zone))' -r)
+    yq-go w -i "$vpcSubnetsFile" 'platform.ibmcloud.controlPlaneSubnets' "$control_plane_subnets"
+
+    compute_subnets=$(yq-go r "$vpcSubnetsFile" "platform.ibmcloud.computeSubnets" -j | jq --arg zone "$zone" 'select(test($zone))' -r)
+    yq-go w -i "$vpcSubnetsFile" 'platform.ibmcloud.computeSubnets' "$compute_subnets"
+    
     cat $vpcSubnetsFile
     yq-go m -x -i "${CONFIG}" "${vpcSubnetsFile}"
 else
