@@ -65,9 +65,6 @@ function load_env {
   VM_DISKS="$(echo ${vm_disk_list} | jq --compact-output)"
   export VM_DISKS
 
-  # HUB_CLUSTER_OPERATORS="$(echo ${OPERATORS} | jq --compact-output '[.[].name]')"
-  export VM_PASSWD
-
   #### Console password
   VM_PASSWD="$(cat /var/run/telcov10n-ansible-group-all/ansible_password)"
   export VM_PASSWD
