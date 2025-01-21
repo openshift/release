@@ -34,8 +34,16 @@ function wait_for_hc_readiness() {
     wait "${pids_to_wait[@]}"
 }
 
+function check_clusterissuer() {
+    echo "Checking the persence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
+    if ! oc wait clusterissuer/$CLUSTERISSUER_NAME --for=condition=Ready --timeout=0; then
+        echo "ClusterIssuer is not created or not ready to use. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
 function create_aggregated_cert() {
-    oc create -f - << EOF
+    oc apply -f - << EOF
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -134,8 +142,7 @@ fi
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
 
 # Check clusterissuer readiness
-CLUSTERISSUER_NAME=cluster-certs-clusterissuer
-oc wait clusterissuer "$CLUSTERISSUER_NAME" --for=condition=Ready=True --timeout=0
+check_clusterissuer
 
 # Get CP service hostnames
 KAS_ROUTE_HOSTNAME="$(mgmt oc get hc -A -o jsonpath='{.items[0].spec.services[?(@.service=="APIServer")].servicePublishingStrategy.route.hostname}')"
@@ -151,8 +158,8 @@ fi
 HYPERSHIFT_EXTERNAL_DNS_DOMAIN="$(cut -d '.' -f 1 --complement <<< "$KAS_ROUTE_HOSTNAME")"
 
 # Create aggregated cert
-AGGREGATED_CERT_NAME=custom-ingress-cert
-AGGREGATED_CERT_SECRET_NAME=cert-manager-managed-ingress-cert-tls
+AGGREGATED_CERT_NAME=custom-aggregated-cert
+AGGREGATED_CERT_SECRET_NAME=cert-manager-managed-aggregated-cert-tls
 INGRESS_DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
 HC_NAME="$(cut -d '.' -f 2 <<< "$INGRESS_DOMAIN")"
 HCP_NS="clusters-$HC_NAME"
