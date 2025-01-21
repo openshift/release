@@ -53,6 +53,7 @@ max_loops=10
 sleep_seconds=60
 while true
 do
+  echo "00000000000000"
   task_json=$(curl -ks -u "${un}":"${pw}" -X GET "${api_ep}" -H "Content-Type: application/json")
   task_status=$(echo "${task_json}" | jq -r ".status")
   echo "task status: $task_status"
@@ -65,7 +66,9 @@ do
     exit 1
   fi
   echo "Image preload is not succeeded yet, wait $sleep_seconds seconds"
-  ((loops++))
+  # ((loops++))
+  loops=("$loops"+1)
+  echo "111111111111111111"
   sleep $sleep_seconds
 done
 
