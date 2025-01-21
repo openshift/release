@@ -10,6 +10,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function create_gitea_deployment {
@@ -126,7 +132,7 @@ EOF
   gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
   echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
   echo "Wait until Gitea endpoint is reachable via openshift route..."
-  wait_until_command_is_ok "curl -vIk ${gitea_url}"
+  wait_until_command_is_ok "${_curl} -vIk ${gitea_url}"
 }
 
 function generate_gitea_ssh_keys {
@@ -152,7 +158,7 @@ function upload_gitea_ssh_keys {
   ssh_key_json=$(mktemp --dry-run)
   echo '{"title":"Gitea ZTP SSH Pub key", "key":"'"$(cat ${ssh_pub_key_file})"'"}' > ${ssh_key_json}
   set -x
-  curl -vLk -X POST \
+  ${_curl} -vLk -X POST \
     -u ${GITEA_ADMIN_USERNAME}:${gitea_admin_pass} \
     -H "Content-Type: application/json" \
     -d @${ssh_key_json} \
@@ -166,7 +172,7 @@ function create_ztp_gitea_repo {
 
   repo_name="telcov10n"
   set -x
-  curl -vLk -X POST \
+  ${_curl} -vLk -X POST \
     -u ${GITEA_ADMIN_USERNAME}:${gitea_admin_pass} \
     -H "Content-Type: application/json" \
     -d '{"name":"'${repo_name}'"}' \
