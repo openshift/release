@@ -631,6 +631,36 @@ function change_channel(){
     return 0
 }
 
+function retrieve_updates_by_channel(){
+    local cmd retrieve_status
+    cmd="oc get clusterversion version -ojson|jq -r '.status.conditions[] | select(.type==\"RetrievedUpdates\").status'"
+    # Change the channel to invalid one to clear RetrievedUpdates by force
+    change_channel "dummy" 
+    retrieve_status=$(eval "${cmd}")
+    if [[ "${retrieve_status}" != "False" ]]; then
+        echo "Failed to clear RetrievedUpdates by force"
+        return 1
+    fi
+    # Then change the channel to expected one to ensure the avaliable update synced from correct channel
+    change_channel "$1"
+    retrieve_status=$(eval "${cmd}")
+    if [[ "${retrieve_status}" != "True" ]]; then
+        echo "Failed to retrieve updates from upstream server after changing channel"
+        return 1
+    fi
+    return 0
+}
+
+function check_channel_enabled(){
+    local result
+    result=$(curl --silent --header "Accept:application/json" "https://api.openshift.com/api/upgrades_info/v1/graph?arch=amd64&channel=${1}"| jq -r '.nodes[]?.version'|head -n1)
+    if [[ -z "${result}" ]]; then
+        echo "The channel $1 is not enabled yet!"
+        return 1
+    fi
+    return 0
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -680,7 +710,10 @@ for target in "${TARGET_RELEASES[@]}"; do
         
         echo "Check updates to target_version in channel-last-hop is the same with channel-current-hop"
         recommends_last_hop=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'|grep "${TARGET_MAJOR_MINOR_VERSION}")
-        change_channel "candidate-${TARGET_MAJOR_MINOR_VERSION}"
+        if ! retrieve_updates_by_channel "candidate-${TARGET_MAJOR_MINOR_VERSION}"; then
+            echo "Fail to get latest update through candidate-${TARGET_MAJOR_MINOR_VERSION}"
+            exit 1
+        fi
         recommends_current_hop=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'|grep "${TARGET_MAJOR_MINOR_VERSION}")
         if [[ "${recommends_last_hop}" != "${recommends_current_hop}" ]]; then
             echo "The available update from channel-last-hop:${recommends_last_hop} is different from channel-current-hop: ${recommends_current_hop}."
@@ -688,20 +721,28 @@ for target in "${TARGET_RELEASES[@]}"; do
         fi
 
         ver_in_channel=$(echo "${channel}"|cut -d- -f2)
-        minor_ver_in_channel=$(echo "${ver_in_channel}"|cut -d. -f2)
-        # currently only even number versions supported for eus channel
-        if (( ${minor_ver_in_channel} % 2 == 0 )); then
+        stable_channel="stable-${ver_in_channel}"
+        eus_channel="eus-${ver_in_channel}"
+        # before GA, eus/stable channel will not be promoted, skip the checkpoints.
+        # currently only even number versions supported for eus channel, if odd number versions, skip the checkpoints.
+        if check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
             echo "Check the updates from stable&eus channels should be the same."
-            change_channel "stable-${ver_in_channel}"
+            if ! retrieve_updates_by_channel ${stable_channel}; then
+                echo "Fail to get latest update through ${stable_channel}"
+                exit 1
+            fi
             recommends_stable=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version')
-            change_channel "eus-${ver_in_channel}"
+            if ! retrieve_updates_by_channel "${eus_channel}"; then
+                echo "Fail to get latest update through ${eus_channel}"
+                exit 1
+            fi
             recommends_eus=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version')
             if [[ "${recommends_stable}" != "${recommends_eus}" ]]; then
                 echo "The available update from stable channel:${recommends_stable} is different from eus channel: ${recommends_eus}."
                 exit 1
             fi
         else
-            echo "Skip the checkpoint on unavailable channel eus-${ver_in_channel}."
+            echo "Skip the checkpoint on unavailable channel ${stable_channel} and ${eus_channel}"
         fi
         # after the test, always restore the channel to original one 
         if ! change_channel "${channel}"; then
