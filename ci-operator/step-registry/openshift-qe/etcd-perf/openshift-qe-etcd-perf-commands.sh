@@ -112,9 +112,9 @@ EOF
   if [[ -s /tmp/secret/kubeadmin-password ]];then adminpassword=`cat /tmp/secret/kubeadmin-password`; fi
   APIURL=`grep 'server:' /tmp/secret/kubeconfig | awk -F 'server:' '{print $2}'`
   oc login $APIURL -u kubeadmin -p $adminpassword
-  date;oc adm top node;date;ls -lrt /tmp/etcd-tools ;etcd-tools/etcd-analyzer.sh;date
+  date;oc adm top node;date;ls -lrt /tmp/etcd-tools ;/tmp/etcd-tools/etcd-analyzer.sh;date
   echo "-----------------------Fio Test STARTS...........................................................................!"
-  etcd-tools/fio_suite.sh
+  /tmp/etcd-tools/fio_suite.sh
   etc_masternode1=`oc get node |grep master|awk '{print $1}'|tail -1`
   oc debug -n openshift-etcd --quiet=true node/$etc_masternode1 -- chroot host bash -c "podman run --privileged --volume /var/lib/etcd:/test quay.io/peterducai/openshift-etcd-suite:latest fio"
 sleep 600  
