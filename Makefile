@@ -343,7 +343,7 @@ config_updater_vault_secret:  build_farm_credentials_folder
 		--confirm \
 		--kubeconfig=/_kubeconfig
 
-	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	./hack/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 
 	ls $(build_farm_credentials_folder)
 
@@ -438,7 +438,7 @@ list-token-secrets:
 .PHONY: list-token-secrets
 
 config-updater-kubeconfig:
-	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	$(timeout_cmd) 60 ./hack/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 	cat "$(TMPDIR)/sa.config-updater.${CLUSTER}.config"
 .PHONY: config-updater-kubeconfig
 

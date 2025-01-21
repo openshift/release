@@ -14,7 +14,7 @@ CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 
 collect_artifacts() {
-	for f in API_IP INGRESS_IP DELETE_FIPS; do
+	for f in API_IP INGRESS_IP HCP_INGRESS_IP DELETE_FIPS; do
 		if [[ -f "${SHARED_DIR}/${f}" ]]; then
 			cp "${SHARED_DIR}/${f}" "${ARTIFACT_DIR}/"
 		fi
@@ -44,4 +44,16 @@ if [[ "${INGRESS_FIP_ENABLED}" == "true" ]]; then
 			--format json -c floating_ip_address -c id)"
 	jq -r '.floating_ip_address' <<<"$INGRESS_FIP" >  "${SHARED_DIR}/INGRESS_IP"
 	jq -r '.id'                  <<<"$INGRESS_FIP" >> "${SHARED_DIR}/DELETE_FIPS"
+fi
+
+if [[ "${HCP_INGRESS_FIP_ENABLED}" == "true" ]]; then
+	echo "Creating floating IP for Hypershift Ingress"
+	HCP_INGRESS_FIP="$(openstack floating ip create \
+			--description "${CLUSTER_NAME}.hcp-ingress-fip" \
+			--tag "PROW_CLUSTER_NAME=${CLUSTER_NAME}" \
+			--tag "PROW_JOB_ID=${PROW_JOB_ID}" \
+			"$OPENSTACK_EXTERNAL_NETWORK" \
+			--format json -c floating_ip_address -c id)"
+	jq -r '.floating_ip_address' <<<"$HCP_INGRESS_FIP" >  "${SHARED_DIR}/HCP_INGRESS_IP"
+	jq -r '.id'                  <<<"$HCP_INGRESS_FIP" >> "${SHARED_DIR}/DELETE_FIPS"
 fi
