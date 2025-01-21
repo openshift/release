@@ -44,18 +44,19 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
-      SLEEP_DURATION: 10m
+      CUSTOM_AZURE_REGION: eastus
+      SLEEP_DURATION: 3h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-provision
+    - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
