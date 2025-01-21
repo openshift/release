@@ -86,6 +86,10 @@ echo "commit hash is ${PULL_BASE_SHA:0:7}"
 echo "Entire commit has is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
 
+# Get credentials for quay repo
+DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
+DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
+
 # Initialize ALL_VARS as an array of variable assignments
 ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
 ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
@@ -120,9 +124,6 @@ git checkout $PULL_BASE_SHA
 docker buildx create --platform="${PLATFORMS}" --name mybuilder --use
 
 # Log in to the registry
-DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
-DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
-
 docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}" "${REGISTRY_HOST}"
 
 # Build and push the multiarch image
