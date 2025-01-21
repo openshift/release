@@ -45,15 +45,13 @@ function create_catalog_sources() {
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
     if [ "${DISCONNECTED}" = "true" ]; then
-        MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-        # the proxy registry port 6001 for quay.io
-        MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
-        index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+        index_image="$(sed 's/5000/6001/' "${SHARED_DIR}/mirror_registry_url")/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    else
+        index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
     fi
-    index_image_repo=`echo "${index_image%%:*}"`
+    index_image_repo="${index_image%:*}"
 
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
