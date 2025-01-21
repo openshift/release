@@ -83,12 +83,13 @@ fi
 
 echo "Image is $DESTINATION_IMAGE_REF"
 echo "commit hash is ${PULL_BASE_SHA:0:7}"
-echo "Entire commit has is $PULL_BASE_SHA"
+echo "Entire commit hash is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
 
 # Get credentials for quay repo
 DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
 export DOCKER_USER
+echo "docker user is $DOCKER_USER"
 DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
 export DOCKER_PASS
 
