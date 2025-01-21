@@ -10,6 +10,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function generate_cluster_image_set {
@@ -120,8 +126,8 @@ function checking_installation_progress {
       oc get clusterimagesets.hive.openshift.io $cis ;
       echo ;
       echo "######## Installation Progress ##########" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "message" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "message" ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
 
       now=$(date +%s)
       if [ ${timeout} -lt ${now} ] ; then
