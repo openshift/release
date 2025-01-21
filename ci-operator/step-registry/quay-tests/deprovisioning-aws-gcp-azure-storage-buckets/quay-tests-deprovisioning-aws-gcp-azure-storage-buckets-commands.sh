@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
 if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
     #Copy GCP auth.json from mounted secret to current directory
     mkdir -p QUAY_GCP && cd QUAY_GCP
@@ -16,7 +17,7 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
 
     export TF_VAR_gcp_storage_bucket="${QUAY_GCP_STORAGE_ID}"
     terraform init
-    terraform destroy -auto-approve || true
+    terraform destroy -auto-approve || true          
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
@@ -31,8 +32,9 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
     export TF_VAR_storage_account="${QUAY_AZURE_STORAGE_ID}"
     export TF_VAR_storage_container="${QUAY_AZURE_STORAGE_ID}"
     terraform init
-    terraform destroy -auto-approve || true
+    terraform destroy -auto-approve || true          
 fi
+
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'aws' ]]; then
     mkdir -p QUAY_AWS && cd QUAY_AWS
@@ -44,12 +46,12 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'aws' ]]; then
 
     export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
     terraform init
-    terraform destroy -auto-approve || true
+    terraform destroy -auto-approve || true          
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     mkdir -p QUAY_AWSSTS && cd QUAY_AWSSTS
-    cp ${SHARED_DIR}/terraform.tgz .
+    cp "${SHARED_DIR}/terraform.tgz" .
     tar -xzvf terraform.tgz && ls
 
     QUAY_AWS_S3_BUCKET=$(cat "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET")
