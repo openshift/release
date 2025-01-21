@@ -1,0 +1,42 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity-filestore-csi-provision
+  steps:
+  - ref: gcp-provision-vpc
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-gcp-oidc-creds-provision
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-credentials-mode
+  - ref: ipi-conf-gcp-filestore-workload-identity-federation
+  - ref: optional-operators-subscribe
+  - ref: storage-create-csi-gcp-filestore
+  - ref: storage-conf-wait-for-csi-driver
+  env:
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: CLUSTERCSIDRIVER
+    default: filestore.csi.storage.gke.io
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: manifest-gcp-filestore.yaml
+  - name: TRUECONDITIONS
+    default: GCPFILESTOREDriverControllerServiceControllerAvailable GCPFILESTOREDriverNodeServiceControllerAvailable
+  - name: OO_PACKAGE
+    default: gcp-filestore-csi-driver-operator
+  - name: OO_CHANNEL
+    default: stable
+  - name: OO_INSTALL_NAMESPACE
+    default: openshift-cluster-csi-drivers
+  - name: OO_TARGET_NAMESPACES
+    default: '!all'
+  - name: EVAL_CONFIG_ENVVARS
+    default: "yes"
+  - name: OO_CONFIG_ENVVARS
+    default: POOL_ID=$(cat ${SHARED_DIR}/gcp-filestore-pool-id),PROVIDER_ID=$(cat ${SHARED_DIR}/gcp-filestore-provider-id),SERVICE_ACCOUNT_EMAIL=$(cat ${SHARED_DIR}/gcp-filestore-service-account-email),PROJECT_NUMBER=$(cat ${SHARED_DIR}/gcp-filestore-project-number)
+  documentation: |-
+    Launch an IPI disconnected cluster (behind proxy) using Workload Identity on GCP for QE e2e tests.
