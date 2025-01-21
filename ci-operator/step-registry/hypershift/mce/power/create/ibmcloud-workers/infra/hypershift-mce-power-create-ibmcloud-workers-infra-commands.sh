@@ -23,9 +23,9 @@ set_x86_configs() {
   # The instance profile, which defines the compute resources allocated to the VSI
   PROFILE_NAME="bx2-2x8"
   # The ID of the image used to create the VSI. NOTE: It should be the ID of an image available in your IBM Cloud account
-  IMAGE_ID="r034-33250be2-61bb-4837-9cd5-6ef83c2ccb2c"
+  IMAGE_ID=$(jq -r '.x86ImageID' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
   # The ID of the SSH key you want to inject into the VSI
-  SSH_KEY_ID="r034-55ccc38b-cad7-4244-bad0-6bb4c25cf0e7"
+  SSH_KEY_ID=$(jq -r '.x86sshKeyID' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
 
   # Fetching Resource Group
   if [[ -z "${RESOURCE_GROUP_NAME}" ]]; then
