@@ -31,9 +31,9 @@ data="{
 }"
 api_ep="${pc_url}/api/nutanix/v3/images/list"
 image_json=$(curl -ks -u "${un}":"${pw}" -X POST "${api_ep}" -H "Content-Type: application/json" -d @-<<<"${data}")
-image_uuid=$(echo "${image_json}" | jq ".entities[] | select (.spec.name == \"${preload_image_name}\") | .metadata.uuid ")
+image_uuid=$(echo "${image_json}" | jq -r ".entities[] | select (.spec.name == \"${preload_image_name}\") | .metadata.uuid")
 
-if [[ -z "${image_uuid}" ]]; then
+if [[ -n "${image_uuid}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - preload image alread exist"
   # image_uuid
 else
