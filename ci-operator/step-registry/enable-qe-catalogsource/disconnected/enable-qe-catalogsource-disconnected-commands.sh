@@ -116,7 +116,7 @@ function disable_default_catalogsource () {
 
 # this func only used when the cluster not set the Proxy registy, such as C2S, SC2S clusters
 function mirror_optional_images () {
-    echo "Configuring credentials that allow images to be mirrored"
+    echo "#Configuring credentials that allow images to be mirrored"
     mirror_registry_cred_file="/var/run/vault/mirror-registry/registry_creds"
     mirror_registry_user=`cat $mirror_registry_cred_file|cut -d: -f1`
     mirror_registry_password=`cat $mirror_registry_cred_file|cut -d: -f2`
@@ -139,13 +139,13 @@ function mirror_optional_images () {
     export XDG_RUNTIME_DIR=$work_dir
     export REGISTRY_AUTH_FILE="$XDG_RUNTIME_DIR/containers/auth.json"
     # skopeo login create/update the REGISTRY_AUTH_FILE
-    echo "REGISTRY_AUTH_FILE is $REGISTRY_AUTH_FILE"
+    echo "#login ${MIRROR_REGISTRY_HOST},brew.registry.redhat.io,registry.redhat.io and quay.io/openshift-qe-optional-operators"
     skopeo login ${MIRROR_REGISTRY_HOST} -u ${mirror_registry_user} -p ${mirror_registry_password} --tls-verify=false
     skopeo login brew.registry.redhat.io -u ${brew_auth_user} -p ${brew_auth_password} --tls-verify=false
     skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
     skopeo login quay.io/openshift-qe-optional-operators -u ${optional_auth_user} -p ${optional_auth_password}
 
-    echo "skopeo copy docker://${origin_index_image} oci://${work_dir}/oci-local-catalog --remove-signatures"
+    echo "#skopeo copy docker://${origin_index_image} oci://${work_dir}/oci-local-catalog --remove-signatures"
 
     RETRY_COUNT=0
     MAX_RETRIES=3
@@ -170,8 +170,8 @@ function mirror_optional_images () {
         exit 1
     fi
 
-    echo "create ImageSetConfiguration"
-    cat <<EOF >${work_dir}/imageset-config.yaml
+    echo "#create ImageSetConfiguration imageset-config.yaml"
+    cat <<EOF |tee ${work_dir}/imageset-config.yaml
 kind: ImageSetConfiguration
 apiVersion: mirror.openshift.io/v1alpha2
 mirror:
@@ -182,7 +182,7 @@ mirror:
 EOF
     #OPERTORS_TO_MIRROR: comma-separated values. for example: elasticsearch-operator,cincinnati-operator,file-integrity-operator
     if [[ $OPERTORS_TO_MIRROR == "" ]]; then
-        echo "mirror all operators"
+        echo "#All operators will be mirrored"
     else 
 
         #only mirror images defined in Env OPERTORS_TO_MIRROR
@@ -193,7 +193,7 @@ EOF
     fi
     cat ${work_dir}/imageset-config.yaml
 
-    echo "create registry.conf"
+    echo "#create registry.conf"
     cat <<EOF |tee "${work_dir}/registry.conf"
 [[registry]]
  location = "registry.redhat.io"
