@@ -208,7 +208,7 @@ function check_signed() {
     try=0
     max_retries=3
     response=0
-    while (( try < max_retries && response != 200 )); do
+    while (( try < max_retries && response != 210 )); do
         echo "Trying #${try}"
         response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
