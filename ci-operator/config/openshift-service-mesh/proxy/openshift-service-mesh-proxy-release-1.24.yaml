@@ -73,6 +73,61 @@ tests:
       timeout: 8h0m0s
     workflow: servicemesh-proxy-e2e-aws
   timeout: 8h0m0s
+- always_run: false
+  as: envoy
+  optional: true
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      CI: "true"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.8xlarge
+      LOCAL_CPU_RESOURCES: "30"
+      LOCAL_JOBS: "30"
+      LOCAL_RAM_RESOURCES: "61440"
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.0
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-proxy-test-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        tar cf - . | oc exec -i -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- tar xf - -C /work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: envoy
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c \
+          "export CI=${CI}; \
+           export LOCAL_CPU_RESOURCES=${LOCAL_CPU_RESOURCES}; \
+           export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
+           export LOCAL_JOBS=${LOCAL_JOBS}; \
+          ./ossm/ci/pre-submit-envoy.sh"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: CI
+      - name: LOCAL_CPU_RESOURCES
+      - name: LOCAL_RAM_RESOURCES
+      - name: LOCAL_JOBS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 8h0m0s
+    workflow: servicemesh-proxy-e2e-aws
+  timeout: 8h0m0s
 - as: copy-artifacts-gcs
   postsubmit: true
   steps:
