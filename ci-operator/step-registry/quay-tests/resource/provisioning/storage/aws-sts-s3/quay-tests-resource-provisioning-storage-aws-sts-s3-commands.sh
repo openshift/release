@@ -114,10 +114,6 @@ output "secretkey" {
   value = aws_iam_access_key.quay.secret
 }
 
-output "user" {
-  value = aws_iam_user.quay.name
-}
-
 EOF
 
 echo "quay aws s3 bucket name is ${QUAY_AWS_STS_S3_BUCKET}"
@@ -139,7 +135,7 @@ echo "${QUAY_AWS_STS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
 terraform output role  > "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN"
 terraform output accesskey  > "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY"
 terraform output secretkey  > "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY"
-terraform output user  > "${SHARED_DIR}/QUAY_AWS_STS_USER"
+echo "$random"  > "${SHARED_DIR}/QUAY_AWS_STS_RANDOM"
 
 
 tar -cvzf terraform.tgz --exclude=".terraform" *
