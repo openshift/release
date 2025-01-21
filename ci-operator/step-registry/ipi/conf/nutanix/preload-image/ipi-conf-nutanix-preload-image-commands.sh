@@ -26,51 +26,63 @@ coreos_location=$(openshift-install coreos print-stream-json | jq -r '.architect
 coreos_release=$(openshift-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.nutanix.release')
 preload_image_name=qe-preload-$coreos_release.qcow2
 
-api_ep="${pc_url}/api/nutanix/v3/images"
 data="{
-  \"spec\": {
-    \"name\": \"$preload_image_name\",
-    \"resources\": {
-      \"image_type\": \"DISK_IMAGE\",
-      \"source_uri\": \"$coreos_location\"
-    }
-  },
-  \"metadata\": {
-    \"kind\": \"image\"
-  }
+  \"kind\": \"image\"
 }"
-import_image_json=$(curl -ks -u "${un}":"${pw}" -X POST "${api_ep}" -H "Content-Type: application/json" -d @-<<<"${data}")
+api_ep="${pc_url}/api/nutanix/v3/images/list"
+image_json=$(curl -ks -u "${un}":"${pw}" -X POST "${api_ep}" -H "Content-Type: application/json" -d @-<<<"${data}")
+image_uuid=$(echo "${image_json}" | jq ".entities[] | select (.spec.name == \"${preload_image_name}\") | .metadata.uuid ")
 
-task_uuid=$(echo "${import_image_json}" | jq -r ".status.execution_context.task_uuid")
-# image_uuid=$(echo "${import_image_json}" | jq -r ".metadata.uuid")
+if [[ -z "${image_uuid}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - preload image alread exist"
+  # image_uuid
+else
+  api_ep="${pc_url}/api/nutanix/v3/images"
+  data="{
+    \"spec\": {
+      \"name\": \"$preload_image_name\",
+      \"resources\": {
+        \"image_type\": \"DISK_IMAGE\",
+        \"source_uri\": \"$coreos_location\"
+      }
+    },
+    \"metadata\": {
+      \"kind\": \"image\"
+    }
+  }"
+  import_image_json=$(curl -ks -u "${un}":"${pw}" -X POST "${api_ep}" -H "Content-Type: application/json" -d @-<<<"${data}")
 
-api_ep="${pc_url}/api/nutanix/v3/tasks/$task_uuid"
-echo "task uuid: $api_ep"
-# api_ep="${pc_url}/api/nutanix/v3/images/$image_uuid"
-# delete_image_json=$(curl -ks -u "${un}":"${pw}" -X DELETE ${api_ep} -H "Content-Type: application/json")
-loops=0
-max_loops=10
-sleep_seconds=60
-while true
-do
-  echo "00000000000000"
-  task_json=$(curl -ks -u "${un}":"${pw}" -X GET "${api_ep}" -H "Content-Type: application/json")
-  task_status=$(echo "${task_json}" | jq -r ".status")
-  echo "task status: $task_status"
-  if [[ "$task_status" == "SUCCEEDED" ]]; then
-    echo "Image preload succeeded"
-    break
-  fi
-  if [[ "$loops" -ge "$max_loops" ]]; then
-    echo "Timeout, failed to preload image"
-    exit 1
-  fi
-  echo "Image preload is not succeeded yet, wait $sleep_seconds seconds"
-  # ((loops++))
-  loops=("$loops"+1)
-  echo "111111111111111111"
-  sleep $sleep_seconds
-done
+  task_uuid=$(echo "${import_image_json}" | jq -r ".status.execution_context.task_uuid")
+  # image_uuid=$(echo "${import_image_json}" | jq -r ".metadata.uuid")
+
+  api_ep="${pc_url}/api/nutanix/v3/tasks/$task_uuid"
+  echo "task uuid: $api_ep"
+  # api_ep="${pc_url}/api/nutanix/v3/images/$image_uuid"
+  # delete_image_json=$(curl -ks -u "${un}":"${pw}" -X DELETE ${api_ep} -H "Content-Type: application/json")
+  loops=0
+  max_loops=10
+  sleep_seconds=60
+  while true
+  do
+    echo "00000000000000"
+    task_json=$(curl -ks -u "${un}":"${pw}" -X GET "${api_ep}" -H "Content-Type: application/json")
+    task_status=$(echo "${task_json}" | jq -r ".status")
+    echo "task status: $task_status"
+    if [[ "$task_status" == "SUCCEEDED" ]]; then
+      echo "Image preload succeeded"
+      break
+    fi
+    if [[ "$loops" -ge "$max_loops" ]]; then
+      echo "Timeout, failed to preload image"
+      exit 1
+    fi
+    echo "Image preload is not succeeded yet, wait $sleep_seconds seconds"
+    # ((loops++))
+    loops=("$loops"+1)
+    echo "111111111111111111"
+    sleep $sleep_seconds
+  done
+fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
