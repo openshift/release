@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2154
 
 set -o nounset
 set -o errexit
@@ -30,7 +29,6 @@ default = "quay_prow_role"
 variable "aws_sts_user_name" {
 default = "quay_prow_automation"
 }
-
 EOF
 
 # role policy
@@ -99,7 +97,7 @@ resource "aws_iam_role_policy_attachment" "policy_attachment" {
 
 }
 
-output "role" {
+output "rolearn" {
   value = aws_iam_role.quay_ci_role.arn
 }
 output "accesskey" {
@@ -124,7 +122,7 @@ terraform apply -auto-approve || true
 #Share Terraform Var and Terraform Directory
 echo "$random"  > "${SHARED_DIR}/QUAY_AWS_STS_RANDOM"
 echo "${QUAY_AWS_STS_S3_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET"
-terraform output role  > "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN"
+terraform output rolearn  > "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN"
 terraform output accesskey  > "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY"
 terraform output secretkey  > "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY"
 

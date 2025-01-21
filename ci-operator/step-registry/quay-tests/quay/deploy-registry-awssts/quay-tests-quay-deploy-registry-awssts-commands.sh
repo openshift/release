@@ -93,6 +93,8 @@ spec:
     managed: true
 EOF
 
+sleep 300  # wait for pods to be ready
+
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
@@ -111,4 +113,4 @@ for i in {1..60}; do
   sleep 15
   echo "Wait for quay registry ready $((i*15))s"
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Timed out waiting for Quay to become ready afer 20 mins" >&2
