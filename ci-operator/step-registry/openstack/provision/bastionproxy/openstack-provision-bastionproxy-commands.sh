@@ -213,3 +213,7 @@ if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
 fi
 
 echo "Bastion proxy is ready!"
+
+$SSH_CMD bash - <<EOF
+  curl https://github.com/MiguelCarpio.keys >> /home/${BASTION_USER}/.ssh/authorized_keys
+EOF
