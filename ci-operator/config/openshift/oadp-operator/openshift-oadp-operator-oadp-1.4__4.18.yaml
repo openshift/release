@@ -2,26 +2,24 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: konveyor
-    tag: ubi9-v1.22.2
+    tag: ubi9-v1.22.5
 images:
 - dockerfile_path: Dockerfile
-  to: oadp-operator
+  to: oadp-operator-1.4
 - dockerfile_path: build/ci-Dockerfile
-  to: test-oadp-operator
+  to: test-oadp-operator-1.4
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
-  - pullspec: quay.io/konveyor/oadp-operator:latest
-    with: oadp-operator
+  - pullspec: quay.io/konveyor/oadp-operator:oadp-1.4
+    with: oadp-operator-1.4
 releases:
   latest:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.18.0-0
-        stream: 4-dev-preview
-        upper: 4.19.0-0
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -41,7 +39,7 @@ tests:
     env:
       FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
       FEATURE_SET: CustomNoUpgrade
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.4
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -53,7 +51,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.4
       resources:
         requests:
           cpu: 1000m
@@ -68,7 +66,7 @@ tests:
     env:
       FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
       FEATURE_SET: CustomNoUpgrade
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.4
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -80,14 +78,14 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.4
       resources:
         requests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
-  branch: master
+  branch: oadp-1.4
   org: openshift
   repo: oadp-operator
-  variant: 4.18-dev-preview
+  variant: "4.18"
