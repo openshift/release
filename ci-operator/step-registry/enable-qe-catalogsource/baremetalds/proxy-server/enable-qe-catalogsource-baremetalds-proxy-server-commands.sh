@@ -10,6 +10,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" "root@${IP}:/home/registry_creds_encrypted_htpasswd"
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_brew.json" "root@${IP}:/home/registry_brew.json"
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_quay_proxy.json" "root@${IP}:/home/registry_quay_proxy.json"
+scp "${SSHOPTS[@]}" "/etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username" "root@${IP}:/home/acm_d_mce_quay_username"
+scp "${SSHOPTS[@]}" "/etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret" "root@${IP}:/home/acm_d_mce_quay_pullsecret"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 set -eo pipefail
@@ -56,11 +58,38 @@ podman run -d --name poc-registry-6002 --net host --log-opt max-size=10mb \
   -e REGISTRY_PROXY_USERNAME="$(cat /home/registry_brew.json | jq '.user')" \
   -e REGISTRY_PROXY_PASSWORD="$(cat /home/registry_brew.json | jq -r '.password')" quay.io/openshifttest/registry:2
 
+echo "config quay.io/acmd proxy server"
+mkdir -p "${WORKING_DIR}"/registry-6003/{data,auth,certs}
+cp -r "${WORKING_DIR}"/registry/certs/* "${WORKING_DIR}"/registry-6003/certs
+cat "/home/registry_creds_encrypted_htpasswd" > "${WORKING_DIR}"/registry-6003/auth/htpasswd
+podman run -d --name poc-registry-6003 --net host --log-opt max-size=10mb \
+  -e REGISTRY_HTTP_ADDR=:6003 \
+  -v "${WORKING_DIR}"/registry-6003:/var/lib/registry:z \
+  -v "${WORKING_DIR}"/registry-6003/auth:/auth \
+  -e REGISTRY_STORAGE_DELETE_ENABLED=true \
+  -e REGISTRY_AUTH=htpasswd \
+  -e REGISTRY_AUTH_HTPASSWD_REALM='Registry Realm' \
+  -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+  -v "${WORKING_DIR}"/registry-6003/certs:/certs:z \
+  -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/"${REGISTRY_CRT}" \
+  -e REGISTRY_HTTP_TLS_KEY=/certs/registry.2.key \
+  -e REGISTRY_PROXY_REMOTEURL="https://quay.io" \
+  -e REGISTRY_PROXY_USERNAME="$(cat /home/acm_d_mce_quay_username)" \
+  -e REGISTRY_PROXY_PASSWORD="$(cat /home/acm_d_mce_quay_pullsecret)" quay.io/openshifttest/registry:2
+
 echo "update firewall"
 sudo firewall-cmd --zone=libvirt --add-port=6001/tcp
 sudo firewall-cmd --zone=libvirt --add-port=6002/tcp
+sudo firewall-cmd --zone=libvirt --add-port=6003/tcp
 EOF
 
 if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
   oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
 fi
+
+oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+jq --argjson a "{\"$(sed 's/5000/6003/g' < "${SHARED_DIR}/mirror_registry_url" | head -n 1)\": {\"auth\": \"$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)\"}}" \
+    '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
+sleep 60
+oc wait mcp master worker --for condition=updated --timeout=20m
