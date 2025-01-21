@@ -87,6 +87,9 @@ CONFIG = {
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
+    'metal-perfscale-telco-quota-slice': {
+        'metal-perfscale-telco-rdu2': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -263,7 +266,7 @@ CONFIG = {
         'default': 2,
     },
     'openstack-hwoffload-quota-slice': {
-        'default': 5,
+        'default': 3,
     },
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
@@ -275,10 +278,10 @@ CONFIG = {
         'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
