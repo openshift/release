@@ -9,6 +9,8 @@ oc config view
 oc projects
 python --version
 
+export ES_PASSWORD=$(cat "/secret/password")
+export ES_USERNAME=$(cat "/secret/username")
 
 # If running from the one folder, will reset SCRIPT and PARAMETERS variables
 export SCRIPT=${SCRIPT_1:-$SCRIPT}
