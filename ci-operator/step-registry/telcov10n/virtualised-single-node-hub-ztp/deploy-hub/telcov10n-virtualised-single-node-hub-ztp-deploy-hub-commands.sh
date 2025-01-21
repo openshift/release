@@ -26,10 +26,6 @@ function load_env {
   CLUSTER_B64_PULL_SECRET="$(cat /var/run/telcov10n-ztp-left-shifting/b64-pull-secret)"
   export CLUSTER_B64_PULL_SECRET
 
-  #### Console password
-  VM_PASSWD="$(cat /var/run/telcov10n-ansible-group-all/ansible_password)"
-  export VM_PASSWD
-
   #### Bastion user
   BASTION_VHUB_HOST_USER="$(cat /var/run/telcov10n-ansible-group-all/ansible_user)"
   export BASTION_VHUB_HOST_USER
@@ -57,6 +53,24 @@ function load_env {
   #### VM
   VM_HUB_ZTP_POOL_PATH="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
   export VM_HUB_ZTP_POOL_PATH
+
+  #### Resources details
+  VM_CPUS="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpu)"
+  export VM_CPUS
+
+  VM_MEM="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_ram)"
+  export VM_MEM
+
+  vm_disk_list="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_disks)"
+  VM_DISKS="$(echo ${vm_disk_list} | jq --compact-output)"
+  export VM_DISKS
+
+  # HUB_CLUSTER_OPERATORS="$(echo ${OPERATORS} | jq --compact-output '[.[].name]')"
+  export VM_PASSWD
+
+  #### Console password
+  VM_PASSWD="$(cat /var/run/telcov10n-ansible-group-all/ansible_password)"
+  export VM_PASSWD
 
   # shellcheck disable=SC2089
   VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('2') | ansible.utils.ipv4('address') }}"
@@ -183,24 +197,13 @@ all:
                   - "{{ lookup('ansible.builtin.env', 'CLUSTER_SSH_PUB_KEY') }}"
                 ctlplanes: 1
                 workers: 0
-                memory: 96000
-                numcpus: 48
-                disks:
-                  - 200
-                  - 100
-                  - 100
-                  - 100
-                  - 100
+                memory: ${VM_MEM}
+                numcpus: ${VM_CPUS}
+                disks: ${VM_DISKS}
                 base64_pull_secret: "{{ lookup('ansible.builtin.env', 'CLUSTER_B64_PULL_SECRET') }}"
                 api_ip: "${HUB_CLUSTER_API_IPv4}"
                 ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
                 apps: ${HUB_CLUSTER_OPERATORS}
-                  # - local-storage-operator
-                  # - lvms-operator
-                  # - openshift-gitops-operator
-                  # - advanced-cluster-management
-                  # - topology-aware-lifecycle-manager
-                  # - multicluster-engine
                 vmrules:
                 - ${HUB_CLUSTER_NAME}-bootstrap:
                     rootpassword: "{{ lookup('ansible.builtin.env', 'VM_PASSWD') }}"
