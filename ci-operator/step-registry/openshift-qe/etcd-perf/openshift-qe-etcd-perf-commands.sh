@@ -108,7 +108,7 @@ EOF
 
   for i in ` oc -n openshift-etcd get pods | grep etcd-ip |awk '{print $1}'`; do oc -n openshift-etcd exec $i -- etcdctl endpoint health; done
   export KUBECONFIG=/tmp/secret/kubeconfig
-  export adminpassword=${adminpassword:=""}
+  adminpassword=${adminpassword:=""}
   if [[ -s /tmp/secret/kubeadmin-password ]];then adminpassword=`cat /tmp/secret/kubeadmin-password`; fi
   APIURL=`grep 'server:' /tmp/secret/kubeconfig | awk -F 'server:' '{print $2}'`
   oc login $APIURL -u kubeadmin -p $adminpassword
