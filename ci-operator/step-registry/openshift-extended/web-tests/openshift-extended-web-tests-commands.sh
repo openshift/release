@@ -33,15 +33,9 @@ else
   elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
     echo 'Run WRS testing'
     ./console-test-frontend.sh --tags @wrs || true
-  elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
-    echo "run all compliance-operator scenarios"
-    ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
-  elif [[ $E2E_RUN_TAGS =~ @fio ]]; then
-    echo "run all file-integrity-operator scenarios"
-    ./console-test-frontend.sh --spec tests/securityandcompliance/file-integirty-operator.cy.ts || true
-  elif [[ $E2E_RUN_TAGS =~ @spo ]]; then
-    echo "run all security profiles operator scenarios"
-    ./console-test-frontend.sh --spec tests/securityandcompliance/security-profiles-operator.cy.ts || true
+  elif [[ $E2E_RUN_TAGS =~ @isc ]]; then
+    echo "run all isc tests"
+    ./console-test-frontend.sh --tags @isc || true
   elif [[ "X${FEATURE_SET}X" == 'XTechPreviewNoUpgradeX' ]]; then
     echo 'Run Tech Preview cases'
     ./console-test-frontend.sh --tags @techpreview || true

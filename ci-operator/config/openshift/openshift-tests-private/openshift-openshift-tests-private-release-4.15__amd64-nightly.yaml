@@ -2300,18 +2300,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
-  cron: 42 17 16 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~HyperShiftMGMT
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
-      TEST_TIMEOUT: "20"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-secureboot-confidential-computing-f14
   cron: 20 6 2,18 * *
   steps:
@@ -2893,20 +2881,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
-- as: vsphere-ipi-ovn-dualstack-f28-compliance
-  cron: 21 9 20 * *
+- as: vsphere-ipi-ovn-dualstack-privmaryv6-f28-isc
+  cron: 35 18 13 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
-      E2E_RUN_TAGS: '@complianceoperator'
+      E2E_RUN_TAGS: '@isc'
       FILTERS_ADDITIONAL: ""
-      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest
+      IP_FAMILIES: DualStackIPv6Primary
+      TEST_FILTERS: ~HyperShiftMGMT&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Compliance_Operator
+      TEST_SCENARIOS: Compliance_Operator|File_Integrity_Operator|Security_Profiles_Operator
       TEST_TIMEOUT: "40"
     test:
     - ref: etcd-encryption
-    - ref: openshift-extended-test
+    - ref: openshift-extended-test-disruptive
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
