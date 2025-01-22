@@ -88,14 +88,14 @@ echo "JOB SPECS are $JOB_SPEC"
 
 
 # Added for temporary debugging, Check if the file exists and show the content of the file
-FILE_PATH="${SECRETS_PATH}/${REGISTRY_SECRET_FILE}"
-export FILE_PATH
-if [ -f "$FILE_PATH" ]; then
-    echo "Contents of the file $FILE_PATH:"
-    cat "$FILE_PATH"  # Display the file content
-else
-    echo "File $FILE_PATH does not exist."
-fi
+#FILE_PATH="${SECRETS_PATH}/${REGISTRY_SECRET_FILE#}"
+#export FILE_PATH
+#if [ -f "$FILE_PATH" ]; then
+#    echo "Contents of the file $FILE_PATH:"
+#    cat "$FILE_PATH"  # Display the file content
+#else
+#    echo "File $FILE_PATH does not exist."
+#fi
 
 # Get credentials for quay repo
 DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
