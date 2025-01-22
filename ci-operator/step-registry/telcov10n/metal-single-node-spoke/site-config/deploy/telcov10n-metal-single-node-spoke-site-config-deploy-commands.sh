@@ -86,10 +86,10 @@ function generate_network_config {
 
 function get_storage_class_name {
 
-  echo "Get the Storage Class name to be used..."
+  echo "************ telcov10n Get the Storage Class name to be used ************"
 
-  if [ -z "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
-    cat <<EOF | oc apply -f -
+  if [ -n "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
+    cat <<EOF | oc create -f - 2>/dev/null || { set -x ; oc -n openshift-storage get LVMCluster lvmcluster -oyaml ; set +x ; }
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
