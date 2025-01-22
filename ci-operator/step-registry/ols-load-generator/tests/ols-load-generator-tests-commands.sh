@@ -17,11 +17,12 @@ job_status=""
 uuid=""
 workload="ols-load-generator"
 es_server="https://${ES_USERNAME}:${ES_PASSWORD}@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
+additional_attributes='{}'
 
 # Function to log job fingerprint
 log_fingerprint() {
   pushd e2e-benchmarking/utils
-  env JOB_START="$job_start" JOB_END="$job_end" JOB_STATUS="$job_status" UUID="$uuid" WORKLOAD="$workload" ES_SERVER="$es_server" ./index.sh
+  env JOB_START="$job_start" JOB_END="$job_end" JOB_STATUS="$job_status" UUID="$uuid" WORKLOAD="$workload" ES_SERVER="$es_server" ADDITIONAL_ATTRIBUTES="$additional_attributes" ./index.sh
   popd
 }
 
@@ -51,6 +52,7 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   job_status="success"
   job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   job_end=""
+  additional_attributes='{"ols_test_workers": '"${OLS_TEST_WORKERS}"', "ols_test_duration": "'"$OLS_TEST_DURATION"'"}'
 
   # Create namespace and set monitoring labels
   run_or_fail oc create namespace openshift-lightspeed
