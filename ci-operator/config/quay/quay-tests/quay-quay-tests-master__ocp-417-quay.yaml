@@ -128,6 +128,25 @@ tests:
     - ref: quay-tests-quay-deploy-registry-builder
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay313-ocp417-aws-sts
+  cron: 0 22 * * 0
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:894318
+      QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_STORAGE_PROVIDER: awssts
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-aws-sts-s3
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-awssts
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
