@@ -63,7 +63,6 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     export TF_VAR_aws_sts_user_name="${QUAY_AWS_STS_USER}"
 
     echo "Start to destroy quay aws sts ..."
-
     terraform init
     terraform destroy -auto-approve || true
 fi
