@@ -88,7 +88,7 @@ function get_storage_class_name {
 
   echo "Get the Storage Class name to be used..."
 
-  if [ -n "$(oc get pod -A | grep "openshift-storage.*lvms-operator" || echo)" ];then
+  if [ -z "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
     cat <<EOF | oc apply -f -
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
@@ -106,9 +106,9 @@ spec:
         overprovisionRatio: 10
         sizePercent: 90
 EOF
-    #sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
-    sc_name="lvms-vg1"
     set -x
+    sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
+    # sc_name="lvms-vg1"
     attempts=0
     while sleep 10s ; do
       oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break

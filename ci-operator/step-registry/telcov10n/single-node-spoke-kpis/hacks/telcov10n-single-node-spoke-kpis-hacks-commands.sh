@@ -22,18 +22,18 @@ function update_host_and_master_yaml_files {
   echo "************ telcov10n update host and master Yaml files ************"
 
   # ${SHARED_DIR}/hosts.yaml file expected values to be available:
-  server_hostname="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/name)"
-  redfish_scheme="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_scheme)"
-  bmc_address="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/bmc_address)"
-  redfish_base_uri="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_base_uri)"
-  mac="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
-  root_device="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_device)"
-  root_dev_hctl="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_dev_hctl)"
-  baremetal_iface="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/baremetal_iface)"
-  ipi_disabled_ifaces="$(cat /var/run/helix72-telcoqe-eng-rdu2-dc-redhat-com/ipi_disabled_ifaces)"
+  server_hostname="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/name)"
+  redfish_scheme="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_scheme)"
+  bmc_address="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/bmc_address)"
+  redfish_base_uri="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_base_uri)"
+  mac="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
+  root_device="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_device)"
+  root_dev_hctl="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_dev_hctl)"
+  baremetal_iface="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/baremetal_iface)"
+  ipi_disabled_ifaces="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/ipi_disabled_ifaces)"
 
-  bmc_user="$(cat /var/run/telcov10n-ansible-group-all/bmc_user)"
-  bmc_pass="$(cat /var/run/telcov10n-ansible-group-all/bmc_password)"
+  bmc_user="$(cat /var/run/telcov10n/ansible-group-all/bmc_user)"
+  bmc_pass="$(cat /var/run/telcov10n/ansible-group-all/bmc_password)"
 
   cat <<EOF >| ${SHARED_DIR}/hosts.yaml
 - mac: ${mac}
@@ -60,7 +60,7 @@ function update_base_domain {
 
   echo "************ telcov10n update base domain ************"
 
-  cluster_base_domain="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
+  cluster_base_domain="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
   set -x
   echo -n "${cluster_base_domain}" >| ${SHARED_DIR}/base_domain
   set +x

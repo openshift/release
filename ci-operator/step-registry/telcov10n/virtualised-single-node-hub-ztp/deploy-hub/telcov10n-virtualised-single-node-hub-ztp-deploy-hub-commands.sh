@@ -19,25 +19,25 @@ function load_env {
   chmod 600 ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
 
   #### SSH Public key
-  CLUSTER_SSH_PUB_KEY="$(cat /var/run/telcov10n-ansible-group-all/ssh_public_key)"
+  CLUSTER_SSH_PUB_KEY="$(cat /var/run/telcov10n/ansible-group-all/ssh_public_key)"
   export CLUSTER_SSH_PUB_KEY
 
   #### Pull secret encoded in base64
-  CLUSTER_B64_PULL_SECRET="$(cat /var/run/telcov10n-ztp-left-shifting/b64-pull-secret)"
+  CLUSTER_B64_PULL_SECRET="$(cat /var/run/telcov10n/ztp-left-shifting/b64-pull-secret)"
   export CLUSTER_B64_PULL_SECRET
 
   #### Bastion user
-  BASTION_VHUB_HOST_USER="$(cat /var/run/telcov10n-ansible-group-all/ansible_user)"
+  BASTION_VHUB_HOST_USER="$(cat /var/run/telcov10n/ansible-group-all/ansible_user)"
   export BASTION_VHUB_HOST_USER
 
   #### Network setup
-  NETWORK_NIC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_external_nic)"
+  NETWORK_NIC="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_external_nic)"
   export NETWORK_NIC
 
-  NETWORK_BRIDGE_NAME="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bridge_name)"
+  NETWORK_BRIDGE_NAME="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bridge_name)"
   export NETWORK_BRIDGE_NAME
 
-  NETWORK_IPv4_SUBNET="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_subnet)"
+  NETWORK_IPv4_SUBNET="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_subnet)"
   export NETWORK_IPv4_SUBNET
 
   # shellcheck disable=SC2089
@@ -51,22 +51,22 @@ function load_env {
   export NETWORK_BRIDGE_GW_IPv4
 
   #### VM
-  VM_HUB_ZTP_POOL_PATH="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
+  VM_HUB_ZTP_POOL_PATH="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
   export VM_HUB_ZTP_POOL_PATH
 
   #### Resources details
-  VM_CPUS="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpu)"
+  VM_CPUS="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpu)"
   export VM_CPUS
 
-  VM_MEM="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_ram)"
+  VM_MEM="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_ram)"
   export VM_MEM
 
-  vm_disk_list="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_disks)"
+  vm_disk_list="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_disks)"
   VM_DISKS="$(echo ${vm_disk_list} | jq --compact-output)"
   export VM_DISKS
 
   #### Console password
-  VM_PASSWD="$(cat /var/run/telcov10n-ansible-group-all/ansible_password)"
+  VM_PASSWD="$(cat /var/run/telcov10n/ansible-group-all/ansible_password)"
   export VM_PASSWD
 
   # shellcheck disable=SC2089
@@ -97,7 +97,7 @@ function load_env {
   HUB_CLUSTER_TAG="${OCP_HUB_VERSION}"
   export HUB_CLUSTER_TAG
 
-  CLUSTER_BASE_DOMAIN="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
+  CLUSTER_BASE_DOMAIN="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
   export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
@@ -119,7 +119,7 @@ function load_env {
   SPOKE_CLUSTER_NAME="spoke-${OCP_SPOKE_VERSION//./-}"
   export SPOKE_CLUSTER_NAME
 
-  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
+  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
   export BAREMETAL_SPOKE_CLUSTER_NIC_MAC
 
   # shellcheck disable=SC2089
