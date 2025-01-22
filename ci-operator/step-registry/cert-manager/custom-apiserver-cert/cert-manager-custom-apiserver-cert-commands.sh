@@ -4,27 +4,57 @@ set -e
 set -u
 set -o pipefail
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-    echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
-fi
+function timestamp() {
+    date -u --rfc-3339=seconds
+}
 
-CLUSTERISSUER_NAME=cluster-certs-clusterissuer
-if [[ ! "$(oc get --no-headers clusterissuer $CLUSTERISSUER_NAME)" =~ True ]]; then
-    echo "The prerequsite clusterissuer $CLUSTERISSUER_NAME is not ready. Please ensure the cert-manager-clusterissuer ref is executed first."
-    exit 1
-fi
+function run_command() {
+    local cmd="$1"
+    echo "Running Command: ${cmd}"
+    eval "${cmd}"
+}
 
-TMP_DIR=/tmp/cert-manager-api-commands-tmp-dir
-mkdir -p $TMP_DIR
-cd $TMP_DIR
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "Setting proxy configuration..."
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "No proxy settings found. Skipping proxy configuration..."
+    fi
+}
 
-# Apiserver uses port 6443 in convention. Therefore we configure "port: 6443" for the alternative Apiserver FQDN (NEW_API_FQDN) too.
-oc create -f - << EOF
+function wait_for_state() {
+    local object="$1"
+    local state="$2"
+    local timeout="$3"
+    local namespace="${4:-}"
+    local selector="${5:-}"
+
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
+    for _ in {1..30}; do
+        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+    done
+
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
+    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+}
+
+function check_clusterissuer() {
+    echo "Checking the persence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
+    if ! oc wait clusterissuer/$CLUSTERISSUER_NAME --for=condition=Ready --timeout=0; then
+        echo "ClusterIssuer is not created or not ready to use. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
+function configure_alt_apiserver_endpoint() {
+    echo "Creating a LoadBalancer service for the alternative API Server endpoint..."
+    # API Server uses port 6443 in convention. Thus we configure "port: 6443" for the alternative API Server FQDN (NEW_API_FQDN) as well.
+    oc apply -f - << EOF
 apiVersion: v1
 kind: Service
 metadata:
-  name: cert-manager-managed-alt-apiserver
+  name: alt-apiserver-endpoint
   namespace: openshift-kube-apiserver
 spec:
   ports:
@@ -37,78 +67,54 @@ spec:
   type: LoadBalancer
 EOF
 
-# Wait for the LoadBalancer service status to become ready
-MAX_RETRY=20
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking the LoadBalancer service's status for the #${COUNTER}-th time ..."
-    EXTERNAL_IP_OUTPUT=$(oc get service cert-manager-managed-alt-apiserver -n openshift-kube-apiserver -o jsonpath='{.status.loadBalancer.ingress}')
-    if grep -q '"ip"' <<< "$EXTERNAL_IP_OUTPUT"; then
-        EXTERNAL_IP=$(oc get service cert-manager-managed-alt-apiserver -n openshift-kube-apiserver -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        RECORD_TYPE=A
-        break
-    elif grep -q '"hostname"' <<< "$EXTERNAL_IP_OUTPUT"; then
-        EXTERNAL_IP=$(oc get service cert-manager-managed-alt-apiserver -n openshift-kube-apiserver -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-        RECORD_TYPE=CNAME
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The LoadBalancer service's status does not show either ip or hostname after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get service cert-manager-managed-alt-apiserver -n openshift-kube-apiserver -o jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+    echo "Retrieving the created LoadBalancer ingress's Hostname or IP..."
+    for _ in {1..30}; do
+        EXTERNAL_IP=$(oc get service alt-apiserver-endpoint -n openshift-kube-apiserver -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        if [[ -n "${EXTERNAL_IP}" ]]; then
+            RECORD_TYPE=CNAME
+            break
+        fi
 
-BASE_DOMAIN=$(oc get dns cluster -o=jsonpath='{.spec.baseDomain}')
-ORIGINAL_API_FQDN=$(oc whoami --show-server | sed -e 's|https://||' -e 's/:6443//')
-NEW_API_FQDN=alt-api.${BASE_DOMAIN}
+        EXTERNAL_IP=$(oc get service alt-apiserver-endpoint -n openshift-kube-apiserver -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        if [[ -n "${EXTERNAL_IP}" ]]; then
+            RECORD_TYPE=A
+            break
+        fi
 
-oc create -f - << EOF
+        sleep 5
+    done
+    if [[ -z "${EXTERNAL_IP}" ]]; then
+        echo "Timed out wait for Hostname or IP to be created. Skipping rest of steps..."
+        exit 0
+    fi
+
+    echo "Creating DNSRecord for the alternative API Server endpoint..."
+    oc apply -f - << EOF
 apiVersion: ingress.operator.openshift.io/v1
 kind: DNSRecord
 metadata:
-  name: cert-manager-managed-alt-apiserver
+  name: alt-apiserver-endpoint
   namespace: openshift-ingress-operator
 spec:
   dnsManagementPolicy: Managed
   dnsName: "${NEW_API_FQDN}."
   recordTTL: 30
-  recordType: ${RECORD_TYPE}
+  recordType: $RECORD_TYPE
   targets:
   - ${EXTERNAL_IP}
 EOF
 
-# Wait for the dnsrecord status to become ready
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking the cert-manager-managed-alt-apiserver dnsrecord status for the #${COUNTER}-th time ..."
-    DNSRECORD_STATUS="$(oc get dnsrecord cert-manager-managed-alt-apiserver -n openshift-ingress-operator '-o=jsonpath={.status.zones[*].conditions[?(@.type=="Published")].status}')"
-    if [[ ! "$DNSRECORD_STATUS" =~ False ]]; then
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The cert-manager-managed-alt-apiserver dnsrecord status is still not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get dnsrecord cert-manager-managed-alt-apiserver -n openshift-ingress-operator -o jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+    echo "Waiting for the DNSRecord to become Published..."
+    oc wait dnsrecord alt-apiserver-endpoint -n openshift-ingress-operator --for=jsonpath='{.status.zones[0].conditions[?(@.type=="Published")].status}'=True --timeout=2m
+}
 
-CERT_NAME=alt-api-cert
-oc create -f - << EOF
+function create_apiserver_certificate() {
+    oc apply -f - << EOF
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: $CERT_NAME
-  namespace: openshift-config
+  namespace: $CERT_NAMESPACE
 spec:
   commonName: "$NEW_API_FQDN"
   dnsNames:
@@ -118,117 +124,85 @@ spec:
   issuerRef:
     kind: ClusterIssuer
     name: $CLUSTERISSUER_NAME
-  secretName: cert-manager-managed-alt-api-tls
-# privateKey:
-#   rotationPolicy: Always # Venafi required this
+  secretName: $CERT_SECRET_NAME
+  privateKey:
+    rotationPolicy: Always
   duration: 2h
   renewBefore: 1h30m
 EOF
 
-# Wait for the certificate status to become ready
-MAX_RETRY=15
-INTERVAL=20
-COUNTER=0
-while :;
-do
-    echo "Checking the $CERT_NAME certificate status for the #${COUNTER}-th time ..."
-    if [[ "$(oc get --no-headers certificate $CERT_NAME -n openshift-config)" =~ True ]]; then
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The $CERT_NAME certificate status is still not ready after $((MAX_RETRY * INTERVAL)) seconds."
-        echo "Dumping the certificate status:"
-        oc get certificate $CERT_NAME -n openshift-config -o jsonpath='{.status}'
-        echo "Dumping the challenge status:"
-        oc get challenge -n openshift-config -o wide
+    if wait_for_state "certificate/$CERT_NAME" "condition=Ready" "5m" "$CERT_NAMESPACE"; then
+        echo "Certificate is ready"
+    else
+        echo "Timed out after 5m. Dumping resources for debugging..."
+        run_command "oc describe certificate $CERT_NAME -n $CERT_NAMESPACE"
         exit 1
     fi
-    sleep $INTERVAL
-done
+}
 
-# The CA_FILE will be used later to update KUBECONFIG
-oc extract secret/cert-manager-managed-alt-api-tls -n openshift-config
-CA_FILE=ca.crt
-if [ ! -f ca.crt ]; then
-    CA_FILE=tls.crt
-fi
+function configure_apiserver_default_cert() {
+    echo "Patching the issued TLS secret to API Server's spec..."
+    local json_path='{"spec":{"servingCerts": {"namedCertificates": [{"names": ["'"$NEW_API_FQDN"'"], "servingCertificate": {"name": "'"$CERT_SECRET_NAME"'"}}]}}}' 
+    oc patch apiserver cluster --type=merge -p "$json_path"
 
-oc patch apiserver cluster --type=merge -p "
-spec:
-  servingCerts:
-    namedCertificates:
-    - names:
-      - $NEW_API_FQDN
-      servingCertificate:
-        name: cert-manager-managed-alt-api-tls
-"
+    echo "[$(timestamp)] Waiting for the Kube API Server ClusterOperator to finish rollout..."
+    oc wait co kube-apiserver --for=condition=Progressing=True --timeout=5m
+    oc wait co kube-apiserver --for=condition=Progressing=False --timeout=20m
+    echo "[$(timestamp)] Rollout progress completed"
+}
 
-# Wait for the clusteroperator kube-apiserver to start rollout
-# Note, if $NEW_API_FQDN is $ORIGINAL_API_FQDN other than an alternative FQDN, all oc commands afterwards need to add the --insecure-skip-tls-verify flag before the KUBECONFIG is updated later
-MAX_RETRY=20
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking if clusteroperator kube-apiserver rollout has started for the #${COUNTER}-th time ..."
-    if [ "$(oc get clusteroperator kube-apiserver -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" == True ]; then
-        echo "The clusteroperator kube-apiserver Progressing status becomes True, indicates rollout has started." && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The clusteroperator kube-apiserver rollout did not start after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusteroperator kube-apiserver -o=jsonpath='{.status.conditions[?(@.type=="Progressing")]}'
+function extract_ca_from_secret() {
+    echo "Extracting the CA certificate from the issued TLS secret to local folder..."
+    oc extract secret/"$CERT_SECRET_NAME" -n $CERT_NAMESPACE
+    CA_FILE=$( [ -f ca.crt ] && echo "ca.crt" || echo "tls.crt" )
+}
+
+function validate_serving_cert() {
+    echo "Validating the serving certificate of '$NEW_API_URL'..."
+    output=$(curl -I -v --cacert $CA_FILE --connect-timeout 30 "$NEW_API_FQDN" 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "The certificate is served by API Server as expected"
+    else
+        echo "Failed curl validation. Curl output: '$output'"
         exit 1
     fi
-    sleep $INTERVAL
-done
+}
 
-MAX_RETRY=50 # kube-apiserver rollout needs long time
-INTERVAL=30
-COUNTER=0
-while :;
-do
-    echo "Checking if clusteroperator kube-apiserver rollout finished for the #${COUNTER}-th time ..."
-    if [ "$(oc get --no-headers clusteroperator kube-apiserver | awk '{print $3 $4 $5}')" == TrueFalseFalse ]; then
-        echo 'The clusteroperator kube-apiserver status becomes "True False False", indicates rollout finished.' && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The clusteroperator kube-apiserver status is not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusteroperator kube-apiserver -o=jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+function update_kubeconfig_ca() {
+    echo "Backing up the old KUBECONFIG file..."
+    run_command "cp -f $KUBECONFIG $KUBECONFIG.old"
 
-echo "Validating the cert-manager customized Apiserver serving certificate."
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    CURL_OUTPUT=$(curl -IsS -v --cacert $CA_FILE --connect-timeout 30 "https://$NEW_API_FQDN:6443" 2>&1 || true)
-    if [[ "$CURL_OUTPUT" =~ "HTTP/2 403" ]]; then
-        echo "The customized certificate is serving as expected." && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo -e "Timeout after $((MAX_RETRY * INTERVAL)) seconds waiting for curl validation succeeded. Dumping the curl output:\n${CURL_OUTPUT}."
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+    echo "Appending the CA data of KUBECONFIG with the new CA certificate..."
+    CA_DATA=$(grep certificate-authority-data "$KUBECONFIG".old | awk '{print $2}' | base64 -d)
+    cat "$CA_FILE" >> <(echo "$CA_DATA")
+    NEW_CA_DATA=$(echo "$CA_DATA" | base64 -w0)
+    sed -i "s/certificate-authority-data:.*$/certificate-authority-data: $NEW_CA_DATA/" "$KUBECONFIG"
 
-# Update KUBECONFIG WRT CA of Apiserver certificate
-cp "$KUBECONFIG" "$KUBECONFIG".before-custom-api.bak
-oc config view --minify --raw --kubeconfig "$KUBECONFIG".before-custom-api.bak > "$KUBECONFIG"
-grep certificate-authority-data "$KUBECONFIG" | awk '{print $2}' | base64 -d > origin-ca.crt
-cat $CA_FILE >> origin-ca.crt
-NEW_CA_DATA=$(base64 -w0 origin-ca.crt)
-sed -i "s/certificate-authority-data:.*$/certificate-authority-data: $NEW_CA_DATA/" "$KUBECONFIG"
-sed -i "s/$ORIGINAL_API_FQDN/$NEW_API_FQDN/" "$KUBECONFIG" # In case NEW_API_FQDN != ORIGINAL_API_FQDN
-echo "[$(date -u --rfc-3339=seconds)] The KUBECONFIG content is updated with CA of new Apiserver certificate."
+    echo "Validating the updated KUBECONFIG using any of oc command"
+    run_command "oc get pod -n openshift-kube-apiserver -L revision -l apiserver"
+}
 
-echo "Validating the updated KUBECONFIG using any oc command."
-oc get po -n openshift-kube-apiserver -L revision -l apiserver
+timestamp
+set_proxy
+check_clusterissuer
+
+CERT_NAME=custom-apiserver-cert
+CERT_NAMESPACE=openshift-config
+CERT_SECRET_NAME=cert-manager-managed-apiserver-cert-tls
+BASE_DOMAIN=$(oc get dns cluster -o=jsonpath='{.spec.baseDomain}')
+NEW_API_FQDN=alt-api.${BASE_DOMAIN}
+NEW_API_URL=https://${NEW_API_FQDN}:6443
+
+configure_alt_apiserver_endpoint
+create_apiserver_certificate
+configure_apiserver_default_cert
+
+TMP_DIR=/tmp/cert-manager-custom-apiserver-cert
+mkdir -p "$TMP_DIR"
+cd "$TMP_DIR"
+
+extract_ca_from_secret
+validate_serving_cert
+update_kubeconfig_ca
+
+echo "[$(timestamp)] Succeeded in adding cert-manager managed certificates to the alternative API Server as named certificate!"

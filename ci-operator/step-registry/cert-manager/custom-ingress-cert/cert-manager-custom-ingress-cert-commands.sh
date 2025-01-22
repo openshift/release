@@ -4,154 +4,144 @@ set -e
 set -u
 set -o pipefail
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-    echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
-fi
+function timestamp() {
+    date -u --rfc-3339=seconds
+}
 
-CLUSTERISSUER_NAME=cluster-certs-clusterissuer
-if [[ ! "$(oc get --no-headers clusterissuer $CLUSTERISSUER_NAME)" =~ True ]]; then
-    echo "The prerequsite clusterissuer $CLUSTERISSUER_NAME is not ready. Please ensure the cert-manager-clusterissuer ref is executed first."
-    exit 1
-fi
+function run_command() {
+    local cmd="$1"
+    echo "Running Command: ${cmd}"
+    eval "${cmd}"
+}
 
-TMP_DIR=/tmp/cert-manager-ingress-commands-tmp-dir
-mkdir -p $TMP_DIR
-cd $TMP_DIR
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "Setting proxy configuration..."
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "No proxy settings found. Skipping proxy configuration..."
+    fi
+}
 
-INGRESS_DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
-CERT_NAME=custom-ingress-cert
-oc create -f - << EOF
+function wait_for_state() {
+    local object="$1"
+    local state="$2"
+    local timeout="$3"
+    local namespace="${4:-}"
+    local selector="${5:-}"
+
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
+    for _ in {1..30}; do
+        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+    done
+
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
+    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    return $?
+}
+
+function check_clusterissuer() {
+    echo "Checking the persence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
+    if ! oc wait clusterissuer/$CLUSTERISSUER_NAME --for=condition=Ready --timeout=0; then
+        echo "ClusterIssuer is not created or not ready to use. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
+function create_ingress_certificate () {
+    echo "Creating the wildcard certificate for the Ingress Controller..."
+    oc apply -f - << EOF
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: $CERT_NAME
-  namespace: openshift-ingress
+  namespace: $CERT_NAMESPACE
 spec:
-  commonName: "*.$INGRESS_DOMAIN"
+  commonName: "*.${INGRESS_DOMAIN}"
   dnsNames:
-  - "*.$INGRESS_DOMAIN"
+  - "*.${INGRESS_DOMAIN}"
   usages:
   - server auth
   issuerRef:
     kind: ClusterIssuer
     name: $CLUSTERISSUER_NAME
-  secretName: cert-manager-managed-ingress-cert-tls
-# privateKey:
-#   rotationPolicy: Always # Venafi need this
+  secretName: $CERT_SECRET_NAME
+  privateKey:
+    rotationPolicy: Always
   duration: 2h
   renewBefore: 1h30m
 EOF
 
-# Wait for the certificate status to become ready
-MAX_RETRY=30
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking the $CERT_NAME certificate status for the #${COUNTER}-th time ..."
-    if [[ "$(oc get --no-headers certificate $CERT_NAME -n openshift-ingress)" =~ True ]]; then
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The $CERT_NAME certificate status is still not ready after $((MAX_RETRY * INTERVAL)) seconds."
-        echo "Dumping the certificate status:"
-        oc get certificate $CERT_NAME -n openshift-ingress -o jsonpath='{.status}'
-        echo "Dumping the challenge status:"
-        oc get challenge -n openshift-ingress -o wide
+    if wait_for_state "certificate/$CERT_NAME" "condition=Ready" "5m" "$CERT_NAMESPACE"; then
+        echo "Certificate is ready"
+    else
+        echo "Timed out after 5m. Dumping resources for debugging..."
+        run_command "oc describe certificate $CERT_NAME -n $CERT_NAMESPACE"
         exit 1
     fi
-    sleep $INTERVAL
-done
+}
 
-# TODO in future: check whether needed to oc patch proxy when the certificate is not issued by the trusted Let's Encrypt product env
+function configure_ingress_default_cert() {
+    echo "Patching the issued TLS secret to Ingress Controller's spec..."
+    local json_path='{"spec":{"defaultCertificate": {"name": "'"$CERT_SECRET_NAME"'"}}}'
+    oc patch ingresscontroller default --type=merge -p "$json_path" -n openshift-ingress-operator
 
-OLD_PROGRESSING_TIME="$(oc get co ingress '-o=jsonpath={.status.conditions[?(@.type=="Progressing")].lastTransitionTime}')"
-oc patch ingresscontroller.operator default --type=merge -p '{"spec":{"defaultCertificate": {"name": "cert-manager-managed-ingress-cert-tls"}}}' -n openshift-ingress-operator
-# Wait for the ingress pods to finish rollout
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking if clusteroperator ingress rollout finished for the #${COUNTER}-th time ..."
-    NEW_PROGRESSING="$(oc get co ingress '-o=jsonpath={.status.conditions[?(@.type=="Progressing")]}')"
-    if [[ "$NEW_PROGRESSING" =~ '"status":"False"' ]] && [[ ! "$NEW_PROGRESSING" =~ lastTransitionTime\":\"$OLD_PROGRESSING_TIME ]]; then
-        echo "The ingress pods finished rollout." && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The ingress pods still do not finish rollout after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get co ingress -o=jsonpath='{.status}'
-        oc get po -n openshift-ingress
+    echo "[$(timestamp)] Waiting for the Ingress ClusterOperator to finish rollout..."
+    oc wait co ingress --for=condition=Progressing=True --timeout=2m
+    oc wait co ingress --for=condition=Progressing=False --timeout=5m
+    echo "[$(timestamp)] Rollout progress completed"
+}
+
+function extract_ca_from_secret() {
+    echo "Extracting the CA certificate from the issued TLS secret to local folder..."
+    oc extract secret/"$CERT_SECRET_NAME" -n $CERT_NAMESPACE
+    CA_FILE=$( [ -f ca.crt ] && echo "ca.crt" || echo "tls.crt" )
+}
+
+function validate_serving_cert() {
+    echo "Validating the serving certificate of '$CONSOLE_URL'..."
+    output=$(curl -I -v --cacert $CA_FILE --connect-timeout 30 "$CONSOLE_URL" 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "The certificate is served by Ingress Controller as expected"
+    else
+        echo "Failed curl validation. Curl output: '$output'"
         exit 1
     fi
-    sleep $INTERVAL
-done
+}
 
-echo "Creating a namespace from test usage."
-TEST_NAMESPACE=test-ingress-cert
-oc create ns $TEST_NAMESPACE
+function update_kubeconfig_ca() {
+    echo "Backing up the old KUBECONFIG file..."
+    run_command "cp -f $KUBECONFIG $KUBECONFIG.old"
 
-echo "Creating the hello-openshift app and exposing a route from it."
-oc new-app -n $TEST_NAMESPACE quay.io/openshifttest/hello-openshift@sha256:4200f438cf2e9446f6bcff9d67ceea1f69ed07a2f83363b7fb52529f7ddd8a83
-# Wait for the hello-openshift pod to be running
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking the hello-openshift pod status for the #${COUNTER}-th time ..."
-    if [ "$(oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift' -o=jsonpath='{.items[*].status.phase}')" == "Running" ]; then
-        echo "The hello-openshift pod is up and running."
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The hello-openshift pod is not running after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get pods -n $TEST_NAMESPACE -l deployment='hello-openshift'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
-oc create route edge -n $TEST_NAMESPACE --service hello-openshift
-TEST_ROUTE=$(oc get route -n $TEST_NAMESPACE hello-openshift -o=jsonpath='{.status.ingress[?(@.routerName=="default")].host}')
-echo "The exposed route's hostname is $TEST_ROUTE"
+    echo "Appending the CA data of KUBECONFIG with the new CA certificate..."
+    CA_DATA=$(grep certificate-authority-data "$KUBECONFIG".old | awk '{print $2}' | base64 -d)
+    cat "$CA_FILE" >> <(echo "$CA_DATA")
+    NEW_CA_DATA=$(echo "$CA_DATA" | base64 -w0)
+    sed -i "s/certificate-authority-data:.*$/certificate-authority-data: $NEW_CA_DATA/" "$KUBECONFIG"
 
-echo "Validating the cert-manager customized default ingress certificate"
-# The CA_FILE will be used later to update KUBECONFIG
-oc extract secret/cert-manager-managed-ingress-cert-tls -n openshift-ingress
-CA_FILE=ca.crt
-if [ ! -f ca.crt ]; then
-    CA_FILE=tls.crt
-fi
+    echo "Validating the updated KUBECONFIG using any of oc command..."
+    run_command "oc get node"
+}
 
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    CURL_OUTPUT=$(curl -IsS -v --cacert $CA_FILE --connect-timeout 30 "https://$TEST_ROUTE" 2>&1 || true)
-    if [[ "$CURL_OUTPUT" =~ HTTP/1.1\ 200\ OK ]]; then
-        echo "The customized certificate is serving as expected." && break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo -e "Timeout after $((MAX_RETRY * INTERVAL)) seconds waiting for curl validation succeeded. Dumping the curl output:\n${CURL_OUTPUT}."
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+timestamp
+set_proxy
+check_clusterissuer
 
-echo "Deleting the namespace as curl validation finished."
-oc delete ns $TEST_NAMESPACE
+CERT_NAME=custom-ingress-cert
+CERT_NAMESPACE=openshift-ingress
+CERT_SECRET_NAME=cert-manager-managed-ingress-cert-tls
+INGRESS_DOMAIN=$(oc get ingress.config cluster -o=jsonpath='{.spec.domain}')
+CONSOLE_URL=$(oc whoami --show-console)
 
-# Update KUBECONFIG WRT CA of ingress certificate otherwise oc login command will fail
-cp "$KUBECONFIG" "$KUBECONFIG".before-custom-ingress.bak
-oc config view --minify --raw --kubeconfig "$KUBECONFIG".before-custom-ingress.bak > "$KUBECONFIG"
-grep certificate-authority-data "$KUBECONFIG" | awk '{print $2}' | base64 -d > origin-ca.crt
-cat $CA_FILE >> origin-ca.crt
-NEW_CA_DATA=$(base64 -w0 origin-ca.crt)
-sed -i "s/certificate-authority-data:.*$/certificate-authority-data: $NEW_CA_DATA/" "$KUBECONFIG"
-echo "[$(date -u --rfc-3339=seconds)] The KUBECONFIG content is updated with CA of new default ingress certificate."
+create_ingress_certificate
+configure_ingress_default_cert
+
+TMP_DIR=/tmp/cert-manager-custom-ingress-cert
+mkdir -p "$TMP_DIR"
+cd "$TMP_DIR"
+
+extract_ca_from_secret
+validate_serving_cert
+update_kubeconfig_ca
+
+echo "[$(timestamp)] Succeeded in replacing the default Ingress Controller serving certificates with cert-manager managed ones!"
