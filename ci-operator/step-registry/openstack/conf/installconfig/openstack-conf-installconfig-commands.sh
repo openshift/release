@@ -76,8 +76,7 @@ case "$CONFIG_TYPE" in
 			SQUID_AUTH=$(<"${SHARED_DIR}/SQUID_AUTH")
 			yq --yaml-output --in-place ".
 				| .proxy.httpProxy  = \"http://${SQUID_AUTH}@${PROXY_INTERFACE}:3128/\"
-				| .proxy.httpsProxy = \"https://${SQUID_AUTH}@${PROXY_INTERFACE}:3130/\"
-				| .additionalTrustBundle = \"$(<"${SHARED_DIR}/domain.crt")\"
+				| .proxy.httpsProxy = \"http://${SQUID_AUTH}@${PROXY_INTERFACE}:3128/\"
 			" "$INSTALL_CONFIG"
 		fi
 

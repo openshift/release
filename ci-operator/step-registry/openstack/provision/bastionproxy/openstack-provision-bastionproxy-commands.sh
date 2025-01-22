@@ -66,7 +66,6 @@ sg_id="$(openstack security group create -f value -c id bastionproxy-${CLUSTER_N
 openstack security group rule create --ingress --protocol tcp --dst-port 22 --description "${CLUSTER_NAME} SSH" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol udp --dst-port 53 --description "${CLUSTER_NAME} DNS" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3128 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
-openstack security group rule create --ingress --protocol tcp --dst-port 3130 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
   openstack security group rule create --ingress --protocol tcp --dst-port 6443 --description "OCP API" "$sg_id" >/dev/null
   openstack security group rule create --ingress --protocol tcp --dst-port 80 --description "OCP Ingress HTTP" "$sg_id" >/dev/null
@@ -167,8 +166,6 @@ acl Safe_ports port 80
 acl Safe_ports port 443
 acl Safe_ports port 1025-65535
 http_port 3128
-https_port 3130 cert=/etc/squid/certs/domain.crt key=/etc/squid/certs/domain.key cafile=/etc/squid/certs/domain.crt
-# Leave coredumps in the first cache dir
 coredump_dir /var/spool/squid
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/htpasswd
 auth_param basic children 5
@@ -181,12 +178,6 @@ http_access allow localnet
 http_access deny all
 EOF"
 
-sudo mkdir -p /etc/squid/certs
-cd /etc/squid/certs
-sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 1 \
- -addext "subjectAltName = IP:$SQUID_IP" -subj "/C=US/ST=Denial/L=Springfield/O=RedHat/CN=shiftstack.com" -out domain.crt
-sudo cp /etc/squid/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt
-sudo update-ca-trust
 sudo yum install -y httpd-tools
 sudo htpasswd -bBc /etc/squid/htpasswd $CLUSTER_NAME $PASSWORD
 
@@ -206,10 +197,5 @@ $SCP_CMD $WORK_DIR/deploy_squid.sh $BASTION_USER@$bastion_fip:/tmp
 $SSH_CMD chmod +x /tmp/deploy_squid.sh
 $SSH_CMD bash -c /tmp/deploy_squid.sh
 $SCP_CMD $BASTION_USER@$bastion_fip:/etc/squid/certs/domain.crt ${SHARED_DIR}/
-
-if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
-  printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
-  cat "${SHARED_DIR}"/domain.crt >> "${SHARED_DIR}/osp-ca.crt"
-fi
 
 echo "Bastion proxy is ready!"
