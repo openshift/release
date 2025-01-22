@@ -32,66 +32,66 @@ releases:
       stream: nightly
       version: "4.18"
 resources:
-  "*":
+  '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: installer-rehearse-debug
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      dependencies:
-        OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-        COMPUTE_NODE_REPLICAS: "3"
-        CUSTOM_AZURE_REGION: eastus
-        SLEEP_DURATION: 7h
-      post:
-        - ref: cucushift-installer-wait
-        - chain: cucushift-installer-rehearse-azure-ipi-deprovision
-      pre:
-        - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
-  - as: installer-rehearse-azure
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      workflow: cucushift-installer-rehearse-azure-ipi-public-to-private
-  - as: installer-rehearse-gcp
-    cron: "@yearly"
-    steps:
-      cluster_profile: gcp-qe
-      env:
-        SLEEP_DURATION: 1h
-      post:
-        - ref: cucushift-installer-wait
-        - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
-      pre:
-        - chain: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption-provision
-  - as: installer-rehearse-aws
-    cron: "@yearly"
-    steps:
-      cluster_profile: aws-1-qe
-      env:
-        AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-        BASE_DOMAIN: qe.devcluster.openshift.com
-        CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-k7gmzl2/release:latest
-        SLEEP_DURATION: 2h
-      post:
-        - ref: cucushift-installer-wait
-        - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-deprovision
-      pre:
-        - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-provision
-  - as: installer-rehearse-ibmcloud
-    cron: "@yearly"
-    steps:
-      cluster_profile: ibmcloud-qe
-      test:
-        - chain: cucushift-installer-check-cluster-health
-      workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_AZURE_REGION: eastus
+      SLEEP_DURATION: 7h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-public-to-private
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      SLEEP_DURATION: 1h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption-provision
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-k7gmzl2/release:latest
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-provision
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
 zz_generated_metadata:
   branch: master
   org: openshift

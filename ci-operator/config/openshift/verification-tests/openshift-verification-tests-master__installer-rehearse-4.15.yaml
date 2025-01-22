@@ -26,63 +26,63 @@ releases:
       stream: nightly
       version: "4.15"
 resources:
-  "*":
+  '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: installer-rehearse-debug
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-        COMPUTE_NODE_REPLICAS: "3"
-        CUSTOM_AZURE_REGION: eastus
-        SLEEP_DURATION: 3h
-      post:
-        - ref: cucushift-installer-wait
-        - chain: cucushift-installer-rehearse-azure-ipi-deprovision
-      pre:
-        - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
-  - as: installer-rehearse-aws
-    cron: "@yearly"
-    steps:
-      cluster_profile: aws-qe
-      env:
-        BASE_DOMAIN: qe.devcluster.openshift.com
-        RHEL_VM_TYPE: m5.xlarge
-        RHEL_WORKER_COUNT_PER_ZONE: "3"
-      workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
-  - as: installer-rehearse-azure
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-day2
-  - as: installer-rehearse-azure-aro
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        ARO_CLUSTER_VERSION: 4.15.27
-        ARO_FIPS: "true"
-      workflow: cucushift-installer-rehearse-azure-aro-byonsg
-  - as: installer-rehearse-ibmcloud
-    cron: "@yearly"
-    steps:
-      cluster_profile: ibmcloud-qe
-      workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy
-  - as: installer-rehearse-gcp
-    cron: "@yearly"
-    steps:
-      cluster_profile: gcp-qe
-      dependency_overrides:
-        OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
-      env:
-        FEATURE_SET: TechPreviewNoUpgrade
-      workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_AZURE_REGION: eastus
+      SLEEP_DURATION: 3h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      RHEL_VM_TYPE: m5.xlarge
+      RHEL_WORKER_COUNT_PER_ZONE: "3"
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-day2
+- as: installer-rehearse-azure-aro
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: 4.15.27
+      ARO_FIPS: "true"
+    workflow: cucushift-installer-rehearse-azure-aro-byonsg
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
 zz_generated_metadata:
   branch: master
   org: openshift
