@@ -17,7 +17,10 @@ export GCS_CRED_FILE=/var/run/vault/release-tests-sa/gcs_sa_for_qe_artifact_acce
 
 echo "Login cluster app.ci"
 which oc
+whoami
 ls -l `which oc`
+stat `/cli/oc`
+ls -l /cli
 oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
 
 echo -e "\n********* Start job controller *********\n"
