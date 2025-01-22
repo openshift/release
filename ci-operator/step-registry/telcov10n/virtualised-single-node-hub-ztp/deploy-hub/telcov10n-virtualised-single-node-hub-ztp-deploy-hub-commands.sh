@@ -15,7 +15,7 @@ function load_env {
 
   #### SSH Private key
   export BASTION_VHUB_HOST_SSH_PRI_KEY_FILE="${PWD}/remote-hypervisor-ssh-privkey"
-  cat /var/run/telcov10n-ansible-group-all/ansible_ssh_private_key > ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
+  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
   chmod 600 ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
 
   #### SSH Public key
@@ -55,7 +55,7 @@ function load_env {
   export VM_HUB_ZTP_POOL_PATH
 
   #### Resources details
-  VM_CPUS="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpu)"
+  VM_CPUS="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpus)"
   export VM_CPUS
 
   VM_MEM="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_ram)"
@@ -201,6 +201,7 @@ all:
                 api_ip: "${HUB_CLUSTER_API_IPv4}"
                 ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
                 apps: ${HUB_CLUSTER_OPERATORS}
+                ignore_hosts: true
                 vmrules:
                 - ${HUB_CLUSTER_NAME}-bootstrap:
                     rootpassword: "{{ lookup('ansible.builtin.env', 'VM_PASSWD') }}"

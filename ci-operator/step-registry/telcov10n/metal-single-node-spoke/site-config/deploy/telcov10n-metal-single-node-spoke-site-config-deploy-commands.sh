@@ -156,7 +156,7 @@ function generate_site_config {
     fi
 
     if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-      SPOKE_CLUSTER_NAME="${SHARED_DIR}/spoke_cluster_name"
+      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
     else
       SPOKE_CLUSTER_NAME=${NAMESPACE}
     fi
