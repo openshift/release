@@ -37,6 +37,8 @@ function update_host_and_master_yaml_files {
 
   cat <<EOF >| ${SHARED_DIR}/hosts.yaml
 - mac: ${mac}
+  ip: ${ip:="no-needed-value"}
+  ipv6: ${ipv6:="no-needed-value"}
   root_device: ${root_device}
   root_dev_hctl: ${root_dev_hctl}
   ipi_disabled_ifaces: "${ipi_disabled_ifaces}"
