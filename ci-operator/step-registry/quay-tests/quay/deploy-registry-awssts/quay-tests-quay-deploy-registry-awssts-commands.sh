@@ -9,9 +9,15 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
+# env variables from shared dir for aws sts
+QUAY_AWS_STS_S3_BUCKET=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET" || echo "")
+QUAY_AWS_STS_ROLE_ARN=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_ROLE_ARN" || echo "") 
+QUAY_AWS_STS_ACCESSKEY=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_ACCESSKEY" || echo "")
+QUAY_AWS_STS_SECRETKEY=$([ -f "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY" ] && cat "${SHARED_DIR}/QUAY_AWS_STS_SECRETKEY" || echo "")
+
 echo "Create registry ${QUAYREGISTRY} in ns ${QUAYNAMESPACE}"
 
-#create secret bundle with odf/noobaa
+#create secret bundle with aws sts s3
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
@@ -39,17 +45,24 @@ DEFAULT_TAG_EXPIRATION: 2w
 TAG_EXPIRATION_OPTIONS:
   - 2w
   - 1d
+DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+  - default
+DISTRIBUTED_STORAGE_PREFERENCE:
+  - default
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+    - STSS3Storage
+    - s3_bucket: ${QUAY_AWS_STS_S3_BUCKET}
+      storage_path: /datafile
+      sts_user_access_key: ${QUAY_AWS_STS_ACCESSKEY}
+      sts_user_secret_key: ${QUAY_AWS_STS_SECRETKEY}
+      sts_role_arn: ${QUAY_AWS_STS_ROLE_ARN}
+      s3_region: us-east-2
+USERFILES_LOCATION: default
+USERFILES_PATH: userfiles/
 EOF
 
-# Create secret bundle upon env variable TLS, by default it is false.
-# tls certs get from $SHARED_DIR folder
-if [[ "$TLS" == "true" ]]; then
-  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-elif [[ "$TLS" = "false" ]]; then
-  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
-    --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
-    config-bundle-secret
-fi
+oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
 
 #Deploy Quay registry, here disable monitoring component
 echo "Creating Quay registry..." >&2
@@ -63,7 +76,7 @@ spec:
   configBundleSecret: config-bundle-secret
   components:
   - kind: objectstorage
-    managed: true
+    managed: false
   - kind: monitoring
     managed: false
   - kind: horizontalpodautoscaler
@@ -75,10 +88,12 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: ${TLS}
+    managed: true
   - kind: route
     managed: true
 EOF
+
+sleep 300  # wait for pods to be ready
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
@@ -96,6 +111,6 @@ for i in {1..60}; do
     exit 0
   fi
   sleep 15
-  echo "Wait for quay registry ready $((i*15))s"
+  echo "Wait for quay registry ready $((i*15+300))s"
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Timed out waiting for Quay to become ready afer 20 mins" >&2
