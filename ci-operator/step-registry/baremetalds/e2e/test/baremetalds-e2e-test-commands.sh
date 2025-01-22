@@ -16,16 +16,10 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
-function mirror_test_images() {
-        echo "### Mirroring test images"
-
-        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
-
-        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
-        scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
-
+function run_mirror_ssh_commands() {
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+set -o errexit
 oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
 # "registry.k8s.io/pause:3.8" is excluded from the output of the "openshift-tests images" command as some of the layers arn't compressed and this isn't supported by quay.io
 # So we need to mirror it from source bypassing quay.io
@@ -45,6 +39,42 @@ oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by
 # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
 EOF
+}
+
+function mirror_test_images() {
+        echo "### Mirroring test images"
+
+        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
+
+        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+        scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
+
+        MIRROR_RESULT=$(run_mirror_ssh_commands || echo "fail")
+
+        JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring.xml"
+
+        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring" tests="1" failures="1">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully">
+        <failure message="Image mirroring failed with status $IMAGE_MIRRORING_SUCCESS"></failure>
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+            exit 1
+        else
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring" tests="1" failures="0">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully">
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+        fi
+
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
 
