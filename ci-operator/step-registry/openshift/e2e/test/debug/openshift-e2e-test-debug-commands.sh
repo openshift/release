@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 
 echo "DEBUG....."
+oc get no
+echo "DEBUG --0--"
 echo $SHARED_DIR
 ls -al $SHARED_DIR
 echo "DEBUG --1--"
