@@ -1,0 +1,43 @@
+workflow:
+  as: hypershift-openstack-nested-conformance
+  documentation: |-
+    Sets up all the mgmt/infra Shift On Stack cluster prerequisites necessary for hypershift openstack guest clusters.
+    Then runs openshift e2e tests.
+    This workflow can be use for regular conformance tests or CSI, you'll need to set
+    TEST_SUITE and also TEST_CSI_DRIVER_MANIFEST if testing CSI.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: "minimal"
+      ETCD_STORAGE_CLASS: "lvms-vg1"
+      HCP_INGRESS_FIP_ENABLED: "true"
+      HYPERSHIFT_BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_CLUSTER_DEVICE_PATH: "/dev/vdb"
+      LVM_CLUSTER_WIPE_DEVICE: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.17
+      REQUIRED_DEFAULT_STORAGECLASS: "standard-csi"
+      SKIP_MONITOR_TEST: "true"
+      TEST_CSI_DRIVER_MANIFEST: ""
+      WORKER_REPLICAS: 1
+    pre:
+    - chain: ipi-openstack-pre
+    - chain: storage-conf-csi-optional-topolvm
+    - ref: hypershift-install
+    - ref: hypershift-openstack-create-hostedcluster
+    - ref: hypershift-openstack-create-wait
+    - ref: storage-obj-save
+    - ref: storage-conf-csi-openstack-cinder
+    - ref: storage-conf-csi-openstack-manila
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: storage-obj-check
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - ref: hypershift-openstack-destroy
+    - chain: ipi-openstack-post
