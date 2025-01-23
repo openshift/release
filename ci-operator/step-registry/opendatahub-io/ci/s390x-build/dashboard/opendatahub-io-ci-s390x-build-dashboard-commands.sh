@@ -85,7 +85,7 @@ echo "Image is $DESTINATION_IMAGE_REF"
 echo "commit hash is ${PULL_BASE_SHA:0:7}"
 echo "Entire commit hash is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
-
+echo "FIP of VM is $zvsi_fip"
 
 # Added for temporary debugging, Check if the file exists and show the content of the file
 #FILE_PATH="${SECRETS_PATH}/${REGISTRY_SECRET_FILE#}"
@@ -98,10 +98,10 @@ echo "JOB SPECS are $JOB_SPEC"
 #fi
 
 # Get credentials for quay repo
-DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
+DOCKER_USER=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
 export DOCKER_USER
 echo "docker user is $DOCKER_USER"
-DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
+DOCKER_PASS=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
 export DOCKER_PASS
 
 # Initialize ALL_VARS as an array of variable assignments
@@ -110,7 +110,7 @@ ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
 export ALL_VARS_STR
 
 # create ssh session to zvsi and pass the script
-ssh "${ssh_options[@]}" root@$zvsi_fip "$ALL_VARS_STR bash -s" << 'EOF'
+ssh "${ssh_options[@]}" root@"$zvsi_fip" "$ALL_VARS_STR bash -s" << 'EOF'
 #Installing docker in zvsi
 echo "Installing docker engine in zvsi"
 
@@ -132,7 +132,11 @@ apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docke
 echo "Platforms is $PLATFORMS "
 echo "Image tag is $IMAGE_TAG "
 git clone https://github.com/opendatahub-io/odh-dashboard
-git checkout $PULL_BASE_SHA
+
+#we don't need to change branch for nightly builds
+#git checkout $PULL_BASE_SHA
+
+cd odh-dashboard
 
 # Enable Buildx for multiarch builds
 docker buildx create --platform="${PLATFORMS}" --name mybuilder --use
