@@ -13,14 +13,12 @@ function delete_stacks() {
 
         # shellcheck disable=SC2016
         if aws --region "${region}" cloudformation describe-stacks --stack-name "${name}" \
-          --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text; then
+               --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text; then
             echo "Deleting stack ${name} in region ${region}..."
-            aws --region "${region}" cloudformation delete-stack --stack-name "${name}" &
-            wait "$!"
-            aws --region "${region}" cloudformation wait stack-delete-complete --stack-name "${name}" &
-            wait "$!"
-            echo "Deleted stack ${name} in region ${region}"
-            aws --region "${region}" cloudformation describe-stacks --stack-name "${name}" || true
+            aws --region "${region}" cloudformation delete-stack --stack-name "${name}"
+            # No need to wait for the stack deletion to complete to speed up the job.
+            # AWS will take care of the deletion in the background.
+            echo "Successfully initiated the stack ${name} deletion in region ${region}"
         else
             echo "Stack ${name} in region ${region} does not exist"
         fi

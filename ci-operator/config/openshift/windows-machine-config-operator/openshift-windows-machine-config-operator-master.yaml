@@ -1,4 +1,8 @@
 base_images:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
   openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
     name: release
     namespace: openshift
@@ -22,6 +26,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
     openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
@@ -92,6 +99,9 @@ tests:
   as: aws-e2e-operator
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -110,6 +120,8 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
       WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
