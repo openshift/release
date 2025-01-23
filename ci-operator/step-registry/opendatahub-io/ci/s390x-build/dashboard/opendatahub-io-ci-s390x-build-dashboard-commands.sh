@@ -138,8 +138,10 @@ git clone https://github.com/opendatahub-io/odh-dashboard
 
 cd odh-dashboard
 
-# Enable Buildx for multiarch builds
+# Enable Buildx and Quemu for multiarch builds
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --platform="${PLATFORMS}" --name mybuilder --use
+docker buildx inspect --bootstrap
 
 # Log in to the registry
 docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}" "${REGISTRY_HOST}"
