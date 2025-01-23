@@ -38,7 +38,10 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-in-ci IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+        IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+        KUBECONFIG="" oc registry login
+        oc image mirror registry.build01.ci.openshift.org/${IMAGE_NAMESPACE}/pipeline --confirm --all
+        make test-e2e-in-ci IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
       from: src
       resources:
         requests:
