@@ -99,6 +99,39 @@ data:
       [[registry.mirror]]
         location = "brew.registry.redhat.io/multicluster-engine"
         insecure = false
+         
+    [[registry]]
+      location = "registry.redhat.io/multicluster-engine"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+    [[registry]]
+      location = "registry.redhat.io/rhacm2"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+    [[registry]]
+      location = "registry.access.redhat.com/openshift4/ose-oauth-proxy"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "registry.redhat.io/openshift4/ose-oauth-proxy"
+        insecure = false
 EOF
 
 # Creating AgentServiceConfig
@@ -139,7 +172,9 @@ set +x
 # Setting up pull secret with brew token
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 brew_token_file="${AGENT_IBMZ_CREDENTIALS}/brew-token"
+quay_token_file="${AGENT_IBMZ_CREDENTIALS}/quay-token"
 cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brew_token_file})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
+cat /tmp/pull-secret | jq --arg quay_token "$(cat ${quay_token_file})" '.auths += {"quay.io:443": {"auth": $quay_token}}' > /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 
