@@ -7,9 +7,31 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 MCE_VERSION=${MCE_VERSION:-"2.2"}
-if [[ $MCE_QE_CATALOG != "true" ]]; then
-  _REPO="quay.io/acm-d/mce-custom-registry"
-
+_REPO="quay.io/acm-d/mce-custom-registry"
+if [[ "$DISCONNECTED" == "true" ]]; then
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  # Setup disconnected quay mirror container repo
+  oc apply -f - <<EOF
+    apiVersion: operator.openshift.io/v1alpha1
+    kind: ImageContentSourcePolicy
+    metadata:
+      name: rhacm-repo
+    spec:
+      repositoryDigestMirrors:
+      - mirrors:
+        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+        source: quay.io/acm-d
+      - mirrors:
+        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+        source: registry.redhat.io/rhacm2
+      - mirrors:
+        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+        source: registry.redhat.io/multicluster-engine
+      - mirrors:
+        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
+        source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+EOF
+else
   # Setup quay mirror container repo
   cat << EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
@@ -37,15 +59,14 @@ EOF
   mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
   rm /tmp/global-pull-secret.json
-  sleep 60
-  oc wait mcp master worker --for condition=updated --timeout=20m
+fi
 
-  VER=`oc version | grep "Client Version:"`
-  echo "* oc CLI ${VER}"
+sleep 60
+oc wait mcp master worker --for condition=updated --timeout=20m
 
-  echo "Install MCE custom catalog source"
-  IMG="${_REPO}:${MCE_VERSION}-latest"
-  oc apply -f - <<EOF
+echo "Install MCE custom catalog source"
+IMG="${_REPO}:${MCE_VERSION}-latest"
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -60,7 +81,6 @@ spec:
     registryPoll:
       interval: 10m
 EOF
-fi
 
 oc apply -f - <<EOF
 apiVersion: v1
@@ -80,8 +100,7 @@ spec:
     - "multicluster-engine"
 EOF
 
-CATALOG=$([[ $MCE_QE_CATALOG == "true" ]] && echo -n "qe-app-registry" || echo -n "multiclusterengine-catalog")
-echo "* Applying SUBSCRIPTION_CHANNEL $MCE_VERSION, SUBSCRIPTION_SOURCE $CATALOG to multiclusterengine-operator subscription"
+echo "* Applying SUBSCRIPTION_CHANNEL $MCE_VERSION, SUBSCRIPTION_SOURCE multiclusterengine-catalog to multiclusterengine-operator subscription"
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -92,7 +111,7 @@ spec:
   channel: stable-${MCE_VERSION}
   installPlanApproval: Automatic
   name: multicluster-engine
-  source: ${CATALOG}
+  source: multiclusterengine-catalog
   sourceNamespace: openshift-marketplace
 EOF
 
