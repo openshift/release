@@ -7,6 +7,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
     name: "4.18"
     namespace: ocp
@@ -19,10 +27,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.18
   openstack-cinder-csi-driver-operator-test:
     name: "4.18"
     namespace: ocp
@@ -31,11 +35,6 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.18_base-rhel9:
@@ -45,18 +44,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
-  to: hypershift-tests
 promotion:
   to:
-  - excluded_images:
-    - hypershift-operator
-    - hypershift-tests
-    name: "4.18"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -199,7 +189,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
       RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
@@ -215,15 +204,13 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-nfv
-      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
       NFV_NODEPOOLS: "true"
+      RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-nfv-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-openstack-aws-nfv
 - always_run: false
   as: e2e-openstack-aws-conformance
   optional: true

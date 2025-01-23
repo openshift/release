@@ -241,7 +241,6 @@ cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 rendezvousIP: ${rendezvous_ip_address}
-minimalISO: ${MINIMAL_ISO}
 hosts: []
 EOF
 
@@ -249,6 +248,12 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 #Add hosts details to the agent-config.yaml
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
+
+if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+  cat >> "${SHARED_DIR}/agent-config.yaml" <<EOF
+minimalISO: ${MINIMAL_ISO}
+EOF
+fi
 
 echo "Creating agent image..."
 dir=/tmp/installer

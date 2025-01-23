@@ -10,7 +10,10 @@ function check_clusteroperators_status() {
     echo "$(date) - all clusteroperators are done progressing."
 }
 
-oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
-check_clusteroperators_status
+# (mko) Devscripts makes sure that by the time we are given a cluster, it has been installed correctly.
+#       One of those steps is to make sure clusteroperators are stable. So there is no need to check
+#       it once again.
+#oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
+#check_clusteroperators_status
 
 make test-e2e-handler-ocp

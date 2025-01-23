@@ -123,6 +123,37 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere-zones
+- as: e2e-metal-ipi-ovn-upgrade-network-flow-matrix
+  cluster: build05
+  cron: 0 23 * * 0,2,4,6
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      SUITE: Nftables
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: network-flow-matrix-tests
+    - chain: baremetalds-ipi-test
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+  timeout: 5h0m0s
+- as: e2e-aws-upgrade-ovn-single-node-network-flow-matrix
+  cron: 0 23 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      SUITE: Nftables
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: network-flow-matrix-tests
+    - ref: single-node-e2e-test
+    workflow: openshift-upgrade-aws-single-node
 zz_generated_metadata:
   branch: master
   org: openshift
