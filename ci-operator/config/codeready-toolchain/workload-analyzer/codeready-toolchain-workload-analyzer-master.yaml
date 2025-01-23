@@ -40,12 +40,12 @@ tests:
       commands: |
         IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
         KUBECONFIG="" oc registry login --to=/tmp/auth.json
-        echo $(KUBECONFIG="" oc get route -n openshift-image-registry)
-        BUILD_REGISTRY=$(KUBECONFIG="" oc get route -n openshift-image-registry | grep -Eo '[a-zA-Z0-9]+\.ci\.openshift\.org')
+        BUILD_REGISTRY=$(KUBECONFIG="" oc registry login --to=/tmp/auth.json | grep -oP '(?<=Using registry public hostname ).*')
         echo BUILD_REGISTRY=${BUILD_REGISTRY}
         echo IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
         oc create secret generic build-registry --from-file=/tmp/auth.json --type=kubernetes.io/podmanconfigjson
-        oc import-image $BUILD_REGISTRY/${IMAGE_NAMESPACE}/pipeline --confirm
+        oc import-image pipeline:alertmanager-mock --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:alertmanager-mock --confirm
+        oc import-image pipeline:workload-analyzer --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:workload-analyzer --confirm
         make test-e2e-in-ci IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
       from: src
       resources:
