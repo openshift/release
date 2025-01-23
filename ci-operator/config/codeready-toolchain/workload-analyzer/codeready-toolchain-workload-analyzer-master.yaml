@@ -40,10 +40,11 @@ tests:
       commands: |
         IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
         KUBECONFIG="" oc registry login --to=/tmp/auth.json
-        CLUSTER=$(oc cluster-info | grep "control plane" | awk -F[/.] '{print $3}')
+        echo $(oc registry info)
+        CLUSTER=$(oc registry info | awk -F'.' '{print $2}')
         echo CLUSTER=${CLUSTER}
         echo IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
-        oc image mirror registry.${CLUSTER}.ci.openshift.org/${IMAGE_NAMESPACE}/pipeline --confirm --all --registry-config=/tmp/auth.json
+        oc image mirror registry.${CLUSTER}.ci.openshift.org/${IMAGE_NAMESPACE}/pipeline --registry-config=/tmp/auth.json
         make test-e2e-in-ci IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
       from: src
       resources:
