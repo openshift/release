@@ -205,6 +205,7 @@ fi
 $SCP_CMD $WORK_DIR/deploy_squid.sh $BASTION_USER@$bastion_fip:/tmp
 $SSH_CMD chmod +x /tmp/deploy_squid.sh
 $SSH_CMD bash -c /tmp/deploy_squid.sh
+$SCP_CMD $BASTION_USER@$bastion_fip:/etc/squid/certs/domain.crt ${SHARED_DIR}/
 
 if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
   printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
