@@ -68,17 +68,18 @@ resources:
       memory: 35Gi
 tests:
 - always_run: true
-  as: smoke-test
+  as: smoke-tests
   cluster: build05
-  dependencies:
-    SOURCE_IMAGE_REF: vllm-build-main-cuda
-  commands: |
-    export VIRTUAL_ENV=/opt/vllm
-    export PATH=$VIRTUAL_ENV/bin/:$PATH
-
-    cd extras
-
-    bash smoke-test.sh
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
+    env:
+      export VIRTUAL_ENV=/opt/vllm
+      export PATH=$VIRTUAL_ENV/bin/:$PATH
+    test:
+    - as: smoke-test
+      commands: |
+        bash extras/smoke-test.sh
   container:
     clone: true
     from: vllm-build-main-cuda
