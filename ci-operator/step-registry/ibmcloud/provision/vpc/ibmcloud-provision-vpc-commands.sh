@@ -219,7 +219,16 @@ rg_id=$("${IBMCLOUD_CLI}" resource group $resource_group --id)
 ## Create the VPC
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
-declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+
+readarray -t ZONES  < <(${IBMCLOUD_CLI} is zones -q | grep ${region} | awk '{print $1}')
+max_zones="${#ZONES[@]}"
+if [ ${ZONES_COUNT} -gt ${max_zones} ]; then
+  echo "based on the availability zones: ${ZONES[*]} adjust the ZONES_COUNT!"
+  ZONES_COUNT=${max_zones}
+fi
+
+ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+echo "Adjusted zones to ${ZONES[*]} based on ZONES_COUNT: ${ZONES_COUNT}."
 
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
