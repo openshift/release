@@ -43,7 +43,7 @@ export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 
 
-# These two environment variables are coming from vsphere_context.sh 
+# These two environment variables are coming from vsphere_context.sh
 # and govc.sh. The file they are assigned to is not available in this step.
 unset SSL_CERT_FILE 
 unset GOVC_TLS_CA_CERTS
@@ -122,5 +122,5 @@ fi
 version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
 if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
   echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-  oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+  oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
 fi
