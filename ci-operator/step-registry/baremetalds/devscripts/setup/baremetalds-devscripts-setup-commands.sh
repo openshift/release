@@ -177,6 +177,15 @@ if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   done
 fi
 
+# DEVSCRIPTS_CONFIG_CLUSTERBOT is a space delimited list of key=value pairs passed in
+# from clusterbot. This allows a clusterbot user to pass in additional configuration or
+# override existing configuration.
+if [[ -n "${DEVSCRIPTS_CONFIG_CLUSTERBOT:-}" ]]; then
+  for var in ${DEVSCRIPTS_CONFIG_CLUSTERBOT}; do
+    echo "export ${var}" >> "${SHARED_DIR}/dev-scripts-additional-config"
+  done
+fi
+
 # Copy additional dev-script configuration provided by the the job, if present
 if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
