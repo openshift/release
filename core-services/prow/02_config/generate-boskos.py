@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 4,
+        'us-east-1': 7,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -188,7 +188,7 @@ CONFIG = {
         'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
-        'eastus2': 4
+        'eastus2': 7
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
@@ -222,7 +222,7 @@ CONFIG = {
         'us-central1': 4,
     },
     'gcp-autorelease-qe-quota-slice': {
-        'us-central1': 4,
+        'us-central1': 7,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
