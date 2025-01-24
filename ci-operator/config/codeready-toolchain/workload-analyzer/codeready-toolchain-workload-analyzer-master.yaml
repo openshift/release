@@ -41,8 +41,6 @@ tests:
         IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
         KUBECONFIG="" oc registry login --to=/tmp/auth.json
         BUILD_REGISTRY=$(grep -Eo '([0-9A-Za-z]+\.)+\w+' /tmp/auth.json)
-        echo BUILD_REGISTRY=${BUILD_REGISTRY}
-        echo IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
         oc create namespace ${IMAGE_NAMESPACE}
         oc create secret generic build-registry --from-file=/tmp/auth.json --type=kubernetes.io/podmanconfigjson -n openshift-config
         oc import-image pipeline:alertmanager-mock --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:alertmanager-mock --confirm -n ${IMAGE_NAMESPACE}
