@@ -564,8 +564,6 @@ fi
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
-  "**** The version of openshift-install: ********************************"
-  openshift-install version
 fi  
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -680,6 +678,8 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
+echo "**** The version of openshift-install: ********************************"
+openshift-install version
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
