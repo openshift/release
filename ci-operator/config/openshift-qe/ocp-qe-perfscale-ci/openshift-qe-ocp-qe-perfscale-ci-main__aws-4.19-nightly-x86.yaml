@@ -50,7 +50,7 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
 - as: control-plane-252nodes
-  cron: 0 0 25 * *
+  cron: 0 0 * * 3
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -58,9 +58,9 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "252"
       COMPUTE_NODE_TYPE: m5.xlarge
+      ES_SECRETS_PATH: /prod-secret
       EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      PROFILE_TYPE: reporting
       SET_ENV_BY_PLATFORM: custom
       SIZE_VARIANT: large
       USER_TAGS: |
@@ -71,7 +71,7 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-120nodes
-  cron: 0 2 4,11,18,25 * *
+  cron: 0 2 * * 1,3
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -79,8 +79,8 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
+      ES_SECRETS_PATH: /prod-secret
       EXTRA_FLAGS: --churn-duration=20m --service-latency
-      PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       USER_TAGS: |
         TicketId 382
@@ -90,24 +90,26 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 7h0m0s
 - as: control-plane-24nodes
-  cron: 0 5 2,9,16,23 * *
+  cron: 0 5 * * 6,2,4,5
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
+      ES_SECRETS_PATH: /prod-secret
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
 - as: control-plane-etcdencrypt-24nodes
-  cron: 0 3 2,9,16,23 * *
+  cron: 0 3 * * 6,3,5
   steps:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
+      ES_SECRETS_PATH: /prod-secret
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
