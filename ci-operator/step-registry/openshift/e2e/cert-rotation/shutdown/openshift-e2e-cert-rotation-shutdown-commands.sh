@@ -112,6 +112,7 @@ chmod +x "${SHARED_DIR}"/time-skew-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-test.sh "root@${IP}:/usr/local/bin"
 
 timeout \
+  -v \
 	--kill-after 10m \
 	120m \
 	ssh \

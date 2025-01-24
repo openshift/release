@@ -386,6 +386,7 @@ chmod +x "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh "root@${IP}:/usr/local/bin"
 
 timeout \
+  -v \
 	--kill-after 10m \
 	120m \
 	ssh \
