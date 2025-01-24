@@ -1,0 +1,44 @@
+ref:
+  as: ols-load-generator-tests
+  from_image:
+    namespace: ci
+    name: ols-load-generator-ci
+    tag: latest
+  cli: latest
+  timeout: 6h
+  commands: ols-load-generator-tests-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OLS_TEST_WORKERS
+    default: "5"
+    documentation: |-
+      Number of parallel workers for the load test
+  - name: OLS_TEST_DURATIONS
+    default: "1m,5m"
+    documentation: |-
+      Comma separated list of test durations to loop through
+  - name: OLS_TEST_PROFILES
+    default: "assets/profiles/metrics-report.yaml,assets/profiles/metrics-timeseries.yaml"
+    documentation: |-
+      Test profiles the contain list of metrics to be scraped
+  - name: OLS_TEST_METRIC_STEP
+    default: "30"
+    documentation: |-
+      Step size of metrics in seconds
+  - name: OLS_TEST_ES_INDEX
+    default: "ols-load-test-results"
+    documentation: |-
+      Elastic search index to store results
+  - name: OLS_QUERY_ONLY
+    default: "false"
+    documentation: |-
+      Flag to only perform load test on /query api endpoint
+  documentation: >-
+    This step runs the ols load testing workload in the deployed cluster
