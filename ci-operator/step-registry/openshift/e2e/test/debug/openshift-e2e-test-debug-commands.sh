@@ -5,20 +5,12 @@ set -o errexit
 set -o pipefail
 
 echo "DEBUG....."
-oc get no
-echo "DEBUG --0--"
+mkdir $SHARED_DIR/nodes
+for n in `oc get no |grep -v "^NAME" |cut -d ' ' -f1`; do
+    echo $n
+    oc debug --to-namespace default node/$n -- ls -l /host/dev/disk/by-id |tee $SHARED_DIR/nodes/$n.out
+done
+echo "DEBUG ----"
 echo $SHARED_DIR
-ls -al $SHARED_DIR
-echo "DEBUG --1--"
-date > $SHARED_DIR/DATE
-cat $SHARED_DIR/DATE
-echo "DEBUG --2--"
-uname -a
-cat /etc/hostname
-echo "DEBUG --3--"
-ls -l /dev
-echo "DEBUG --4--"
-ls -l /dev/disk || true
-echo "DEBUG --5--"
-ls -l /dev/disk/by-id || true
-echo "DEBUG --6--"
+ls -al $SHARED_DIR/nodes
+echo "DEBUG ---- DONE"
