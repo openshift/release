@@ -567,7 +567,7 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   tmpDir=$(mktemp -d)
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
   oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=${tmpDir}
-  initInstall=$(which openshif-install)
+  initInstall=$(which openshift-install)
   $tmpDir/openshift-install version
   cp $tmpDir/openshift-install ${initInstall}
   echo "overwrite the openshift-install Done"
