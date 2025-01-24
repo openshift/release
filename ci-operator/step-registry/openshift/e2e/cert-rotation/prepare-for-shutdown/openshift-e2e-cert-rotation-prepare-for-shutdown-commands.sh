@@ -65,7 +65,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   trap 'echo "external interrupt"' TERM INT KILL
 
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  until oc --request-timeout=5s get nodes; do sleep 30; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
   echo "Approving CSRs at $(date)"
@@ -74,11 +74,13 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
     until (( approved_csrs >= required_csrs )); do
+      echo "." >&3;
       mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
       if [[ ${#csrs[@]} -gt 0 ]]; then
+        echo
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      sleep 10
+      sleep 30
     done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
   echo "All CSRs approved at $(date)"
@@ -87,7 +89,6 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     STATUS="False"
     TIME_DIFF="301"
     until [[ ${TIME_DIFF} -le 300 ]] && [[ ${STATUS} == True ]]; do
-      oc --request-timeout=5s get ${nodename}
       STATUS=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
       NODE_HEARTBEAT_TIME=$(oc --request-timeout=5s get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}')
       if [[ -z ${NODE_HEARTBEAT_TIME} ]]; then
@@ -95,7 +96,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
       fi
       TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
       sleep 1
-    done 3> >(/usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null)
+    done | /usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null
   done
   echo "All nodes are ready at $(date)"
 EOZ
