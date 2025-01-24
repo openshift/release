@@ -109,10 +109,10 @@ function wait-for-nodes-to-be-ready {
   run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
+
+cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
   trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
   trap 'echo "external interrupt"' TERM INT KILL
-cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
-  trap 'echo $BASH_COMMAND failed with error code $?' TERM
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done
@@ -124,10 +124,10 @@ run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/
 function wait-for-valid-lb-ext-kubeconfig {
   run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
+
+cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
   trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
   trap 'echo "external interrupt"' TERM INT KILL
-cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
-  trap 'echo $BASH_COMMAND failed with error code $?' TERM
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   # TODO: kube-apiserver never starts progressing in 4.19+
@@ -141,10 +141,10 @@ run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr
 function wait-for-kubeapiserver-to-start-progressing {
   run-on-first-master "bash /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
 }
+
+cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
   trap 'echo "external interrupt"' TERM INT KILL
-cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
-  trap 'echo $BASH_COMMAND failed with error code $?' TERM
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
