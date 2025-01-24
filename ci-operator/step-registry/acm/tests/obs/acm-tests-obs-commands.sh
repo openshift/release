@@ -28,12 +28,6 @@ export PARAM_AWS_ACCESS_KEY_ID
 OC_HUB_CLUSTER_API_URL=$(oc whoami --show-server)
 export OC_HUB_CLUSTER_API_URL
 
-# Get the base domain from the API URL
-# left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
-# BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
-BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
-export BASE_DOMAIN
-
 # HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
 HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
 export HUB_CLUSTER_NAME
@@ -41,21 +35,37 @@ export HUB_CLUSTER_NAME
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_HUB_CLUSTER_PASS
 
+set +x
+   oc login ${OC_HUB_CLUSTER_API_URL} --insecure-skip-tls-verify=true -u kubeadmin -p ${OC_HUB_CLUSTER_PASS}
+set -x
+
+# Get the base domain from the API URL
+# left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
+# BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
+metadata=$(cat $SHARED_DIR/metadata.json)
+echo $metadata
+
+# BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
+DOMAIN=$(oc get ingress.config.openshift.io/cluster -ojson | jq -r '.spec.domain')
+BASE_DOMAIN=$(echo $DOMAIN | sed 's/apps.//g')
+echo $BASE_DOMAIN
+export BASE_DOMAIN
+
 # Set the dynamic vars needed to execute the Observability scenarios on the managed clusters
-MANAGED_CLUSTER_NAME=$(cat $SHARED_DIR/managed.cluster.name)
-export MANAGED_CLUSTER_NAME
+# MANAGED_CLUSTER_NAME=$(cat $SHARED_DIR/managed.cluster.name)
+# export MANAGED_CLUSTER_NAME
 
-MANAGED_CLUSTER_BASE_DOMAIN=$(cat $SHARED_DIR/managed.cluster.base.domain)
-export MANAGED_CLUSTER_BASE_DOMAIN
+# MANAGED_CLUSTER_BASE_DOMAIN=$(cat $SHARED_DIR/managed.cluster.base.domain)
+# export MANAGED_CLUSTER_BASE_DOMAIN
 
-MANAGED_CLUSTER_USER=$(cat $SHARED_DIR/managed.cluster.username)
-export MANAGED_CLUSTER_USER
+# MANAGED_CLUSTER_USER=$(cat $SHARED_DIR/managed.cluster.username)
+# export MANAGED_CLUSTER_USER
 
-MANAGED_CLUSTER_PASS=$(cat $SHARED_DIR/managed.cluster.password)
-export MANAGED_CLUSTER_PASS
+# MANAGED_CLUSTER_PASS=$(cat $SHARED_DIR/managed.cluster.password)
+# export MANAGED_CLUSTER_PASS
 
-MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
-export MANAGED_CLUSTER_API_URL
+# MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
+# export MANAGED_CLUSTER_API_URL
 
 # Create a .kube directory inside the alabama dir
 mkdir -p /alabama/.kube

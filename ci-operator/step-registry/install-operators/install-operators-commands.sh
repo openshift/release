@@ -31,6 +31,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_install_namespace=$(jq --raw-output '.install_namespace // ""' <<< "$operator_obj")
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
+    operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
 
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
@@ -45,7 +46,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         # If source is any, use any available catalog
         if [[ "${operator_source}" == "!any" ]]; then
             # Prioritize the use of the default catalog
-            operator_source=$(oc get packagemanifest ${operator_name} | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
+            operator_source=$(oc get packagemanifest | grep "${operator_name}.*${DEFAULT_OPERATOR_SOURCE_DISPLAY}" || echo)
             if [[ -n "${operator_source}" ]]; then
                 operator_source="${DEFAULT_OPERATOR_SOURCE}" ;
             else
@@ -77,13 +78,11 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.defaultChannel}' 2>/dev/null || echo)
         if [[ -z "${operator_channel}" ]]; then
             echo "ERROR: Default channel not found in '${operator_name}' packagemanifest."
-            echo "Checking if the ${operator_name} packagemanifest is available in other catalogs:"
+            echo "Checking if the ${operator_name} packagemanifest is available in other catalogs for debugging purpose:"
             set -x
-            oc get packagemanifest "${operator_name}" --ignore-not-found || {
-                echo "There is not any available packagemanifest for '${operator_name}' operator" ;
-                exit 1 ;
-            }
-            operator_source=$(oc get packagemanifest ${operator_name} -ojsonpath='{.metadata.labels.catalog}')
+            oc get packagemanifest "${operator_name}" || \
+              echo "There is not any available packagemanifest for '${operator_name}' operator"
+            exit 1
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi
@@ -134,19 +133,40 @@ EOF
 
     echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
-    cat <<EOF | oc apply -f -
-    apiVersion: operators.coreos.com/v1alpha1
-    kind: Subscription
-    metadata:
-        name: "${operator_name}"
-        namespace: "${operator_install_namespace}"
-    spec:
-        channel: "${operator_channel}"
-        installPlanApproval: Automatic
-        name: "${operator_name}"
-        source: "${operator_source}"
-        sourceNamespace: openshift-marketplace
+    if [[ -z "$operator_config" ]]; then
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+            name: "${operator_name}"
+            namespace: "${operator_install_namespace}"
+        spec:
+            channel: "${operator_channel}"
+            installPlanApproval: Automatic
+            name: "${operator_name}"
+            source: "${operator_source}"
+            sourceNamespace: openshift-marketplace
 EOF
+    else
+        cat <<EOF | oc apply -f -
+        {
+            "apiVersion": "operators.coreos.com/v1alpha1",
+            "kind": "Subscription",
+            "metadata": {
+                "name": "${operator_name}",
+                "namespace": "${operator_install_namespace}"
+            },
+            "spec": {
+                "channel": "${operator_channel}",
+                "installPlanApproval": "Automatic",
+                "name": "${operator_name}",
+                "source": "${operator_source}",
+                "sourceNamespace": "openshift-marketplace",
+                "config": ${operator_config}
+            }
+        }
+EOF
+    fi
 
     # Need to allow some time before checking if the operator is installed.
     sleep 60
@@ -177,12 +197,12 @@ EOF
         echo
         echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
         echo
-        oc get packagemanifest ${operator_name} --ignore-not-found
+        oc get packagemanifest | grep ${operator_name} || echo
         echo "CSV ${CSV} YAML"
-        oc get CSV "${CSV}" -n "${operator_install_namespace}" -o yaml
+        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
         echo
         echo "CSV ${CSV} Describe"
-        oc describe CSV "${CSV}" -n "${operator_install_namespace}"
+        oc describe csv "${CSV}" -n "${operator_install_namespace}"
         exit 1
     fi
 

@@ -20,6 +20,11 @@ echo "[$(date --utc +%FT%T.%3NZ)] OO_BUNDLE:            $OO_BUNDLE"
 echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
 echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_MODE:      $OO_INSTALL_MODE"
 echo "[$(date --utc +%FT%T.%3NZ)] OO_SECURITY_CONTEXT:  $OO_SECURITY_CONTEXT"
+echo "[$(date --utc +%FT%T.%3NZ)] USE_HOSTED_KUBECONFIG:  $USE_HOSTED_KUBECONFIG"
+
+if [[ "${USE_HOSTED_KUBECONFIG}" == "true" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+fi
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)

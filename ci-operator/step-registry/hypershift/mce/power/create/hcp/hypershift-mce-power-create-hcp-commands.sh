@@ -35,6 +35,11 @@ tar -xvf /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz -C /tmp/${HYPERSHIFT_CLI_NAME}_cli
 chmod +x /tmp/${HYPERSHIFT_CLI_NAME}_cli/${HYPERSHIFT_CLI_NAME}
 export PATH=$PATH:/tmp/${HYPERSHIFT_CLI_NAME}_cli
 
+# Fetching Domain from Vault
+if [[ -z "${HYPERSHIFT_BASE_DOMAIN}" ]]; then
+		HYPERSHIFT_BASE_DOMAIN=$(jq -r '.hypershiftBaseDomain' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+fi
+
 # Applying mirror config
 echo "$(date) Applying mirror config"
 cat <<EOF | oc apply -f -

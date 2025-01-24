@@ -32,13 +32,13 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate416:
+  intermediate1:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.16"
-  intermediate417:
+  intermediate2:
     candidate:
       architecture: multi
       product: ocp
@@ -71,21 +71,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE417
-        name: release:intermediate417
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-3hops
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
 - as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
@@ -102,21 +88,7 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE417
-        name: release:intermediate417
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-3hops
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec

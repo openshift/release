@@ -137,7 +137,7 @@ metadata:
   name: $CATALOG_SOURCE
   namespace: openshift-marketplace
 spec:
-  displayName: Production Operators
+  displayName: OTEL Konflux
   image: $DT_INDEX_IMAGE
   publisher: OpenShift QE
   sourceType: grpc

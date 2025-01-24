@@ -1,8 +1,9 @@
 workflow:
   as: hypershift-mce-power-conformance
   documentation: |-
-    The HyperShift mce power conformance workflow executes tests against a new ephemeral Hypershift Agent cluster
-    created on Power Nodes to validate the cluster creation reaches completed state.
+    The hypershift-mce-power-conformance workflow runs tests on a newly created ephemeral HyperShift Agent cluster.
+    For standard workflows: Tests execute on Power nodes to ensure the cluster reaches a completed state.
+    For heterogeneous setups: Tests run across a combination of Power and x86 nodes to validate cluster creation.
   steps:
     pre:
       - ref: ingress-aws-nlb-manifest
@@ -19,15 +20,11 @@ workflow:
       - ref: hypershift-mce-power-destroy
       - chain: ipi-aws-post
     env:
-      HYPERSHIFT_BASE_DOMAIN: "hypershift.cis.ibm.net"
       HYPERSHIFT_NODE_COUNT: 2
-      POWERVS_INSTANCE_CRN: "crn:v1:bluemix:public:power-iaas:tok04:a/c265c8cefda241ca9c107adcbbacaa84:d04e2b0c-58aa-4e64-85c1-ecb5ab00d03d::"
-      POWERVS_IMAGE: "rhcos-none"
-      POWERVS_NETWORK: "private-net"
-      CIS_INSTANCE: "hypershift.cis.ibm.net"
-      CIS_DOMAIN_ID: "2efc206d822e60cd3586d1f482ffac97"
-      BASTION: "rh-agent-ci-bastion.hypershift.cis.ibm.net"
-      BASTION_CI_SCRIPTS_DIR: "/root/agent-ci/scripts"
+      CLUSTERS_NAMESPACE: "local-cluster"
+      IS_HETEROGENEOUS: "no"
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
       # NOTE: Aggregator test is skipped as it is a known flake - https://github.com/kubernetes/kubernetes/issues/122333
       # TODO: Re-enable this test once the underlying flakiness issue is resolved.
       TEST_SKIPS: >-

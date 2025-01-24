@@ -4,10 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ ${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS} == "yes" ]]; then
+  if [[ ! -f "${SHARED_DIR}/aws_minimal_permission_ccoctl" ]]; then
+    echo "ERROR: AWS_CCOCTL_USE_MINIMAL_PERMISSIONS is enabled, but the credential file \"aws_minimal_permission_ccoctl\" is missing."
+    echo "ERROR: Note, the credential file is created by chain \"aws-provision-iam-user-minimal-permission\", please check."
+    echo "Exit now."
+    exit 1
+  fi
+  echo "Setting AWS credential with minimal permision for ccoctl"
+  export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission_ccoctl
+else
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
 REGION="${LEASED_RESOURCE}"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image

@@ -36,7 +36,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   tests:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tests
 build_root:
@@ -55,13 +55,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -118,25 +118,27 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- as: e2e-metal-assisted
+- as: e2e-metal-assisted-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-deploy-nodes
+- as: e2e-metal-assisted-deploy-nodes-4-18
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-arm-workers
+- as: e2e-metal-assisted-day2-arm-workers-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
     env:
       ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
@@ -144,6 +146,8 @@ tests:
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        DAY2_CPU_ARCHITECTURE=arm64
+        OPENSHIFT_VERSION=4.18-multi
     workflow: assisted-equinix
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -156,19 +160,23 @@ tests:
     env:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-oci-assisted
+- as: e2e-oci-assisted-4-18
   optional: true
   steps:
     cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external
+  as: e2e-metal-assisted-external-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: main

@@ -17,51 +17,52 @@ metadata:
 rules:
 - apiGroups:
   - ""
-  - "extensions"
-  - "apps"
-  - "batch"
+  - extensions
+  - apps
+  - batch
   resources:
-    - "namespaces"
-    - "replicationcontrollers"
-    - "services"
-    - "nodes"
-    - "nodes/spec"
-    - "pods"
-    - "jobs"
-    - "cronjobs"
-    - "persistentvolumes"
-    - "persistentvolumeclaims"
-    - "deployments"
-    - "replicasets"
-    - "daemonsets"
+  - namespaces
+  - replicationcontrollers
+  - services
+  - nodes
+  - nodes/spec
+  - pods
+  - jobs
+  - cronjobs
+  - persistentvolumes
+  - persistentvolumeclaims
+  - deployments
+  - replicasets
+  - daemonsets
   verbs:
-    - "get"
-    - "watch"
-    - "list"
-- apiGroups: [""]
+  - get
+  - watch
+  - list
+- apiGroups:
+  - ""
   resources:
-    - "services/proxy"
-    - "pods/proxy"
-    - "nodes/proxy"
-    - "nodes/stats"
-    - "nodes/metrics"
+  - services/proxy
+  - pods/proxy
+  - nodes/proxy
+  - nodes/stats
+  - nodes/metrics
   verbs:
-    - "get"
-    - "list"
+  - get
+  - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: cloudability-metrics-agent
   namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cloudability-metrics-agent
 subjects:
 - kind: ServiceAccount
   name: cloudability
   namespace: cloudability
-roleRef:
-  kind: ClusterRole
-  name: cloudability-metrics-agent
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -69,83 +70,84 @@ metadata:
   name: cloudability-metrics-agent
   namespace: cloudability
 rules:
-- apiGroups: ["*"]
+- apiGroups:
+  - '*'
   resources:
-    - "pods"
-    - "pods/log"
+  - pods
+  - pods/log
   verbs:
-    - "get"
-    - "list"
+  - get
+  - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: cloudability-metrics-agent
   namespace: cloudability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cloudability-metrics-agent
 subjects:
 - kind: ServiceAccount
   name: cloudability
   namespace: cloudability
-roleRef:
-  kind: Role
-  name: cloudability-metrics-agent
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    name: "cloudability-metrics-agent"
-  name: "cloudability-metrics-agent"
+    name: cloudability-metrics-agent
+  name: cloudability-metrics-agent
   namespace: cloudability
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: cloudability-metrics-agent
-  replicas: 1
   template:
     metadata:
       labels:
         app: cloudability-metrics-agent
     spec:
-      serviceAccount: "cloudability"
       containers:
-        - image: cloudability/metrics-agent:latest
-          imagePullPolicy: Always
-          securityContext:
-              runAsNonRoot: true
-              seccompProfile:
-                type: RuntimeDefault
-              capabilities:
-                drop:
-                  - ALL
-              allowPrivilegeEscalation: false
-          resources:
-            requests:
-              memory: "2Gi"
-              cpu: ".5"
-            limits:
-              memory: "4Gi"
-              cpu: "1"
-          livenessProbe:
-            exec:
-              command:
-                - touch
-                - tmp/healthy
-            initialDelaySeconds: 120
-            periodSeconds: 600
-          name: "cloudability-metrics-agent"
-          args:
-            - "kubernetes"
-          env:
-            - name: CLOUDABILITY_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: cloudability-api-key
-                  key: api-key
-            - name: CLOUDABILITY_CLUSTER_NAME
-              value: "build10"
-            - name: CLOUDABILITY_UPLOAD_REGION
-              value: "us-west-2"
-            - name: CLOUDABILITY_POLL_INTERVAL
-              value: "180"
+      - args:
+        - kubernetes
+        env:
+        - name: CLOUDABILITY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: api-key
+              name: cloudability-api-key
+        - name: CLOUDABILITY_CLUSTER_NAME
+          value: build10
+        - name: CLOUDABILITY_UPLOAD_REGION
+          value: us-west-2
+        - name: CLOUDABILITY_POLL_INTERVAL
+          value: "180"
+        image: cloudability/metrics-agent:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          exec:
+            command:
+            - touch
+            - tmp/healthy
+          initialDelaySeconds: 120
+          periodSeconds: 600
+        name: cloudability-metrics-agent
+        resources:
+          limits:
+            cpu: "1"
+            memory: 4Gi
+          requests:
+            cpu: ".5"
+            memory: 2Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      serviceAccount: cloudability

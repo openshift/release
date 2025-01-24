@@ -14,9 +14,9 @@ export GOCACHE=/tmp/.cache/go-build
 mkdir -p /tmp/go/bin $GOCACHE \
   && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
-git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
+git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout -b downstream-release "${INTEROP_TESTS_COMMIT}"
+git checkout rhosdt-3-3-interop
 make build
 
 #Enable user workload monitoring.
@@ -57,8 +57,7 @@ chainsaw test \
 --test-dir \
 tests/e2e \
 tests/e2e-openshift \
-tests/e2e-openshift-serverless \
-tests/e2e-openshift-ossm || any_errors=true
+tests/e2e-openshift-serverless || any_errors=true
 
 # Get the platform type
 dt_platform_type=$(oc get infrastructures cluster -o=jsonpath='{.status.platformStatus.type}')

@@ -1,0 +1,83 @@
+ref:
+  as: redhat-chaos-syn-flood
+  from_image:
+    namespace: chaos
+    name: prow-scripts
+    tag: latest
+  commands: redhat-chaos-syn-flood-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/es
+  env:
+    - name: DURATION
+      default: "600"
+    - name: TARGET_NAMESPACE
+      default: ""
+    - name: NODE_SELECTORS
+      default: ""
+    - name: TARGET_SERVICE_LABEL
+      default: ""
+    - name: TARGET_PORT
+      default: "443"
+    - name: PACKET_SIZE
+      default: "120"
+    - name: WINDOW_SIZE
+      default: "64"
+    - name: TARGET_SERVICE
+      default: ""
+    - name: TOTAL_CHAOS_DURATION
+      default: "120"
+    - name: WAIT_DURATION
+      default: "300"
+    - name: RETRY_WAIT
+      default: "60"
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "/home/krkn/kraken/config/alerts_openshift.yaml"
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: TELEMETRY_ENABLED
+      default: "True"
+    - name: TELEMETRY_API_URL
+      default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+    - name: TELEMETRY_USERNAME
+      default: "redhat-chaos"
+    - name: TELEMETRY_GROUP
+      default: "prow"
+    - name: TELEMETRY_RUN_TAG
+      default: "syn-flood"
+    - name: TELEMETRY_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMTRY_BACKUP_THREADS
+      default: "5"
+    - name: TELEMETRY_ARCHIVE_PATH
+      default: "/tmp"
+    - name: TELEMETRY_MAX_RETRIES
+      default: "0"
+    - name: TELEMETRY_ARCHIVE_SIZE
+      default: "1000000"
+    - name: TELEMETRY_LOGS_BACKUP
+      default: "True"
+    - name: TELEMTRY_CLI_PATH
+      default: "/usr/local/bin/oc"
+    - name: TELEMETRY_EVENTS_BACKUP
+      default: "True"
+    - name: ENABLE_ES
+      default: "True"
+    - name: ES_COLLECT_METRICS
+      default: "True"
+    - name: ES_COLLECT_ALERTS
+      default: "True"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This workflow runs the krkn-hub config workload in the deployed cluster and introduces network latency, packet loss, bandwidth restriction in the egress traffic of a Node's interface using the tc and Netem.

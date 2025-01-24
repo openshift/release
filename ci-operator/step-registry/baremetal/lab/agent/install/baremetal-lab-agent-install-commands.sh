@@ -121,6 +121,18 @@ do
   fi
 done
 
+echo "[INFO] Looking for patches to the agent-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_agent_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/agent-config.yaml" "$f"
+  fi
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
@@ -156,6 +168,9 @@ case "${BOOT_MODE}" in
   oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
+  if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
+  fi
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
@@ -238,7 +253,6 @@ if ! wait $!; then
   exit 1
 fi
 
-update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
@@ -246,6 +260,7 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+update_image_registry
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

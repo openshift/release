@@ -9,8 +9,9 @@ set +e
 env > "${ARTIFACT_DIR}/prow-ci-env.log"
 
 job_type="${JOB_TYPE:-}"
+
 user=""
-pull_number="null"
+pull_number=""
 if [[ "${job_type}" == "presubmit" ]]; then
     user=$(echo "${JOB_SPEC:-}" | jq -r '.refs.pulls[].author' | tr -d "[]")
     pull_number=${PULL_NUMBER:-unknown}
@@ -21,6 +22,9 @@ elif [[ "${job_type}" == "postsubmit" ]]; then
 else
     echo "The job type - ${job_type} is not supported yet!"
 fi
+user=${user:-"empty"}
+pull_number=${pull_number:-"empty"}
+
 ci_type="prow"
 if [[ "${JOB_NAME_SAFE:-}" == "launch" ]]; then
     ci_type="cluster-bot"

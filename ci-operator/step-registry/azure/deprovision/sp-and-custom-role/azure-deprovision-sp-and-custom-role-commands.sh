@@ -17,6 +17,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/installer-sp-minter.json" ]]; then
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/installer-sp-minter.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -32,19 +35,23 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 
 if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
     echo "Deleting sp..."
-    sp_id=$(< "${SHARED_DIR}/azure_sp_id")
-    cmd="az ad sp delete --id ${sp_id}"
-    run_command "${cmd}"
+    sp_ids=$(< "${SHARED_DIR}/azure_sp_id")
+    for sp_id in ${sp_ids}; do
+        cmd="az ad app delete --id ${sp_id}"
+        run_command "${cmd}"
+    done
 fi
 
 if [[ -f "${SHARED_DIR}/azure_custom_role_name" ]]; then
-    echo "Deleting custom role assigment on scope of subsciption..."
-    role_name=$(< ${SHARED_DIR}/azure_custom_role_name)
-    assigment_id=$(az role assignment list --role ${role_name} --query "[].id" -otsv)
-    cmd="az role assignment delete --ids ${assigment_id}"
-    run_command "${cmd}"
+    role_names=$(< ${SHARED_DIR}/azure_custom_role_name)
+    for role_name in ${role_names}; do
+        echo "Deleting custom role assigment on scope of subsciption, role name: ${role_name}"
+        assigment_id=$(az role assignment list --role ${role_name} --query "[].id" -otsv)
+        cmd="az role assignment delete --ids ${assigment_id}"
+        run_command "${cmd}"
 
-    echo "Deleting custom role definition..."
-    cmd="az role definition delete --name ${role_name}"
-    run_command "${cmd}"
+        echo "Deleting custom role definition, role name: ${role_name}"
+        cmd="az role definition delete --name ${role_name}"
+        run_command "${cmd}"
+    done
 fi

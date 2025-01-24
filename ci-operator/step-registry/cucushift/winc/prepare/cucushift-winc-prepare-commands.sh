@@ -126,7 +126,7 @@ EOF
 IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
 
 
-winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("win")).metadata.name')
+winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("winworker")).metadata.name')
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
 echo "Waiting for Windows nodes to come up in Running state"
@@ -160,6 +160,10 @@ case "$IAAS_PLATFORM" in
 	# in this example projects/windows-cloud/global/images/family/windows-2022-core
 	# windows_os_image_id needs to be windows-2022-core
 	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
+    ;;
+  nutanix)
+        # Extract the image name from Nutanix providerSpec
+        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.name}" -n openshift-machine-api)
     ;;
   *)
     echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"

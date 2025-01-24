@@ -74,6 +74,7 @@ caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
+caps_operator[OperatorLifecycleManagerV1]="olm"
 caps_operator[CloudCredential]="cloud-credential"
 caps_operator[CloudControllerManager]="cloud-controller-manager"
 caps_operator[Ingress]="ingress"
@@ -92,7 +93,9 @@ v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
-latest_defined="v416"
+v417=" ${v416}"
+v418=" ${v417} OperatorLifecycleManagerV1" 
+latest_defined="v418"
 always_default="${!latest_defined}"
 # always enabled capabilities
 #declare -A always_enabled_caps
@@ -135,6 +138,12 @@ case ${baselinecaps_from_config} in
   ;;
 "v4.16")
   enabled_capability_set="${v416}"
+  ;;
+"v4.17")
+  enabled_capability_set="${v417}"
+  ;;
+"v4.18")
+  enabled_capability_set="${v418}"
   ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"

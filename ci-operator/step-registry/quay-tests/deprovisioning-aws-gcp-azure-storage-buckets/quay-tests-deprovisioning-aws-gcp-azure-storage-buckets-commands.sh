@@ -49,3 +49,20 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'aws' ]]; then
     terraform destroy -auto-approve || true          
 fi
 
+if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
+    mkdir -p QUAY_AWSSTS && cd QUAY_AWSSTS
+    cp "${SHARED_DIR}/terraform.tgz" .
+    tar -xzvf terraform.tgz && ls
+
+    QUAY_AWS_S3_BUCKET=$(cat "${SHARED_DIR}/QUAY_AWS_STS_S3_BUCKET")
+    randomnum=$(cat "${SHARED_DIR}/QUAY_AWS_STS_RANDOM")
+    QUAY_AWS_STS_ROLE_NAME="quay_prow_role${randomnum}"
+    QUAY_AWS_STS_USER="quay_prow_automation${randomnum}"
+    export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
+    export TF_VAR_aws_sts_role_name="${QUAY_AWS_STS_ROLE_NAME}"
+    export TF_VAR_aws_sts_user_name="${QUAY_AWS_STS_USER}"
+
+    echo "Start to destroy quay aws sts ..."
+    terraform init
+    terraform destroy -auto-approve || true
+fi

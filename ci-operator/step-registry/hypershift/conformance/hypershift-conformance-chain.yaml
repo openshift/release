@@ -149,12 +149,23 @@ chain:
       if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
         export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       fi
-      
+
+      if [[ -n "${TEST_INCLUDES}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep "${TEST_INCLUDES}" >/tmp/test_includes
+      fi
+
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          if [[ -n "${TEST_INCLUDES}" ]]; then
+            TEST_SKIPS_SPECIFIC=$(echo "$TEST_SKIPS" | sed 's/\\\[Suite:openshift\/conformance\/parallel\\\]$//')
+            TEST_SKIPS_SPECIFIC="${TEST_SKIPS_SPECIFIC%\\|}"
+            cat /tmp/test_includes | grep -v "${TEST_SKIPS_SPECIFIC:-placeholder_no_match}" >>/tmp/tests
+          fi
+
           echo "Skipping tests:"
-          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          echo "${TESTS}" | grep -vxFf /tmp/tests || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
@@ -201,6 +212,11 @@ chain:
         It is suggested to test the regex to make sure that it matches with the available tests.
         Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
         that are printed in Prow won't exactly match the list returned by openshift-tests.
+    - name: TEST_INCLUDES
+      default: ""
+      documentation: |
+        Regular expression (POSIX basic regular expression) of tests to include,
+        even if these tests were matched in the TEST_SKIPS expression.
     - name: SKIP_MONITOR_TEST
       default: ""
       documentation: |-

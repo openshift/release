@@ -143,7 +143,7 @@ function download_microshift_scripts() {
 
 function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 22 )); then
+    if (( go_version < 23 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
         mkdir -p /tmp/prow
@@ -233,8 +233,15 @@ EOF
 
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         testname=$(basename "${test}")
+        p_extra_style=""
+        # If there's no junit from Robot Framework execution (i.e. it didn't run), or
+        # if junit contains any failures=N, N>0, then make the line red-ish to make it easier to find.
+        if [[ ! -e "${test}/junit.xml" ]] || grep --quiet --extended-regexp 'failures="[1-9][0-9]?"' "${test}/junit.xml"; then
+            p_extra_style="color:#FF6666"
+        fi
+
         cat >>"${report_html}" <<EOF
-<p>${testname}:&nbsp;
+<p style="${p_extra_style}">${testname}:&nbsp;
 <a target="_blank" href="${url_prefix}/${testname}">directory</a>
 EOF
 

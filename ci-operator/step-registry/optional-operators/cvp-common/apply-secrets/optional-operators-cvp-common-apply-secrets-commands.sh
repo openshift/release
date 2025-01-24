@@ -5,7 +5,6 @@
 
 REHEARSAL_INSTALL_NAMESPACE="!create"
 
-PYXIS_URL="${PYXIS_URL:-""}"
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
@@ -31,34 +30,6 @@ metadata:
   $NS_NAMESTANZA
 EOF
     )
-fi
-
-
-# Check if PYXIS_URL exists, skip the whole step if not.
-if [[ -z "$PYXIS_URL" ]]; then
-    echo "[$(date --utc +%FT%T.%3NZ)] PYXIS_URL is not defined!"
-else
-    echo "[$(date --utc +%FT%T.%3NZ)] PYXIS_URL is defined, proceeding with cvp-common-apply-secrets from PYXIS"
-    # Creating file that contains namespace name
-    echo "$OO_INSTALL_NAMESPACE" > "${SHARED_DIR}"/operator-install-namespace.txt
-    GPG_KEY=${GPG_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-gpg.key} # Secret file which will be mounted by DPTP
-    GPG_PASS=${GPG_PASS:-/var/run/cvp-pyxis-gpg-secret/cvp-gpg.pass} # Secret file which will be mounted by DPTP
-    PKCS12_CERT=${PKCS12_CERT:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.cert} # Secret file which will be mounted by DPTP
-    PKCS12_KEY=${PKCS12_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.key} # Secret file which will be mounted by DPTP
-
-    echo "[$(date --utc +%FT%T.%3NZ)] Fetching the kube_objects from Pyxis for ISV pid ${PYXIS_URL}"
-    touch /tmp/get_kubeObjects.txt
-    curl --key "${PKCS12_KEY}" --cert "${PKCS12_CERT}" "${PYXIS_URL}" | jq -r ".container.kube_objects" > /tmp/get_kubeObjects.txt
-
-    echo "[$(date --utc +%FT%T.%3NZ)] Decrypting the kube_objects fetched from Pyxis"
-    gpg --batch --yes --quiet --pinentry-mode loopback --import --passphrase-file "${GPG_PASS}" "${GPG_KEY}"
-    gpg --batch --yes --quiet --pinentry-mode loopback --decrypt --passphrase-file "${GPG_PASS}" /tmp/get_kubeObjects.txt > /tmp/kube_objects.yaml
-
-    echo "[$(date --utc +%FT%T.%3NZ)] Applying the kube_objects on the testing OCP cluster"
-    oc apply -f /tmp/kube_objects.yaml -n "$OO_INSTALL_NAMESPACE"
-
-    # Remove the kube objects file just in case
-    rm -rf /tmp/kube_objects.yaml
 fi
 
 # applying custom kubeobjects from the vault configured

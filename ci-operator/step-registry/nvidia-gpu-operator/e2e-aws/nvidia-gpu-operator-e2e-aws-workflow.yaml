@@ -1,0 +1,53 @@
+workflow:
+  as: nvidia-gpu-operator-e2e-aws
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - ref: single-node-conf-aws
+      - chain: ipi-install
+    test:
+      - as: gpu-operator-e2e
+        commands: make run-tests
+        from: nvidia-ci
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+        env:
+          - name: NVIDIAGPU_CLEANUP
+            default: "false"
+            documentation: |-
+              Clean up installed operators on test completion. Is not needed when
+              the cluster will be destroyed after running the tests.
+          - name: NVIDIAGPU_DEPLOY_FROM_BUNDLE
+            default: "false"
+            documentation: |-
+              Deploy the NVIDIA GPU Operator from a bundle instead of an OLM catalog source.
+          - name: TEST_FEATURES
+            default: "nvidiagpu"
+            documentation: |-
+              The subset of tests to run.
+          - name: NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE
+            default: "g4dn.xlarge"
+            documentation: |-
+              The AWS instance type with a NVIDIA GPU.
+          - name: NVIDIAGPU_NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
+            documentation: |-
+              The catalog source index image to use if the NFD operator
+              does not exist in the default catalog source.
+          - name: NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
+            documentation: |-
+              The catalog source index image to use if the NVIDIA GPU operator
+              does not exist in the default catalog source.
+          - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+            default: ""
+            documentation: |-
+              The OLM subscription channel for the NVIDIA GPU operator.
+              Latest if not specified.
+    post:
+      - chain: ipi-aws-post
+  documentation: |-
+    This workflow provisions an OpenShift cluster on AWS suitable for installing the
+    NVIDIA GPU operator, and preforms E2E tests on the operator.

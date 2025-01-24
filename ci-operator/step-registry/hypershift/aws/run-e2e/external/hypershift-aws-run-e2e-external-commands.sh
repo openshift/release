@@ -13,6 +13,11 @@ function cleanup() {
 }
 trap cleanup EXIT
 
+check_e2e_flag() {
+  grep -q "$1" <<<"$( bin/test-e2e -h 2>&1 )"
+  return $?
+}
+
 REQUEST_SERVING_COMPONENT_TEST="${REQUEST_SERVING_COMPONENT_TEST:-}"
 REQUEST_SERVING_COMPONENT_PARAMS=""
 
@@ -29,7 +34,7 @@ if [[ "${DISABLE_PKI_RECONCILIATION:-}" == "true" ]]; then
 fi
 
 AWS_OBJECT_PARAMS=""
-if grep -q 'e2e.aws-oidc-s3-bucket-name' <<<"$( bin/test-e2e -h 2>&1 )"; then
+if check_e2e_flag 'e2e.aws-oidc-s3-bucket-name'; then
   AWS_OBJECT_PARAMS="--e2e.aws-oidc-s3-bucket-name=hypershift-ci-oidc --e2e.aws-kms-key-alias=alias/hypershift-ci"
 fi
 
@@ -46,6 +51,11 @@ fi
 N2_NP_VERSION_TEST_ARGS=""
 if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
+fi
+
+RUN_UPGRADE_PARAM=""
+if [[ "${RUN_UPGRADE_TEST:-}" == "true" ]] && check_e2e_flag "upgrade.run-tests" ; then
+  RUN_UPGRADE_PARAM="--upgrade.run-tests --e2e.private-platform=AWS --e2e.ho-enable-ci-debug-output=true --e2e.hypershift-operator-latest-image=${CI_HYPERSHIFT_OPERATOR}"
 fi
 
 export EVENTUALLY_VERBOSE="false"
@@ -67,5 +77,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.aws-endpoint-access=PublicAndPrivate \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
   ${AWS_MULTI_ARCH_PARAMS:-} \
-  ${REQUEST_SERVING_COMPONENT_PARAMS:-} &
+  ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
+  ${RUN_UPGRADE_PARAM} &
 wait $!

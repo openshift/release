@@ -21,13 +21,6 @@ if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
     exit 1
 fi
 
-if [ "${NFV_NODEPOOLS}" == "true" ]; then
-    # TODO(emilien): be more specific on the regex to only select the NFV related tests.
-    E2E_TESTS_REGEX='^TestNodePool$'
-    # NFV's flavor uses dedicated CPU so we can't deploy many nodepools at the same time
-    E2E_TESTS_PARALLEL=1
-fi
-
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -37,10 +30,6 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
-    E2E_EXTRA_ARGS="${E2E_EXTRA_ARGS} --e2e.openstack-ca-cert-file ${SHARED_DIR}/osp-ca.crt"
 fi
 
 # run the test

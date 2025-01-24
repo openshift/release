@@ -20,6 +20,7 @@ function create_resource_group() {
     echo "create resource group ... ${rg}"
     "${IBMCLOUD_CLI}" resource group-create ${rg} || return 1
     "${IBMCLOUD_CLI}" target -g ${rg} || return 1
+    "${IBMCLOUD_CLI}" resource group ${rg} || return 1
 }
 
 ibmcloud_login

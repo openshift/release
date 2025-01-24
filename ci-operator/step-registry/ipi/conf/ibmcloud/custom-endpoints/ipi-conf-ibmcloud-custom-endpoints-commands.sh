@@ -1,9 +1,13 @@
 #!/bin/bash
+set -o nounset
+set -o errexit
+set -o pipefail
 
 REGION="${LEASED_RESOURCE}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
-DEFAULT_PRIVATE_ENDPOINTS=$(mktemp)
-cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
+DEFAULT_PRIVATE_ENDPOINTS="${SHARED_DIR}/eps_default.json"
+if [[ ! -f "${DEFAULT_PRIVATE_ENDPOINTS}" ]]; then
+  cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
 {
     "IAM": "https://private.iam.cloud.ibm.com",
     "VPC": "https://${REGION}.private.iaas.cloud.ibm.com/v1",
@@ -12,9 +16,14 @@ cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
     "DNSServices": "https://api.private.dns-svcs.cloud.ibm.com/v1",
     "COS": "https://s3.direct.${REGION}.cloud-object-storage.appdomain.cloud",
     "GlobalSearch": "https://api.private.global-search-tagging.cloud.ibm.com",
-    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com"
+    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com",
+    "COSConfig": "https://config.direct.cloud-object-storage.cloud.ibm.com/v1",
+    "GlobalCatalog": "https://private.globalcatalog.cloud.ibm.com",
+    "KeyProtect": "https://private.${REGION}.kms.cloud.ibm.com",
+    "HyperProtect": "https://api.private.${REGION}.hs-crypto.cloud.ibm.com"
 }
 EOF
+fi
 
 function patch_endpoint()
 {
@@ -58,4 +67,16 @@ if [ -n "$SERVICE_ENDPOINT_GlobalSearch" ]; then
 fi
 if [ -n "$SERVICE_ENDPOINT_GlobalTagging" ]; then
   patch_endpoint "GlobalTagging" $SERVICE_ENDPOINT_GlobalTagging
+fi
+if [[ -n "$SERVICE_ENDPOINT_COSConfig" ]]; then
+  patch_endpoint "COSConfig" $SERVICE_ENDPOINT_COSConfig
+fi
+if [[ -n "$SERVICE_ENDPOINT_GlobalCatalog" ]]; then
+  patch_endpoint "GlobalCatalog" $SERVICE_ENDPOINT_GlobalCatalog
+fi
+if [[ -n "$SERVICE_ENDPOINT_KeyProtect" ]]; then
+  patch_endpoint "KeyProtect" $SERVICE_ENDPOINT_KeyProtect
+fi
+if [[ -n "$SERVICE_ENDPOINT_HyperProtect" ]]; then
+  patch_endpoint "HyperProtect" $SERVICE_ENDPOINT_HyperProtect
 fi

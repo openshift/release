@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 
 date -u "+%Y-%m-%dT%H:%M:%SZ"
+[ -f "${SHARED_DIR}/proxy-conf.sh" ] && source "${SHARED_DIR}/proxy-conf.sh"
 
 MAJOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $1}')
 MINOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $2}')
