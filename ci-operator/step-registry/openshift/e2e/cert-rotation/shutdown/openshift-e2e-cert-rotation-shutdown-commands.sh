@@ -48,6 +48,8 @@ run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${S
 run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
 # Shutdown nodes
+python -m ensurepip && python -m pip install tqdm
+
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
 set +x
 for vm in ${VMS[@]}; do
@@ -60,11 +62,10 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo -n "."
+    echo "." >&3; echo;
     sleep 10
-  done
+  done 3> >(/usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null)
 done
 
 # Set date for host
@@ -83,11 +84,10 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo -n "."
+    echo "." >&3; echo;
     sleep 10
-  done
+  done 3> >(/usr/local/bin/tqdm --desc "Starting ${vm} VM" --null)
 done
 set -x
 
