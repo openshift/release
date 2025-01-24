@@ -3,6 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base
+  go:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
@@ -10,8 +14,43 @@ images:
 - dockerfile_path: test/e2e/alertmanager-mock/build/Dockerfile
   from: base
   to: alertmanager-mock
-- dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci
-  from: base
+- dockerfile_literal: |-
+    FROM registry.redhat.io/ubi8/go-toolset AS builder
+
+    # Set the working directory inside the container
+    WORKDIR /app
+
+    # Copy the entire repository into the container
+    COPY . .
+
+    # Build the Go application
+    RUN env GOOS=linux GOARCH=amd64 go build -buildvcs=false -o workload-analyzer .
+
+    FROM registry.access.redhat.com/ubi8/ubi:latest
+
+    ENV CONTROLLER=/usr/local/bin/workload-analyzer \
+        USER_UID=1001 \
+        USER_NAME=workload-analyzer \
+        LANG=en_US.utf8
+
+    # Download crictl to make manual debugging in the contidion easier
+    ENV CRICTL_VERSION="v1.28.0"
+    RUN curl -L -s https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz -o crictl-${CRICTL_VERSION}-linux-amd64.tar.gz && \
+        sha256sum crictl-${CRICTL_VERSION}-linux-amd64.tar.gz | grep "8dc78774f7cbeaf787994d386eec663f0a3cf24de1ea4893598096cb39ef2508" && \
+        tar zxvf crictl-${CRICTL_VERSION}-linux-amd64.tar.gz  && \
+        rm -f crictl-${CRICTL_VERSION}-linux-amd64.tar.gz && \
+        mv crictl /usr/bin/crictl
+
+    # install controller binary
+    COPY --from=builder /app/workload-analyzer ${CONTROLLER}
+
+    COPY build/bin /usr/local/bin
+    RUN  /usr/local/bin/user_setup
+
+    ENTRYPOINT ["/usr/local/bin/entrypoint"]
+
+    USER ${USER_UID}
+  from: go
   to: workload-analyzer
 releases:
   initial:
@@ -41,8 +80,6 @@ tests:
         IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
         KUBECONFIG="" oc registry login --to=/tmp/auth.json
         BUILD_REGISTRY=$(grep -Eo '([0-9A-Za-z]+\.)+\w+' /tmp/auth.json)
-        echo BUILD_REGISTRY=${BUILD_REGISTRY}
-        echo IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
         oc create namespace ${IMAGE_NAMESPACE}
         oc create secret generic build-registry --from-file=/tmp/auth.json --type=kubernetes.io/podmanconfigjson -n openshift-config
         oc import-image pipeline:alertmanager-mock --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:alertmanager-mock --confirm -n ${IMAGE_NAMESPACE}
