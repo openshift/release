@@ -564,13 +564,14 @@ fi
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  set -x
   tmpDir=$(mktemp -d)
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
   oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=${tmpDir}
-  initInstall=$(which openshift-install)
   $tmpDir/openshift-install version
-  cp $tmpDir/openshift-install ${initInstall}
+  cp $tmpDir/openshift-install "/cli/"
   echo "overwrite the openshift-install Done"
+  $(which openshift-install)
 fi  
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
