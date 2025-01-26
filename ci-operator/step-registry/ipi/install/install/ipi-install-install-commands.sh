@@ -571,7 +571,7 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   $tmpDir/openshift-install version
   cp $tmpDir/openshift-install "/cli/"
   echo "overwrite the openshift-install Done"
-  $(which openshift-install)
+  which openshift-install
 fi  
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
