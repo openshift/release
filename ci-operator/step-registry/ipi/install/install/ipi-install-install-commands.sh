@@ -199,7 +199,7 @@ function copy_kubeconfig_minimal() {
   echo 'api available'
 
   echo 'waiting for bootstrap to complete'
-  openshift-install --dir="${dir}" wait-for bootstrap-complete &
+  install --dir="${dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
@@ -463,6 +463,13 @@ EOF
   done
 }
 
+function install() {
+  if [[ -f "/tmp/openshift_install" ]]; then
+    /tmp/openshift_install
+  else
+    openshift_install
+  fi
+}
 # inject_spot_instance_config is an AWS specific option that enables the
 # use of AWS spot instances.
 # PARAMS:
@@ -487,7 +494,7 @@ function inject_spot_instance_config() {
       if [[ -d ${dir}/cluster-api/machines ]]; then
         echo "Spot masters supported via CAPA"
         manifests="${dir}/cluster-api/machines/10_inframachine_*.yaml $manifests"
-      elif openshift-install list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
+      elif install list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
         echo "Spot masters supported via terraform"
       else
         echo "Spot masters are not supported in this configuration!"
@@ -565,13 +572,10 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
   set -x
-  tmpDir=$(mktemp -d)
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-  oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=${tmpDir}
-  $tmpDir/openshift-install version
-  cp $tmpDir/openshift-install "/bin/"
-  echo "overwrite the openshift-install Done"
-  which openshift-install
+  oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=/tmp
+  /tmp/openshift-install version
+  echo "extract the openshift-install from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} Done"
 fi  
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -683,8 +687,8 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
 echo "**** The version of openshift-install: ********************************"
-openshift-install version
-openshift-install --dir="${dir}" create manifests &
+install version
+install --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
 if test "${ret}" -ne 0 ; then
@@ -749,7 +753,7 @@ esac
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
-  openshift-install --dir="${dir}" create ignition-configs &
+  install --dir="${dir}" create ignition-configs &
   wait "$!"
   ret="$?"
   if test "${ret}" -ne 0 ; then
@@ -796,15 +800,15 @@ tries=1
 set +o errexit
 backup=/tmp/install-orig
 cp -rfpv "$dir" "$backup"
-openshift-install version
-which openshift-install
+install version
+which install
 while [ $ret -eq 4 ] && [ $tries -le $max ]
 do
   echo "Install attempt $tries of $max"
   if [ $tries -gt 1 ]; then
     write_install_status
     populate_artifact_dir
-    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -825,7 +829,7 @@ do
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
 
-  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
