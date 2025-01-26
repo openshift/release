@@ -21,19 +21,23 @@ chmod 600 "${SHARED_DIR}/kubeconfig"
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
-K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
-kubectl config set-context --current --namespace=default
-kubectl create serviceaccount tester-sa-2
-kubectl create clusterrolebinding tester-sa-2-binding \
-  --clusterrole=cluster-admin \
-  --serviceaccount=default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(kubectl create token tester-sa-2)
-export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
-
-if kubectl auth whoami > /dev/null 2>&1; then
-  echo "SHOULD: Using an ephemeral AKS cluster."
+# Create a service account and assign cluster url and token
+SA_NAME="tester-sa-2"
+SA_NAMESPACE="default"
+SA_BINDING_NAME="${SA_NAME}-binding"
+if ! kubectl get serviceaccount ${SA_NAME} -n ${SA_NAMESPACE} &> /dev/null; then
+  echo "Creating service account ${SA_NAME}..."
+  kubectl create serviceaccount ${SA_NAME} -n ${SA_NAMESPACE}
+  echo "Creating cluster role binding..."
+  kubectl create clusterrolebinding ${SA_BINDING_NAME} \
+      --clusterrole=cluster-admin \
+      --serviceaccount=${SA_NAMESPACE}:${SA_NAME}
+  echo "Service account and binding created successfully"
 else
-  echo "SHOULD: Falling back to a long-running AKS cluster."
+  echo "Service account ${SA_NAME} already exists in namespace ${NAMESPACE}"
 fi
+K8S_CLUSTER_TOKEN=$(kubectl create token tester-sa-2 -n default)
+K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
+
 bash ./.ibm/pipelines/openshift-ci-tests.sh
