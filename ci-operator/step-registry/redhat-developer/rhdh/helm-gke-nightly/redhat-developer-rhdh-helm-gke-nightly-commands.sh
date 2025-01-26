@@ -30,7 +30,7 @@ if ! kubectl get serviceaccount ${SA_NAME} -n ${SA_NAMESPACE} &> /dev/null; then
       --serviceaccount=${SA_NAMESPACE}:${SA_NAME}
   echo "Service account and binding created successfully"
 else
-  echo "Service account ${SA_NAME} already exists in namespace ${NAMESPACE}"
+  echo "Service account ${SA_NAME} already exists in namespace ${SA_NAMESPACE}"
 fi
 K8S_CLUSTER_TOKEN=$(kubectl create token tester-sa-2 -n default)
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
