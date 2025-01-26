@@ -569,7 +569,7 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
   oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=${tmpDir}
   $tmpDir/openshift-install version
-  cp $tmpDir/openshift-install "/cli/"
+  cp $tmpDir/openshift-install "/bin/"
   echo "overwrite the openshift-install Done"
   which openshift-install
 fi  
@@ -800,6 +800,8 @@ tries=1
 set +o errexit
 backup=/tmp/install-orig
 cp -rfpv "$dir" "$backup"
+openshift-install version
+which openshift-install
 while [ $ret -eq 4 ] && [ $tries -le $max ]
 do
   echo "Install attempt $tries of $max"
