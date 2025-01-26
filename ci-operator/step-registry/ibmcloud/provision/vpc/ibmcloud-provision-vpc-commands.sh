@@ -101,12 +101,12 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" rg-id="$3" num_subnets_pair_per_zone="${4:-1}"
+    local preName="$1" vpcName="$2" rgID="$3" num_subnets_pair_per_zone="${4:-1}"
     local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
-    echo "Creating vpc $vpcName under $rg-id ..."
+    echo "Creating vpc $vpcName under $rgID ..."
     # create vpc
-    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName}  --resource-group-id "${rg-id}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName}  --resource-group-id "${rgID}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
