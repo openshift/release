@@ -101,12 +101,12 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" rg="$3" num_subnets_pair_per_zone="${4:-1}"
+    local preName="$1" vpcName="$2" rg-id="$3" num_subnets_pair_per_zone="${4:-1}"
     local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
-    echo "Creating vpc $vpcName under $rg ..."
+    echo "Creating vpc $vpcName under $rg-id ..."
     # create vpc
-    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName}  --resource-group-id "${rg-id}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
@@ -232,7 +232,7 @@ echo "Adjusted zones to ${ZONES[*]} based on ZONES_COUNT: ${ZONES_COUNT}."
 
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
-create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
+create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${rg_id}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}"
