@@ -465,9 +465,9 @@ EOF
 
 function install() {
   if [[ -f "/tmp/openshift_install" ]]; then
-    /tmp/openshift_install
+    /tmp/openshift_install --log-level=debug "${@}" 2>&1
   else
-    openshift_install
+    openshift_install --log-level=debug "${@}" 2>&1
   fi
 }
 # inject_spot_instance_config is an AWS specific option that enables the
