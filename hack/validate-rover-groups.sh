@@ -11,7 +11,7 @@ out=$(sync-rover-groups --manifest-dir=$RELEASE_REPO/clusters --config-file=$REL
 
 # && true avoids the abrupt script termination because diff return code.
 # Exit status is 0 if inputs are the same, 1 if different, 2 if trouble.
-echo "$out" | diff - $RELEASE_REPO/core-services/sync-rover-groups/_config.yaml && true
+echo "$out" | diff - $RELEASE_REPO/core-services/sync-rover-groups/_config.yaml -U10 && true
 if [[ $? -ne 0 ]]; then
   echo "ERROR: Changes in release/core-services/sync-rover-groups/_config.yaml ^^^"
   echo "ERROR: Running sync-rover-groups --validate results in changes"
