@@ -99,6 +99,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -826,6 +830,12 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
+- as: e2e-vsphere-externallb-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-externallb
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview
   optional: true
   run_if_changed: vsphere
@@ -863,6 +873,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-disk
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
