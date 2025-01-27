@@ -3,6 +3,19 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- dockerfile_literal: |
+    RUN dnf install --setopt=tsflags=nodocs -y koji && dnf clean all
+  optional: true
+  from: root
+  to: microshift-release-custom-image
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - microshift-release-custom-image
+    name: "4.19"
+    namespace: ocp
 releases:
   latest:
     candidate:
@@ -34,6 +47,7 @@ tests:
     workflow: openshift-microshift-publish-release-notes
 - as: e2e-aws-tests-cache-nightly
   cron: 0 0 * * *
+  cluster: build05
   steps:
     cluster_profile: aws
     env:

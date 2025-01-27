@@ -27,11 +27,6 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -353,6 +348,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       OCP_ARCH: arm64
     test:
@@ -444,6 +440,13 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
+- as: ibmcloud-ipi-default-f28
+  cron: 34 13 15 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
 - as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
   cron: 1 4 24 * *
   steps:
@@ -457,6 +460,8 @@ tests:
   cron: 21 8 11 * *
   steps:
     cluster_profile: ibmcloud-qe
+    env:
+      ZONES_COUNT: "1"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey

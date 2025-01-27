@@ -29,7 +29,32 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
-ci_clone_src
+# To clone a private branch for testing cross-repository source changes, comment
+# out the 'ci_clone_src' function call and add the following commands instead.
+#
+# GUSR=myuser
+# GBRN=mybranch
+# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+#
+#ci_clone_src
+git clone https://github.com/ggiguash/microshift.git -b brew_package_tests /go/src/github.com/openshift/microshift
+
+# Attempt downloading RPMs from brew.
+# This requires VPN access, which is only enabled in the cache jobs.
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
+    # If the current release supports brew RPM download, get the latest RPMs from
+    # brew to be included in the source repository archive
+    pushd /go/src/github.com/openshift/microshift &>/dev/null
+    if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
+        bash -x ./scripts/fetch_tools.sh brew
+        bash -x ./test/bin/manage_brew_rpms.sh download
+    fi
+    popd &>/dev/null
+fi
+# TODO: Remove this
+exit 0
+
+# Archive the sources, potentially including brew RPMs
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \

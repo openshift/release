@@ -113,6 +113,11 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   exit 1
 fi
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
 if [[ -f "${SHARED_DIR}/bastion_public_address" ]]; then
     BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
     BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
