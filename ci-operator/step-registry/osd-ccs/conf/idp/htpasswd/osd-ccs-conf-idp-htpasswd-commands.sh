@@ -85,11 +85,11 @@ echo "Add the user ${IDP_USER} to the cluster-admins group..."
 ocm create user ${IDP_USER} --cluster=${CLUSTER_ID} --group=cluster-admins
 
 echo "Waiting for idp ready..."
-IDP_LOGIN_LOG="${ARTIFACT_DIR}/htpasswd_login.log"
 start_time=$(date +"%s")
 while true; do
   sleep 60
-  echo "Attempt to login..."
+  IDP_LOGIN_LOG="${ARTIFACT_DIR}/htpasswd_login-$(date +%s).log"
+  echo "$(date) Attempt to login..."
   oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true > "${IDP_LOGIN_LOG}" || true
   LOGIN_INFO=$(cat "${IDP_LOGIN_LOG}")
   if [[ "${LOGIN_INFO}" =~ "Login successful" ]]; then
@@ -97,6 +97,7 @@ while true; do
     break
   fi
 
+  echo "$(date) Login failed."
   if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
     echo "error: Timed out while waiting for the htpasswd idp to be ready for login"
     exit 1
