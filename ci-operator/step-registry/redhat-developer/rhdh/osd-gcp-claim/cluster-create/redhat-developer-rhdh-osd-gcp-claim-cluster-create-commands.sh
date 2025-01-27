@@ -20,7 +20,6 @@ git checkout osd-nightly-job || exit
 
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export CLUSTER_NAME="osd-$job_id"
-export OSD_VERSION="4.17.12"
 
 echo "CLUSTER_NAME : $CLUSTER_NAME"
 
