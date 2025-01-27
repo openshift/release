@@ -51,7 +51,7 @@ stringData:
 EOF
 echo "machine API credentials created"
 
-version=$(oc version | grep -oE 'Server Version: ([0-9]+\.[0-9]+)' | sed 's/Server Version: //')
+version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
 resource_timeout_seconds=300
 
 # Do the following if OCP version is >=4.13

@@ -114,6 +114,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -140,6 +148,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -165,6 +181,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
 
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
