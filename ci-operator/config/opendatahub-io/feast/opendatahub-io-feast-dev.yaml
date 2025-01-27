@@ -1,8 +1,9 @@
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/ubi
-      RUN yum install -y --nodocs make git golang
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.22.9
+      USER 0
+      RUN yum install -y --nodocs make git
       RUN ln -s /cli/oc /usr/bin/kubectl
 images:
 - context_dir: .
@@ -35,15 +36,7 @@ tests:
     - as: run-tests
       cli: latest
       commands: |
-        echo "Using feast server image ${FEAST_FEATURE_SERVER_IMAGE}"
-        echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
-        export SHOULD_NOT_CREATE_NS=true
-        export SHOULD_NOT_BUILD_OPERATOR_IMAGE=true
-        export SHOULD_NOT_LOAD_IMAGE_TO_KIND=true
-        export SHOULD_NOT_BUILD_FEAST_IMAGE=true
-        export SHOULD_NOT_LOAD_FEAST_IMAGE_TO_KIND=true
-        export SHOULD_NOT_DEPLOY_OPERATOR=true
-        export SHOULD_NOT_VALIDATE_DEPLOYMENT=true
+        export RUN_ON_OPENSHIFT_CI=true
         cd infra/feast-operator
         make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
         oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
@@ -71,15 +64,7 @@ tests:
     - as: run-tests
       cli: latest
       commands: |
-        echo "Using feast server image ${FEAST_FEATURE_SERVER_IMAGE}"
-        echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
-        export SHOULD_NOT_CREATE_NS=true
-        export SHOULD_NOT_BUILD_OPERATOR_IMAGE=true
-        export SHOULD_NOT_LOAD_IMAGE_TO_KIND=true
-        export SHOULD_NOT_BUILD_FEAST_IMAGE=true
-        export SHOULD_NOT_LOAD_FEAST_IMAGE_TO_KIND=true
-        export SHOULD_NOT_DEPLOY_OPERATOR=true
-        export SHOULD_NOT_VALIDATE_DEPLOYMENT=true
+        export RUN_ON_OPENSHIFT_CI=true
         cd infra/feast-operator
         make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
         oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
