@@ -2,17 +2,10 @@
 set -e
 export HOME WORKSPACE
 HOME=/tmp
-WORKSPACE=/tmp
+WORKSPACE=$(pwd)
 cd /tmp || exit
 
-job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
-export CLUSTER_NAME="osd-$job_id"
-echo "CLUSTER_NAME IN job : $CLUSTER_NAME"
-
-exit 0
-
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-oc whoami 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"

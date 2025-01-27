@@ -24,13 +24,11 @@ export OSD_VERSION="4.17.12"
 
 echo "CLUSTER_NAME : $CLUSTER_NAME"
 
-exit 0
-
 bash ./.ibm/pipelines/cluster/osd-gcp/create-osd.sh
 
-cp -v /tmp/rhdh/osdcluster/cluster-info.id "${SHARED_DIR}/"
+cp -v /tmp/rhdh/osdcluster/cluster-info.name "${SHARED_DIR}/"
 cp -v /tmp/rhdh/osdcluster/kubeconfig "${SHARED_DIR}/"
 
-echo "cluster ID in shared: "
-echo "${SHARED_DIR}/cluster-info.id"
-cat "${SHARED_DIR}/cluster-info.id"
+echo "cluster name in shared: "
+echo "${SHARED_DIR}/cluster-info.name"
+cat "${SHARED_DIR}/cluster-info.name"
