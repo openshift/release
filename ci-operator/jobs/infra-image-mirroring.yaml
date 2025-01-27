@@ -807,6 +807,46 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
+    ci.openshift.io/area: ols-load-generator
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-ols-load-generator
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - command:
+      - /tp-entrypoint.sh
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_ols_load_generator
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: .dockerconfigjson
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-ols-load-generator
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
     ci.openshift.io/area: observability-ui
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-observability-ui

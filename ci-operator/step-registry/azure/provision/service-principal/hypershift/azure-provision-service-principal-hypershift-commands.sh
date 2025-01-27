@@ -27,9 +27,13 @@ declare -A component_to_cert_name
 for component in $COMPONENTS; do
     name="${SP_NAME_PREFIX}-${component}"
     scopes="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
+    role="Contributor"
+
     if [[ $component == ingress ]]; then
-        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
+          role="Azure Red Hat OpenShift Cluster Ingress Operator Role"
+          scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == cloud-provider ]]; then
+        role="Azure Red Hat OpenShift Cloud Controller Manager Role"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
     elif [[ $component == cpo ]]; then
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
@@ -38,11 +42,18 @@ for component in $COMPONENTS; do
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == azure-file ]]; then
-            scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
-            scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
+        role="Azure Red Hat OpenShift Azure Files Storage Operator Role"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
+        scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
+    elif [[ $component == azure-disk ]]; then
+        role="Azure Red Hat OpenShift Storage Operator Role"
+    elif [[ $component == cncc ]]; then
+        role="Azure Red Hat OpenShift Network Operator Role"
+    elif [[ $component == ciro ]]; then
+        role="Azure Red Hat OpenShift Image Registry Operator Role"
     fi
 
-    client_id="$(eval "az ad sp create-for-rbac --name $name --role Contributor --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"
+    client_id="$(eval "az ad sp create-for-rbac --name $name --role \"$role\" --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"
     echo "$client_id" >> "${SHARED_DIR}/azure_sp_id"
 
     component_to_client_id+=(["$component"]="$client_id")
