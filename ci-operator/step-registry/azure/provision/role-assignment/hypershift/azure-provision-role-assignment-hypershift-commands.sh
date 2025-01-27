@@ -4,6 +4,7 @@ set -euo pipefail
 
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
 AZURE_MANAGED_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-azurecreds/managed-identities.json"
+AZURE_WORKLOAD_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json"
 
 # Load Azure credentials
 AZURE_AUTH_CLIENT_ID="$(jq -r .clientId < "${AZURE_AUTH_LOCATION}")"
@@ -21,19 +22,31 @@ RG_NSG=$(<"${SHARED_DIR}/resourcegroup_nsg")
 RG_VNET=$(<"${SHARED_DIR}/resourcegroup_vnet")
 RG_HC=$(<"${SHARED_DIR}/resourcegroup")
 
-COMPONENTS=("disk" "file" "imageRegistry" "cloudProvider" "network" "controlPlaneOperator" "ingress" "nodePoolManagement")
+CONTROLPLANE_COMPONENTS=("disk" "file" "imageRegistry" "cloudProvider" "network" "controlPlaneOperator" "ingress" "nodePoolManagement")
+DATAPLANE_COMPONENTS=("imageRegistryMSIClientID" "diskMSIClientID" "fileMSIClientID")
 
 # Function to get client ID for a component
-get_client_id() {
+get_controlplane_object_id() {
   local component=$1
-  jq -r ."$component".clientID < "${AZURE_MANAGED_IDENTITIES_LOCATION}"
+  local client_id
+  client_id=$(jq -r ."$component".clientID < "${AZURE_MANAGED_IDENTITIES_LOCATION}")
+
+  az ad sp show --id "$client_id" | jq -r .id
+}
+
+get_dataplane_object_id() {
+  local component=$1
+  local client_id
+  client_id=$(jq -r ."$component" < "${AZURE_WORKLOAD_IDENTITIES_LOCATION}")
+
+  az ad sp show --id "$client_id" | jq -r .id
 }
 
 # Assign roles
-for component in "${COMPONENTS[@]}"; do
-  client_id=$(get_client_id "$component")
-  if [[ -z "$client_id" ]]; then
-    echo "Error: Missing clientID for component $component" >&2
+for component in "${CONTROLPLANE_COMPONENTS[@]}"; do
+  object_id=$(get_controlplane_object_id "$component")
+  if [[ -z "$object_id" ]]; then
+    echo "Error: Missing objectID for component $component" >&2
     exit 1
   fi
 
@@ -79,9 +92,32 @@ for component in "${COMPONENTS[@]}"; do
     ROLE="Azure Red Hat OpenShift Image Registry Operator Role"
   fi
 
-  object_id=$(az ad sp show --id "$client_id" | jq -r .id)
-
   for scope in $scopes; do
     az role assignment create --assignee-object-id "$object_id" --role "$ROLE" --scope "$scope" --assignee-principal-type "ServicePrincipal"
   done
+done
+
+for component in "${DATAPLANE_COMPONENTS[@]}"; do
+  object_id=$(get_dataplane_object_id "$component")
+  if [[ -z "$object_id" ]]; then
+    echo "Error: Missing objectID for component $component" >&2
+    exit 1
+  fi
+
+  scope="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
+
+  if [[ $component == "imageRegistryMSIClientID" ]]; then
+    ROLE="Azure Red Hat OpenShift Image Registry Operator Role"
+  fi
+
+  if [[ $component == "diskMSIClientID" ]]; then
+    ROLE="Azure Red Hat OpenShift Storage Operator Role"
+  fi
+
+  if [[ $component == "fileMSIClientID" ]]; then
+    ROLE="Azure Red Hat OpenShift Azure Files Storage Operator Role"
+  fi
+
+  az role assignment create --assignee-object-id "$object_id" --role "$ROLE" --scope "$scope" --assignee-principal-type "ServicePrincipal"
+
 done
