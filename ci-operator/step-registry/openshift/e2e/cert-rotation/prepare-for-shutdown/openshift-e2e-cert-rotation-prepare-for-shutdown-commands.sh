@@ -61,7 +61,7 @@ function copy-file-from-first-master {
 run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
-  trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
+  set +e
   trap 'echo "external interrupt"' TERM INT KILL
 
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
@@ -111,7 +111,7 @@ function wait-for-nodes-to-be-ready {
 }
 
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
-  trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
+  set +e
   trap 'echo "external interrupt"' TERM INT KILL
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
@@ -126,7 +126,7 @@ function wait-for-valid-lb-ext-kubeconfig {
 }
 
 cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
-  trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
+  set +e
   trap 'echo "external interrupt"' TERM INT KILL
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
@@ -143,7 +143,7 @@ function wait-for-kubeapiserver-to-start-progressing {
 }
 
 cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
-  trap 'rc=$?; if [[ rc -ne 0 ]]; then echo "$BASH_COMMAND failed with error code $?"; fi' EXIT
+  set +e
   trap 'echo "external interrupt"' TERM INT KILL
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
