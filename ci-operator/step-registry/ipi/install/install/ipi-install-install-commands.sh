@@ -464,12 +464,10 @@ EOF
 }
 
 function install() {
-  if [[ -f "/tmp/openshift_install" ]]; then
-    /tmp/openshift_install --log-level=debug "${@}" 2>&1  | grep\
-   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+  if [[ -f ${newInstall} ]]; then
+    echo "${newInstall}"
   else
-    /bin/openshift_install --log-level=debug "${@}" 2>&1 |  grep\
-   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+    echo "openshift-install"
   fi
 }
 # inject_spot_instance_config is an AWS specific option that enables the
@@ -576,8 +574,10 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   set -x
   set +oe
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-  oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=/tmp
-  /tmp/openshift-install version
+  tmpDir=$(mktemp -d)
+  oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=${/tmpDir}
+  ${tmpDir}/openshift-install version
+  newInstall=${tmpDir}/openshift-install
   echo "extract the openshift-install from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} Done"
 fi  
 
