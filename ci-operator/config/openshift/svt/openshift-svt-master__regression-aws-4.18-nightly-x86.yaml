@@ -49,6 +49,38 @@ tests:
     test:
     - chain: openshift-svt-regression-one
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: ingress-scale-ocp-43281-ingress-tunning-ocp-43175
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/ingress-scale/ingress-scale.sh
+      SCRIPT_1: perfscale_regression_ci/scripts/scalability/ingress-scale/ingress-tunning-options.sh
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: openshift-svt-regression-one
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: networkpolicy-scale-ocp-41535
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCRIPT: perfscale_regression_ci/scripts/network/network_policy_scalability.sh
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: master
   org: openshift
