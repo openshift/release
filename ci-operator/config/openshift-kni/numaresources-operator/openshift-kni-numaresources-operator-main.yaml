@@ -26,9 +26,7 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/manager
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
   to: numaresources-operator
 - dockerfile_path: bundle.Dockerfile
   to: numaresources-operator-bundle
@@ -38,7 +36,7 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
   to: resource-topology-exporter
 - dockerfile_path: Dockerfile.openshift.tests
   from: os-min9
@@ -53,7 +51,7 @@ operator:
   - as: tested-numaresources-operator-bundle
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.18.999-snapshot
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.19.999-snapshot
     with: pipeline:numaresources-operator
 promotion:
   to:
@@ -64,12 +62,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -99,7 +97,7 @@ tests:
     test:
     - as: e2e-install-test
       cli: latest
-      commands: make test-install-e2e
+      commands: make test-install-e2e test-uninstall-e2e
       from: src
       resources:
         requests:
@@ -178,7 +176,7 @@ tests:
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        make test-install-e2e
+        make test-install-e2e test-uninstall-e2e
       from: src
       resources:
         requests:

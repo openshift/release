@@ -276,6 +276,52 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-sno-etcd-encryption-longduration-apiserver-arm-f14
+  cron: 30 4 9,23 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
+- as: gcp-ipi-sno-longduration-apiserver-arm-f14
+  cron: 11 7 10,24 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-sno
+- as: azure-ipi-sno-etcd-encryption-longduration-apiserver-arm-f14
+  cron: 59 11 9,23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      SINGLE_NODE_AZURE_INSTANCE_TYPE: Standard_D32ps_v5
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-ipi-sno
 - as: aws-ipi-f9-longduration-part1-3
   cron: 47 12 8,17,26 * *
   steps:
@@ -287,21 +333,6 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-f9-longduration-part2-3
-  cron: 15 13 6,18,27 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      TEST_SCENARIOS: Cluster_Infrastructure
     test:
     - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -352,7 +383,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCE_QE_CATALOG: "true"
       MCE_VERSION: "2.7"
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
@@ -371,7 +401,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCE_QE_CATALOG: "true"
       MCE_VERSION: "2.7"
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
@@ -390,7 +419,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCE_QE_CATALOG: "true"
       MCE_VERSION: "2.7"
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
@@ -409,12 +437,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCE_QE_CATALOG: "true"
       MCE_VERSION: "2.7"
       OCP_ARCH: arm64
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
@@ -429,12 +453,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCE_QE_CATALOG: "true"
       MCE_VERSION: "2.7"
       OCP_ARCH: arm64
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
-      TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
@@ -710,6 +730,21 @@ tests:
       architecture: arm64
       masters: "3"
       workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
+- as: baremetal-upi-ovn-ipv4-compact-f28
+  cluster: build05
+  cron: 33 17 28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: arm64
+      masters: "3"
+      workers: "0"
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi

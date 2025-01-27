@@ -5,7 +5,7 @@ endpoint=$(cat "/var/run/token/dpu-token/url")
 
 job_url="https://${endpoint}/job/Lab140_DPU_Operator_Test/lastBuild"
 
-endpoint_resolve="${endpoint}:443:10.0.180.88"
+endpoint_resolve="${endpoint}:443:10.0.180.171"
 
 max_sleep_duration=86400  # Maximum sleep duration in seconds (2 hours)
 sleep_counter=0
