@@ -2,39 +2,99 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi
-      RUN dnf install -y --nodocs make git
-      RUN dnf list golang --showduplicates
-      RUN dnf install -y --nodocs golang-1.21
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
+images:
+- context_dir: .
+  dockerfile_path: sdk/python/feast/infra/feature_servers/multicloud/Dockerfile.dev
+  to: feast-feature-server
+- context_dir: infra/feast-operator
+  dockerfile_path: Dockerfile
+  to: feast-operator
 releases:
   latest:
     integration:
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-in-cluster-build
+- as: e2e-in-cluster-presubmit
   steps:
     cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "1"
     test:
-    - as: run tests
+    - as: run-tests
       cli: latest
       commands: |
+        echo "Using feast server image ${FEAST_FEATURE_SERVER_IMAGE}"
+        echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+        export SHOULD_NOT_CREATE_NS=true
+        export SHOULD_NOT_BUILD_OPERATOR_IMAGE=true
+        export SHOULD_NOT_LOAD_IMAGE_TO_KIND=true
+        export SHOULD_NOT_BUILD_FEAST_IMAGE=true
+        export SHOULD_NOT_LOAD_FEAST_IMAGE_TO_KIND=true
+        export SHOULD_NOT_DEPLOY_OPERATOR=true
+        export SHOULD_NOT_VALIDATE_DEPLOYMENT=true
         cd infra/feast-operator
-        make install && make deploy IMG=feast-operator
-        oc wait --for condition=Available -n default deployment feast-operator # wait until the operator is ready
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
         make test-e2e
+      dependencies:
+      - env: FEAST_OPERATOR_CONTROLLER_IMAGE
+        name: feast-operator
+      - env: FEAST_FEATURE_SERVER_IMAGE
+        name: feast-feature-server
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e-in-cluster-postsubmit
+  postsubmit: true
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: run-tests
+      cli: latest
+      commands: |
+        echo "Using feast server image ${FEAST_FEATURE_SERVER_IMAGE}"
+        echo "Using feast image ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+        export SHOULD_NOT_CREATE_NS=true
+        export SHOULD_NOT_BUILD_OPERATOR_IMAGE=true
+        export SHOULD_NOT_LOAD_IMAGE_TO_KIND=true
+        export SHOULD_NOT_BUILD_FEAST_IMAGE=true
+        export SHOULD_NOT_LOAD_FEAST_IMAGE_TO_KIND=true
+        export SHOULD_NOT_DEPLOY_OPERATOR=true
+        export SHOULD_NOT_VALIDATE_DEPLOYMENT=true
+        cd infra/feast-operator
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
+        make test-e2e
+      dependencies:
+      - env: FEAST_OPERATOR_CONTROLLER_IMAGE
+        name: feast-operator
+      - env: FEAST_FEATURE_SERVER_IMAGE
+        name: feast-feature-server
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: dev
   org: opendatahub-io
