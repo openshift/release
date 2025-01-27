@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- dockerfile_path: test/e2e/alertmanager-mock/build/Dockerfile
+  from: base
+  to: alertmanager-mock
+- dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci
+  from: base
+  to: workload-analyzer
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 250Mi
+tests:
+- as: e2e
+  steps:
+    cluster_profile: devsandboxci-aws
+    env:
+      BASE_DOMAIN: devsandboxci.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        IMAGE_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+        KUBECONFIG="" oc registry login --to=/tmp/auth.json
+        BUILD_REGISTRY=$(grep -Eo '([0-9A-Za-z]+\.)+\w+' /tmp/auth.json)
+        oc create namespace ${IMAGE_NAMESPACE}
+        oc create secret generic build-registry --from-file=/tmp/auth.json --type=kubernetes.io/podmanconfigjson -n openshift-config
+        oc import-image pipeline:alertmanager-mock --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:alertmanager-mock --confirm -n ${IMAGE_NAMESPACE}
+        oc import-image pipeline:workload-analyzer --from=${BUILD_REGISTRY}/${IMAGE_NAMESPACE}/pipeline:workload-analyzer --confirm -n ${IMAGE_NAMESPACE}
+        make test-e2e-in-ci IMAGE_NAMESPACE=${IMAGE_NAMESPACE}
+      from: src
+      resources:
+        requests:
+          cpu: "3"
+          memory: 250Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: codeready-toolchain
+  repo: workload-analyzer
