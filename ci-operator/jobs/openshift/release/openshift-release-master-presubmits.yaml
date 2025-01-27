@@ -1734,6 +1734,30 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/prow/rover-groups-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-rover-groups-config-validation
+    rerun_command: /test rover-groups-config-validation
+    run_if_changed: ^core-services/sync-rover-groups/_config.yaml
+    spec:
+      containers:
+      - command:
+        - ./hack/validate-rover-groups.sh
+        image: registry.ci.openshift.org/ci/sync-rover-groups:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )rover-groups-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build03
     context: ci/prow/sync-rover-groups
     decorate: true
