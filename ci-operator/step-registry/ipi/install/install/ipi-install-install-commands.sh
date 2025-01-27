@@ -465,9 +465,11 @@ EOF
 
 function install() {
   if [[ -f "/tmp/openshift_install" ]]; then
-    /tmp/openshift_install --log-level=debug "${@}" 2>&1
+    /tmp/openshift_install --log-level=debug "${@}" 2>&1  | grep\
+   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
   else
-    openshift_install --log-level=debug "${@}" 2>&1
+    /bin/openshift_install --log-level=debug "${@}" 2>&1 |  grep\
+   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
   fi
 }
 # inject_spot_instance_config is an AWS specific option that enables the
@@ -572,6 +574,7 @@ if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
   set -x
+  set +oe
   PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
   oc adm release extract -a "$PULL_SECRET_PATH" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=/tmp
   /tmp/openshift-install version
@@ -847,4 +850,5 @@ if test "${ret}" -eq 0 ; then
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
 
+sleep 2h
 exit "$ret"
