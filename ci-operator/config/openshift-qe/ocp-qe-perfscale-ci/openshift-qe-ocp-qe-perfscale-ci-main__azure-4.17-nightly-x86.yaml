@@ -102,9 +102,18 @@ tests:
   as: data-path-9nodes
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D8ps_v5
+      ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D8s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v5
+      CUSTOM_AZURE_REGION: eastus
+      OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       SET_ENV_BY_PLATFORM: custom
       TOLERANCE: "99"
@@ -114,11 +123,13 @@ tests:
     pre:
     - chain: ipi-azure-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
     test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
     - ref: openshift-qe-perfscale-azu-data-path-nsg
     - chain: openshift-qe-data-path-tests
-  timeout: 7h0m0s
+    workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
 - always_run: false
   as: control-plane-24nodes
   steps:
