@@ -17,7 +17,4 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
 git switch -f gke-new-cluster-working-setup
 
-K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-export K8S_CLUSTER_URL
-
 bash ./.ibm/pipelines/openshift-ci-tests.sh
