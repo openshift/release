@@ -16,7 +16,7 @@ cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
 set -euxo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -v -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no' }
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -253,6 +253,12 @@ oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
+# Set ClientAliveInterval
+echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config
+echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config
+run-on-all-nodes "echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config"
+run-on-all-nodes "echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config"
+
 # Sync host and node timezones to avoid possible errors when skewing time
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
 run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
@@ -390,6 +396,7 @@ timeout \
 	--kill-after 10m \
 	120m \
 	ssh \
+	-v \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
 	/usr/local/bin/prepare-nodes-for-shutdown.sh \
