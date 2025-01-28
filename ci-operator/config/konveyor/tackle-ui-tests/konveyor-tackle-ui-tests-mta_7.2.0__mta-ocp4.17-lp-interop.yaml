@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.17"
     namespace: ocp
     tag: cli
 build_root:
@@ -17,15 +17,43 @@ releases:
     prerelease:
       product: ocp
       version_bounds:
-        lower: 4.15.0-0
+        lower: 4.17.0-0
         stream: 4-stable
-        upper: 4.16.0-0
+        upper: 4.18.0-0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: mta-interop-ibmcloud
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","mta-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+            {"name": "mta-operator", "source": "redhat-operators", "channel": "stable-v7.2", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: mta-deploy-tackle
+    - ref: mta-tests-ui
+    workflow: firewatch-ipi-ibmcloud
 - as: mta-interop-aws
   cron: 0 23 31 2 *
   steps:
@@ -42,12 +70,12 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","mta-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","mta-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OPERATORS: |
         [
-            {"name": "mta-operator", "source": "redhat-operators", "channel": "stable-v7.0", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
+            {"name": "mta-operator", "source": "redhat-operators", "channel": "stable-v7.2", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
         ]
       USER_TAGS: |
         scenario mta
@@ -56,35 +84,8 @@ tests:
     - ref: mta-deploy-tackle
     - ref: mta-tests-ui
     workflow: firewatch-ipi-aws
-- as: mta-interop-ibmcloud
-  cron: 0 23 31 2 *
-  steps:
-    cluster_profile: ibmcloud-cspi-qe
-    env:
-      BASE_DOMAIN: zstream.interop.ccitredhat.com
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","mta-lp"]'
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      OPERATORS: |
-        [
-            {"name": "mta-operator", "source": "redhat-operators", "channel": "stable-v7.0", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
-        ]
-    test:
-    - ref: install-operators
-    - ref: mta-deploy-tackle
-    - ref: mta-tests-ui
-    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
-  branch: mta_7.0.3
+  branch: mta_7.2.0
   org: konveyor
   repo: tackle-ui-tests
-  variant: mta-ocp4.15-lp-interop
+  variant: mta-ocp4.17-lp-interop
