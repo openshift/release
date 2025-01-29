@@ -5,12 +5,15 @@ set -o errexit
 set -o pipefail
 
 echo "DEBUG....."
-mkdir $SHARED_DIR/nodes
+OUT=$SHARED_DIR/disk-by-id.out
+echo $OUT
+rm -f $OUT
 for n in `oc get no |grep -v "^NAME" |cut -d ' ' -f1`; do
-    echo $n
-    oc debug --to-namespace default node/$n -- ls -l /host/dev/disk/by-id |tee $SHARED_DIR/nodes/$n.out
+    echo $n >> $OUT
+    oc debug --to-namespace default node/$n -- ls -l /host/dev/disk/by-id >> $OUT
+    echo "END-OF-$n" >> $OUT
 done
 echo "DEBUG ----"
 echo $SHARED_DIR
-ls -al $SHARED_DIR/nodes
+ls -al $SHARED_DIR
 echo "DEBUG ---- DONE"
