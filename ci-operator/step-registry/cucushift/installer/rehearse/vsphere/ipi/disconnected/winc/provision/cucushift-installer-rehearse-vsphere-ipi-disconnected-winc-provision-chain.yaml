@@ -1,0 +1,37 @@
+chain:
+  as: cucushift-installer-rehearse-vsphere-ipi-disconnected-winc-provision
+  steps:
+    - chain: ipi-conf-vsphere 
+    - ref: ipi-install-rbac
+    - chain: vsphere-provision-bastionhost
+    - ref: mirror-images-by-oc-adm-in-bastion
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest-with-custom-vxlan-port
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-install 
+    - ref: ipi-install-vsphere-registry 
+    - ref: mirror-images-check-registry-service
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: windows-e2e-operator-test-mirror-images
+    - ref: set-sample-operator-disconnected 
+    - ref: operatorhub-vsphere-disconnected
+    - ref: windows-conf-operator
+  env:
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+    documentation: |-
+      Register DNS for mirror registry.
+  - name: SUB_PACKAGE
+    default: "windows-machine-config-operator"
+    documentation: |-
+      The name of the operator package to subscribe to.
+  - name: SUB_CHANNEL
+    default: "stable"
+    documentation: |-
+      The channel of the operator to subscribe to.
+  - name: SUB_INSTALL_NAMESPACE
+    default: "openshift-windows-machine-config-operator"
+    documentation: |-
+      The namespace where the operator will be installed.
+  documentation: |-
+    Create a winc IPI cluster in disconnected network on vSphere for QE e2e tests.
