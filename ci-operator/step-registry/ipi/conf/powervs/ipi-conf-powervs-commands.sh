@@ -397,17 +397,20 @@ platform:
     vpcRegion: ${VPCREGION}
 EOF
 
-if [ -n "${PERSISTENT_TG}" ]; then
-cat >> "${CONFIG}" << EOF
-    tgName: ${PERSISTENT_TG}
-EOF
-fi
-
-if [ -n "${PERSISTENT_VPC}" ]; then
-cat >> "${CONFIG}" << EOF
-    vpcName: ${PERSISTENT_VPC}
-EOF
-fi
+#
+# Disabling persistent TGs and VPCs for now
+#
+#if [ -n "${PERSISTENT_TG}" ]; then
+#cat >> "${CONFIG}" << EOF
+#    tgName: ${PERSISTENT_TG}
+#EOF
+#fi
+#
+#if [ -n "${PERSISTENT_VPC}" ]; then
+#cat >> "${CONFIG}" << EOF
+#    vpcName: ${PERSISTENT_VPC}
+#EOF
+#fi
 
 cat >> "${CONFIG}" << EOF
 publish: External
