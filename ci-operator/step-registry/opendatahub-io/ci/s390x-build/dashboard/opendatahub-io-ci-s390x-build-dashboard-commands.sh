@@ -83,8 +83,26 @@ fi
 
 echo "Image is $DESTINATION_IMAGE_REF"
 echo "commit hash is ${PULL_BASE_SHA:0:7}"
-echo "Entire commit has is $PULL_BASE_SHA"
+echo "Entire commit hash is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
+echo "FIP of VM is $zvsi_fip"
+
+# Added for temporary debugging, Check if the file exists and show the content of the file
+#FILE_PATH="${SECRETS_PATH}/${REGISTRY_SECRET_FILE#}"
+#export FILE_PATH
+#if [ -f "$FILE_PATH" ]; then
+#    echo "Contents of the file $FILE_PATH:"
+#    cat "$FILE_PATH"  # Display the file content
+#else
+#    echo "File $FILE_PATH does not exist."
+#fi
+
+# Get credentials for quay repo
+DOCKER_USER=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
+export DOCKER_USER
+echo "docker user is $DOCKER_USER"
+DOCKER_PASS=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
+export DOCKER_PASS
 
 # Initialize ALL_VARS as an array of variable assignments
 ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
@@ -92,7 +110,7 @@ ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
 export ALL_VARS_STR
 
 # create ssh session to zvsi and pass the script
-ssh "${ssh_options[@]}" root@$zvsi_fip "$ALL_VARS_STR bash -s" << 'EOF'
+ssh "${ssh_options[@]}" root@"$zvsi_fip" "$ALL_VARS_STR bash -s" << 'EOF'
 #Installing docker in zvsi
 echo "Installing docker engine in zvsi"
 
@@ -114,15 +132,18 @@ apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docke
 echo "Platforms is $PLATFORMS "
 echo "Image tag is $IMAGE_TAG "
 git clone https://github.com/opendatahub-io/odh-dashboard
-git checkout $PULL_BASE_SHA
 
-# Enable Buildx for multiarch builds
+#we don't need to change branch for nightly builds
+#git checkout $PULL_BASE_SHA
+
+cd odh-dashboard
+
+# Enable Buildx and Quemu for multiarch builds
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --platform="${PLATFORMS}" --name mybuilder --use
+docker buildx inspect --bootstrap
 
 # Log in to the registry
-DOCKER_USER=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
-DOCKER_PASS=$(cat "${SECRETS_PATH}/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f2)
-
 docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}" "${REGISTRY_HOST}"
 
 # Build and push the multiarch image
