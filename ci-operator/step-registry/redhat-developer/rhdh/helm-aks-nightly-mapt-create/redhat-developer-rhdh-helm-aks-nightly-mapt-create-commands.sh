@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
 AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
