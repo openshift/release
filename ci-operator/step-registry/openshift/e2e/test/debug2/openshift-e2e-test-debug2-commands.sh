@@ -11,5 +11,7 @@ for n in `oc get no |grep -v "^NAME" |cut -d ' ' -f1`; do
 done
 echo "DEBUG2 ----"
 echo $SHARED_DIR
-ls -al $SHARED_DIR/nodes
+ls -al $SHARED_DIR
+echo "DEBUG2 --CAT--"
+cat $SHARED_DIR/disk-by-id.out
 echo "DEBUG2 ---- DONE"
