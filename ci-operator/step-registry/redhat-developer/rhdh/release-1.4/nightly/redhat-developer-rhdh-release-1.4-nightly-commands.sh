@@ -21,14 +21,14 @@ NAME_SPACE_POSTGRES_DB="postgress-external-db-nightly"
 NAME_SPACE_RUNTIME="showcase-runtime-1-4"
 NAME_SPACE_RDS="showcase-rds-nightly-1-4"
 
-GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
+GITHUB_ORG_NAME="Omar-AlJaljuli"
+GITHUB_REPOSITORY_NAME="janus-idp-backstage-showcase-"
 QUAY_REPO="rhdh/rhdh-hub-rhel9"
 TAG_NAME="1.4"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd rhdh || exit
-git checkout "release-1.4" || exit
+git checkout "1.4-test" || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
