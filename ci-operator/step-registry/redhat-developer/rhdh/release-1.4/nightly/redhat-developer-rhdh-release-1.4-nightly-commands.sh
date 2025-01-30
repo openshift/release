@@ -28,7 +28,7 @@ TAG_NAME="1.4"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
-cd rhdh || exit
+cd janus-idp-backstage-showcase- || exit
 git checkout "1.4-test" || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
