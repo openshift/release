@@ -118,7 +118,7 @@ queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --reque
 # Must gather steps to collect OpenShift logs
 mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
-find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
+find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
 
 mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log
