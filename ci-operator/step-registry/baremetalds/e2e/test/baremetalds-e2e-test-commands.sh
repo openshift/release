@@ -58,7 +58,7 @@ function mirror_test_images() {
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="Image Mirroring" tests="1" failures="1">
     <testcase name="[sig-metal] release payload images should be mirrored successfully">
-        <failure message="Image mirroring failed with status $IMAGE_MIRRORING_SUCCESS"></failure>
+        <failure message="Image mirroring failed"></failure>
     </testcase>
 </testsuite>
 EOF
