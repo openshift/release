@@ -36,64 +36,65 @@ releases:
       stream: nightly
       version: "4.16"
 resources:
-  '*':
+  "*":
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-debug
-  cron: '@yearly'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADD_ZONES: "no"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      ENABLE_CUSTOM_SG_CONTROL_PLANE: "false"
-      ENABLE_CUSTOM_SG_CUMPUTE: "false"
-      REGION: us-east-2
-      SLEEP_DURATION: 2h
-      SPOT_INSTANCES: "false"
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
-- as: installer-rehearse-aws
-  cron: '@yearly'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      RHEL_VM_TYPE: m5.xlarge
-      RHEL_WORKER_COUNT_PER_ZONE: "3"
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
-- as: installer-rehearse-azure
-  cron: '@yearly'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-upi
-- as: installer-rehearse-ibmcloud
-  cron: '@yearly'
-  steps:
-    cluster_profile: ibmcloud-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms
-- as: installer-rehearse-gcp
-  cron: '@yearly'
-  steps:
-    cluster_profile: gcp-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
-- as: installer-rehearse-vsphere
-  cron: '@yearly'
-  steps:
-    cluster_profile: vsphere-connected-2
-    workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+  - as: installer-rehearse-debug
+    cron: "@yearly"
+    steps:
+      cluster_profile: aws-qe
+      env:
+        ADD_ZONES: "no"
+        BASE_DOMAIN: qe.devcluster.openshift.com
+        COMPUTE_NODE_REPLICAS: "2"
+        ENABLE_SHARED_VPC: "no"
+        LOKI_ENABLED: "false"
+        PERSISTENT_MONITORING: "false"
+        REGION: us-east-2
+        SLEEP_DURATION: 2h
+        SPOT_INSTANCES: "false"
+      post:
+        - ref: cucushift-installer-wait
+        - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
+      pre:
+        - chain: cucushift-installer-rehearse-aws-ipi-private-provision
+  - as: installer-rehearse-aws
+    cron: "@yearly"
+    steps:
+      cluster_profile: aws-qe
+      env:
+        BASE_DOMAIN: qe.devcluster.openshift.com
+        RHEL_VM_TYPE: m5.xlarge
+        RHEL_WORKER_COUNT_PER_ZONE: "3"
+      workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
+  - as: installer-rehearse-azure
+    cron: "@yearly"
+    steps:
+      cluster_profile: azure-qe
+      env:
+        BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      workflow: cucushift-installer-rehearse-azure-upi
+  - as: installer-rehearse-ibmcloud
+    cron: "@yearly"
+    steps:
+      cluster_profile: ibmcloud-qe
+      workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms
+  - as: installer-rehearse-gcp
+    cron: "@yearly"
+    steps:
+      cluster_profile: gcp-qe
+      dependency_overrides:
+        OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
+      env:
+        FEATURE_SET: TechPreviewNoUpgrade
+      workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+  - as: installer-rehearse-vsphere
+    cron: "@yearly"
+    steps:
+      cluster_profile: vsphere-connected-2
+      workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
 zz_generated_metadata:
   branch: master
   org: openshift
