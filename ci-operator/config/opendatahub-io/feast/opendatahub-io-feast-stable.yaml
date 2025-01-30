@@ -25,33 +25,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-in-cluster-presubmit
-  steps:
-    cluster_profile: aws-opendatahub
-    env:
-      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
-      HYPERSHIFT_AWS_REGION: us-west-2
-      HYPERSHIFT_NODE_COUNT: "1"
-    test:
-    - as: run-tests
-      cli: latest
-      commands: |
-        export RUN_ON_OPENSHIFT_CI=true
-        cd infra/feast-operator
-        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
-        oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
-        make test-e2e
-      dependencies:
-      - env: FEAST_OPERATOR_CONTROLLER_IMAGE
-        name: feast-operator
-      - env: FEAST_FEATURE_SERVER_IMAGE
-        name: feast-feature-server
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: hypershift-hostedcluster-workflow
 - as: e2e-in-cluster-postsubmit
   postsubmit: true
   steps:
@@ -81,6 +54,6 @@ tests:
           memory: 200Mi
     workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
-  branch: dev
+  branch: stable
   org: opendatahub-io
   repo: feast
