@@ -3,11 +3,47 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.54.2
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  ubi:
+    name: ubi-micro
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: golang-1.23
+images:
+- dockerfile_path: Dockerfile.daemonset-ocp
+  to: instaslice-daemonset
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22
+    ubi:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-micro
+  to: instaslice-operator
+- dockerfile_path: bundle-ocp.Dockerfile
+  to: instaslice-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundle-ocp.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-daemonset-rhel9@sha256:.*
+    with: pipeline:instaslice-daemonset
+  - pullspec: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-rhel9-operator@sha256:.*
+    with: pipeline:instaslice-operator
 promotion:
   to:
   - name: "4.19"
@@ -43,6 +79,52 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: instaslice
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    test:
+    - as: install-cert-manager
+      cli: latest
+      commands: |
+        make deploy-cert-manager-ocp
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install-operator
+      cli: latest
+      commands: |
+        oc new-project instaslice-system
+        operator-sdk run bundle "$OO_BUNDLE" -n instaslice-system --verbose
+        oc wait deployment --for condition=Available --timeout=120s instaslice-operator-controller-manager -n instaslice-system
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: run-test
+      cli: latest
+      commands: |
+        make test-e2e-konflux
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
