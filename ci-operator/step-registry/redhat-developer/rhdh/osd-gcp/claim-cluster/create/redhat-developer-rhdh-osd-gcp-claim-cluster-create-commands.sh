@@ -26,6 +26,7 @@ echo "CLUSTER_NAME : $CLUSTER_NAME"
 bash ./.ibm/pipelines/cluster/osd-gcp/create-osd.sh
 
 cp -v /tmp/rhdh/osdcluster/cluster-info.name "${SHARED_DIR}/"
+cp -v /tmp/rhdh/osdcluster/cluster-info.id "${SHARED_DIR}/"
 cp -v /tmp/rhdh/osdcluster/kubeconfig "${SHARED_DIR}/"
 
 echo "cluster name in shared: "
