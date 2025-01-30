@@ -61,7 +61,7 @@ function download_automation_code() {
 
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
-    mkdir -p ${IBMCLOUD_HOME_FOLDER}
+    mkdir -p "${IBMCLOUD_HOME_FOLDER}/ocp-install-dir"
     echo "Attempting to install terraform using gzip"
     curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
