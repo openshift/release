@@ -259,6 +259,58 @@ function wait_for_additional_nodes_readiness() {
     done
 }
 
+# waits for the worker machines to be available
+function wait_for_worker_machines() {
+    INTERVAL=10
+    CNT=180
+
+    while [ $((CNT)) -gt 0 ]; do
+        READY=false
+        while read -r i
+        do
+            name=$(echo "${i}" | awk '{print $1}')
+            status=$(echo "${i}" | awk '{print $2}')
+            if [[ "${status}" == "Ready" ]]; then
+                echo "Worker ${name} is ready"
+                READY=true
+            else
+                echo "Waiting for the worker to be ready"
+            fi
+        done <<< "$(oc get node --no-headers -l node-role.kubernetes.io/worker | grep -v master)"
+
+        if [[ ${READY} == "true" ]]; then
+            echo "Worker is ready"
+            return 0
+        else
+            sleep "${INTERVAL}"
+            CNT=$((CNT))-1
+        fi
+
+        if [[ $((CNT)) -eq 0 ]]; then
+            echo "Timed out waiting for worker to be ready"
+            oc get node
+            return 1
+        fi
+    done
+}
+
+# Scales up the intel workers
+function scale_up_intel_workers {
+    echo "Scaling the MachineSet for 2 of the workers/zones"
+    for WORKER_MACHINESET in $(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}' | head -n 2)
+    do
+        echo "[Worker MachineSet]: Scaling up worker to 1 for '${WORKER_MACHINESET}'"
+        oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
+    done
+
+    echo "Start waiting for Workers to be ready"
+    wait_for_worker_machines
+
+    echo "Disable mastersSchedulable since we now have a dedicated worker node"
+	oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+	sleep 10
+}
+
 ## Main Execution Path
 if [ "${ADDITIONAL_WORKERS}" == "0" ]
 then
@@ -277,6 +329,8 @@ then
     echo "only runs with ppc64le"
     exit 64
 fi
+
+scale_up_intel_workers
 
 setup_ibmcloud_cli
 login_ibmcloud
