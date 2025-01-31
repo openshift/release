@@ -3,14 +3,28 @@ workflow:
   steps:
     env:
       MASTERS: "1"
+      WORKERS: "0"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
     pre:
-    - chain: ipi-conf-vsphere
-    - ref: ovn-conf 
-    - chain: ipi-install-vsphere
-    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: ipi-install-rbac
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-vsphere-check
+    - ref: ipi-conf-vsphere-check-vcm
+    - ref: cucushift-agent-vsphere-conf-vips
+    - ref: cucushift-agent-vsphere-conf
+    - ref: ipi-conf-vsphere-dns
+    - ref: cucushift-agent-vsphere-provision
+    - ref: cucushift-agent-vsphere-postinstall
+    - ref: ipi-install-vsphere-registry
+    - ref: enable-qe-catalogsource
     post:
-    - chain: ipi-vsphere-post
+      - chain: ipi-vsphere-post
+      - ref: cucushift-agent-gather
+      - chain: gather
+      - ref: ipi-deprovision-vsphere-dns
+      - ref: cucushift-agent-vsphere-deprovision
+      - ref: ipi-deprovision-vsphere-lease
   documentation: |-
     The IPI workflow provides chains that provision and deprovision
     a Single Node OpenShift (SNO) cluster with a default configuration
