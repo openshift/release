@@ -909,11 +909,46 @@ periodics:
     repo: release
   labels:
     ci.openshift.io/role: infra
-  name: periodic-prow-image-autobump
+  name: periodic-prow-image-autobump-openshift-release
   spec:
     containers:
     - args:
-      - --config=core-services/prow/02_config/_bumper.yaml
+      - --config=core-services/prow/02_config/_release-bumper.yaml
+      command:
+      - /ko-app/generic-autobumper
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250124-d572f855b
+      imagePullPolicy: IfNotPresent
+      name: autobump
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 22 * * 3
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: ci-tools
+    workdir: true
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-prow-image-autobump-openshift-ci-tools
+  spec:
+    containers:
+    - args:
+      - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
       image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250124-d572f855b
