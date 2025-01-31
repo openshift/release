@@ -4,6 +4,10 @@ set -e
 set -u
 set -o pipefail
 
+# v1 is used in clusters 4.19+
+MOSC_V1_API_VERSION="v1"
+# vialpha is used in clusters 4.18-
+MOSC_V1ALPHA_API_VERSION="v1alpha1"
 
 function set_proxy () {
     if [ -s "${SHARED_DIR}/proxy-conf.sh" ]; then
@@ -64,11 +68,19 @@ fi
 set_proxy
 
 IFS=" " read -r -a mcp_arr <<<"$MCO_CONF_DAY2_OCL_POOLS"
-for custom_mcp_name in "${mcp_arr[@]}"; do
-    echo ""
-    echo "Enable OCL in pool $custom_mcp_name"
+# Currently only v1 or v1alpha are provided and they are mutually exclusive. If anything  changes we want this step to fail, that's why we get [*] in the jsonpath
+# If more than one api is provided we need to analyse if it is right or not, and if necessary adapt this code
+MOSC_API_VERSION=$(oc get crd -oyaml machineosconfigs.machineconfiguration.openshift.io -ojsonpath='{.spec.versions[*].name}')
 
-   oc create -f - << EOF
+echo ""
+echo "Using MOSC API: $MOSC_API_VERSION"
+
+if [ "$MOSC_API_VERSION" == "$MOSC_V1ALPHA_API_VERSION" ]; then
+    for custom_mcp_name in "${mcp_arr[@]}"; do
+        echo ""
+        echo "Enable OCL in pool $custom_mcp_name"
+    
+        oc create -f - << EOF
 apiVersion: machineconfiguration.openshift.io/v1alpha1
 kind: MachineOSConfig
 metadata:
@@ -92,9 +104,41 @@ spec:
             LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
 EOF
 
-    oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
 
-done
+    done
+
+elif [ "$MOSC_API_VERSION" == "$MOSC_V1_API_VERSION" ] ; then
+    for custom_mcp_name in "${mcp_arr[@]}"; do
+        echo ""
+        echo "Enable OCL in pool $custom_mcp_name"
+    
+        oc create -f - << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineOSConfig
+metadata:
+  name: mosc-$custom_mcp_name
+spec:
+  machineConfigPool:
+    name: $custom_mcp_name
+  imageBuilder:
+    imageBuilderType: Job
+  renderedImagePushSecret:
+    name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
+  renderedImagePushSpec: "quay.io/mcoqe/layering:ocl-$custom_mcp_name"
+  containerFile:
+      - content: |-
+          LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
+EOF
+
+        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+
+    done
+
+else
+    echo "Suported MOSC API versions [$MOSC_V1ALPHA_API_VERSION, $MOSC_V1ALPHA_API_VERSION] MOSCO Unexpected MOSC API version: $MOSC_API_VERSION"
+    debug_and_exit
+fi
 
 for custom_mcp_name in "${mcp_arr[@]}"; do
     echo ""

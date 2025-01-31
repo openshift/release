@@ -14,6 +14,6 @@ TAG_NAME="next"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
-cd rhdh || exit
+cd "${GITHUB_REPOSITORY_NAME}" || exit
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
