@@ -1,28 +1,18 @@
-binary_build_commands: go build -o bin/manager cmd/manager/main.go
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.23
-canonical_go_repository: github.com/k-orc/openstack-resource-controller
-promotion:
-  to:
-  - name: "4.19"
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
     namespace: ocp
-releases:
-  initial:
-    integration:
-      name: "4.19"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.19"
-      namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/k-orc/openstack-resource-controller
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -31,6 +21,16 @@ tests:
   commands: make test
   container:
     from: src
+  optional: true
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  optional: true
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift
