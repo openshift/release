@@ -16,7 +16,7 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
-function run_mirror_ssh_commands() {
+function run_mirror_test_images_ssh_commands() {
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -o errexit
@@ -49,7 +49,7 @@ function mirror_test_images() {
         openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
         scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
 
-        MIRROR_RESULT=$(run_mirror_ssh_commands || echo "fail")
+        MIRROR_RESULT=$(run_mirror_test_images_ssh_commands || echo "fail")
 
         JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring.xml"
 
@@ -98,12 +98,10 @@ function set_test_provider() {
     fi
 }
 
-function mirror_release_image_for_disconnected_upgrade() {
-    # All IPv6 clusters are disconnected and
-    # release image should be mirrored for upgrades.
-    if [[ "${DS_IP_STACK}" == "v6" ]]; then
-      # shellcheck disable=SC2087
+function run_mirror_release_image_for_disconnected_upgrade_ssh_commands() {
+  # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+set -o errexit
 MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
 RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
@@ -137,6 +135,39 @@ echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
 oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
 
 EOF
+}
+
+function mirror_release_image_for_disconnected_upgrade() {
+    # All IPv6 clusters are disconnected and
+    # release image should be mirrored for upgrades.
+    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+      echo "### Mirroring release image for disconnected upgrade ###"
+
+      MIRROR_RESULT=$(run_mirror_release_image_for_disconnected_upgrade_ssh_commands || echo "fail")
+
+      JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring-disconnected-upgrade.xml"
+
+        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring for Disconnected Upgrade" tests="1" failures="1">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully for disconnected upgrade">
+        <failure message="Image mirroring for Disconnected Upgrade failed"></failure>
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+            exit 1
+        else
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring for Disconnected Upgrade" tests="1" failures="0">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully for disconnected upgrade">
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+        fi
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
     fi
