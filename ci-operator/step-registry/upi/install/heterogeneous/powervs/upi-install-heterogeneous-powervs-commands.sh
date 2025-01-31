@@ -162,9 +162,9 @@ function configure_automation() {
 
     # Use existing pvs workspace.
     # Process the CRN into a variable
-    CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
-      export CRN
-      echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
+    CRN="$(ibmcloud pi workspace ls 2> /dev/null | grep multi-arch-x-px-${REGION}-1 | awk '{print $1}' | grep crn | awk '{print $NF}')"
+    export CRN
+    echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
     # This CRN is useful when manually destroying.
     echo "PowerVS Service CRN: ${CRN}"
 
@@ -183,7 +183,7 @@ function configure_automation() {
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
     cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CLEAN_VERSION}"
     cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
     #Create the VPC to fixed transit gateway Connection for the TG
