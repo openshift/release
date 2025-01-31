@@ -277,7 +277,7 @@ EOF
 # https://issues.redhat.com/browse/OCPBUGS-12841
 # The underlying issue is same for below mentioned sig-network tests
 # Excluding few loadbalancer tests with UDP since its not supported in Libvirt and PowerVS ppc64le jobs
-elif [[ ( "${BRANCH}" == "master" ) || ( "${BRANCH#4.}" -ge 13 ) ]] && [ "${ARCH}" == "ppc64le" ]; then
+elif echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 >= 13 && $2 <= 15)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
@@ -299,6 +299,12 @@ EOF
 else
     echo "Executing all tests"
 fi
+
+# ^
+# NOTE: If you want to test for the master/main branch and also include an OpenShift range, then use the following test
+#
+# elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 17 && $2 <= 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+#
 
 # Until the yellow-zone network bandwidth is upgraded, we will run the following tests in their own periodic and exclude
 # them from the conformance-parallel workflow.
