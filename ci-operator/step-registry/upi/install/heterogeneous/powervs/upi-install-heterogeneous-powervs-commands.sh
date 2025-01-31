@@ -5,7 +5,7 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # Development Assumptions:
-# - jq, yq, openshift-install are installed
+# - jq, yq-v4, openshift-install are installed
 
 ##### Constants
 IBMCLOUD_HOME=/tmp/ibmcloud
@@ -150,7 +150,7 @@ function configure_automation() {
 
     export INSTALL_CONFIG_FILE=${SHARED_DIR}/install-config.yaml
     # Resource Group:
-    RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+    RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
     # create workspace for powervs from cli
