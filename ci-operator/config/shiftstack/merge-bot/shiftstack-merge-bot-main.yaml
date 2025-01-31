@@ -425,6 +425,34 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: openstack-resource-controller-main
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: openstack-resource-controller-main
+      commands: |
+        merge-bot --source https://github.com/k-orc/openstack-resource-controller:main \
+                  --dest openshift/openstack-resource-controller:main \
+                  --merge shiftstack/openstack-resource-controller:merge-bot-main \
+                  --update-go-modules \
+                  --bot-name shiftstack-merge-bot --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-shiftstack
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: shiftstack
