@@ -60,19 +60,31 @@ function test_deployment_and_services {
 
   echo "************ telcov10n-spoke Generate Test results ************"
 
-  cat <<EOF > /tmp/pytest.ini
+  cat <<EOF-INIT > /tmp/pytest.ini
 [pytest]
 junit_suite_name = telco-verification
-EOF
+EOF-INIT
+
+cat <<EOF-CONFTEST > /tmp/conftest.py
+import pytest
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        parts = item.nodeid.split("::")
+        if len(parts) > 1:
+            test_name = ' '.join(parts[-1].split('_')[1:])
+            file_path = parts[0]
+            item._nodeid = f"{file_path}::[sig-telco-verification] {test_name.capitalize()}"
+EOF-CONFTEST
 
   tc_file="/tmp/${JOB_NAME_SAFE}.py"
-  cat << EOF >| ${tc_file}
+  cat << EOF-PYTEST >| ${tc_file}
 import os
 import time
 import requests
 import pytest
 
-def test_cluster_operators(bash):
+def test_spoke_cluster_operators_are_ready(bash):
     count = 0
     attempts = 10
     while attempts > 0:
@@ -83,9 +95,9 @@ def test_cluster_operators(bash):
       time.sleep(60)
     assert attempts > 0, f"Not all cluster operators are ready yet"
 
-def test_cluster_deployed_successfully(bash):
+def test_spoke_cluster_deployed_successfully(bash):
     assert True
-EOF
+EOF-PYTEST
 
   echo
   echo -----------------
