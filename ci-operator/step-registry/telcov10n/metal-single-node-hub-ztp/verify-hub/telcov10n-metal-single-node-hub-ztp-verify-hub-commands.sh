@@ -71,13 +71,26 @@ function test_deployment_and_services {
 
   echo "************ telcov10n-vhub Generate Test results ************"
 
-  cat <<EOF > /tmp/pytest.ini
+  cat <<EOF-INIT > /tmp/pytest.ini
 [pytest]
 junit_suite_name = telco-verification
-EOF
+EOF-INIT
+
+cat <<EOF-CONFTEST > /tmp/conftest.py
+import pytest
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        parts = item.nodeid.split("::")
+        if len(parts) > 1:
+            test_name = ' '.join(parts[-1].split('_')[1:])
+            file_path = parts[0]
+            item._nodeid = f"{file_path}::[sig-telco-verification] {test_name.capitalize()}"
+EOF-CONFTEST
+
 
   tc_file="/tmp/${JOB_NAME_SAFE}.py"
-  cat << EOF >| ${tc_file}
+  cat << EOF-PYTEST >| ${tc_file}
 import os
 import time
 import requests
@@ -117,7 +130,7 @@ def test_ztp_namespaces(bash, namespace):
 def test_ztp_storageclass(bash):
     oc_cmd = f"oc get storageclass --no-headers | grep -w '(default)'"
     assert " (default) " in bash.run_script_inline([oc_cmd])
-EOF
+EOF-PYTEST
 
   run_pytest check_hub_installation
 }
