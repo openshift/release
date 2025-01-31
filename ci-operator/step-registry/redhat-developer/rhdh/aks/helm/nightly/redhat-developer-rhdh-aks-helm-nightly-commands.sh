@@ -44,8 +44,21 @@ annotations:
   kubernetes.io/service-account.name: ${sa_name}
 type: kubernetes.io/service-account-token
 EOF
-  sleep 5
-  token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"
+
+  retries=12
+  sleep_time=5
+  for ((i=1; i <= retries; i++)); do
+    if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
+      echo "Successfully got token on attempt $i."
+      break
+    elif [ $i -eq $retries ]; then
+      echo "Failed to get token after $i attempts. Exiting..."
+      exit 1
+    else
+      echo "Failed to get token on attempt $i, retrying..."
+    fi
+    sleep $sleep_time
+  done
   K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
   echo "Acquired token for the service account into K8S_CLUSTER_TOKEN"
 fi
