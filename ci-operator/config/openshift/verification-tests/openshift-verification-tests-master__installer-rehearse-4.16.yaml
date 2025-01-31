@@ -44,18 +44,18 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
-      SLEEP_DURATION: 10m
+      REGION: us-east-2
+      SLEEP_DURATION: 2h
+      SPOT_INSTANCES: "false"
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-provision
+    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
