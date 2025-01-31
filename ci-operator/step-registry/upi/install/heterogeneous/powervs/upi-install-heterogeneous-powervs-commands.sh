@@ -78,7 +78,7 @@ function cleanup_prior() {
     do
         VPC_CONN="${WORKSPACE_NAME}-vpc"
         VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
-        if [ ! -z "${VPC_CONN_ID}" ]
+        if [ -n "${VPC_CONN_ID}" ]
         then
             echo "deleting VPC connection"
             ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
@@ -183,7 +183,7 @@ function configure_automation() {
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
     cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CLEAN_VERSION}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "p-px"
     cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
     #Create the VPC to fixed transit gateway Connection for the TG
@@ -340,6 +340,6 @@ configure_automation
 cleanup_prior
 setup_powervs_image
 run_automation
-wait_for_additional_nodes_readiness ${ADDITIONAL_WORKERS}
+wait_for_additional_nodes_readiness "${ADDITIONAL_WORKERS}"
 
 exit 0
