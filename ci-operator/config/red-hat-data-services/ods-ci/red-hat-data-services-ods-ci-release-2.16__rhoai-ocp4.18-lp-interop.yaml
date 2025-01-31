@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,10 +14,12 @@ images:
   to: rhoai-tests
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.17"
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-stable
+        upper: 4.19.0-0
 resources:
   '*':
     limits:
@@ -45,7 +47,6 @@ tests:
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhoai-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: apodhrad@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -57,6 +58,7 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
             {"name": "rhods-operator", "source": "redhat-operators", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
         ]
+      RE_TRIGGER_ON_FAILURE: "false"
       USER_TAGS: |
         scenario rhoai
     test:
@@ -68,4 +70,4 @@ zz_generated_metadata:
   branch: release-2.16
   org: red-hat-data-services
   repo: ods-ci
-  variant: rhoai2.16-ocp4.17-lp-interop
+  variant: rhoai-ocp4.18-lp-interop
