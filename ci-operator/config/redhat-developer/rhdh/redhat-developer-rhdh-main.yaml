@@ -8,6 +8,9 @@ images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
+- dockerfile_literal: |
+    FROM mcr.microsoft.com/azure-cli:latest
+  to: rhdh-azure-cli
 promotion:
   to:
   - name: rhdh
@@ -124,6 +127,15 @@ tests:
     test:
     - ref: redhat-developer-rhdh-operator-nightly
     workflow: generic-claim
+- as: cleanup-mapt-destroy-orphaned-aks-clusters
+  cron: 0 2 * * SUN
+  optional: true
+  presubmit: true
+  steps:
+    pre:
+    - ref: redhat-developer-rhdh-aks-mapt-orphaned-get
+    test:
+    - ref: redhat-developer-rhdh-aks-mapt-orphaned-destroy
 zz_generated_metadata:
   branch: main
   org: redhat-developer
