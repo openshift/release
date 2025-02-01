@@ -16,7 +16,7 @@ cat > /tmp/foreman-deploy.sh << 'EOF'
 echo 'Running foreman-deploy.sh'
 USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
-for i in $(curl -sS $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   hammer -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
   sleep 10
   badfish -H mgmt-$i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
@@ -32,7 +32,7 @@ envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_N
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
-for i in $(curl -sS $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   while ! nc -z $i 22; do
     echo "Trying SSH port on host $i ..."
     sleep 60
@@ -47,7 +47,7 @@ scp -q ${SSH_ARGS} /tmp/foreman-wait_updated.sh root@${bastion}:/tmp/
 ssh ${SSH_ARGS} root@${bastion} "
   set -e
   set -o pipefail
-  curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r '.nodes[0].name' > /tmp/foreman_inventory_$LAB_CLOUD
+  curl -sSk $QUADS_INSTANCE | jq -r '.nodes[0].name' > /tmp/foreman_inventory_$LAB_CLOUD
   ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-deploy_updated.sh
   sleep 300
   ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-wait_updated.sh
