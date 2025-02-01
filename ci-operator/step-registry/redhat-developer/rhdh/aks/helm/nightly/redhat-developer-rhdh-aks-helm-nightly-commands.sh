@@ -38,10 +38,10 @@ else
 apiVersion: v1
 kind: Secret
 metadata:
-name: ${sa_secret_name}
-namespace: ${sa_namespace}
-annotations:
-  kubernetes.io/service-account.name: ${sa_name}
+  name: ${sa_secret_name}
+  namespace: ${sa_namespace}
+  annotations:
+    kubernetes.io/service-account.name: ${sa_name}
 type: kubernetes.io/service-account-token
 EOF
 
