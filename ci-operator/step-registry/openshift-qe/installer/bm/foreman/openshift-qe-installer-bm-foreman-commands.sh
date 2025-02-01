@@ -14,20 +14,18 @@ bastion=$(cat "/secret/address")
 # 2. Use badfish to set the boot interface and bounce the box
 cat > /tmp/foreman-deploy.sh << 'EOF'
 echo 'Running foreman-deploy.sh'
-USER=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[0].pm_password")
-for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  hammer host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
+USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
+for i in $(curl -sS $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+  hammer -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
   sleep 10
-  badfish -H $i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
-  sleep 10
-  badfish --reboot-only -H mgmt-$i -u $USER -p $PWD
+  badfish -H mgmt-$i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
 done
 EOF
 if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="http://quads.rdu3.labs.perfscale.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
 envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated.sh
 
