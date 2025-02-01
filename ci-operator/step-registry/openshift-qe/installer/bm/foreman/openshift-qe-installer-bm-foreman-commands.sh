@@ -32,14 +32,14 @@ envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_N
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
-for i in $(curl -sS $QUADS_INSTANCE/cloud/$LAB_CLOUD\_ocpinventory.json | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+for i in $(curl -sS $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   while ! nc -z $i 22; do
     echo "Trying SSH port on host $i ..."
     sleep 60
   done
 done
 EOF
-envsubst '${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated.sh
+envsubst '${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated.sh
 
 scp -q ${SSH_ARGS} /tmp/foreman-deploy_updated.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/foreman-wait_updated.sh root@${bastion}:/tmp/
