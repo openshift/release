@@ -27,7 +27,7 @@ if [[ $LAB == "performancelab" ]]; then
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated.sh
+envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
 
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
@@ -39,16 +39,15 @@ for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING
   done
 done
 EOF
-envsubst '${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated.sh
+envsubst '${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 
-scp -q ${SSH_ARGS} /tmp/foreman-deploy_updated.sh root@${bastion}:/tmp/
-scp -q ${SSH_ARGS} /tmp/foreman-wait_updated.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/foreman-deploy_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/foreman-wait_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
 
 ssh ${SSH_ARGS} root@${bastion} "
   set -e
   set -o pipefail
-  curl -sSk $QUADS_INSTANCE | jq -r '.nodes[0].name' > /tmp/foreman_inventory_$LAB_CLOUD
-  ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-deploy_updated.sh
+  source /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
   sleep 300
-  ansible -i /tmp/foreman_inventory_$LAB_CLOUD all -m script -a /tmp/foreman-wait_updated.sh
+  source /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 "
