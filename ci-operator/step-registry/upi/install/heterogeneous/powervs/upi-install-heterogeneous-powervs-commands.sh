@@ -182,6 +182,12 @@ function configure_automation() {
     
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+    RHEL_IMAGE_NAME="CentOS-Stream-9"
+    export RHEL_IMAGE_NAME
+
+    echo "Target the PowerVS Workspace"
+    ibmcloud pi workspace target "${POWERVS_SERVICE_INSTANCE_ID}"
+
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
     cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
@@ -189,6 +195,7 @@ function configure_automation() {
     cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
     #Create the VPC to fixed transit gateway Connection for the TG
+    RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
     for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
     do
         for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
