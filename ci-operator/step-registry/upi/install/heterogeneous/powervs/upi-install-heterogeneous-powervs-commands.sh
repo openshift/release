@@ -345,8 +345,8 @@ setup_ibmcloud_cli
 login_ibmcloud
 download_terraform_binary
 download_automation_code
+#cleanup_prior
 configure_automation
-cleanup_prior
 setup_powervs_image
 run_automation
 wait_for_additional_nodes_readiness "${ADDITIONAL_WORKERS}"
