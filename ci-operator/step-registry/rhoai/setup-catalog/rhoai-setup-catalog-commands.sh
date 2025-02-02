@@ -47,15 +47,15 @@ metadata:
   name: rhoai-catalog-dev
   namespace: openshift-marketplace
 spec:
-  displayName: Red Hat OpenShift AI
+  displayName: OpenShift AI Pre-Release
   publisher: RHOAI Development Catalog
-  image: quay.io/rhoai/rhoai-fbc-fragment:rhoai-2.16
+  image: quay.io/rhoai/rhoai-fbc-fragment:rhoai-2.17
   sourceType: grpc
   secrets:
      - pull-secret
 EOF
 
-sleep 200
+sleep 300
 
 echo "Checking custom catalog..."
 oc get catalogsource -n openshift-marketplace
