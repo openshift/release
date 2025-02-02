@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/aneeshkp/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
@@ -208,7 +210,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="master"
+export TEST_BRANCH="fix-pro-error"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"
@@ -224,6 +226,11 @@ else
     source $HOME/golang-1.22.4
 fi
 
+#[dev-ci] use dev branch for test code if needed
+#export TEST_BRANCH="dev-branch-for-ci-fix"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="master"
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
@@ -236,7 +243,9 @@ build_images
 
 # deploy ptp-operator
 
+#[dev-ci] use dev branch for product code
 git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#git clone https://github.com/aneeshkp/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -270,7 +279,9 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#[dev-ci] use dev branch for test code if needed
+git clone https://github.com/aneeshkp/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
