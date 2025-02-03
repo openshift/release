@@ -1,5 +1,12 @@
 #!/bin/sh
 
+#
+if [[ ! "${TEST_SUITE}" =~ "Upgrade" ]]; then
+  echo "Prepare Catalog Source for Upgrade testing."
+else
+  exit 0
+fi
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export CONSOLE_URL
