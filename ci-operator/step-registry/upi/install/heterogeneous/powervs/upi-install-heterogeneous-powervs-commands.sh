@@ -216,7 +216,7 @@ function setup_powervs_image() {
     ibmcloud pi workspace target "${CRN}"
 
     COUNT=$(ibmcloud pi image ls --json | jq -r '.images[] | [.name? | select(. = "CentOS-Stream-9")] | length')
-    if [ "${COUNT}" -ne 1 ]
+    if [[ "${COUNT}" == "0" ]]
     then
         echo "Creating the Centos Stream Image"
         ibmcloud pi image ls
