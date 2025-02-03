@@ -367,6 +367,18 @@ server:
 target_config:
   sync_period: 10s
 EOF
+  cat >> "${config_dir}/etcd-metrics.sh" << EOF
+#!/bin/bash
+export ETCD_HOSTNAME="\$(grep -Poh "etcd\-serving-\K.+(?=.key)" /etc/kubernetes/manifests/etcd-member-pod.yaml | head -n1)"
+export ETCDCTL_CACERT=/etc/kubernetes/static-pod-resources/etcd-member/ca.crt
+export ETCDCTL_CERT=/etc/kubernetes/static-pod-resources/etcd-member/etcd-all-certs/etcd-serving-\${ETCD_HOSTNAME}.crt
+export ETCDCTL_KEY=/etc/kubernetes/static-pod-resources/etcd-member/etcd-all-certs/etcd-serving-\${ETCD_HOSTNAME}.key
+curl -kLq --connect-timeout 10 \
+    --cacert \${ETCDCTL_CACERT} \
+    --cert \${ETCDCTL_CERT} \
+    --key \${ETCDCTL_KEY} \
+    https://localhost:2379/metrics
+EOF
 
   cat >> "${config_dir}/fcct.yml" << EOF
 variant: fcos
@@ -381,6 +393,10 @@ storage:
       contents:
         local: promtail-prod-creds
       mode: 0644
+    - path: /var/usrlocal/bin/etcd-metrics.sh
+      contents:
+        local: etcd-metrics.sh
+      mode: 0755
     - path: /etc/promtail/config.yaml
       contents:
         local: promtail_config.yml
@@ -425,6 +441,28 @@ systemd:
 
         [Install]
         WantedBy=multi-user.target
+    - contents: |
+        [Unit]
+        After=kubelet.service
+        Description=Dump etcd metrics
+
+        [Service]
+        Type=simple
+        ExecStart=/bin/bash /var/usrlocal/bin/etcd-metrics.sh
+
+        [Install]
+        WantedBy=multi-user.target
+      enabled: true
+      name: etcd-metrics.service
+    - contents: |
+        [Unit]
+        Description=Dump etcd metrics
+        [Timer]
+        OnUnitInactiveSec=10s
+        [Install]
+        WantedBy=timers.target
+      enabled: true
+      name: etcd-metrics.timer
 EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
@@ -732,6 +770,7 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+export OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
