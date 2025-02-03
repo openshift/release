@@ -186,7 +186,7 @@ function configure_automation() {
     export RHEL_IMAGE_NAME
 
     echo "Target the PowerVS Workspace"
-    ibmcloud pi workspace target "${POWERVS_SERVICE_INSTANCE_ID}"
+    ibmcloud pi workspace target "${CRN}"
 
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
