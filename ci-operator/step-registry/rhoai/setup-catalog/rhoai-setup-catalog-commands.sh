@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo "TEST_SUITE: ${TEST_SUITE}"
+
 # Run the command for upgrade testing
 if [[ ! "${TEST_SUITE}" =~ "Upgrade" ]]; then
   echo "Prepare Catalog Source for Upgrade testing."
