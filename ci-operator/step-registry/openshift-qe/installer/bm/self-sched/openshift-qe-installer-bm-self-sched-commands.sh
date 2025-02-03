@@ -19,4 +19,4 @@ HOST=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true | jq 
 CLOUD=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self | jq .'Cloud.Name')
 
 # Create schedule
-curl -k -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"cloud":"$CLOUD", "hostname": "$HOST"}' $QUADS_INSTANCE/api/v3/schedules
+curl -k -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{'cloud':$CLOUD, 'hostname': $HOST}" $QUADS_INSTANCE/api/v3/schedules
