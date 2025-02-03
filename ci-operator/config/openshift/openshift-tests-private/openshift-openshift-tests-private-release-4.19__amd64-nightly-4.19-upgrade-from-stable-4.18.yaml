@@ -387,11 +387,13 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_MIN_PERMISSION_FOR_MARKETPLACE: "true"
       OS_IMAGE_VERSION: 413.92.2023101700
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-marketplace-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-marketplace
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28
   cron: 48 13 16 * *
   steps:
@@ -453,60 +455,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-stack-upi
-- as: baremetalds-agent-hypershift-mce-inplace-f7
-  cluster: build05
-  cron: 5 16 1,8,15,24 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      EXTRA_ARGS: --node-upgrade-type=InPlace
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      MCE_VERSION: "2.8"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
-- as: baremetalds-agent-hypershift-mce-mceupgrade-inplace-f7
-  cluster: build05
-  cron: 30 13 1,8,15,24 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      EXTRA_ARGS: --node-upgrade-type=InPlace
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      MCE_TARGET_VERSION: "2.8"
-      MCE_VERSION: "2.7"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - ref: hypershift-mce-upgrade
-    - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
-- as: baremetalds-agent-hypershift-mce-compact-full-inplace-f7
-  cluster: build05
-  cron: 49 0 1,8,17,24 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NUM_WORKERS=0
-        NUM_MASTERS=3
-        MASTER_VCPU=16
-        MASTER_MEMORY=32768
-        MASTER_DISK=256
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=256G
-        NUM_EXTRA_WORKERS=2
-      EXTRA_ARGS: --node-upgrade-type=InPlace
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      MCE_TARGET_VERSION: "2.8"
-      MCE_VERSION: "2.7"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift-full
-    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetal-compact-agent-ipv4-static-connected-f28
   cluster: build05
   cron: 11 15 1 * *
@@ -565,8 +513,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28
-  cron: 12 8 20 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -890,13 +838,10 @@ tests:
 - as: vsphere-ipi-multisubnets-elb-usermanaged-f28
   cron: 3 10 13 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       LB_TYPE: UserManaged
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
@@ -993,11 +938,9 @@ tests:
 - as: vsphere-ipi-zones-multisubnets-external-lb-f28
   cron: 33 19 27 * *
   steps:
-    cluster_profile: vsphere-multizone-2
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+    cluster_profile: vsphere-elastic
+    env:
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
@@ -1040,7 +983,7 @@ tests:
 - as: vsphere-upi-zones-canary-f28
   cron: 35 1 25 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-vsphere-upi-zones

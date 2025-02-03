@@ -36,8 +36,12 @@ for kubeconfig in $(find ${KUBECONFIG} -type f); do
     export KUBECONFIG=${kubeconfig}
 done
 fi
+source ~/config.sh
+export EXTENSIONS_PAYLOAD_OVERRIDE=${RELEASE_IMAGE_LATEST}
+export EXTENSIONS_PAYLOAD_OVERRIDE_hyperkube=${HYPERKUBE_IMAGE}
+export REGISTRY_AUTH_FILE=~/pull-secret
 openshift-tests run \
-    -v 2 \
+    -v 5 \
     --provider=none \
     --monitor='node-lifecycle,operator-state-analyzer,legacy-kube-apiserver-invariants' \
     -f /tmp/test-list \
