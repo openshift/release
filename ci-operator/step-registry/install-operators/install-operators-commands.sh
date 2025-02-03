@@ -133,7 +133,21 @@ EOF
 
     echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
-    if [[ -z "$operator_config" ]]; then
+    if [[ "${operator_name}" == "rhods-operator" ]]; then
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+            name: "${operator_name}"
+            namespace: "${operator_install_namespace}"
+        spec:
+            channel: "${operator_channel}"
+            installPlanApproval: Manual
+            name: "${operator_name}"
+            source: "${operator_source}"
+            sourceNamespace: openshift-marketplace
+EOF
+    elif [[ -z "$operator_config" ]]; then
         cat <<EOF | oc apply -f -
         apiVersion: operators.coreos.com/v1alpha1
         kind: Subscription
