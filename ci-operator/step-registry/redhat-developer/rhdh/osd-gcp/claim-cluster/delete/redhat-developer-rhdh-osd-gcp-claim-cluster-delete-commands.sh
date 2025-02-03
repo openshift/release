@@ -16,4 +16,4 @@ ocm login --client-id=$CLIENT_ID --client-secret=$CLIENT_SECRET
 
 ocm describe cluster $CLUSTER_ID
 
-# ocm delete /api/clusters_mgmt/v1/clusters/$CLUSTER_ID
+ocm delete /api/clusters_mgmt/v1/clusters/$CLUSTER_ID
