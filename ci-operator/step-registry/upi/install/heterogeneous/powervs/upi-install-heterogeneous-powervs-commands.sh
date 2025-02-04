@@ -113,8 +113,9 @@ function cleanup_prior() {
             sleep 60
         done
 
+        # Dev Note: avoid deleting the stream9 image
         echo "Deleting the Images"
-        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
+        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | .name? | select(. = "CentOS-Stream-9").imageID')
         do
             echo "Deleting Images ${IMAGE_ID}"
             ibmcloud pi image delete "${IMAGE_ID}"
