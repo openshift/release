@@ -1,7 +1,7 @@
 base_images:
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
+    name: "4.19"
+    namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
@@ -13,7 +13,6 @@ base_images:
     tag: "4.19"
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/gcp-pd-csi-driver-operator
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
@@ -29,18 +28,18 @@ images:
   to: gcp-pd-csi-driver-operator-test
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -100,7 +99,19 @@ tests:
     env:
       PROJECT_NAME: gcp-pd-csi-driver-operator
     workflow: openshift-ci-security
+- as: periodic-e2e-gcp-csi-c3
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: periodic-e2e-gcp-csi-n4
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+    workflow: openshift-e2e-gcp-csi-custom-worker
 zz_generated_metadata:
-  branch: master
-  org: openshift-priv
+  branch: main
+  org: openshift
   repo: gcp-pd-csi-driver-operator
