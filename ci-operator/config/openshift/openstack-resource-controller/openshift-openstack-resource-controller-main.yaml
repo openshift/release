@@ -11,14 +11,43 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/k-orc/openstack-resource-controller
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: openstack-resource-controller
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify
+  commands: make XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache verify-generated
+  container:
+    from: src
+  optional: true
 - as: test
-  commands: make test
+  commands: make KUBEBUILDER_ASSETS_DIR=/tmp/data test
   container:
     from: src
   optional: true
