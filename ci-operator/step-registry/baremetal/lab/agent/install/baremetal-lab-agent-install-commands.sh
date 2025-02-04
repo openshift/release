@@ -97,6 +97,11 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
+capabilities:
+  baselineCapabilitySet: None
+  additionalEnabledCapabilities:
+    - Ingress
+    - Console
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
