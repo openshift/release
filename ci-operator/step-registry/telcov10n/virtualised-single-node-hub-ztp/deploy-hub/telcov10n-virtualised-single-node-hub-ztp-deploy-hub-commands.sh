@@ -40,15 +40,67 @@ function load_env {
   NETWORK_IPv4_SUBNET="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_subnet)"
   export NETWORK_IPv4_SUBNET
 
-  # shellcheck disable=SC2089
-  NETWORK_BRIDGE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') }}"
-  # shellcheck disable=SC2090
-  export NETWORK_BRIDGE_IPv4
+  ipv6_offset="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_offset)"
+  NETWORK_IPv6_SUBNET="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_subnet)"
+  export NETWORK_IPv6_SUBNET
 
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_GW_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('1') | ansible.utils.ipv4('address') }}"
+  NETWORK_BRIDGE_CIDR_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('20') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_CIDR_IPv4
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_CIDR_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 32))') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_CIDR_IPv6
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('20') | ansible.utils.ipv4('address') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv4
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 32))') | ansible.utils.ipv6('address') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv6
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_IPv4_SUBNET="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipv4('network') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv4_SUBNET
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_IPv6_SUBNET="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipv6('network') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv6_SUBNET
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_IPv4_NET_MASK="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipv4('netmask') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_IPv4_NET_MASK
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_GW_IPv4="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_gateway)"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_GW_IPv4
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_GW_IPv6="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_gateway)"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_GW_IPv6
+
+  #### DNS
+
+  # shellcheck disable=SC2089
+  NETWORK_BRIDGE_BASE_DOMAIN="{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}"
+  # shellcheck disable=SC2090
+  export NETWORK_BRIDGE_BASE_DOMAIN
+
+  # shellcheck disable=SC2089
+  DNS_SERVER_1="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/dns_server_1)"
+  # shellcheck disable=SC2090
+  export DNS_SERVER_1
+
+  # shellcheck disable=SC2089
+  DNS_SERVER_2="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/dns_server_2)"
+  # shellcheck disable=SC2090
+  export DNS_SERVER_2
 
   #### VM
   VM_HUB_ZTP_POOL_PATH="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
@@ -70,22 +122,40 @@ function load_env {
   export VM_PASSWD
 
   # shellcheck disable=SC2089
-  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('2') | ansible.utils.ipv4('address') }}"
+  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('21') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_BOOTSTRAP_IPv4
+  # shellcheck disable=SC2089
+  VM_BOOTSTRAP_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 33))') | ansible.utils.ipv6('address') }}"
+  # shellcheck disable=SC2090
+  export VM_BOOTSTRAP_IPv6
 
   # shellcheck disable=SC2089
-  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('3') | ansible.utils.ipv4('address') }}"
+  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('22') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_CONTROL_PLANE_0_IPv4
+  # shellcheck disable=SC2089
+  VM_CONTROL_PLANE_0_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 34))') | ansible.utils.ipv6('address') }}"
+  # shellcheck disable=SC2090
+  export VM_CONTROL_PLANE_0_IPv6
 
   oct_net="$(echo ${NETWORK_IPv4_SUBNET} | cut -d'.' -f3)"
   hex_net="$(printf '%x' ${oct_net})"
-  VM_BOOTSTRAP_MAC="cc:a4:de:aa:${hex_net}:01"
+  VM_BOOTSTRAP_MAC="7e:1c:0b:10:${hex_net}:01"
   export VM_BOOTSTRAP_MAC
 
-  VM_CONTROL_PLANE_0_MAC="cc:a4:de:aa:${hex_net}:02"
+  VM_CONTROL_PLANE_0_MAC="7e:1c:0b:10:${hex_net}:02"
   export VM_CONTROL_PLANE_0_MAC
+
+  # # shellcheck disable=SC2089
+  # VM_BOOTSTRAP_CIDR_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 33))') }}"
+  # # shellcheck disable=SC2090
+  # export VM_BOOTSTRAP_CIDR_IPv6
+
+  # # shellcheck disable=SC2089
+  # VM_CONTROL_PLANE_0_CIDR_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 34))') }}"
+  # # shellcheck disable=SC2090
+  # export VM_CONTROL_PLANE_0_CIDR_IPv6
 
   #### Hub cluster
   HUB_CLUSTER_NAME="hub-${OCP_HUB_VERSION//./-}"
@@ -101,14 +171,22 @@ function load_env {
   export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
-  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('4') | ansible.utils.ipv4('address') }}"
+  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('23') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_API_IPv4
+  # shellcheck disable=SC2089
+  HUB_CLUSTER_API_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 35))') | ansible.utils.ipv6('address') }}"
+  # shellcheck disable=SC2090
+  export HUB_CLUSTER_API_IPv6
 
   # shellcheck disable=SC2089
-  HUB_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('5') | ansible.utils.ipv4('address') }}"
+  HUB_CLUSTER_INGRESS_IPv4="${HUB_CLUSTER_API_IPv4}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_INGRESS_IPv4
+  # shellcheck disable=SC2089
+  HUB_CLUSTER_INGRESS_IPv6="${HUB_CLUSTER_API_IPv6}"
+  # shellcheck disable=SC2090
+  export HUB_CLUSTER_INGRESS_IPv6
 
   # shellcheck disable=SC2089
   HUB_CLUSTER_OPERATORS="$(echo ${OPERATORS} | jq --compact-output '[.[].name]')"
@@ -123,19 +201,31 @@ function load_env {
   export BAREMETAL_SPOKE_CLUSTER_NIC_MAC
 
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('6') | ansible.utils.ipv4('address') }}"
+  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('24') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export BAREMETAL_SPOKE_IPv4
+  # shellcheck disable=SC2089
+  BAREMETAL_SPOKE_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 36))') | ansible.utils.ipv6('address') }}"
+  # shellcheck disable=SC2090
+  export BAREMETAL_SPOKE_IPv6
 
   # shellcheck disable=SC2089
-  SPOKE_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('7') | ansible.utils.ipv4('address') }}"
+  SPOKE_CLUSTER_API_IPv4="${BAREMETAL_SPOKE_IPv4}"
   # shellcheck disable=SC2090
   export SPOKE_CLUSTER_API_IPv4
+  # shellcheck disable=SC2089
+  SPOKE_CLUSTER_API_IPv6="${BAREMETAL_SPOKE_IPv6}"
+  # shellcheck disable=SC2090
+  export SPOKE_CLUSTER_API_IPv6
 
   # shellcheck disable=SC2089
-  SPOKE_CLUSTER_INGRESS_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('8') | ansible.utils.ipv4('address') }}"
+  SPOKE_CLUSTER_INGRESS_IPv4="${BAREMETAL_SPOKE_IPv4}"
   # shellcheck disable=SC2090
   export SPOKE_CLUSTER_INGRESS_IPv4
+  # shellcheck disable=SC2089
+  SPOKE_CLUSTER_INGRESS_IPv6="${BAREMETAL_SPOKE_IPv6}"
+  # shellcheck disable=SC2090
+  export SPOKE_CLUSTER_INGRESS_IPv6
 
   #### Proxy access
   SOCKS5_PROXY_PORT="${SOCKS5_PROXY##*:}"
@@ -173,12 +263,17 @@ all:
           #    name: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}"
           #    path: "{{ lookup('ansible.builtin.env', 'VM_HUB_ZTP_POOL_PATH') }}"
           kcli_wrp:
-            networks:
-            - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
-              bridge: true
-              bridgename: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
-              nic: "{{ lookup('ansible.builtin.env', ' NETWORK_NIC') }}"
-              bridge_ip: "${NETWORK_BRIDGE_IPv4}"
+            # networks:
+            # - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
+            #   bridge: true
+            #   nic: "{{ lookup('ansible.builtin.env', ' NETWORK_NIC') }}"
+            #   bridge_cidr_ipv4: "${NETWORK_BRIDGE_CIDR_IPv4}"
+            #   bridge_gw4: "${NETWORK_BRIDGE_GW_IPv4}"
+            #   bridge_dns_ipv4:
+            #     - "${DNS_SERVER_1}"
+            #     - "${DNS_SERVER_2}"
+            #   bridge_cidr_ipv6: "${NETWORK_BRIDGE_CIDR_IPv6}"
+            #   bridge_gw6: "${NETWORK_BRIDGE_GW_IPv6}"
             clusters:
             - type: openshift
               force_installation: true
@@ -186,7 +281,7 @@ all:
                 cluster: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}"
                 version: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_VERSION') }}"
                 tag: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_TAG') }}"
-                domain: "{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}"
+                domain: "${NETWORK_BRIDGE_BASE_DOMAIN}"
                 pool: "{{kcli_wrp_libvirt.pool.name}}"
                 nets:
                   - "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
@@ -199,7 +294,9 @@ all:
                 disks: ${VM_DISKS}
                 base64_pull_secret: "{{ lookup('ansible.builtin.env', 'CLUSTER_B64_PULL_SECRET') }}"
                 api_ip: "${HUB_CLUSTER_API_IPv4}"
-                ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
+                # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
+                dual_api_ip: "${HUB_CLUSTER_API_IPv6}"
+                # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv6}"
                 apps: ${HUB_CLUSTER_OPERATORS}
                 ignore_hosts: true
                 vmrules:
@@ -208,11 +305,19 @@ all:
                     nets:
                       - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
                         mac: "{{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }}"
+                        # ip: "${VM_BOOTSTRAP_IPv4}"
+                        # mask: "${NETWORK_BRIDGE_IPv4_NET_MASK}"
+                        # gateway: "${NETWORK_BRIDGE_GW_IPv4}"
+                        # domain: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
                 - ${HUB_CLUSTER_NAME}-ctlplane-0:
                     rootpassword: "{{ lookup('ansible.builtin.env', 'VM_PASSWD') }}"
                     nets:
                       - name: "{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
                         mac: "{{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }}"
+                        # ip: "${VM_CONTROL_PLANE_0_IPv4}"
+                        # mask: "${NETWORK_BRIDGE_IPv4_NET_MASK}"
+                        # gateway: "${NETWORK_BRIDGE_GW_IPv4}"
+                        # domain: "{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
           kcli_wrp_credentials:
             clusters_details: ~/.kcli/clusters
             kubeconfig: auth/kubeconfig
@@ -220,53 +325,97 @@ all:
           kcli_wrp_dnsmasq:
             use_nm_plugin: true
             drop_in_files:
-              - path: /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}.conf
+              - path: /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
                 content: |
-                  # /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}.conf
+                  # /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
+
+                  domain=${NETWORK_BRIDGE_BASE_DOMAIN}
+                  domain-needed
+                  bogus-priv
+                  expand-hosts
 
                   log-dhcp
                   log-queries
                   # log-facility=/var/log/dnsmasq.log
-                  strict-order
 
-                  server=10.11.5.160
-                  server=10.2.70.215
+                  server=${DNS_SERVER_1}
+                  server=${DNS_SERVER_2}
 
                   # except-interface=lo # <--- To check local resolves
-                  interface="{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}"
+                  interface={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
 
-                  listen-address=127.0.0.1,${NETWORK_BRIDGE_GW_IPv4}
+                  listen-address=127.0.0.1,${NETWORK_BRIDGE_IPv4},${NETWORK_BRIDGE_IPv6}
 
-                  dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('network') }},static
-                  dhcp-no-override
-                  # dhcp-authoritative <---- No needed
+                  ########################################
+                  # DHCP IPv4
+                  ########################################
+
+                  # dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('network') }},static,4h
+                  #            {{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipv4('network') }}"
+                  dhcp-range=${NETWORK_BRIDGE_IPv4_SUBNET},static,4h
+                  dhcp-option={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},option:netmask,${NETWORK_BRIDGE_IPv4_NET_MASK}
+                  dhcp-option={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},option:router,${NETWORK_BRIDGE_GW_IPv4}
+                  dhcp-option={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},option:dns-server,${NETWORK_BRIDGE_IPv4}
+                  dhcp-option={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},option:ntp-server,${NETWORK_BRIDGE_IPv4}
+                  dhcp-option={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},option:domain-search,${NETWORK_BRIDGE_BASE_DOMAIN}
+                  # dhcp-no-override
+
+                  ########################################
+                  # DHCP IPv6
+                  ########################################
+
+                  # dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET},static,64,4h
+                  dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET}100,${NETWORK_BRIDGE_IPv6_SUBNET}200,64,4h
+                  dhcp-option=option6:dns-server,[${NETWORK_BRIDGE_IPv6}]
+                  enable-ra
+                  # dhcp-authoritative
+                  strict-order
+
+                  ########################################
+                  # IP reserved
+                  ########################################
 
                   # Bridge setup:
-                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},${VM_BOOTSTRAP_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},${VM_BOOTSTRAP_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  # dhcp-host=id:00:03:00:01:{{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},[${VM_BOOTSTRAP_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  # dhcp-host={{ lookup('ansible.builtin.env', 'VM_BOOTSTRAP_MAC') }},${VM_BOOTSTRAP_IPv4},[${VM_BOOTSTRAP_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-bootstrap.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # Virtualised SNO Hub main NIC
-                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  # dhcp-host=id:00:03:00:01:{{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},[${VM_CONTROL_PLANE_0_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
+                  # dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},[${VM_CONTROL_PLANE_0_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # SNO Spoke main NIC
                   dhcp-host={{ lookup('ansible.builtin.env', 'BAREMETAL_SPOKE_CLUSTER_NIC_MAC') }},${BAREMETAL_SPOKE_IPv4}
+                  # dhcp-host=id:00:03:00:01:{{ lookup('ansible.builtin.env', 'BAREMETAL_SPOKE_CLUSTER_NIC_MAC') }},[${BAREMETAL_SPOKE_IPv6}]
+
+                  ########################################
+                  # DNS entries
+                  ########################################
 
                   # This file sets up the local OCP cluster domain and defines some aliases and a wildcard.
-                  # local=/{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/
-                  local=/{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/
+                  # local=/{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/
+                  local=/${NETWORK_BRIDGE_BASE_DOMAIN}/
                   #
                   # OCP HUB cluster
                   #
                   # OCP HUB cluster API
-                  address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_API_IPv4}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_API_IPv4}
+                  address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv4}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv4}
+                  address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
                   # OCP HUB cluster INGRESS
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${HUB_CLUSTER_INGRESS_IPv4}
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv4}
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv6}
                   #
                   # OCP SPOKE cluster API
                   #
                   # OCP SPOKE cluster
-                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_API_IPv4}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_API_IPv4}
+                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
+                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
+                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
                   # OCP HUB cluster INGRESS
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.{{ lookup('ansible.builtin.env', 'CLUSTER_BASE_DOMAIN') }}/${SPOKE_CLUSTER_INGRESS_IPv4}
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv4}
+                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv6}
           kcli_wrp_firewalld:
             zone_files:
               - path: /etc/firewalld/zones/public.xml
@@ -279,10 +428,11 @@ all:
                     <service name="dhcpv6-client"/>
                     <service name="cockpit"/>
                     <service name="dhcp"/>
+                    <service name="dhcpv6"/>
                     <service name="dns"/>
                     <service name="https"/>
                     <port port="{{ lookup('ansible.builtin.env', 'SOCKS5_PROXY_PORT') }}" protocol="tcp"/>
-                    <masquerade/>
+                    # <masquerade/>
                     <forward/>
                   </zone>
           kcli_wrp_socks5_proxy:
