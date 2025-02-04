@@ -138,6 +138,26 @@ tests:
         requests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
+- as: e2e-aro
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-parallel
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aro-e2e-classic
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode
