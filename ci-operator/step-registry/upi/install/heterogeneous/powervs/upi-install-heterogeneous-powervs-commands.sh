@@ -216,13 +216,15 @@ function setup_powervs_image() {
     echo "PowerVS Target CRN is: ${CRN}"
     ibmcloud pi workspace target "${CRN}"
 
-    COUNT=$(ibmcloud pi image ls --json | jq -r '.images[] | [.name? | select(. = "CentOS-Stream-9")] | length')
+    COUNT=$(ibmcloud pi image ls --json | jq -r '[.images[] | select(.name? == "CentOS-Stream-9").name] | length')
     if [[ "${COUNT}" == "0" ]]
     then
         echo "Creating the Centos Stream Image"
         ibmcloud pi image ls
         ibmcloud pi image create CentOS-Stream-9 --json
         echo "Import image status is: $?"
+    else
+        echo "Skipping import, CentOS-Stream exists"
     fi
 }
 
