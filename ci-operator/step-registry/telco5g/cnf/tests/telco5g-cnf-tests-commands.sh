@@ -402,7 +402,7 @@ elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export HYPERSHIFT_ENVIRONMENT=true
     export FEATURES_ENVIRONMENT=hypershift-ci
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
