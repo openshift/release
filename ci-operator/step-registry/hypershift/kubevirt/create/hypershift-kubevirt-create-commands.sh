@@ -202,6 +202,7 @@ else
     --root-volume-size 64 \
     --release-image "${RELEASE_IMAGE}" \
     --pull-secret "${PULL_SECRET_PATH}" \
+    --host-device-name nvidia.com/H20,count:2 --host-device-name nvidia.com/NVSwitch,count:2 \
     --generate-ssh \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
