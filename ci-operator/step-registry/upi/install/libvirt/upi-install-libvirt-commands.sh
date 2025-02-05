@@ -436,6 +436,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
+   sleep 1200
   ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
 fi
 
