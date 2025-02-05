@@ -72,7 +72,6 @@ fi
 PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
-IMAGE_BUILD_NEEDED=false
 # Check if changes are exclusively within the specified directories
 DIRECTORIES_TO_CHECK=".ibm|e2e-tests"
 ONLY_IN_DIRS=true
@@ -83,28 +82,7 @@ for change in $PR_CHANGESET; do
         ONLY_IN_DIRS=false
         break
     fi
-    # Check if there were any changes in .ibm/images/
-    if echo "$change" | grep -qE "^.ibm/images/"; then
-        IMAGE_BUILD_NEEDED=true
-        break
-    fi
 done
-
-# If no changes are detected in .ibm/images/, skip the image build process
-if [ "$IMAGE_BUILD_NEEDED" = false ]; then
-    echo "No changes detected in .ibm/images/. Skipping showcase-e2e-runner image build..."
-else
-    echo "Changes detected in .ibm/images/. Starting image build..."
-
-    # Build the Docker image
-    podman build -t quay.io/rhdh-community/rhdh-e2e-runner:latest .ibm/images/
-
-    # Authenticate with Quay.io
-    podman login -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
-
-    # Push the newly built image to Quay.io
-    podman push quay.io/rhdh-community/rhdh-e2e-runner:latest
-fi
 
 if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : next"
@@ -143,5 +121,7 @@ else
 
 fi
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "$REPO_ROOT/ci-operator/step-registry/redhat-developer/rhdh/select-image.sh"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

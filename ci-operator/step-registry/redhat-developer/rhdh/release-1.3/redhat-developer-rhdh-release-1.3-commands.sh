@@ -58,7 +58,7 @@ done
 
 # If no changes are detected in .ibm/images/, skip the image build process
 if [ "$IMAGE_BUILD_NEEDED" = false ]; then
-    echo "No changes detected in .ibm/images/. Skipping showcase-e2e-runner image build..."
+    echo "No changes detected in .ibm/images/. Skipping rhdh-e2e-runner image build..."
 else
     echo "Changes detected in .ibm/images/. Starting image build..."
 
@@ -109,5 +109,8 @@ else
     done
 
 fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "$REPO_ROOT/ci-operator/step-registry/redhat-developer/rhdh/select-image.sh"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

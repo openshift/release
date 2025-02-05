@@ -31,4 +31,7 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd rhdh || exit
 git checkout "release-1.4" || exit
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "$REPO_ROOT/ci-operator/step-registry/redhat-developer/rhdh/select-image.sh"
+
 bash ./.ibm/pipelines/openshift-ci-tests.sh

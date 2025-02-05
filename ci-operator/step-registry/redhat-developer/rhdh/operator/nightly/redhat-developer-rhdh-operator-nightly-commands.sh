@@ -143,5 +143,7 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "$REPO_ROOT/ci-operator/step-registry/redhat-developer/rhdh/select-image.sh"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
