@@ -27,3 +27,4 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 for f in $ARO_CLUSTER_FILES; do
   az storage blob download --account-name ${AZURE_SA_NAME} --container-name ${AZURE_SA_CONTAINER} --name ${f} --file ${SHARED_DIR}/${f} --auth-mode login
 done
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
