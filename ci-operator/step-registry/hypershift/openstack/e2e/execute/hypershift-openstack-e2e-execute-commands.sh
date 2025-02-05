@@ -13,19 +13,12 @@ trap cleanup EXIT
 
 OPENSTACK_COMPUTE_FLAVOR=$(cat "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
 OPENSTACK_EXTERNAL_NETWORK_ID=$(cat "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK_ID")
-E2E_TESTS_PARALLEL=2
+E2E_TESTS_PARALLEL=4
 E2E_EXTRA_ARGS=""
 
 if [ ! -f "${SHARED_DIR}/clouds.yaml" ]; then
     >&2 echo clouds.yaml has not been generated
     exit 1
-fi
-
-if [ "${NFV_NODEPOOLS}" == "true" ]; then
-    # TODO(emilien): be more specific on the regex to only select the NFV related tests.
-    E2E_TESTS_REGEX='^TestNodePool$'
-    # NFV's flavor uses dedicated CPU so we can't deploy many nodepools at the same time
-    E2E_TESTS_PARALLEL=1
 fi
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -42,7 +35,7 @@ fi
 # run the test
 hack/ci-test-e2e.sh ${E2E_EXTRA_ARGS} \
         --test.v \
-	-test.timeout=2h30m \
+	--test.timeout=2h30m \
         --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
         --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \

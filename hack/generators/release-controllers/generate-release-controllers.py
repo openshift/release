@@ -60,12 +60,14 @@ def generate_app_ci_content(config, git_clone_dir):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('ibm_managed_control_plane_testing.yaml'), context=config) as gendoc:
         content.add_ibm_managed_control_plane_testing(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_rpms.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
-        content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
+    for path in config.paths.path_rc_rpms:
+        with genlib.GenDoc(path.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
+            content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
-    for major_minor in config.releases:
-        with genlib.GenDoc(config.paths.path_rc_rpms.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
-            content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
+    for path in config.paths.path_rc_rpms:
+        for major_minor in config.releases:
+            with genlib.GenDoc(path.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
+                content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
     # If there is an annotation defined for the public release controller, use it as a template
     # for the private annotations.

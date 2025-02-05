@@ -272,7 +272,12 @@ fi
 curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.2.2/PowerVS-get-largest-system-pool-v0.2.2-linux-amd64.tar.gz
 tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
 chmod u+x /tmp/PowerVS-get-largest-system-pool
-POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -serviceGUID "${POWERVS_SERVICE_INSTANCE_ID}" -limitTypes "release-${BRANCH}" -zone "${POWERVS_REGION}")
+if [[ "${BRANCH}" == "master" || "${BRANCH}" == "main" ]]; then
+  LIMIT_TYPES=${BRANCH} 
+else
+  LIMIT_TYPES="release-${BRANCH}"
+fi
+POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -serviceGUID "${POWERVS_SERVICE_INSTANCE_ID}" -limitTypes "${LIMIT_TYPES}" -zone "${POWERVS_REGION}")
 echo "POOL_TYPE=${POOL_TYPE}"
 PLATFORM_ARGS_COMPUTE+=( "sysType" "${POOL_TYPE}" )
 PLATFORM_ARGS_WORKER+=( "sysType" "${POOL_TYPE}" )
@@ -435,6 +440,19 @@ if [ -n "${FEATURE_GATES}" ]; then
   cat >> "${CONFIG}" << EOF
 featureGates: ${FEATURE_GATES}
 EOF
+fi
+
+# If the branch is 4.18 or greater, then don't use the existing
+#   - Service Instance
+#   - Transit Gateway
+#   - Virtual Private Cloud
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+    echo "Removing existing service instance!"
+    sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
+    echo "Removing existing transit gateway!"
+    sed -i -e '/tgName/d' "${CONFIG}"
+    echo "Removing existing vpc!"
+    sed -i -e '/vpcName/d' "${CONFIG}"
 fi
 
 echo "tgName in ${CONFIG}:"

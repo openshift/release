@@ -249,6 +249,12 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
 
+if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+  cat >> "${SHARED_DIR}/agent-config.yaml" <<EOF
+minimalISO: ${MINIMAL_ISO}
+EOF
+fi
+
 echo "Creating agent image..."
 dir=/tmp/installer
 mkdir "${dir}/"

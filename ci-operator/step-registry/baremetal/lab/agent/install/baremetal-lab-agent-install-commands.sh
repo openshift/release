@@ -61,13 +61,6 @@ function update_image_registry() {
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
-  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
-  oc wait co image-registry --for=condition=Available=True  --timeout=30m
-  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
-  sleep 60
-  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
-  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
-  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -128,6 +121,18 @@ do
   fi
 done
 
+echo "[INFO] Looking for patches to the agent-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_agent_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/agent-config.yaml" "$f"
+  fi
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
@@ -163,6 +168,9 @@ case "${BOOT_MODE}" in
   oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
+  if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
+  fi
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
@@ -215,6 +223,13 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+echo -e "\nGenerating coreOS stream file..."
+
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}/coreos-stream.json" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/coreos-stream.json"
+
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -241,19 +256,27 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
+  # Used by observer pod
+  touch "${SHARED_DIR}/failure"
+  # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
 fi
 
-update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch "${SHARED_DIR}/failure"
+  # TODO: gather logs??
   exit 1
 fi
+update_image_registry
+
+# Used by observer pod
+touch  "${SHARED_DIR}/success"
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
-update_image_registry
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

@@ -1,18 +1,22 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.18
+    tag: rhel-9-release-golang-1.22-openshift-4.19
   operator-sdk:
     name: "4.20"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -22,9 +26,12 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.19:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.19
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -92,6 +99,9 @@ tests:
   as: aws-e2e-operator
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -110,6 +120,8 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
       WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
@@ -249,8 +261,8 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.18
-      SOURCE_BRANCH: release-4.18
+      DESTINATION_BRANCH: community-4.19
+      SOURCE_BRANCH: release-4.19
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator

@@ -7,6 +7,11 @@ set -o pipefail
 export NAMESPACE=$DEPL_PROJECT_NAME
 status=0
 
+echo "Deploying Tools"
+oc new-project tools --skip-config-write=true
+make fetch-tools fetch_tools="https://api.github.com/repos/mdujava/tools/tarball/jsonpath"
+make tools
+
 echo "Running 3scale interop tests"
 make smoke || status="$?" || :
 
