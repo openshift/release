@@ -35,6 +35,16 @@ tests:
     version: "4.17"
   run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
   steps:
+    allow_skip_on_success: true
+    post:
+    - as: gather-must-gather
+      commands: gather-must-gather-commands.sh
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
     test:
     - as: e2e
       cli: latest
