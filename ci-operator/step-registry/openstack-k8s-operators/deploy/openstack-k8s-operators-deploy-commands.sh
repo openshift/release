@@ -4,6 +4,7 @@ set -ex
 DEFAULT_ORG="openstack-k8s-operators"
 DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
+OPENSTACK_OPERATOR_TAG=${OPENSTACK_OPERATOR_TAG:="latest"}
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
@@ -55,7 +56,7 @@ if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   # when testing install_yamls patch, we can skip build process and
   #  validate using latest openstack-operator tag
   export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${OPENSTACK_OPERATOR_TAG}
 else
   export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
   export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
