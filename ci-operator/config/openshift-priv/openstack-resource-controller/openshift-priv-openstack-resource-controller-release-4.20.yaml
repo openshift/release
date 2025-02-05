@@ -1,10 +1,26 @@
-binary_build_commands: go build -o bin/manager cmd/manager/main.go
+base_images:
+  ocp_4.19_base-rhel9:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.23
+  from_repository: true
 canonical_go_repository: github.com/k-orc/openstack-resource-controller
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: openstack-resource-controller
 promotion:
   to:
   - name: 4.20-priv
@@ -21,16 +37,29 @@ releases:
       namespace: ocp-private
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: test
-  commands: make test
+- as: verify
+  commands: make XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache verify-generated
   container:
     from: src
+  optional: true
+- as: test
+  commands: make KUBEBUILDER_ASSETS_DIR=/tmp/data test
+  container:
+    from: src
+  optional: true
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  optional: true
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
