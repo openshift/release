@@ -36,7 +36,7 @@ GITHUB_REPOSITORY_NAME="rhdh"
 
 export QUAY_REPO="rhdh-community/rhdh"
 export RELEASE_BRANCH_NAME="main"
-RELEASE_TAG_NAME="next"
+export RELEASE_TAG_NAME="next"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
