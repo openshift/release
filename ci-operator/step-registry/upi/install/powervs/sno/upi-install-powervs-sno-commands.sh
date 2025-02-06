@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -o nounset
 set -euox pipefail
 
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
@@ -476,25 +477,37 @@ mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
 
 download_installer() {
     echo "Dowmload openshift-install"
-    install_tar_file="openshift-install-linux.tar.gz"
-    if [[ ! -z \${INSTALLER_URL} ]]; then
-        curl -s \${INSTALLER_URL} -o \${install_tar_file}
-    else
-      root_path="https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients"
-      install_path="\${root_path}/ocp/latest-\${OCP_VERSION}/\${install_tar_file}"
-      rc_install_path="\${root_path}/ocp/candidate-\${OCP_VERSION}/\${install_tar_file}"
-      echo "Download GA release"
-      curl -s \${install_path} -o \${install_tar_file}
-      if grep -q "File not found" "./\${install_tar_file}" ; then
-          echo "Download RC release"
-          curl -s \${rc_install_path} -o \${install_tar_file}
-      fi
-      if grep -q "File not found" "./\${install_tar_file}" ; then
-          echo "could not down load \${install_tar_file}"
-          exit -1
-      fi
-    fi
-    tar xzvf \${install_tar_file}
+    echo $OCP_VERSION
+    curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
+    sleep 1200
+    jq -r --arg nightly "nightly" --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
+    TARGET_VERSION="$(< /tmp/target_version)"
+    install_path="\${root_path}/ocp/latest/ppc64le/openshift-install"
+    echo "Extracting openshift-install from the payload..."
+    oc adm release extract -a "${PULL_SECRET_FILE}" "${TARGET_VERSION}" \
+    --command=openshift-install --to="${install_path}"
+    
+
+    # install_tar_file="openshift-install-linux.tar.gz"
+    # if [[ ! -z \${INSTALLER_URL} ]]; then
+    #     curl -s \${INSTALLER_URL} -o \${install_tar_file}
+    # else
+    #   root_path="https://mirror.openshift.com/pub/openshift-v4/multi/clients"
+    #   install_path="\${root_path}/ocp/latest/ppc64le/\${install_tar_file}"
+    #   rc_install_path="\${root_path}/ocp/candidate-\${OCP_VERSION}/\${install_tar_file}"
+    #   echo "Download GA release"
+    #   curl -s \${install_path} -o \${install_tar_file}
+    #   if grep -q "File not found" "./\${install_tar_file}" ; then
+    #       echo "Download RC release"
+    #       curl -s \${rc_install_path} -o \${install_tar_file}
+    #   fi
+    #   if grep -q "File not found" "./\${install_tar_file}" ; then
+    #       echo "could not down load \${install_tar_file}"
+    #       exit -1
+    #   fi
+    # fi
+    # tar xzvf \${install_tar_file}
+
 }
 
 sno_prepare_cluster() {
