@@ -38,7 +38,7 @@ echo "..." $quayregistry_redis_hostname "... " $quayregistry_clair_scanner_endpo
 
 # QUAY_OPERATOR_TESTCASE: Quay-Allns-Medium|Quay-Allns-High, Quay-High|Quay-Medium
 # extended-platform-tests run all --dry-run | grep -E ${QUAY_OPERATOR_TESTCASE} | extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
-echo "{QUAY_OPERATOR_TESTCASE}"
+echo "${QUAY_OPERATOR_TESTCASE}"
 extended-platform-tests run all --dry-run | grep -E 42378-Quay | extended-platform-tests run --timeout 150m --max-parallel-tests 3 --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 function handle_result {
