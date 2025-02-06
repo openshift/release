@@ -1,0 +1,113 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  numaresources-operator-bundle-4.17:
+    name: numaresources-operator-4.17
+    namespace: ocp-kni
+    tag: numaresources-operator-bundle
+  operator-numaresources-tests-4.17:
+    name: numaresources-operator-4.17
+    namespace: ocp-kni
+    tag: numaresources-operator-tests
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  os-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
+  build-topics
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+  to: numaresources-operator
+- dockerfile_path: bundle.Dockerfile
+  to: numaresources-operator-bundle
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 250Mi
+tests:
+- as: e2e-operator-upgrade
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: numaresources-operator-bundle-4.17
+      OO_BUNDLE_NEW: numaresources-operator-bundle
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      TEST_TYPE: upgrade-conformance
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.18
+        ci-job-fullname openshift-kni-e2e-operator-upgrade-numaresources-operator-release-4.18
+        ci-job-type e2e-operator-upgrade
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test-install-e2e
+      cli: latest
+      commands: ./e2e-nrop-install.test --ginkgo.v --ginkgo.timeout=2h
+      from: operator-numaresources-tests-4.17
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - ref: telco5g-ocp-upgrade
+    - as: upgrade-operator
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n openshift-numaresources "$OO_BUNDLE_NEW"
+        oc wait --for condition=Available -n openshift-numaresources deployment numaresources-controller-manager
+      dependencies:
+      - env: OO_BUNDLE_NEW
+        name: ${OO_BUNDLE_NEW}
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: test-upgrade-e2e
+      cli: latest
+      commands: make test-upgrade-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: telco5g-nrop-upgrade
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift-kni
+  repo: numaresources-operator
+  variant: 4.18-upgrade-from-stable-4.17
