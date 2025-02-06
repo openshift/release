@@ -5,6 +5,17 @@ set -o errexit
 set -o pipefail
 
 
+# IBM Cloud CLI login
+function ibmcloud_login {
+    export IBMCLOUD_CLI=ibmcloud
+    export IBMCLOUD_HOME=/output   
+    region="${LEASED_RESOURCE}"
+    export region
+    "${IBMCLOUD_CLI}" config --check-version=false
+    echo "Try to login..." 
+    "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+}
+
 if [[ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]]; then
     provisioned_rg_file="${SHARED_DIR}/ibmcloud_cluster_resource_group"
 else
@@ -22,7 +33,7 @@ echo "Using provisioned resource group: ${provisioned_rg}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-provisioned-resourcegroup.yaml.patch"
 
-IBMCLOUD_CLI=ibmcloud
+ibmcloud_login
 rg_id=$("${IBMCLOUD_CLI}" resource group $provisioned_rg --id)
 # create a patch with existing resource group configuration
 cat > "${PATCH}" << EOF
