@@ -9,6 +9,10 @@ quay_security_testing_hostname="$(cat ${SHARED_DIR}/QUAY_SECURITY_TESTING_HOST_N
 QUAY_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
 QUAY_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
 
+#Retrieve the Credentials of image registry "registry.redhat.io"
+QUAY_REGISTRY_REDHAT_IO_USERNAME=$(cat /var/run/quay-qe-registry-redhat-io-secret/username)
+QUAY_REGISTRY_REDHAT_IO_PASSWORD=$(cat /var/run/quay-qe-registry-redhat-io-secret/password)
+
 #Retrieve the private key of Quay Security Testing Hostname
 cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder && echo "" >>quaybuilder || true
 
@@ -19,9 +23,15 @@ quay_bridge_operator_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BRIDGE_OP
 quay_container_security_operator_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE}"
 quay_builder_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_IMAGE}"
 quay_builder_qemu_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_QEMU_IMAGE}"
+quay_redis_image_tag="${QUAY_REDIS_IMAGE}"
       
 function scan_quay_images(){
     ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1 "sudo trivy image $2 --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} > $3_image_vulnerability-report" || true
+    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/ec2-user/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
+}
+
+function scan_quay_redis_images(){
+    ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1 "sudo trivy image $2 --username '${QUAY_REGISTRY_REDHAT_IO_USERNAME}' --password ${QUAY_REGISTRY_REDHAT_IO_PASSWORD} > $3_image_vulnerability-report" || true
     scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/ec2-user/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
 }
 
@@ -33,5 +43,7 @@ scan_quay_images "$quay_security_testing_hostname" "$quay_bridge_operator_image_
 scan_quay_images "$quay_security_testing_hostname" "$quay_container_security_operator_image_tag" "quay_container_security_operator"
 scan_quay_images "$quay_security_testing_hostname" "$quay_builder_image_tag" "quay_builder"
 scan_quay_images "$quay_security_testing_hostname" "$quay_builder_qemu_image_tag" "quay_builder_qemu"
+
+scan_quay_redis_images "$quay_security_testing_hostname" "$quay_redis_image_tag" "quay_redis"
 
 echo "completed scanning quay images, pls check the scan results in artifact directory."
