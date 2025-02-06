@@ -22,11 +22,12 @@ echo "Using provisioned resource group: ${provisioned_rg}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-provisioned-resourcegroup.yaml.patch"
 
+rg_id=$("${IBMCLOUD_CLI}" resource group $provisioned_rg --id)
 # create a patch with existing resource group configuration
 cat > "${PATCH}" << EOF
 platform:
   ibmcloud:
-    resourceGroupName: ${provisioned_rg}
+    resourceGroupName: ${rg_id}
 EOF
 
 # apply patch to install-config
