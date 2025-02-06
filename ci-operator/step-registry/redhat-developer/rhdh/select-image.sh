@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Define the default image from OpenShift CI mirror
+# Define default image
 MIRRORED_IMAGE="registry.ci.openshift.org/ci/rhdh-e2e-runner:latest"
 LOCAL_IMAGE="rhdh-e2e-runner-temp"
 
@@ -16,15 +16,12 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-# If changes are detected, build the image locally
+# Define the correct image
 if [ "$IMAGE_BUILD_NEEDED" = true ]; then
-    echo "Changes detected in .ibm/images/. Building local image..."
+    echo "🚀 Changes detected in .ibm/images/. Building local image..."
     podman build -t $LOCAL_IMAGE .ibm/images/
-    export RHDH_E2E_RUNNER_IMAGE=$LOCAL_IMAGE
+    echo "RHDH_E2E_RUNNER_IMAGE=$LOCAL_IMAGE" >> "$SHARED_DIR/env_vars"
 else
-    echo "No changes in .ibm/images/. Using mirrored image from OpenShift CI."
-    export RHDH_E2E_RUNNER_IMAGE=$MIRRORED_IMAGE
+    echo "✅ No changes in .ibm/images/. Using mirrored image from OpenShift CI."
+    echo "RHDH_E2E_RUNNER_IMAGE=$MIRRORED_IMAGE" >> "$SHARED_DIR/env_vars"
 fi
-
-# Save the selected image variable for use in OpenShift CI jobs
-echo "RHDH_E2E_RUNNER_IMAGE=$RHDH_E2E_RUNNER_IMAGE" > "$WORKSPACE/env_vars"
