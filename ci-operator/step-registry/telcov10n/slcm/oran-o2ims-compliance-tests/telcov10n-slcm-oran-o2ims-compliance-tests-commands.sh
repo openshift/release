@@ -95,4 +95,4 @@ robots:
 END_INVENTORY
 
 ansible-galaxy collection install ansible.posix
-ansible-playbook -i robot_inventory.yml playbooks/run_oran_o2ims_compliance_tests.yml
+ansible-playbook -i robot_inventory.yml playbooks/run_oran_o2ims_compliance_tests.yml -v | tee  ${ARTIFACT_DIR}/ansible.log
