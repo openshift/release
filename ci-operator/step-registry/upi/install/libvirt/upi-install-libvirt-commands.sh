@@ -431,12 +431,12 @@ for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-
+sleep 1200
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
-  ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete --log-level=debug &
 fi
 
 wait "$!"
