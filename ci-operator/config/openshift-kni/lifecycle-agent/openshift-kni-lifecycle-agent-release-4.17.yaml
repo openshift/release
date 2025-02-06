@@ -17,7 +17,8 @@ images:
   to: lifecycle-agent-operator-bundle
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
     with: pipeline:lifecycle-agent-operator
@@ -56,6 +57,8 @@ tests:
   skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_CHANNEL: alpha
@@ -94,7 +97,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: operator-bundle
     env:
       OCP_BASE_IMAGE_SOURCE: ci
       OCP_BASE_VERSION: "4.17"
@@ -111,7 +114,6 @@ tests:
     cluster_profile: aws
     dependencies:
       INSTALLER_PULL_REF: pipeline:installer
-      LCA_PULL_REF: pipeline:lifecycle-agent-operator
     env:
       OCP_BASE_IMAGE_SOURCE: ci
       OCP_BASE_VERSION: "4.17"
