@@ -703,7 +703,7 @@ images:
   to: job-run-aggregator
 - dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-    RUN microdnf install -y tar git && microdnf clean all && rm -rf /var/cache/dnf
+    RUN microdnf install -y tar git diffutils && microdnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
@@ -782,6 +782,12 @@ promotion:
   to:
   - namespace: ci
     tag: latest
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -964,6 +970,51 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: konflux-test-cluster-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 0 1 1 0
+  steps:
+    test:
+    - as: konflux-test
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: konflux-test-aws
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: konflux-test-gcp
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: security
   optional: true
   steps:
