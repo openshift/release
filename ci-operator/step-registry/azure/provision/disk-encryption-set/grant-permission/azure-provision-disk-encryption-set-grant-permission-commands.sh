@@ -51,7 +51,7 @@ if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
     role_name=$(jq -r '.cluster' "${SHARED_DIR}/azure_custom_role_name" )
 fi
 
-echo "Grants the cluster service principal ${role_name} privileges to the disk encryption set"
+echo "Grants the cluster identity ${role_name} privileges to the disk encryption set"
 des_type_list="$(cat ${azure_des_file} | jq -r 'keys[]')"
 for type in ${des_type_list}; do
     des_name=$(cat "${azure_des_file}" | jq -r ".${type}")
