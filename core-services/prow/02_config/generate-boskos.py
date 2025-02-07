@@ -271,9 +271,13 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
+    # Based on https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#configuration-for-heterogeneous-resources
+    # Should be renamed to openstack-rhoso-quota-slice as soon as
+    #   https://github.com/openshift/ci-tools/pull/4455 is merged:
     'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+        'titan03': 2,
+        'titan02': 2,
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
