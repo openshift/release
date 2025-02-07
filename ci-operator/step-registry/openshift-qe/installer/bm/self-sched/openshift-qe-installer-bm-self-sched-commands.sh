@@ -7,6 +7,7 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+bastion=$(cat "/secret/address")
 PWD=$(cat "/secret/quads_pwd")
 
 # Login to get token
