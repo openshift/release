@@ -48,7 +48,7 @@ fi
 #if customer role is not defined
 role_name="Contributor"
 if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
-    role_name=$(< "${SHARED_DIR}/azure_custom_role_name")
+    role_name=$(jq -r '.cluster' "${SHARED_DIR}/azure_custom_role_name" )
 fi
 
 echo "Grants the cluster service principal ${role_name} privileges to the disk encryption set"

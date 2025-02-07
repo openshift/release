@@ -52,21 +52,8 @@ tests:
     timeout: 1h0m0s
     version: "4.17"
   cron: 0 7 * * *
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-nightly
-    workflow: generic-claim
-- as: periodic-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
   optional: true
+  presubmit: true
   steps:
     test:
     - ref: redhat-developer-rhdh-nightly
@@ -107,23 +94,16 @@ tests:
     workflow: generic-claim
 - as: e2e-tests-aks-helm-nightly
   cron: 0 7 * * *
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-aks-helm-nightly
-    workflow: redhat-developer-rhdh-aks-mapt
-- as: periodic-e2e-tests-aks-helm-nightly
   optional: true
+  presubmit: true
   steps:
     test:
     - ref: redhat-developer-rhdh-aks-helm-nightly
     workflow: redhat-developer-rhdh-aks-mapt
 - as: e2e-tests-gke-helm-nightly
   cron: 0 7 * * *
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-gke-helm-nightly
-- as: periodic-e2e-tests-gke-helm-nightly
   optional: true
+  presubmit: true
   steps:
     test:
     - ref: redhat-developer-rhdh-gke-helm-nightly
@@ -143,25 +123,43 @@ tests:
     timeout: 1h0m0s
     version: "4.17"
   cron: 0 8 * * *
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-operator-nightly
-    workflow: generic-claim
-- as: periodic-e2e-tests-operator
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
   optional: true
+  presubmit: true
   steps:
     test:
     - ref: redhat-developer-rhdh-operator-nightly
     workflow: generic-claim
+- as: cleanup-mapt-destroy-orphaned-aks-clusters
+  cron: 0 2 * * SUN
+  optional: true
+  presubmit: true
+  steps:
+    pre:
+    - ref: redhat-developer-rhdh-aks-mapt-orphaned-get
+    test:
+    - ref: redhat-developer-rhdh-aks-mapt-orphaned-destroy
+- as: e2e-tests-osd-gcp-helm-nightly
+  cron: 0 8 * * *
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OSD_VERSION: 4.17.12
+    test:
+    - ref: redhat-developer-rhdh-osd-gcp-nightly
+    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+  timeout: 3h40m0s
+- as: e2e-tests-osd-gcp-operator-nightly
+  cron: 0 8 * * *
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OSD_VERSION: 4.17.12
+    test:
+    - ref: redhat-developer-rhdh-osd-gcp-nightly
+    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+  timeout: 3h40m0s
 zz_generated_metadata:
   branch: main
   org: redhat-developer
