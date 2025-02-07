@@ -26,7 +26,7 @@ metadata:
   name: ${HOSTED_CLUSTER_NAME}
   namespace: ${AGENT_NAMESPACE}
 spec:
-  cpuArchitecture: ${ADDITIONAL_WORKER_ARCHITECTURE}
+  cpuArchitecture: ${AGENTSERVICECONFIG_OSIMAGE_ARCH}
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
@@ -100,6 +100,7 @@ metadata:
     inspect.metal3.io: disabled
     bmac.agent-install.openshift.io/hostname: ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}
 spec:
+  architecture: ${AGENTSERVICECONFIG_OSIMAGE_ARCH}
   automatedCleaningMode: disabled
   bmc:
     address: ${redfish_scheme}://${bmc_address}${redfish_base_uri}
