@@ -10,6 +10,8 @@ set -x
 bastion=$(cat "/secret/address")
 quads_pwd=$(cat "/secret/quads_pwd")
 
+echo $bastion > /dev/null
+
 # Login to get token
 TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq .'auth_token')
 
