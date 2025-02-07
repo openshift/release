@@ -295,7 +295,7 @@ all:
                 base64_pull_secret: "{{ lookup('ansible.builtin.env', 'CLUSTER_B64_PULL_SECRET') }}"
                 api_ip: "${HUB_CLUSTER_API_IPv4}"
                 # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
-                dual_api_ip: "${HUB_CLUSTER_API_IPv6}"
+                # dual_api_ip: "${HUB_CLUSTER_API_IPv6}"
                 # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv6}"
                 apps: ${HUB_CLUSTER_OPERATORS}
                 ignore_hosts: true
@@ -344,7 +344,8 @@ all:
                   # except-interface=lo # <--- To check local resolves
                   interface={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
 
-                  listen-address=127.0.0.1,${NETWORK_BRIDGE_IPv4},${NETWORK_BRIDGE_IPv6}
+                  listen-address=127.0.0.1,${NETWORK_BRIDGE_IPv4}
+                  # listen-address=127.0.0.1,${NETWORK_BRIDGE_IPv4},${NETWORK_BRIDGE_IPv6}
 
                   ########################################
                   # DHCP IPv4
@@ -364,12 +365,12 @@ all:
                   # DHCP IPv6
                   ########################################
 
-                  # dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET},static,64,4h
-                  dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET}100,${NETWORK_BRIDGE_IPv6_SUBNET}200,64,4h
-                  dhcp-option=option6:dns-server,[${NETWORK_BRIDGE_IPv6}]
-                  enable-ra
-                  # dhcp-authoritative
-                  strict-order
+                  # dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET},ra-stateless,ra-names
+                  # # dhcp-range={{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }},${NETWORK_BRIDGE_IPv6_SUBNET},static,64,4h
+                  # dhcp-option=option6:dns-server,[${NETWORK_BRIDGE_IPv6}]
+                  # # enable-ra
+                  # # dhcp-authoritative
+                  # strict-order
 
                   ########################################
                   # IP reserved
@@ -400,22 +401,22 @@ all:
                   # OCP HUB cluster API
                   address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv4}
                   address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv4}
-                  address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
+                  # address=/api.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
+                  # address=/api-int.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_API_IPv6}
                   # OCP HUB cluster INGRESS
                   address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv4}
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv6}
+                  # address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv6}
                   #
                   # OCP SPOKE cluster API
                   #
                   # OCP SPOKE cluster
                   address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
                   address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
-                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
+                  # address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
+                  # address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
                   # OCP HUB cluster INGRESS
                   address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv4}
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv6}
+                  # address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv6}
           kcli_wrp_firewalld:
             zone_files:
               - path: /etc/firewalld/zones/public.xml
@@ -428,11 +429,9 @@ all:
                     <service name="dhcpv6-client"/>
                     <service name="cockpit"/>
                     <service name="dhcp"/>
-                    <service name="dhcpv6"/>
                     <service name="dns"/>
                     <service name="https"/>
                     <port port="{{ lookup('ansible.builtin.env', 'SOCKS5_PROXY_PORT') }}" protocol="tcp"/>
-                    # <masquerade/>
                     <forward/>
                   </zone>
           kcli_wrp_socks5_proxy:
