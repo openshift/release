@@ -3590,17 +3590,6 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-4.17-upgrade-from-stable-4.16-baremetalds-agent-hypershift-mce-compact-full-inplace-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Upgrade Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -3683,17 +3672,6 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-4.17-upgrade-from-stable-4.16-baremetalds-agent-hypershift-mce-inplace-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Upgrade Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -3776,17 +3754,6 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-4.17-upgrade-from-stable-4.16-baremetalds-agent-hypershift-mce-mceupgrade-inplace-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Upgrade Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -9449,6 +9416,87 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 45 8 15 1,3,5,7,9,11 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.17
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: amd64-nightly-4.17-upgrade-from-stable-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-4.17-upgrade-from-stable-4.17-azure-ipi-confidentialvm-vmgueststateonly-f60
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=azure-ipi-confidentialvm-vmgueststateonly-f60
+      - --variant=amd64-nightly-4.17-upgrade-from-stable-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
   cron: 26 8 15 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -14020,16 +14068,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-c2s-ipi-disc-priv-fips-f28-longduration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - error
-      - failure
-      - success
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -16310,17 +16348,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16403,17 +16430,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16496,17 +16512,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16589,17 +16594,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-fips-guest-f28-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16682,17 +16676,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-fips-guest-openldap-f14
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16775,17 +16758,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-fips-mgmt-f14
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16868,17 +16840,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-guest-ext-oidc-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -16961,17 +16922,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-guest-f14-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17054,17 +17004,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17147,17 +17086,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-arm-nodepool-guest-f28-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17240,17 +17168,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-arm-nodepool-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17333,17 +17250,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-arm-nodepool-mgmt-f28-longduration
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17426,17 +17332,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-arm-nodepool-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17519,17 +17414,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17612,17 +17496,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17869,17 +17742,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mgmt-critical-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -17962,17 +17824,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -18055,17 +17906,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-private-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -18148,17 +17988,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-aws-ipi-ovn-hypershift-private-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -23730,6 +23559,170 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 48 8 2,16 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.17
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-azure-ipi-confidentialvm-vmgueststateonly-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=azure-ipi-confidentialvm-vmgueststateonly-f14
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  cron: 59 12 24 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.17
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-azure-ipi-confidentialvm-vmgueststateonly-f28-destructive
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=azure-ipi-confidentialvm-vmgueststateonly-f28-destructive
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
   cron: 35 22 9,25 * *
   decorate: true
   decoration_config:
@@ -24084,17 +24077,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-azure-ipi-f9-longduration-part3-3
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hive-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27505,17 +27487,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-disconnected-guest-f14-des
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27599,17 +27570,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-disconnected-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27693,17 +27653,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-disconnected-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27787,17 +27736,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-dualstack-guest-f14-des
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27881,17 +27819,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-dualstack-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -27975,17 +27902,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-dualstack-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -28069,17 +27985,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-guest-f14-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -28163,17 +28068,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -28257,17 +28151,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-baremetalds-hypershift-agent-mce-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -29826,17 +29709,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-amd64-nightly-gcp-ipi-filestore-csi-f28-longduration-part3-3
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hive-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -48856,17 +48728,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-arm64-nightly-aws-ipi-ovn-hypershift-mce-guest-f28-destructive
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -48949,17 +48810,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-arm64-nightly-aws-ipi-ovn-hypershift-mce-guest-f28-longduration
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -49042,17 +48892,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-arm64-nightly-aws-ipi-ovn-hypershift-mce-guest-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -49135,17 +48974,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-arm64-nightly-aws-ipi-ovn-hypershift-mce-mgmt-f28-longduration
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -49228,17 +49056,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-arm64-nightly-aws-ipi-ovn-hypershift-mce-mgmt-f7
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -66219,17 +66036,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-multi-nightly-azure-aks-hypershift-guest-f14
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -73397,16 +73203,6 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.17-multi-nightly-gcp-ipi-proxy-private-arm-f28-longduration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - error
-      - failure
-      - success
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
