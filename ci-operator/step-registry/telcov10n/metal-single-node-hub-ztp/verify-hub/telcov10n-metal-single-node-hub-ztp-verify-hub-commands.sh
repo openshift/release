@@ -172,7 +172,7 @@ function assert_console_is_available {
       $oc_hub -n openshift-authentication wait --for=condition=Ready ${authentication_pods} --timeout 5m &&
       $oc_hub get co &&
       $oc_hub whoami --show-console &&
-      $oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}' &&
+      [ "$($oc_hub get managedcluster local-cluster -ojsonpath='{.spec.managedClusterClientConfigs[0].url}')" != "" ] &&
       set +x &&
       return ;
     } ||
