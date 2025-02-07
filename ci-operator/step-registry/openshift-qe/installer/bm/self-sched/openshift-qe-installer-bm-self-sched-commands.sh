@@ -8,10 +8,10 @@ set -x
 ~/fix_uid.sh
 
 bastion=$(cat "/secret/address")
-PWD=$(cat "/secret/quads_pwd")
+quads_pwd=$(cat "/secret/quads_pwd")
 
 # Login to get token
-TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$PWD" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq .'auth_token')
+TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq .'auth_token')
 
 # Get available hosts for self scheduling
 HOST=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true | jq '.[0]')
