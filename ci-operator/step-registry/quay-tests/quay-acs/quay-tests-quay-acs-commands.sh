@@ -242,10 +242,12 @@ function deploy_acs_operator_default_setting() {
 
    generate_vuln_id_detail_report
 
-  #  archiveArtifacts artifacts into ${ARTIFACT_DIR}acs/ folder
+  # archiveArtifacts artifacts into ${ARTIFACT_DIR}acs/ folder
 
 }
 
    deploy_acs_operator_default_setting || true
+   echo "Quay image violations scanning with ACS is done successfully"
+   sleep 600
 
 
