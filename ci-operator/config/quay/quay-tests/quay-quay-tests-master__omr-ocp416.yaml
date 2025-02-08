@@ -9,24 +9,20 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman jq" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-        yum -y install terraform && \
-        jq --version && \
-        yum clean all && rm -rf /var/cache/yum/*
-    RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-        unzip -q awscliv2.zip && \
-        ./aws/install && \
-        rm -rf awscliv2.zip aws &&\
-        aws --version
-    RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq && \
-        yq --version
-    ENV HOME="/tmp"
+- dockerfile_literal: "FROM src\nRUN curl --silent --location https://rpm.nodesource.com/setup_lts.x
+    | bash - && \\\n    curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo
+    | tee /etc/yum.repos.d/yarn.repo && \\\n    PACKAGES=\"openssh-clients httpd-tools
+    nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2
+    nss libXScrnSaver alsa-lib skopeo podman jq\" && \\\n    yum install --setopt=tsflags=nodocs
+    -y $PACKAGES && \\\n    yum install -y yum-utils && yum-config-manager --add-repo
+    https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \\\n    yum -y install
+    terraform && \\\n    jq --version && \\\n    yum clean all && rm -rf /var/cache/yum/*\nRUN
+    curl -s \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\"
+    && \\\n    unzip -q awscliv2.zip && \\\n    ./aws/install && \\\n    rm -rf awscliv2.zip
+    aws &&\\\n    aws --version\nRUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64
+    && chmod +x /usr/bin/yq && \\\n    yq --version && \\\n    curl -Lk -o /usr/bin/roxctl
+    https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl && \\\n
+    \   chmod +x /usr/bin/roxctl \nENV HOME=\"/tmp\"\n"
   from: src
   to: quay-test-omr
 promotion:
