@@ -20,19 +20,15 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: qa-e2e-tests
-  optional: true
-  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   cluster_claim:
-    # architecture, cloud, owner, product, and version are used to determine a cluster pool by matching the labels
-    #as: custom    # optional; release name to use when importing cluster claim release; defaults to `latest`
     architecture: amd64
     cloud: aws
     owner: stackrox
     product: ocp
-    version: "4.13"
-    # labels:       # optional; more labels to match besides architecture, cloud, owner, product, and version defined above
-    #   size: "6"
     timeout: 5h0m0s
+    version: "4.13"
+  optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -110,18 +106,14 @@ tests:
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-qa-e2e-tests
-  postsubmit: true
   cluster_claim:
-    # architecture, cloud, owner, product, and version are used to determine a cluster pool by matching the labels
-    #as: custom    # optional; release name to use when importing cluster claim release; defaults to `latest`
     architecture: amd64
     cloud: aws
     owner: stackrox
     product: ocp
-    version: "4.13"
-    # labels:       # optional; more labels to match besides architecture, cloud, owner, product, and version defined above
-    #   size: "6"
     timeout: 5h0m0s
+    version: "4.13"
+  postsubmit: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
