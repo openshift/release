@@ -34,9 +34,6 @@ kind: OperatorGroup
 metadata:
   name: quayacsgrp
   namespace: ${ACS_NAMESPACE}
-spec:
-  targetNamespaces:
-  - ${ACS_NAMESPACE}
 EOF
 
 #Create ACS operator Subscription
