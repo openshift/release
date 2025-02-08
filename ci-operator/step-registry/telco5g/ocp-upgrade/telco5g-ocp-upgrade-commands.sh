@@ -453,49 +453,49 @@ else
 fi
 
 
-# this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
-count=1
-while :
-do
-  echo "[$(date)] waiting for non-samples imagesteams to import..."
-  wait_count=1
-  while :
-  do
-    non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
-    if [ -z "${non_imported_imagestreams}" ]
-    then
-      break 2 # break from outer loop
-    fi
-    echo "[$(date)] The following image streams are yet to be imported (attempt #${wait_count}):"
-    echo "${non_imported_imagestreams}"
+# # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
+# count=1
+# while :
+# do
+#   echo "[$(date)] waiting for non-samples imagesteams to import..."
+#   wait_count=1
+#   while :
+#   do
+#     non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+#     if [ -z "${non_imported_imagestreams}" ]
+#     then
+#       break 2 # break from outer loop
+#     fi
+#     echo "[$(date)] The following image streams are yet to be imported (attempt #${wait_count}):"
+#     echo "${non_imported_imagestreams}"
 
-    wait_count=$((wait_count+1))
-    if (( wait_count > 10 )); then
-        break
-    fi
+#     wait_count=$((wait_count+1))
+#     if (( wait_count > 10 )); then
+#         break
+#     fi
 
-    sleep 60
-  done
+#     sleep 60
+#   done
 
-  # Given up after 3 rounds of waiting 10 minutes
-  count=$((count+1))
-  if (( count > 3 )); then
-      echo "[$(date)] Failed to import all image streams after 30 minutes"
-      echo $non_imported_imagestreams
-      exit 1
-  fi
+#   # Given up after 3 rounds of waiting 10 minutes
+#   count=$((count+1))
+#   if (( count > 3 )); then
+#       echo "[$(date)] Failed to import all image streams after 30 minutes"
+#       echo $non_imported_imagestreams
+#       exit 1
+#   fi
 
-  # image streams won't retry by themselves https://issues.redhat.com/browse/RFE-3660
-  set +e
-  for imagestream in $non_imported_imagestreams
-  do
-      echo "[$(date)] Retrying image import $imagestream"
-      oc import-image --insecure=true -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
-  done
-  set -e
-done
+#   # image streams won't retry by themselves https://issues.redhat.com/browse/RFE-3660
+#   set +e
+#   for imagestream in $non_imported_imagestreams
+#   do
+#       echo "[$(date)] Retrying image import $imagestream"
+#       oc import-image --insecure=true -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
+#   done
+#   set -e
+# done
 
-echo "[$(date)] All imagestreams are imported."
+# echo "[$(date)] All imagestreams are imported."
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
