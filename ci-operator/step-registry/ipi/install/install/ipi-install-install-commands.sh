@@ -239,6 +239,9 @@ function prepare_next_steps() {
   if [[ "${CLUSTER_TYPE}" == "vsphere" ]] && [[ -f ${SHARED_DIR}/template.yaml.patch ]]; then
       grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/.openshift_install.log"
   fi
+  if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f ${SHARED_DIR}/install-config-patch-preloadedOSImageName.yaml ]]; then
+      grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/nutanix-preload-image-openshift_install.log"
+  fi
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -558,6 +561,11 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   exit 1
 fi
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
@@ -629,7 +637,13 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+    cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
+    if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
+      echo "additional CA bundle found, appending it to the bundle from vault"
+      echo -n $'\n' >> /tmp/ca-bundle.pem
+      cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
+    fi
+    export SSL_CERT_FILE=/tmp/ca-bundle.pem
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;

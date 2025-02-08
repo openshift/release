@@ -91,6 +91,11 @@ function create_sp_with_custom_role() {
     run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
 
+if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
+    echo "AZURE_INSTALL_USE_MINIMAL_PERMISSIONS is set to no, skip this step to create sp with minimal permission!"
+    exit 0
+fi
+
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
@@ -113,6 +118,9 @@ az --version
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/installer-sp-minter.json" ]]; then
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/installer-sp-minter.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
@@ -319,6 +327,7 @@ ${required_permissions}
 """
 fi
 
+custom_role_name_json="{}"
 if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
     sp_role="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
 else
@@ -326,7 +335,8 @@ else
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
     # for destroy
-    echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
+    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"cluster\":\"${CUSTOM_ROLE_NAME}\"}")
+    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
     sp_role="${CUSTOM_ROLE_NAME}"
 fi
 echo "Creating sp with custom role..."
@@ -383,7 +393,8 @@ if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
     create_role_definition_json "${sts_role_name}" "${sts_required_permissions}" "${sts_role_definition}"
     create_custom_role "${sts_role_definition}" "${sts_role_name}"
     # for destroy
-    echo "${sts_role_name}" >> "${SHARED_DIR}/azure_custom_role_name"
+    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"ccoctl\":\"${sts_role_name}\"}")
+    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
     sts_sp_role="${sts_role_name}"
 
     create_sp_with_custom_role "${sts_sp_name}" "${sts_sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sts_sp_output}"

@@ -21,11 +21,11 @@ set_x86_configs() {
   # VPC VSI(Virtual Server Instance) configs
   VPC_VSI_NAME="x86-${HOSTED_CLUSTER_NAME}-worker"
   # The instance profile, which defines the compute resources allocated to the VSI
-  PROFILE_NAME="bx2-2x8"
+  PROFILE_NAME=$(jq -r '.x86ProfileName' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
   # The ID of the image used to create the VSI. NOTE: It should be the ID of an image available in your IBM Cloud account
-  IMAGE_ID="r034-33250be2-61bb-4837-9cd5-6ef83c2ccb2c"
+  IMAGE_ID=$(jq -r '.x86ImageID' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
   # The ID of the SSH key you want to inject into the VSI
-  SSH_KEY_ID="r034-55ccc38b-cad7-4244-bad0-6bb4c25cf0e7"
+  SSH_KEY_ID=$(jq -r '.x86sshKeyID' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
 
   # Fetching Resource Group
   if [[ -z "${RESOURCE_GROUP_NAME}" ]]; then
@@ -103,15 +103,15 @@ update_agentserviceconfig() {
 set_power_configs() {
   # PowerVS VSI(Virtual Server Instance) configs
   POWERVS_VSI_NAME="power-${HOSTED_CLUSTER_NAME}-worker"
-  POWERVS_VSI_MEMORY=16
-  POWERVS_VSI_PROCESSORS=0.5
-  POWERVS_VSI_PROC_TYPE="shared"
+  POWERVS_VSI_MEMORY=$(jq -r '.powervsVSIMemory' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+  POWERVS_VSI_PROCESSORS=$(jq -r '.powervsVSIProcessors' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+  POWERVS_VSI_PROC_TYPE=$(jq -r '.powervsVSIProcType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
   if [ ${IS_HETEROGENEOUS} == "yes" ]; then
       # NOTE: Using e980 as a workaround for VPC Load Balancer connectivity issues with
       # s922 in heterogeneous node pools, until a permanent fix.
-      POWERVS_VSI_SYS_TYPE="e980"
+      POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
   else
-      POWERVS_VSI_SYS_TYPE="s922"
+      POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
   fi
 
   MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
