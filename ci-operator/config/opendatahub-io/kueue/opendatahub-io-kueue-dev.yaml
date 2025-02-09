@@ -6,7 +6,9 @@ build_root:
 images:
 - build_args:
   - name: GOLANG_IMAGE
-    value: registry.access.redhat.com/ubi9/go-toolset:1.22.9
+    value: golang:1.23
+  - name: GOLANG_DIR
+    value: /usr/local/go
   dockerfile_path: Dockerfile.rhoai
   to: kueue-operator
 releases:
@@ -42,7 +44,9 @@ tests:
         fi
         sed -i "s|odh-kueue-controller-image=.*|odh-kueue-controller-image=${KUEUE_CONTROLLER_IMAGE}|g" config/rhoai/params.env
         oc apply --server-side -k ./config/rhoai
+        oc wait --for=condition=ready --timeout=360s -n opendatahub $(oc get pods -n opendatahub -o name | grep kueue)
         oc apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/latest/download/manifests.yaml
+        oc wait --for=condition=ready --timeout=360s -n jobset-system $(oc get pods -n jobset-system -o name | grep jobset)
         echo "Adding label on worker node ..."
         oc label node --selector=node-role.kubernetes.io/worker instance-type=on-demand
         go version

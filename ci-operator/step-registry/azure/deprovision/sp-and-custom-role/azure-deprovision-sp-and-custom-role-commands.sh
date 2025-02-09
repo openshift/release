@@ -43,12 +43,15 @@ if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
 fi
 
 if [[ -f "${SHARED_DIR}/azure_custom_role_name" ]]; then
-    role_names=$(< ${SHARED_DIR}/azure_custom_role_name)
+    role_names=$(jq -r 'values[]' "${SHARED_DIR}/azure_custom_role_name")
     for role_name in ${role_names}; do
-        echo "Deleting custom role assigment on scope of subsciption, role name: ${role_name}"
-        assigment_id=$(az role assignment list --role ${role_name} --query "[].id" -otsv)
-        cmd="az role assignment delete --ids ${assigment_id}"
-        run_command "${cmd}"
+        echo "Deleting custom role assigment, role name: ${role_name}"
+        assigment_id_list=$(az role assignment list --all --query "[?roleDefinitionName=='${role_name}'].id" -otsv)
+        echo "Debug: role assignment id list to be deleted - ${assigment_id_list}"
+        for assigment_id in ${assigment_id_list}; do
+            cmd="az role assignment delete --ids ${assigment_id}"
+            run_command "${cmd}"
+        done
 
         echo "Deleting custom role definition, role name: ${role_name}"
         cmd="az role definition delete --name ${role_name}"

@@ -208,7 +208,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="master"
+export TEST_BRANCH="main"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"

@@ -54,28 +54,42 @@ chain:
         TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
 
       }
-      
-      export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-      export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-      export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
-      [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-      
+
+      if [[ -z "${HOSTED_CP:-}" ]]; then
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      else
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+      fi
+
+      # In order for openshift-tests to pull external binary images from the
+      # payload, we need access enabled to the images on the build farm. In
+      # order to do that, we need to unset the KUBECONFIG so we talk to the
+      # build farm, not the cluster under test.
+      echo "Granting access for image pulling from the build farm..."
+      KUBECONFIG_BAK=$KUBECONFIG
+      unset KUBECONFIG
+      oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+      export KUBECONFIG=$KUBECONFIG_BAK
+
       if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
       fi
-      
-      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
       if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
         source "${SHARED_DIR}/ds-vars.conf"
-      fi  
+      fi
       if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
         source "${SHARED_DIR}/packet-conf.sh"
-      fi  
+      fi
 
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
@@ -237,6 +251,9 @@ chain:
         Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
         program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
         details. The file must be present in ${SHARED_DIR}.
+    - name: HOSTED_CP
+      default: ""
+      documentation: Execute against a ROSA hosted control plane
     resources:
       requests:
         cpu: "3"

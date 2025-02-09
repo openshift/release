@@ -391,32 +391,6 @@ function check_resources() {
   fi
 }
 
-function delete_network() {
-  NETWORK_NAME=$1
-  echo "delete_network(${NETWORK_NAME})"
-
-  (
-    while read UUID
-    do
-      echo ibmcloud pi subnet delete ${UUID}
-      ibmcloud pi subnet delete ${UUID}
-    done
-  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
-
-  for (( TRIES=0; TRIES<20; TRIES++ ))
-  do
-    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
-    echo "LINES=${LINES}"
-    if (( LINES == 0 ))
-    then
-      return 0
-    fi
-    sleep 15s
-  done
-
-  return 1
-}
-
 function destroy_resources() {
   #
   # Create a fake cluster metadata file

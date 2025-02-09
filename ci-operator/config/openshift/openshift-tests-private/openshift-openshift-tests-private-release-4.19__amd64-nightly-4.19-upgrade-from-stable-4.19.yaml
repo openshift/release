@@ -72,6 +72,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-ocl-fips-f60
+  cron: 4 9 5 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-c2s-ipi-disc-priv-fips-f60
   cron: 22 12 20 2,4,6,8,10,12 *
   steps:

@@ -82,20 +82,8 @@ if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
 fi
 
 echo "Image is $DESTINATION_IMAGE_REF"
-echo "commit hash is ${PULL_BASE_SHA:0:7}"
-echo "Entire commit hash is $PULL_BASE_SHA"
 echo "JOB SPECS are $JOB_SPEC"
 echo "FIP of VM is $zvsi_fip"
-
-# Added for temporary debugging, Check if the file exists and show the content of the file
-#FILE_PATH="${SECRETS_PATH}/${REGISTRY_SECRET_FILE#}"
-#export FILE_PATH
-#if [ -f "$FILE_PATH" ]; then
-#    echo "Contents of the file $FILE_PATH:"
-#    cat "$FILE_PATH"  # Display the file content
-#else
-#    echo "File $FILE_PATH does not exist."
-#fi
 
 # Get credentials for quay repo
 DOCKER_USER=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
@@ -105,7 +93,7 @@ DOCKER_PASS=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | j
 export DOCKER_PASS
 
 # Initialize ALL_VARS as an array of variable assignments
-ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' PULL_BASE_SHA='$PULL_BASE_SHA' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
+ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
 ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
 export ALL_VARS_STR
 
