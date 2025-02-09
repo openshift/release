@@ -122,6 +122,80 @@ presubmits:
     - ^release-ocm-2\.9$
     - ^release-ocm-2\.9-
     cluster: build11
+    context: ci/prow/e2e-ai-operator-disconnected-capi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.9-e2e-ai-operator-disconnected-capi
+    rerun_command: /test e2e-ai-operator-disconnected-capi
+    run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ai-operator-disconnected-capi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ai-operator-disconnected-capi,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-ocm-2\.9$
+    - ^release-ocm-2\.9-
+    cluster: build11
     context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     labels:
@@ -132,7 +206,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.9-e2e-ai-operator-ztp
     rerun_command: /test e2e-ai-operator-ztp
-    run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+    run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
     spec:
       containers:
       - args:
@@ -207,7 +281,6 @@ presubmits:
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.9-e2e-ai-operator-ztp-3masters
-    optional: true
     rerun_command: /test e2e-ai-operator-ztp-3masters
     run_if_changed: ^(deploy/operator/.*)$
     spec:
@@ -282,7 +355,6 @@ presubmits:
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.9-e2e-ai-operator-ztp-capi
-    optional: true
     rerun_command: /test e2e-ai-operator-ztp-capi
     run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
     spec:
@@ -509,7 +581,6 @@ presubmits:
       job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.9-e2e-ai-operator-ztp-disconnected
-    optional: true
     rerun_command: /test e2e-ai-operator-ztp-disconnected
     run_if_changed: ^(deploy/operator/.*)$
     spec:

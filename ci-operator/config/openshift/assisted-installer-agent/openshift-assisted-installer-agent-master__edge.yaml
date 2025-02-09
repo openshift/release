@@ -113,7 +113,7 @@ tests:
   container:
     clone: true
     from: assisted-installer-agent-build
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
     export GOCACHE=/tmp/gocache
@@ -126,7 +126,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export GOCACHE=/tmp/gocache
@@ -141,7 +141,7 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: subsystem-test
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
@@ -151,13 +151,14 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: e2e-metal-assisted-4-18
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv6-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -167,7 +168,8 @@ tests:
         IPv4=no
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-single-node-4-18
+- always_run: false
+  as: e2e-metal-assisted-single-node-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -176,7 +178,8 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4-17
+- always_run: false
+  as: e2e-metal-assisted-cnv-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -194,7 +197,8 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-lvm-4-18
+- always_run: false
+  as: e2e-metal-assisted-lvm-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -208,7 +212,8 @@ tests:
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-17
+- always_run: false
+  as: e2e-metal-assisted-odf-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -221,7 +226,8 @@ tests:
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-4-18
+- always_run: false
+  as: e2e-metal-assisted-day2-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -230,7 +236,8 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-upgrade-agent-4-18
+- always_run: false
+  as: e2e-metal-assisted-upgrade-agent-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -241,7 +248,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -259,18 +266,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
-    workflow: assisted-oci
-- always_run: false
-  as: e2e-oci-assisted-4-17
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-      PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
   as: e2e-metal-assisted-external-4-18

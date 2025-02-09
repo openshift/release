@@ -341,7 +341,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
-  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -362,7 +362,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters
-  optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -389,7 +388,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
-  optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -412,7 +410,8 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-compact-day2-workers
+- always_run: false
+  as: e2e-ai-operator-ztp-compact-day2-workers
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -426,7 +425,8 @@ tests:
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-compact-day2-masters
+- always_run: false
+  as: e2e-ai-operator-ztp-compact-day2-masters
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -489,7 +489,8 @@ tests:
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-node-labels
+- always_run: false
+  as: e2e-ai-operator-ztp-node-labels
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -539,7 +540,8 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -554,7 +556,8 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-masters
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-masters
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -570,7 +573,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi
-  optional: true
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -589,6 +591,39 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+  timeout: 6h0m0s
+- as: e2e-ai-operator-disconnected-capi
+  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        IP_STACK=v6
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
+      DISCONNECTED: "true"
+      IP_STACK: v6
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-disconnected-capi-periodic
+  cron: 00 14 * * 2
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        IP_STACK=v6
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
+      DISCONNECTED: "true"
+      IP_STACK: v6
     workflow: assisted-baremetal-operator-capi
   timeout: 6h0m0s
 - always_run: false

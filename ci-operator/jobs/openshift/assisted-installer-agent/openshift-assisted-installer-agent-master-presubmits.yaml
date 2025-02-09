@@ -397,7 +397,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -473,7 +473,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-metal-assisted-4-18
     rerun_command: /test edge-e2e-metal-assisted-4-18
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -533,7 +533,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-4-18,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -609,7 +609,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-cnv-4-17,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -761,7 +761,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-external-4-18,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -837,7 +837,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-ipv6-4-18,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -913,7 +913,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-lvm-4-18,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -989,7 +989,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-odf-4-17,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -1065,7 +1065,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-single-node-4-18,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -1140,82 +1140,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-upgrade-agent-4-18,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build01
-    context: ci/prow/edge-e2e-oci-assisted-4-17
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: oci-edge
-      ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
-      ci-operator.openshift.io/variant: edge
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-oci-assisted-4-17
-    optional: true
-    rerun_command: /test edge-e2e-oci-assisted-4-17
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-oci-assisted-4-17
-        - --variant=edge
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )edge-e2e-oci-assisted-4-17,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1363,7 +1287,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-lint
     rerun_command: /test edge-lint
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1498,7 +1422,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-subsystem-test
     rerun_command: /test edge-subsystem-test
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1572,7 +1496,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-unit-test
     rerun_command: /test edge-unit-test
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
