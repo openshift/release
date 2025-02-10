@@ -52,7 +52,6 @@ then
   exit 0
 fi
 
-EXTRA_ARGS=""
 
 if [ -n "${KUBEVIRT_CSI_INFRA}" ]
 then
