@@ -25,7 +25,9 @@ echo "KUBECONFIG=${KUBECONFIG}"
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
+echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
+
 function exit_handler() {
   exitcode=$?
   set +e
@@ -284,14 +286,14 @@ wait_created crd centrals.platform.stackrox.io
 
 oc new-project stackrox >/dev/null || true
 create_cr central
+echo ">>> Wait for 'stackrox-central-services' deployments"
+wait_deploy central-db
 wait_deploy central
 
 get_init_bundle
 wait_created crd securedclusters.platform.stackrox.io
 create_cr secured-cluster
-
-echo ">>> Wait for deployments"
-wait_deploy central-db
+echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   wait_deploy scanner-v4-matcher
@@ -302,4 +304,9 @@ else
 fi
 wait_deploy sensor
 wait_deploy admission-control
-oc get deployments -n stackrox
+
+echo "Restart sensor to accelerate scanner start up..."
+oc rollout restart deployment sensor -n stackrox
+
+retry oc get deployments -n stackrox
+retry oc get pods --namespace stackrox
