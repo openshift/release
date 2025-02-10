@@ -127,11 +127,11 @@ function generate_init_bundle() {
    chmod +x ./roxctl
    ./roxctl version
 
-   #totally 6 steps
+   #totally 6 steps to init bundle
    #1, get central admin password from central-htpasswd
    oc -n ${CENTRAL_NAMESPACE} get secret central-htpasswd -o go-template='{{index .data "password" | base64decode}}'>central_htpasswd
-   echo "fetch central admin password successfully..."
    central_htpasswd=$(cat central_htpasswd)
+   echo "fetch central admin password successfully..."
 
    #2, get central route
    oc get route -n ${CENTRAL_NAMESPACE} central -o jsonpath='{.spec.host}'>ROX_ENDPOINT
@@ -185,38 +185,39 @@ EOF
 
 #Quay violations creteria: Deployment:quay, Severity: High & Critical
 function generate_quay_violation_report() {
-      echo "Generating quay violation report"
-      curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-      https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical%2BDeployment%3Aquay | jq > "${ARTIFACT_DIR}"/quay_acs_violations.json
+    echo "Generating quay violation report"
+    curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
+    https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical%2BDeployment%3Aquay | jq > "${ARTIFACT_DIR}"/quay_acs_violations.json
    
 }
 
 #Get and archive each vulnerability with id
 function generate_vuln_id_detail_report() {
 
-      echo "Generating vulnerability detail report"
+    echo "Generating vulnerability detail report"
+    mkdir -p "${ARTIFACT_DIR}"/detail
       
-      curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-      https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
+    curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
+    https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
     #  https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
      
       #reload below two parameter as "${env.parametername}" can't be get from triple single quote in sh block
       # ROX_ENDPOINT=$(cat ROX_ENDPOINT)
       # ROX_API_TOKEN=$(cat ROX_API_TOKEN)
 
-      vulnnum=$(cat quay_acs_detail_violations | jq '.alerts' | jq 'length')
-      if [ "$vulnnum" -lt 1 ]; then
+    vulnnum=$(cat quay_acs_detail_violations | jq '.alerts' | jq 'length')
+    if [ "$vulnnum" -lt 1 ]; then
         echo "No High && Critical vulnerability found for Quay in 'Vulnerability Management' Category"
         exit 0
-      fi
+    fi
 
-      echo "get vulnerability by id"
-      jq -r '.alerts|.[]|.id'<quay_acs_detail_violations | while read req
-      do
-         vulnname=$(jq -r -c --arg req "$req" '.alerts|.[]|select(.id == $req)|.deployment.name' <quay_acs_detail_violations)
-         curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-         https://${ROX_ENDPOINT}/v1/alerts/$req | jq > "${ARTIFACT_DIR}/${req}_${vulnname}"
-      done
+    echo "get vulnerability by id"
+    jq -r '.alerts|.[]|.id'<quay_acs_detail_violations | while read req
+    do
+        vulnname=$(jq -r -c --arg req "$req" '.alerts|.[]|select(.id == $req)|.deployment.name' <quay_acs_detail_violations)
+        curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
+        https://${ROX_ENDPOINT}/v1/alerts/$req | jq > "${ARTIFACT_DIR}/detail/${req}_${vulnname}"
+    done
       
 }
 
@@ -239,11 +240,10 @@ function deploy_acs_operator_default_setting() {
    wait_deploy scanner-db
    wait_deploy sensor
 
+  # Artifacts archiv into ${ARTIFACT_DIR}/ folder, detail report in detail/ folder
    generate_quay_violation_report
 
    generate_vuln_id_detail_report
-
-  # archiveArtifacts artifacts into ${ARTIFACT_DIR}/ folder
 
 }
 
