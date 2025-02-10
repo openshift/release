@@ -230,14 +230,10 @@ function setup_powervs_image() {
 
 # run_automation executes the terraform based on automation
 function run_automation() {
-    cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
-        && "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init -upgrade -no-color \
-        && "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform plan -var-file=data/var.tfvars -no-color \
-        && "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
-        || cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
-
-    echo "Shared Directory: copy the terraform.tfstate"
-    cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+    cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform init -upgrade -no-color \
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform plan -var-file=data/var.tfvars -no-color \
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform apply -var-file=data/var.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
 }
 
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
