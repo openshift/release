@@ -113,4 +113,13 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+export NAME_SPACE="showcase-ci-nightly"
+export NAME_SPACE_RBAC="showcase-rbac-nightly"
+export NAME_SPACE_POSTGRES_DB="postgress-external-db-nightly"
+
+if [[ "$JOB_NAME" == *operator* ]]; then
+    NAME_SPACE="showcase-operator-nightly"
+    NAME_SPACE_RBAC="showcase-op-rbac-nightly"
+fi
+
 bash ./.ibm/pipelines/openshift-ci-tests.sh
