@@ -197,7 +197,8 @@ function generate_vuln_id_detail_report() {
       echo "Generating vulnerability detail report"
       
       curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-      https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
+      https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
+    #  https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
      
       #reload below two parameter as "${env.parametername}" can't be get from triple single quote in sh block
       # ROX_ENDPOINT=$(cat ROX_ENDPOINT)
@@ -242,7 +243,7 @@ function deploy_acs_operator_default_setting() {
 
    generate_vuln_id_detail_report
 
-  # archiveArtifacts artifacts into ${ARTIFACT_DIR}acs/ folder
+  # archiveArtifacts artifacts into ${ARTIFACT_DIR}/ folder
 
 }
 
