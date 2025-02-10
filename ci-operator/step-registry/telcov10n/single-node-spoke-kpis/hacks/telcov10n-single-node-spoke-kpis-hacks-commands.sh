@@ -82,6 +82,25 @@ function update_spoke_cluster_name {
   set +x
 }
 
+function use_shared_ssh_keys_from_vault {
+
+  echo "************ telcov10n use shared ssh keys from vault ************"
+
+  gitea_project="${GITEA_NAMESPACE}"
+  ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
+  ssh_pub_key_file="${ssh_pri_key_file}.pub"
+
+  #### SSH Private key
+  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${ssh_pri_key_file}
+  chmod 0600 ${ssh_pri_key_file}
+
+  #### SSH Public key
+  cat /var/run/telcov10n/ansible-group-all/ssh_public_key >| ${ssh_pub_key_file}
+  chmod 0644 ${ssh_pub_key_file}
+
+  ls -lhtr ${ssh_pri_key_file}*
+}
+
 function hack_spoke_deployment {
 
   echo "************ telcov10n hack spoke deployment values ************"
@@ -89,6 +108,7 @@ function hack_spoke_deployment {
   update_host_and_master_yaml_files
   update_spoke_cluster_name
   update_base_domain
+  use_shared_ssh_keys_from_vault
 }
 
 function main {
