@@ -123,7 +123,9 @@ EOF
 function generate_init_bundle() {
   
    #check roxctl availability
-   roxctl version
+   curl -Lk -o roxctl https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl
+   chmod +x ./roxctl
+   ./roxctl version
 
    #totally 6 steps
    #1, get central admin password from central-htpasswd
@@ -143,7 +145,7 @@ function generate_init_bundle() {
    export ROX_CENTRAL_ADDRESS="${ROX_ENDPOINT}:443"
    export ROX_API_TOKEN="${ROX_API_TOKEN}"
 
-   roxctl -e "$ROX_CENTRAL_ADDRESS" central init-bundles generate quay-acs --output-secrets acs_cluster_init_bundle.yaml --insecure-skip-tls-verify
+   ./roxctl -e "$ROX_CENTRAL_ADDRESS" central init-bundles generate quay-acs --output-secrets acs_cluster_init_bundle.yaml --insecure-skip-tls-verify
 
    #5, apply init bundle yaml
    oc create -f acs_cluster_init_bundle.yaml -n ${CENTRAL_NAMESPACE}
