@@ -71,6 +71,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -546,7 +550,9 @@ tests:
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-workers
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -612,7 +618,9 @@ tests:
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -842,9 +850,9 @@ tests:
         IPv4=no
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv4v6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv4v6-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -863,9 +871,9 @@ tests:
         PLATFORM=none
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-sno-4-18
+- always_run: false
+  as: e2e-metal-assisted-sno-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -873,9 +881,9 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-static-ip-suite-4-18
+- always_run: false
+  as: e2e-metal-assisted-static-ip-suite-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -883,9 +891,9 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-bond-4-18
+- always_run: false
+  as: e2e-metal-assisted-bond-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -928,7 +936,9 @@ tests:
         DEPLOY_TARGET=onprem
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-12
+- always_run: false
+  as: e2e-metal-assisted-4-12
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1183,9 +1193,23 @@ tests:
         WORKER_CPU=3
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-4-18
+- always_run: false
+  as: e2e-metal-assisted-nmstate-4-17
   optional: true
-  run_if_changed: ^(data/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=nmstate
+        NUM_MASTERS=3
+        NUM_WORKERS=1
+        OPENSHIFT_VERSION=4.17
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-day2-4-18
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1193,9 +1217,9 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-sno-4-18
+- always_run: false
+  as: e2e-metal-assisted-day2-sno-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1383,9 +1407,9 @@ tests:
         OPENSHIFT_VERSION=4.18
       PLATFORM: nutanix
     workflow: assisted-nutanix
-- as: e2e-oci-assisted-4-18
+- always_run: false
+  as: e2e-oci-assisted-4-18
   optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
     env:
@@ -1491,6 +1515,19 @@ tests:
         IPv4=true
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-vsphere-assisted-umlb-4-18
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.18
+        LOAD_BALANCER_TYPE=user-managed
+      PLATFORM: vsphere
+    workflow: assisted-vsphere-external-lb
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -442,6 +442,19 @@ featureGates: ${FEATURE_GATES}
 EOF
 fi
 
+# If the branch is 4.18 or greater, then don't use the existing
+#   - Service Instance
+#   - Transit Gateway
+#   - Virtual Private Cloud
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+    echo "Removing existing service instance!"
+    sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
+    echo "Removing existing transit gateway!"
+    sed -i -e '/tgName/d' "${CONFIG}"
+    echo "Removing existing vpc!"
+    sed -i -e '/vpcName/d' "${CONFIG}"
+fi
+
 echo "tgName in ${CONFIG}:"
 grep tgName "${CONFIG}" || true
 echo "vpcName in ${CONFIG}:"
