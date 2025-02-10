@@ -141,14 +141,20 @@ function generate_gitea_ssh_keys {
 
   ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
   ssh_pub_key_file="${ssh_pri_key_file}.pub"
-  ssh-keygen -N '' -f ${ssh_pri_key_file} -C "${gitea_project}-SSH-Public-Key"
-  chmod 0600 ${ssh_pri_key_file}*
+  if [[ ! -f ${ssh_pri_key_file} || ! -f ${ssh_pub_key_file} ]]; then
+    yes | ssh-keygen -N '' -f ${ssh_pri_key_file} -C "${gitea_project}-SSH-Public-Key"
+    chmod 0600 ${ssh_pri_key_file}*
 
-  cp -v ${ssh_pri_key_file}* ${ARTIFACT_DIR}/
+    cp -v ${ssh_pri_key_file}* ${ARTIFACT_DIR}/
 
-  echo
-  cat ${ssh_pri_key_file}
-  echo
+    echo
+    cat ${ssh_pri_key_file}
+    echo
+  else
+    echo
+    echo "Skipping SSH keys generation. Using available ones."
+    echo
+  fi
 }
 
 function upload_gitea_ssh_keys {
