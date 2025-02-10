@@ -201,10 +201,6 @@ function generate_vuln_id_detail_report() {
     https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
     #  https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
      
-      #reload below two parameter as "${env.parametername}" can't be get from triple single quote in sh block
-      # ROX_ENDPOINT=$(cat ROX_ENDPOINT)
-      # ROX_API_TOKEN=$(cat ROX_API_TOKEN)
-
     vulnnum=$(cat quay_acs_detail_violations | jq '.alerts' | jq 'length')
     if [ "$vulnnum" -lt 1 ]; then
         echo "No High && Critical vulnerability found for Quay in 'Vulnerability Management' Category"
@@ -218,9 +214,7 @@ function generate_vuln_id_detail_report() {
         curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
         https://${ROX_ENDPOINT}/v1/alerts/$req | jq > "${ARTIFACT_DIR}/detail/${req}_${vulnname}"
     done
-      
 }
-
 
 function deploy_acs_operator_default_setting() {
 
@@ -247,8 +241,7 @@ function deploy_acs_operator_default_setting() {
 
 }
 
+   echo "ACS violations scan start..."  
    deploy_acs_operator_default_setting || true
    echo "Quay image violations scanning with ACS is done successfully"
-   sleep 600
-
 
