@@ -272,8 +272,9 @@ CONFIG = {
         'default': 1,
     },
     'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+        'titan03': 2,
+        'titan02': 2,
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
