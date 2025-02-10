@@ -151,19 +151,20 @@ function generate_init_bundle() {
    oc create -f acs_cluster_init_bundle.yaml -n ${CENTRAL_NAMESPACE}
    echo "init bundle is generated successfully..."
     
-   #6, copy central files to "${ARTIFACT_DIR}/acs" folder for archive
-   mkdir -p "${ARTIFACT_DIR}"/acs
-   cp central_htpasswd "${ARTIFACT_DIR}"/acs
-   cp acs_cluster_init_bundle.yaml "${ARTIFACT_DIR}"/acs
+   #6, copy central files to "${ARTIFACT_DIR}/" folder for archive
+  #  cp central_htpasswd "${ARTIFACT_DIR}"
+   cp acs_cluster_init_bundle.yaml "${ARTIFACT_DIR}"
 
    # Central url for archive   
-   echo https://${ROX_ENDPOINT}>"${ARTIFACT_DIR}"/acs/central_route
+   echo https://${ROX_ENDPOINT}>"${ARTIFACT_DIR}"/central_route
 
 }
 
 #Deploy SecuredCluster
 function deploy_acs_secured_cluster() {
+   echo "start to deploy secured cluster..."
    cat <<EOF | oc apply -f -
+kind: SecuredCluster   
 apiVersion: platform.stackrox.io/v1alpha1
 metadata:
   name: stackrox-secured-cluster-services
@@ -186,7 +187,7 @@ EOF
 function generate_quay_violation_report() {
       echo "Generating quay violation report"
       curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-      https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical%2BDeployment%3Aquay | jq > "${ARTIFACT_DIR}"/acs/quay_acs_violations.json
+      https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical%2BDeployment%3Aquay | jq > "${ARTIFACT_DIR}"/quay_acs_violations.json
    
 }
 
@@ -213,7 +214,7 @@ function generate_vuln_id_detail_report() {
       do
          vulnname=$(jq -r -c --arg req "$req" '.alerts|.[]|select(.id == $req)|.deployment.name' <quay_acs_detail_violations)
          curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-         https://${ROX_ENDPOINT}/v1/alerts/$req | jq > "${ARTIFACT_DIR}/acs/${req}_${vulnname}"
+         https://${ROX_ENDPOINT}/v1/alerts/$req | jq > "${ARTIFACT_DIR}/${req}_${vulnname}"
       done
       
 }
