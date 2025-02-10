@@ -123,9 +123,7 @@ EOF
 function generate_init_bundle() {
   
    #check roxctl availability
-   curl -Lk -o roxctl https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl
-   chmod +x ./roxctl
-   ./roxctl version
+   roxctl version
 
    #totally 6 steps to init bundle
    #1, get central admin password from central-htpasswd
@@ -145,14 +143,14 @@ function generate_init_bundle() {
    export ROX_CENTRAL_ADDRESS="${ROX_ENDPOINT}:443"
    export ROX_API_TOKEN="${ROX_API_TOKEN}"
 
-   ./roxctl -e "$ROX_CENTRAL_ADDRESS" central init-bundles generate quay-acs --output-secrets acs_cluster_init_bundle.yaml --insecure-skip-tls-verify
+   roxctl -e "$ROX_CENTRAL_ADDRESS" central init-bundles generate quay-acs --output-secrets acs_cluster_init_bundle.yaml --insecure-skip-tls-verify
 
    #5, apply init bundle yaml
    oc create -f acs_cluster_init_bundle.yaml -n ${CENTRAL_NAMESPACE}
    echo "init bundle is generated successfully..."
     
    #6, copy central files to "${ARTIFACT_DIR}/" folder for archive
-  #  cp central_htpasswd "${ARTIFACT_DIR}"
+   # cp central_htpasswd "${ARTIFACT_DIR}"
    cp acs_cluster_init_bundle.yaml "${ARTIFACT_DIR}"
 
    # Central url for archive   
@@ -174,12 +172,12 @@ spec:
 EOF
    sleep 90
    
-   #check SecuredCluster deploy status
+   #Check SecuredCluster deploy status
    securedcluster_name=$(oc get SecuredCluster -n ${CENTRAL_NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
    oc wait SecuredCluster "${securedcluster_name}" --for=condition=Deployed=true  --timeout=360s  -n ${CENTRAL_NAMESPACE}
    echo "SecuredCluster is deployed successfully..."
 
-   #wait for pod starting and vulnerability scan
+   #Wait for pod starting and vulnerability scan
    sleep 120   
 }
 
@@ -198,8 +196,7 @@ function generate_vuln_id_detail_report() {
     mkdir -p "${ARTIFACT_DIR}"/detail
       
     curl -k -X GET -H "Authorization: Bearer ${ROX_API_TOKEN}"  -H "Content-Type: application/json" \
-    https://${ROX_ENDPOINT}/v1/alerts?query=Severity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
-    #  https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
+     https://${ROX_ENDPOINT}/v1/alerts?query=Category%3AVulnerability%20Management%2BDeployment%3Aquay%2BSeverity%3AHigh%2CCritical  | jq > quay_acs_detail_violations
      
     vulnnum=$(cat quay_acs_detail_violations | jq '.alerts' | jq 'length')
     if [ "$vulnnum" -lt 1 ]; then
@@ -234,9 +231,8 @@ function deploy_acs_operator_default_setting() {
    wait_deploy scanner-db
    wait_deploy sensor
 
-  # Artifacts archiv into ${ARTIFACT_DIR}/ folder, detail report in detail/ folder
+  # Artifacts archiv into ${ARTIFACT_DIR}/ folder, detail violation report in detail/ folder
    generate_quay_violation_report
-
    generate_vuln_id_detail_report
 
 }
