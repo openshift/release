@@ -35,9 +35,11 @@ fi
 echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 
-export CLIENT_ID=$(cat /tmp/osdsecrets/OSD_CLIENT_ID)
-export CLIENT_SECRET=$(cat /tmp/osdsecrets/OSD_CLIENT_SECRET)
+export CLIENT_ID CLIENT_SECRET CLUSTER_NAME
 
-export CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-info.name")
+CLIENT_ID=$(cat /tmp/osdsecrets/OSD_CLIENT_ID)
+CLIENT_SECRET=$(cat /tmp/osdsecrets/OSD_CLIENT_SECRET)
+
+CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-info.name")
 
 bash ./.ibm/pipelines/cluster/osd-gcp/destroy-osd.sh
