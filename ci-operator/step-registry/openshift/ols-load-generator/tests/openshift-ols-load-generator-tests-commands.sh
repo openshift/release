@@ -104,30 +104,6 @@ EOF
   sleep 60
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
 
-  # Deploy service monitor
-  run_or_fail cat <<EOF | oc apply -f - -n openshift-lightspeed
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: ols-service-monitor
-  namespace: openshift-lightspeed
-  labels:
-    app: ols
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: application-server
-      app.kubernetes.io/managed-by: lightspeed-operator
-      app.kubernetes.io/name: lightspeed-service-api
-  endpoints:
-  - port: "8443"
-    path: /metrics
-    interval: 30s
-EOF
-
-  # Wait for setup
-  sleep 30
-
   # Create namespace and kubeconfig secret for load testing
   run_or_fail oc create namespace ols-load-test
   run_or_fail oc create secret generic kubeconfig-secret --from-file=kubeconfig=${KUBECONFIG} -n ols-load-test
