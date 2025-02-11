@@ -1,0 +1,36 @@
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  from: root
+  to: kueue-controller
+promotion:
+  to:
+  - name: "4.20"
+    namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.20"
+  namespace: ocp
+tests:
+- as: vet
+  commands: make vet
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: kubernetes-sigs-kueue
