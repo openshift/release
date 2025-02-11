@@ -273,11 +273,9 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
-# Skip the following network tests in 4.13 to 4.15 jobs until the below defect is fixed
-# https://issues.redhat.com/browse/OCPBUGS-12841
-# The underlying issue is same for below mentioned sig-network tests
-# Excluding few loadbalancer tests with UDP since its not supported in Libvirt and PowerVS ppc64le jobs
-elif echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 >= 13 && $2 <= 15)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+
+# Excluding few loadbalancer tests with UDP in 4.13 to 4.19 Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
+elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13 && $2 <= 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
@@ -287,15 +285,7 @@ elif echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 >= 13 && $2 <= 15)) { exit
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
-    if [ "${INSTALLER}" == "powervs" ]; then
-        cat >> "${SHARED_DIR}/excluded_tests" << EOF
-"[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-network] Services should have session affinity timeout work for NodePort service [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Services should have session affinity work for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-EOF
-    fi
+
 else
     echo "Executing all tests"
 fi
