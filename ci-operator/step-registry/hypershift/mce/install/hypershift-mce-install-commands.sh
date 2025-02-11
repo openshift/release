@@ -12,24 +12,35 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
   # Setup disconnected quay mirror container repo
   oc apply -f - <<EOF
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
-    metadata:
-      name: rhacm-repo
-    spec:
-      repositoryDigestMirrors:
-      - mirrors:
-        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
-        source: quay.io/acm-d
-      - mirrors:
-        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
-        source: registry.redhat.io/rhacm2
-      - mirrors:
-        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
-        source: registry.redhat.io/multicluster-engine
-      - mirrors:
-        - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
-        source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: rhacm-repo
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: quay.io/acm-d
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.redhat.io/rhacm2
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.redhat.io/multicluster-engine
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
+    source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+EOF
+  oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: rhacm-repo
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: quay.io/acm-d
 EOF
 else
   # Setup quay mirror container repo
@@ -81,6 +92,7 @@ spec:
     registryPoll:
       interval: 10m
 EOF
+oc wait CatalogSource --timeout=20m --for=jsonpath='{.status.connectionState.lastObservedState}'=READY -n openshift-marketplace multiclusterengine-catalog
 
 oc apply -f - <<EOF
 apiVersion: v1
