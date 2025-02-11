@@ -121,16 +121,5 @@ else
 
 fi
 
-# Import the image variable set by select-image.sh
-if [[ -f "$SHARED_DIR/env_vars" ]]; then
-    source "$SHARED_DIR/env_vars"
-    echo "🔹 Using image: $RHDH_E2E_RUNNER_IMAGE"
-else
-    echo "❌ Error: env_vars file not found in SHARED_DIR!"
-    exit 1
-fi
-
-# Run the main CI job logic
-echo "🚀 Running tests with image: $RHDH_E2E_RUNNER_IMAGE"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

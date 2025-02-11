@@ -41,7 +41,6 @@ echo "Changeset: $PR_CHANGESET"
 # Directories to check if changes are exclusively within the specified directories
 DIRECTORIES_TO_CHECK=".ibm|e2e-tests"
 ONLY_IN_DIRS=true
-IMAGE_BUILD_NEEDED=false
 
 for change in $PR_CHANGESET; do
     # Check if the change is not within the specified directories
@@ -49,28 +48,7 @@ for change in $PR_CHANGESET; do
         ONLY_IN_DIRS=false
         break
     fi
-    # Check if there were any changes in .ibm/images/
-    if echo "$change" | grep -qE "^.ibm/images/"; then
-       IMAGE_BUILD_NEEDED=true
-       break
-    fi
 done
-
-# If no changes are detected in .ibm/images/, skip the image build process
-if [ "$IMAGE_BUILD_NEEDED" = false ]; then
-    echo "No changes detected in .ibm/images/. Skipping rhdh-e2e-runner image build..."
-else
-    echo "Changes detected in .ibm/images/. Starting image build..."
-
-    # Build the Docker image
-    podman build -t quay.io/rhdh-community/rhdh-e2e-runner:latest .ibm/images/
-
-    # Authenticate with Quay.io
-    podman login -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
-
-    # Push the newly built image to Quay.io
-    podman push quay.io/rhdh-community/rhdh-e2e-runner:latest
-fi
 
 if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : 1.3"
@@ -109,17 +87,5 @@ else
     done
 
 fi
-
-# Import the image variable set by select-image.sh
-if [[ -f "$SHARED_DIR/env_vars" ]]; then
-    source "$SHARED_DIR/env_vars"
-    echo "🔹 Using image: $RHDH_E2E_RUNNER_IMAGE"
-else
-    echo "❌ Error: env_vars file not found in SHARED_DIR!"
-    exit 1
-fi
-
-# Run the main CI job logic
-echo "🚀 Running tests with image: $RHDH_E2E_RUNNER_IMAGE"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

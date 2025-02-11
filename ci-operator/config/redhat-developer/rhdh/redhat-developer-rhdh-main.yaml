@@ -1,3 +1,13 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
+promotion:
+  to:
+  - name: rhdh
+    namespace: ci
 releases:
   latest:
     release:
@@ -24,8 +34,6 @@ tests:
     version: "4.17"
   skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md$
   steps:
-    pre:
-      - ref: select-image
     test:
     - ref: redhat-developer-rhdh
     workflow: generic-claim
@@ -45,6 +53,7 @@ tests:
   steps:
     test:
     - ref: redhat-developer-rhdh-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: generic-claim
 - as: e2e-tests-nightly-ocp-v4-16
   cluster_claim:
@@ -62,6 +71,7 @@ tests:
       OC_CLIENT_VERSION: stable-4.16
     test:
     - ref: redhat-developer-rhdh-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: generic-claim
 - as: e2e-tests-nightly-ocp-v4-15
   cluster_claim:
@@ -79,6 +89,7 @@ tests:
       OC_CLIENT_VERSION: stable-4.15
     test:
     - ref: redhat-developer-rhdh-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: generic-claim
 - as: e2e-tests-aks-helm-nightly
   cron: 0 7 * * *
@@ -95,6 +106,7 @@ tests:
   steps:
     test:
     - ref: redhat-developer-rhdh-gke-helm-nightly
+      from: ci/rhdh-e2e-runner:main
 - as: e2e-tests-operator-nightly
   cluster_claim:
     architecture: amd64
@@ -111,6 +123,7 @@ tests:
   steps:
     test:
     - ref: redhat-developer-rhdh-operator-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: generic-claim
 - as: cleanup-mapt-destroy-orphaned-aks-clusters
   cron: 0 2 * * SUN
@@ -130,6 +143,7 @@ tests:
       OSD_VERSION: 4.17.12
     test:
     - ref: redhat-developer-rhdh-osd-gcp-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
   timeout: 3h40m0s
 - as: e2e-tests-osd-gcp-operator-nightly
@@ -141,6 +155,7 @@ tests:
       OSD_VERSION: 4.17.12
     test:
     - ref: redhat-developer-rhdh-osd-gcp-nightly
+      from: ci/rhdh-e2e-runner:main
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
   timeout: 3h40m0s
 zz_generated_metadata:
