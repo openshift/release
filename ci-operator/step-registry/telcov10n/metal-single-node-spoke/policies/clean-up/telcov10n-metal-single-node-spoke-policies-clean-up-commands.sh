@@ -14,26 +14,7 @@ function set_hub_cluster_kubeconfig {
 
 function clean_up {
 
-  echo "************ telcov10n Clean up ManagedCluster object and related Spoke namespace ************"
-
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
-  set -x
-  oc delete managedcluster ${SPOKE_CLUSTER_NAME} --ignore-not-found
-  oc delete ns ${SPOKE_CLUSTER_NAME} --ignore-not-found
-  set +x
-
-  echo "************ telcov10n Clean up AgentServiceConfig CR ************"
-
-  # set -x
-  # assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
-  #   grep "^assisted-service" || echo "assisted-service")
-  # oc delete AgentServiceConfig agent --ignore-not-found --timeout=10m && \
-  # oc -n multicluster-engine wait --for=delete pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=10m
-  # set +x
+  echo "************ telcov10n Clean up Policies related Spoke namespace ************"
 }
 
 
@@ -42,7 +23,7 @@ function main {
   clean_up
 
   echo
-  echo "Success!!! The SNO Spoke cluster CRs have been removed correctly."
+  echo "Success!!! The Policies have been removed correctly."
 }
 
 main
