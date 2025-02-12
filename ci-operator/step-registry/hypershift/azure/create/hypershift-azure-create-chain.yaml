@@ -156,6 +156,7 @@ chain:
         --location ${HC_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
         --encryption-key-id=${ENCRYPTION_KEY_ID} \
+        # --control-plane-operator-image=quay.io/pewang/hcp:cpo \
         --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
         --resource-group-name=${RESOURCE_GROUP_NAME} \
         --vnet-id=${VNET_ID} \
@@ -241,8 +242,9 @@ chain:
         "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
-      
-      "${COMMAND[@]}"
+
+      echo "Running command: ${COMMAND[@]}" > /tmp/create_hc_commands
+      ("${COMMAND[@]}" || true)
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
@@ -277,13 +279,15 @@ chain:
           oc get clusterversion 2>/dev/null || true
           sleep 1s
       done
+      echo "Hosted cluster cluster-operators are ready"
+      sleep 12h
     from: hypershift-operator
     grace_period: 5m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 45m0s
+    timeout: 24h
     credentials:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
