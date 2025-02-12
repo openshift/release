@@ -3,10 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.31.0
-  operator-sdk:
-    name: "4.17"
-    namespace: origin
-    tag: operator-sdk
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   os-min9:
     name: ubi-minimal
     namespace: ocp
@@ -26,9 +26,7 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/manager
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
   to: numaresources-operator
 - dockerfile_path: bundle.Dockerfile
   to: numaresources-operator-bundle
@@ -38,7 +36,7 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
   to: resource-topology-exporter
 - dockerfile_path: Dockerfile.openshift.tests
   from: os-min9
@@ -50,9 +48,10 @@ images:
   to: numaresources-operator-tests
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: tested-numaresources-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.18.999-snapshot
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.19.999-snapshot
     with: pipeline:numaresources-operator
 promotion:
   to:
@@ -63,12 +62,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -83,7 +82,7 @@ tests:
   steps:
     cluster_profile: aws-telco
     dependencies:
-      OO_BUNDLE: numaresources-operator-bundle
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_INSTALL_MODE: OwnNamespace
@@ -98,7 +97,7 @@ tests:
     test:
     - as: e2e-install-test
       cli: latest
-      commands: make test-install-e2e
+      commands: make test-install-e2e test-uninstall-e2e
       from: src
       resources:
         requests:
@@ -109,7 +108,7 @@ tests:
   steps:
     cluster_profile: aws-telco
     dependencies:
-      OO_BUNDLE: numaresources-operator-bundle
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_INSTALL_MODE: OwnNamespace
@@ -136,7 +135,7 @@ tests:
   steps:
     cluster_profile: aws-telco
     dependencies:
-      OO_BUNDLE: numaresources-operator-bundle
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_INSTALL_MODE: OwnNamespace
@@ -162,21 +161,28 @@ tests:
   steps:
     cluster_profile: aws-telco
     dependencies:
-      OO_BUNDLE: numaresources-operator-bundle
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
-      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
       OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
+      USE_HOSTED_KUBECONFIG: "true"
     test:
     - as: e2e-install-test
       cli: latest
-      commands: make test-install-e2e
+      commands: |-
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        make test-install-e2e test-uninstall-e2e
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-operator-sdk-hypershift
+    workflow: hypershift-optional-operators
 - as: security
   optional: true
   steps:

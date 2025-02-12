@@ -61,8 +61,8 @@ quay.io/openshifttest/hello-openshift:winc-1.2.0=MIRROR_REGISTRY_PLACEHOLDER/ope
 quay.io/openshifttest/hello-openshift:alt-1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/hello-openshift:alt-1.2.0
 quay.io/openshifttest/hello-openshift:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/hello-openshift:1.2.0
 quay.io/openshifttest/hello-websocket:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/hello-websocket:1.2.0
-quay.io/openshifttest/httpbin:1.2.1=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/httpbin:1.2.1
-quay.io/openshifttest/httpbin:ssl-1.2.1=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/httpbin:ssl-1.2.1
+quay.io/openshifttest/httpbin:1.2.2=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/httpbin:1.2.2
+quay.io/openshifttest/httpbin:ssl-1.2.2=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/httpbin:ssl-1.2.2
 quay.io/openshifttest/http-header-test:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/http-header-test:1.2.0
 quay.io/openshifttest/ip-echo:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ip-echo:1.2.0
 quay.io/openshifttest/iscsi:1.2.2=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/iscsi:1.2.2
@@ -98,6 +98,7 @@ quay.io/openshifttest/testssl:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/te
 quay.io/openshifttest/uiauto-operators-index:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/uiauto-operators-index:1.2.0
 quay.io/openshifttest/ui-auto-operators:latest=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ui-auto-operators:latest
 quay.io/openshifttest/prometheus-example-app:multiarch=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/prometheus-example-app:multiarch
+quay.io/openshifttest/golang:1.22.11=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/golang:1.22.11
 EOF
     # Creating ICSP for quay.io/openshifttest is in enable-qe-catalogsource-disconnected step
     # Set Node CA for Mirror Registry is in enable-qe-catalogsource-disconnected step

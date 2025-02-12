@@ -31,11 +31,16 @@ oc --context app.ci --namespace ci extract configmap/plugins --to "${APPDATA}/pl
 
 CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
 CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64}
+mounts_labels="ro,Z"
+if [[ $(uname -s) = "Darwin" && ${CONTAINER_ENGINE} = "podman" ]]; then
+  # Darwin (MacOS)
+  mounts_labels="ro"
+fi
 $CONTAINER_ENGINE pull registry.ci.openshift.org/ci/check-gh-automation:latest $CONTAINER_ENGINE_OPTS
 $CONTAINER_ENGINE run \
     --rm \
     --platform linux/amd64 \
-    -v "${APPDATA}":/data \
+    -v "${APPDATA}:/data:${mounts_labels}" \
     registry.ci.openshift.org/ci/check-gh-automation:latest \
     --repo="$1" \
     --app-check-mode="$app_check_mode" \

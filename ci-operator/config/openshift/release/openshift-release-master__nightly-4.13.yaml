@@ -59,10 +59,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  driver-toolkit-tests:
-    name: "4.13"
-    namespace: ocp
-    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.13"
     namespace: ocp
@@ -694,9 +690,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-csi
 - as: e2e-azurestack-csi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     env:
       TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     observers:
@@ -808,27 +805,9 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-aws-driver-toolkit
-  cron: 9 22 * * 6
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: driver-toolkit-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 21 * * 6
+  cron: 0 17 * * 0
   restrict_network_access: false
   steps:
     env:
@@ -896,9 +875,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-upi
 - as: e2e-azurestack-ovn-upi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     observers:
       enable:
       - observers-resource-watch

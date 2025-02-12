@@ -74,7 +74,7 @@ function debug() {
     echo "-------------------"
     oc get mcp -o yaml "${MCP}"
     echo "-------------------"
-    oc get pinnedimageset -o yaml "99-${MACHINE_CONFIG_POOL}-pinned-release"
+    oc get pinnedimageset -o yaml "99-${MCP}-pinned-release"
     echo "-------------------"
     for node in $(oc get nodes -l node-role.kubernetes.io/"${MCP}" -o name)
     do
@@ -145,7 +145,7 @@ function wait_for_mcp_to_finish_pinning_images() {
 
 function get_pinned_image_file() {
     MCP="${1}"
-    echo "${ARTIFACT_DIR}/pinnedimageset-${MACHINE_CONFIG_POOL}.yaml"
+    echo "${ARTIFACT_DIR}/pinnedimageset-${MCP}.yaml"
 }
 
 # Writing the PinnedImageSet files
@@ -191,20 +191,20 @@ if [ "${MCO_CONF_DAY2_PINTARGETRELEASE_REMOVE_PULLSECRET,,}" == "true" ]; then
         oc set data secret/pull-secret -n openshift-config .dockerconfigjson={}
 
         # Wait for MCP to start updating
-        oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s
         oc wait mcp master --for='condition=UPDATING=True' --timeout=300s
 
         # Wait for MCP to apply the new configuration
         oc wait mcp master --for='condition=UPDATED=True' --timeout=600s
         oc wait mcp worker --for='condition=UPDATED=True' --timeout=600s
     else
-    ￼   echo "ERROR! Global cluster pull secret does not exist."
+        echo "ERROR! Global cluster pull secret does not exist."
         create_failed_junit "$JUNIT_SUITE" "$JUNIT_TEST" "The cluster has no pull-secret"
-    ￼   exit 255
+        exit 255
     fi
 fi
 
 create_passed_junit "$JUNIT_SUITE" "$JUNIT_TEST"
 
-debug "worker"
-debug "master"
+for MACHINE_CONFIG_POOL in ${MCO_CONF_DAY2_PINTARGETRELEASE_MCPS}; do
+    debug "$MACHINE_CONFIG_POOL"
+done

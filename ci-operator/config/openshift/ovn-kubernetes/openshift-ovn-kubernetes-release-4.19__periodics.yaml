@@ -1,4 +1,8 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.17_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -11,45 +15,27 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.22
-images:
-- dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: ovn-kubernetes-microshift
 releases:
   initial:
-    integration:
-      name: "4.19"
-      namespace: ocp
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.19"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.19"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -64,7 +50,31 @@ tests:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-ovn-virt
+- as: e2e-aws-ovn-virt-periodic
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+    workflow: openshift-e2e-aws-ovn-virt
+- as: e2e-metal-ipi-ovn-ipv4-bgp-techpreview-periodic
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-ipv4
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

@@ -120,11 +120,7 @@ function getCIR(){
     fi
 }
 
-# Most virt based jobs run on all of the CI hosts, but the diask space available
-# in ESI isn't enough for upgrade jobs
-CIRTYPE=host_el9,host_esi_el9
-[[ "$JOB_NAME" =~ -upgrade|-serial ]] && CIRTYPE=host_el9
-
+CIRTYPE=host_el9
 #CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc

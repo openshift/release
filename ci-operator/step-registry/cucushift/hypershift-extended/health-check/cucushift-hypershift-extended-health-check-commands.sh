@@ -76,7 +76,7 @@ function check_pod_status {
             return 1
         fi
     # ignore osd pods in for rosa hcp since it takes a very long time to recover for some reason.
-    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix" | grep -v "osd-delete-backplane")
+    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix" | grep -v "osd-delete-backplane" | grep -v "osd-cluster-ready")
     echo "All pods are in the expected state."
     return 0
 }

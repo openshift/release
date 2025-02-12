@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
@@ -36,7 +42,7 @@ workdir=`mktemp -d`
 # Generally we do not update boot image for bastion host very often, we just use it as a jump
 # host, mirror registry, and proxy server, these services do not have frequent update.
 # So hard-code them here.
-IMAGE_NAME="fedora-coreos-34-20210821-3-0-gcp-x86-64"
+IMAGE_NAME="fedora-coreos-41-20241122-3-0-gcp-x86-64"
 IMAGE_PROJECT="fedora-coreos-cloud"
 echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
 
@@ -45,12 +51,13 @@ echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
 #####################################
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
-  echo "Activating XPN service-account..."
+  echo "$(date -u --rfc-3339=seconds) - Activating XPN service-account..."
   GOOGLE_CLOUD_XPN_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/xpn_creds.json"
   gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
   GOOGLE_CLOUD_XPN_SA=$(jq -r .client_email "${GOOGLE_CLOUD_XPN_KEYFILE_JSON}")
 fi
 if [[ "${OSD_QE_PROJECT_AS_SERVICE_PROJECT}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Activating OSD QE service account & project..."
   export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
   GOOGLE_PROJECT_ID="$(jq -r -c .project_id "${GCP_SHARED_CREDENTIALS_FILE}")"
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"

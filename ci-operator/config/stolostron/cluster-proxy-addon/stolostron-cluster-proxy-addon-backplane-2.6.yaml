@@ -49,18 +49,22 @@ tests:
     true
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make update-deps-overrides
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: cluster-proxy-addon
@@ -78,9 +82,11 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
-        EXAMPLE_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:cluster-proxy-addon}
-        export KUBECTL EXAMPLE_IMAGE_NAME
+        export KUBECTL
         make test-e2e
+      dependencies:
+      - env: CLUSTER_PROXY_ADDON_IMAGE
+        name: cluster-proxy-addon
       from: src
       resources:
         requests:

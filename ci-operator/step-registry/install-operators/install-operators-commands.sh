@@ -31,6 +31,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_install_namespace=$(jq --raw-output '.install_namespace // ""' <<< "$operator_obj")
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
+    operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
 
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
@@ -132,19 +133,40 @@ EOF
 
     echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
-    cat <<EOF | oc apply -f -
-    apiVersion: operators.coreos.com/v1alpha1
-    kind: Subscription
-    metadata:
-        name: "${operator_name}"
-        namespace: "${operator_install_namespace}"
-    spec:
-        channel: "${operator_channel}"
-        installPlanApproval: Automatic
-        name: "${operator_name}"
-        source: "${operator_source}"
-        sourceNamespace: openshift-marketplace
+    if [[ -z "$operator_config" ]]; then
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+            name: "${operator_name}"
+            namespace: "${operator_install_namespace}"
+        spec:
+            channel: "${operator_channel}"
+            installPlanApproval: Automatic
+            name: "${operator_name}"
+            source: "${operator_source}"
+            sourceNamespace: openshift-marketplace
 EOF
+    else
+        cat <<EOF | oc apply -f -
+        {
+            "apiVersion": "operators.coreos.com/v1alpha1",
+            "kind": "Subscription",
+            "metadata": {
+                "name": "${operator_name}",
+                "namespace": "${operator_install_namespace}"
+            },
+            "spec": {
+                "channel": "${operator_channel}",
+                "installPlanApproval": "Automatic",
+                "name": "${operator_name}",
+                "source": "${operator_source}",
+                "sourceNamespace": "openshift-marketplace",
+                "config": ${operator_config}
+            }
+        }
+EOF
+    fi
 
     # Need to allow some time before checking if the operator is installed.
     sleep 60
@@ -175,12 +197,12 @@ EOF
         echo
         echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
         echo
-        oc get packagemanifest ${operator_name} --ignore-not-found
+        oc get packagemanifest | grep ${operator_name} || echo
         echo "CSV ${CSV} YAML"
-        oc get CSV "${CSV}" -n "${operator_install_namespace}" -o yaml
+        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
         echo
         echo "CSV ${CSV} Describe"
-        oc describe CSV "${CSV}" -n "${operator_install_namespace}"
+        oc describe csv "${CSV}" -n "${operator_install_namespace}"
         exit 1
     fi
 

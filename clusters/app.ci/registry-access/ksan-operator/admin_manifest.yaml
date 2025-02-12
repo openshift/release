@@ -1,0 +1,82 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Openshift KubeSAN Operator
+    openshift.io/display-name: ksan-operator
+  name: ksan-operator
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: ksan-operator
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ksan-operator-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: ksan-operator
+    name: image-puller
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ksan-operator-viewer-binding
+  namespace: ksan-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ksan-operator
+    namespace: ksan-operator
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ksan-operator-admins-binding
+  namespace: ksan-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ksan-operator
+    namespace: ksan-operator
+---
+# Allows unauthorized pulling privileges based on https://docs.ci.openshift.org/docs/how-tos/mirroring-to-quay/#requirements
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: generic-ksan-operator-puller
+  namespace: ksan-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:unauthenticated
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated

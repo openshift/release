@@ -1,6 +1,6 @@
 base_images:
-  ocp_4.13_cli-artifacts:
-    name: "4.13"
+  ocp_4.14_cli-artifacts:
+    name: "4.14"
     namespace: ocp
     tag: cli-artifacts
   ocp_4.18_cli-artifacts:
@@ -15,22 +15,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  openshift_eventing-istio-src_knative-v1.15:
+  openshift_eventing-istio-src_knative-v1.16:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.15
-  openshift_eventing-kafka-broker-src_knative-v1.15:
+    tag: knative-v1.16
+  openshift_eventing-kafka-broker-src_knative-v1.16:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.15
-  openshift_knative-eventing-src_knative-v1.15:
+    tag: knative-v1.16
+  openshift_knative-eventing-src_knative-v1.16:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.15
-  openshift_knative-serving-src_knative-v1.15:
+    tag: knative-v1.16
+  openshift_knative-serving-src_knative-v1.16:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.15
+    tag: knative-v1.16
   openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
@@ -54,7 +54,7 @@ images:
   to: serverless-knative-operator
 - dockerfile_path: must-gather/Dockerfile
   inputs:
-    ocp_4.13_cli-artifacts:
+    ocp_4.14_cli-artifacts:
       as:
       - $CLI_ARTIFACTS
     ocp_ubi-minimal_8:
@@ -71,6 +71,10 @@ images:
       - registry.ci.openshift.org/origin/4.18:operator-registry
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
   to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
@@ -87,18 +91,18 @@ images:
     ocp_4.18_cli-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.18:cli-artifacts
-    openshift_eventing-istio-src_knative-v1.15:
+    openshift_eventing-istio-src_knative-v1.16:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.15
-    openshift_eventing-kafka-broker-src_knative-v1.15:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.16
+    openshift_eventing-kafka-broker-src_knative-v1.16:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.15
-    openshift_knative-eventing-src_knative-v1.15:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.16
+    openshift_knative-eventing-src_knative-v1.16:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.15
-    openshift_knative-serving-src_knative-v1.15:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.16
+    openshift_knative-serving-src_knative-v1.16:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.15
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.16
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
@@ -137,7 +141,7 @@ tests:
     cluster_profile: gcp
     test:
     - as: operator-e2e
-      commands: FORCE_KONFLUX_INDEX=true HA=false make test-e2e-with-kafka-no-tracing
+      commands: HA=false GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin make test-e2e-with-kafka-no-tracing
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
