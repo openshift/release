@@ -1,0 +1,32 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 5Gi
+    requests:
+      cpu: 500m
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  commands: |
+    echo "branch"
+    echo "PULL_BASE_REF : $PULL_BASE_REF"
+    BRANCH=$(jq -r '.refs.base_ref' <<< "$JOB_SPEC")
+    echo "Running tests on branch: $BRANCH"
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-1.5
+  org: redhat-developer
+  repo: rhdh
