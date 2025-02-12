@@ -14,6 +14,7 @@ function set_cluster_access() {
         source "${SHARED_DIR}/proxy-conf.sh"
 	echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
     fi
+    sleep 3h
 }
 function preparation_for_test() {
     if ! which kubectl &> /dev/null ; then
