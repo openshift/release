@@ -17,3 +17,5 @@ curl -o "${ARTIFACT_DIR}/junit.zip" "${OCP_TESTING_URL}/${JOB_NUMBER}/artifact/m
 unzip ${ARTIFACT_DIR}/junit.zip -d ${ARTIFACT_DIR} && mv ${ARTIFACT_DIR}/manilacsi-test-results ${ARTIFACT_DIR}/junit
 
 rm -f ${ARTIFACT_DIR}/junit.zip
+
+sleep 600

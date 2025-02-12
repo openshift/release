@@ -26,3 +26,6 @@ export OCP_TESTING_URL="$(<"${SHARED_DIR}/ocp_testing_url")"
 export JQ_QUERY=".builds[] | {number, OPENSHIFT_RELEASE: (.actions[].parameters[]?| select(.name==\"OCP_RELEASE\" and .value==\"${OCP_RELEASE}\") | .value)}"
 
 curl "${OCP_TESTING_URL}/api/json?tree=builds\[number,status,timestamp,id,duration,result,url,actions\[parameters\[name,value\]\]\]" | jq "${JQ_QUERY}" | jq -s '.[0].number' > "${SHARED_DIR}/job_number"
+
+
+sleep 600
