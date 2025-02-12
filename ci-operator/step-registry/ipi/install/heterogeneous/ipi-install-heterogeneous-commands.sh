@@ -268,9 +268,13 @@ case $CLUSTER_TYPE in
     echo "Waiting for the VHD blob copy to conclude... (timeout in $(( 15 - i )) minutes)"
   done
   echo "The VHD image is now available. Creating the image version..."
+  # The Gallery Image Version need match Major(int).Minor(int).Patch(int), where int is between 0 and 2,147,483,647.
+  # The VHD URL string format might differ across multiple OpenShift versions.
+  # To avoid cut errors, use the OCP version instead.
+  image_version=$(oc get clusterversion --no-headers | awk '{split($2, a, "-"); print a[1]}')
   az sig image-version create --resource-group "${rg_name}" \
     --gallery-name "${gallery_name}" --gallery-image-definition "${image_name}" \
-    --gallery-image-version "${vhd_name:6:15}"  --target-regions "${region}" \
+    --gallery-image-version "${image_version}"  --target-regions "${region}" \
     --os-vhd-uri "${storage_blob_url}" --os-vhd-storage-account "${sa_name}"
   echo "The image version for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers has been created... "
   echo "Patching the MachineSet..."
