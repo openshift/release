@@ -133,18 +133,16 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disc-priv-f28-ota
+- as: aws-ipi-disc-priv-f28-70744
   cron: 14 10 13 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-7hj5npb/release:latest
       EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: DisconnectedOnly&
-      TEST_SCENARIOS: OTA
     test:
-    - chain: openshift-e2e-test-qe-longrun
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-localzone-fips-f7-nokubeadmin
   cron: 52 11 1,10,17,24 * *
@@ -2511,6 +2509,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
+- as: gcp-ipi-f9-longduration-53100
+  cron: 14 13 3,12,24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SCENARIOS: "53100"
+      TEST_TIMEOUT: "100"
+    test:
+    - ref: wait
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: vsphere-agent-dualstack-sno-longduration-mco-critical-f9
   cron: 1 17 4,13,22 * *
   steps:
@@ -2595,17 +2606,14 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
+- as: gcp-ipi-proxy-etcd-encryption-f28
   cron: 5 20 23 * *
   steps:
     cluster_profile: gcp-qe
     env:
-      TEST_FILTERS: ~HyperShiftMGMT
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
-      TEST_TIMEOUT: "20"
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
-    - ref: openshift-extended-test
+    - ref: wait
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-secureboot-confidential-computing-f14
   cron: 8 17 13,29 * *
