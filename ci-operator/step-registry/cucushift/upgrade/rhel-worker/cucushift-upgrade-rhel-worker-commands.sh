@@ -212,6 +212,24 @@ function rhel_post_upgrade(){
         echo "oc logs checking command failed." && return 1
     fi
 
+    cat > /tmp/post_check.yaml <<-'EOF'
+---
+- name: Run post check on the workers
+  hosts: workers
+  any_errors_fatal: true
+  gather_facts: false
+  tasks:
+  - name: Ensure fixfiles_exclude_dirs contains '/var/lib/kubelet'
+    lineinfile:
+      name: /etc/selinux/fixfiles_exclude_dirs
+      line: "/var/lib/kubelet"
+      state: present
+    check_mode: yes
+    register: presence
+    failed_when: (presence is changed) or (presence is failed)
+EOF
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv
+
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
