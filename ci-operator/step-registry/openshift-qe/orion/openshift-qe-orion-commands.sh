@@ -20,6 +20,11 @@ pushd orion
 
 pip install -r requirements.txt
 
+# Download the latest ACK file
+if [ ${JUNIT} == true ]; then
+  curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
+fi
+
 if [[ ${ES_TYPE} == "qe" ]]; then
     ES_PASSWORD=$(cat "/secret/qe/password")
     ES_USERNAME=$(cat "/secret/qe/username")
@@ -42,7 +47,7 @@ if [ ${JUNIT} == true ]; then
   export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
   export EXTRA_FLAGS+=" --output-format junit"
   export EXTRA_FLAGS+=" --save-output-path=junit.xml"
-  export EXTRA_FLAGS+=" --ack ack/${VERSION}_${ACK_FILE}"
+  export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
   export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 

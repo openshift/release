@@ -249,6 +249,32 @@ function write_html() {
   write_results_html
 }
 
+function embed_topology_data() {
+  echo "<hr>" >> "${RESULT_HTML}"
+  for LEASE in "${SHARED_DIR}"/LEASE_*; do
+    if [[ $LEASE == *_single.json* ]]; then
+        continue
+    fi
+
+    POOL=$(jq --compact-output -r .status.name < "${LEASE}")
+    SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
+    CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
+    DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
+    DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
+    NETWORKS=$(jq --compact-output -r .status.topology.networks[] < "${LEASE}")
+    NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
+
+    echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
+    echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+    echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+    echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+    echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+    echo "<br>" >> "${RESULT_HTML}"
+  done
+}
+
 function generate_vm_input() {
   IFS=$'\n' read -d '' -r -a VMS <<< "$(jq -r '.vms[]|.name' ${vcenter_state}/metric-files.json)"
   # shellcheck disable=SC2089
@@ -360,6 +386,11 @@ function write_results_html() {
           <dt class="text-light bg-secondary ps-1 mb-1">Info</dt>
           <dd>This report contains metrics for both the Virtual Machines used in the CI tests as well as the hosts the VMs ran on.</dd>
       </dl>
+EOF
+
+embed_topology_data
+
+cat >> "${RESULT_HTML}" << EOF      
     </data>
     <data id="vm-data">
       <div id="vm-data-content">
