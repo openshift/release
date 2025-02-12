@@ -1,8 +1,12 @@
 ref:
   as: openshift-qe-cloud-governance-perf-dept
+  # from_image:
+  #   namespace: ci
+  #   name: cloud-governance
+  #   tag: latest
   from_image:
     namespace: ci
-    name: cloud-governance
+    name: telco-bastion
     tag: latest
   commands: openshift-qe-cloud-governance-perf-dept-commands.sh
   credentials:
@@ -11,7 +15,13 @@ ref:
     mount_path: /secret
   env:
     - name: POLICIES_LIST
-      default: "unattached_volume, unused_nat_gateway"
+      default: "instance_idle, ec2_stop, unattached_volume, ip_unattached, zombie_snapshots, unused_nat_gateway, s3_inactive, empty_roles, zombie_cluster_resource"
+    - name: DAYS_TO_DELETE_RESOURCE
+      default: "7"
+    - name: dry_run
+      default: "yes"
+    - name: EMAIL_ALERT
+      default: "false"
   resources:
     requests:
       cpu: 100m
