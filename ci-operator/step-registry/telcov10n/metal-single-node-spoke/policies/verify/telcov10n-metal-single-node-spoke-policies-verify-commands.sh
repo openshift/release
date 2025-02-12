@@ -22,7 +22,7 @@ function main {
   run_tests
 
   echo
-  echo "Success!!! The SNO Spoke cluster has been installed correctly."
+  echo "Success!!! The Policies have been pushed correctly."
 }
 
 main
