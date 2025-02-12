@@ -59,6 +59,186 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cluster-api-provider-azure
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-azure
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api-provider-azure/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api-provider-azure:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api-provider-azure:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-azure:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-aws
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-aws
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api-provider-aws/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api-provider-aws:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api-provider-aws:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-aws:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-gcp
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-gcp
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api-provider-gcp/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api-provider-gcp:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api-provider-gcp:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-gcp:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-vsphere
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-vsphere
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api-provider-vsphere/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api-provider-vsphere:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api-provider-vsphere:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-vsphere:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-ibmcloud
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-ibmcloud
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api-provider-ibmcloud/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api-provider-ibmcloud:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api-provider-ibmcloud:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-ibmcloud:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api
+      commands: |
+        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes-sigs/cluster-api/releases" | grep '"tag_name":' | grep -v alpha | grep -v beta | grep -v rc | sed -E 's/.*"([^"]+)".*/\1/' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | tail -n1)
+        rebasebot --source kubernetes-sigs/cluster-api:"${UPSTREAM_VERSION}" \
+                  --dest openshift/cluster-api:master \
+                  --rebase openshift-cloud-team/cluster-api:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook=git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: cloud-provider-ibm
   cron: 10 12 * * Mon,Thu
   steps:
