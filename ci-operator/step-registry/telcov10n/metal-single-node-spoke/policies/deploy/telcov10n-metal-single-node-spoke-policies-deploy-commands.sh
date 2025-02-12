@@ -12,13 +12,15 @@ function set_hub_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
-function check_hub_cluster_is_alive {
+function check_git_repo_is_alive {
 
   echo "************ telcov10n Checking if the Hub cluster is available ************"
 
+  gitea_project="${GITEA_NAMESPACE}"
+
   echo
   set -x
-  oc get node,clusterversion
+  oc -n ${gitea_project} get deploy,pod
   set +x
   echo
 }
@@ -51,188 +53,48 @@ EOF
   set +x
 }
 
-function generate_network_config {
+function push_source_crs {
 
-  baremetal_iface=$1 ; shift
-  [ $# -gt 0 ] && ipi_disabled_ifaces=$1 && shift
+  echo "************ telcov10n Pushing Source CR files ************"
 
-  network_config="interfaces:
-              - name: ${baremetal_iface}
-                type: ethernet
-                state: up
-                ipv4:
-                  enabled: true
-                  dhcp: true
-                ipv6:
-                  enabled: true
-                  dhcp: true"
+  gitea_ssh_nodeport_uri="$(cat ${SHARED_DIR}/gitea-ssh-nodeport-uri.txt)"
+  ssh_pri_key_file=/tmp/ssh-prikey
+  cp -v ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE} ${ssh_pri_key_file}
+  chmod 0400 ${ssh_pri_key_file}
 
-  # # split the ipi_disabled_ifaces semi-comma separated list into an array
-  # IFS=';' read -r -a disabled_ifaces <<< "${ipi_disabled_ifaces}"
-  # for iface in "${disabled_ifaces[@]}"; do
-  #   # Take care of the indentation when adding the disabled interfaces to the above yaml
-  #   network_config+="
-  #             - name: ${iface}
-  #               type: ethernet
-  #               state: up
-  #               ipv4:
-  #                 enabled: false
-  #                 dhcp: false
-  #               ipv6:
-  #                 enabled: false
-  #                 dhcp: false"
-  #   done
+  set -x
+  ztp_repo_dir=$(mktemp -d --dry-run)
+  git config --global user.email "ztp-spoke-cluster@telcov10n.com"
+  git config --global user.name "ZTP Spoke Cluster Telco Verification"
+  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git clone ${gitea_ssh_nodeport_uri} ${ztp_repo_dir}
+  pushd .
+  cd ${ztp_repo_dir}
+  mkdir -pv site-policies
+  cp -a ${HOME}/ztp/source-crs site-policies/
+  git add .
+  git commit -m 'Generated PGT'
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main
+  popd
 }
 
-function get_storage_class_name {
+function generate_policy_related_files {
 
-  echo "************ telcov10n Get the Storage Class name to be used ************"
+  jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})" | while read -r entry; do
+    # Extract the filename and content
+    filename=$(echo "$entry" | jq -r '.filename')
+    content=$(echo "$entry" | jq -r '.content')
 
-  if [ -n "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
-    cat <<EOF | oc create -f - 2>/dev/null || { set -x ; oc -n openshift-storage get LVMCluster lvmcluster -oyaml ; set +x ; }
-apiVersion: lvm.topolvm.io/v1alpha1
-kind: LVMCluster
-metadata:
-  name: lvmcluster
-  namespace: openshift-storage
-spec:
-  storage:
-    deviceClasses:
-    - fstype: xfs
-      name: vg1
-      thinPoolConfig:
-        chunkSizeCalculationPolicy: Static
-        name: thin-pool-1
-        overprovisionRatio: 10
-        sizePercent: 90
-EOF
-    set -x
-    sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
-    # sc_name="lvms-vg1"
-    attempts=0
-    while sleep 10s ; do
-      oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
-      [ $(( attempts=${attempts} + 1 )) -lt 3 ] || exit 1
-    done
-    set +x
-    oc -n openshift-storage get lvmcluster/lvmcluster -oyaml
-  else
-    sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
-  fi
-
-  oc get sc
-  echo
-  echo "Using ${sc_name} Storage Class name"
-}
-
-function generate_site_config {
-
-  echo "************ telcov10n Generate SiteConfig file from template ************"
-
-  site_config_file=$(mktemp --dry-run)
-
-  # From ${SHARED_DIR}/hosts.yaml file are retrived the following values:
-  #   - name
-  #   - redfish_scheme
-  #   - bmc_address
-  #   - redfish_base_uri
-  #   - mac
-  #   - root_device
-  #   - deviceName
-  #   - root_device
-  #   - root_dev_hctl
-  #   - hctl
-  #   - baremetal_iface
-  #   - ipi_disabled_ifaces
-
-  # shellcheck disable=SC2154
-  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-
-    if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ] || [ ${#ipv6} -eq 0 ]; then
-      echo "[ERROR] Unable to parse the Bare Metal Host metadata"
-      exit 1
-    fi
-
-    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-    else
-      SPOKE_CLUSTER_NAME=${NAMESPACE}
-    fi
-    SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
-
-    generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
-
-    if [ "${root_device}" != "" ]; then
-      ignition_config_override='{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"'${root_device}'\",\"wipeTable\":true, \"partitions\": []}]}}'
-    fi
-
-    cat << EOF > ${site_config_file}
-apiVersion: ran.openshift.io/v1
-kind: SiteConfig
-metadata:
-  name: "site-plan-${SPOKE_CLUSTER_NAME}"
-  namespace: ${SPOKE_CLUSTER_NAME}
-spec:
-  baseDomain: "${SPOKE_BASE_DOMAIN}"
-  pullSecretRef:
-    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
-  clusterImageSetNameRef: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-  sshPublicKey: "$(cat ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}.pub)"
-  clusters:
-  - clusterName: "${SPOKE_CLUSTER_NAME}"
-    networkType: "OVNKubernetes"
-    # See: oc get clusterversion version -o json | jq -rc .status.capabilities
-    # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
-    extraManifestPath: sno-extra-manifest/
-    clusterType: sno
-    clusterProfile: du
-    clusterLabels:
-      du-profile: "${DU_PROFILE}"
-      group-du-sno: ""
-      common: true
-      sites: "${SPOKE_CLUSTER_NAME}"
-    clusterNetwork:
-      - cidr: "10.128.0.0/14"
-        hostPrefix: 23
-    machineNetwork:
-      - cidr: ${INTERNAL_NET_CIDR}
-    serviceNetwork:
-      - "172.30.0.0/16"
-    additionalNTPSources:
-      - ${AUX_HOST}
-    # ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
-    cpuPartitioningMode: AllNodes
-    nodes:
-      - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
-        bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-        # disableCertificateVerification: true
-        bmcCredentialsName:
-          name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${mac}"
-        bootMode: "UEFI"
-        rootDeviceHints:
-          ${root_device:+deviceName: ${root_device}}
-          ${root_dev_hctl:+hctl: ${root_dev_hctl}}
-        # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
-        nodeNetwork:
-          interfaces:
-            - name: "${baremetal_iface}"
-              macAddress: "${mac}"
-          config:
-            ${network_config}
-EOF
-
-  cat $site_config_file
-
+    # Create the file and write the content
+    echo "mkdir -pv $(dirname $filename)"
+    echo "cat <<EOPGT >| $filename"
+    echo -e "$content"
+    echo "EOPGT"
   done
 }
 
-function push_site_config {
+function push_policies {
 
-  echo "************ telcov10n Pushing SiteConfig file ************"
+  echo "************ telcov10n Pushing Policy Gen Templates files ************"
 
   gitea_ssh_uri="$(cat ${SHARED_DIR}/gitea-ssh-uri.txt)"
   ssh_pri_key_file=${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}
@@ -252,159 +114,47 @@ ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
-mkdir -pv \${ztp_repo_dir}/site-configs/sno-extra-manifest
-mkdir -pv \${ztp_repo_dir}/site-policies
-cat <<EOS > \${ztp_repo_dir}/site-configs/site-config.yaml
-$(cat ${site_config_file})
-EOS
-cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
-generators:
-  - site-config.yaml
-EOK
-touch \${ztp_repo_dir}/site-configs/sno-extra-manifest/.placeholder
-touch \${ztp_repo_dir}/site-policies/.placeholder
-
 cd \${ztp_repo_dir}
+rm -fv .placeholder*
+touch .placeholder-$(date +%s)
+############## BEGIN of Policy GenTemplate files #####################################################
+$(generate_policy_related_files)
+############## END of Policy GenTemplate files #######################################################
 git add .
-git commit -m 'Generated SiteConfig file'
+git commit -m 'Generated Policy files'
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main
 EOF
 
-  gitea_project="${GITEA_NAMESPACE}"
+  # cat ${run_script}
   run_script_in_the_hub_cluster ${run_script} ${gitea_project}
 }
 
-function get_openshift_baremetal_install_tool {
+function are_there_polices_to_be_defined {
 
-  echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
-
-  set -x
-  pull_secret=${SHARED_DIR}/pull-secret
-  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
-  attempts=0
-  while sleep 5s ; do
-    ./openshift-baremetal-install version && break
-    [ $(( attempts=${attempts} + 1 )) -lt 2 ] || exit 1
-  done
-
-  echo -n "$(./openshift-baremetal-install version | head -1 | awk '{print $2}')" > ${SHARED_DIR}/cluster-image-set-ref.txt
-  set +x
-}
-
-function extract_rhcos_images {
-
-  echo "************ telcov10n Extract RHCOS images ************"
-  get_openshift_baremetal_install_tool
-
-  openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
-  rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
-  iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
-
-}
-
-function generate_agent_service_config {
-
-  echo "************ telcov10n Generate and Deploy AgentServiceConfig CR ************"
-
-  echo "Enabling assisted installer service on bare metal"
-  cat <<EOF | oc apply -f -
-apiVersion: metal3.io/v1alpha1
-kind: Provisioning
-metadata:
-  name: provisioning-configuration
-spec:
-  preProvisioningOSDownloadURLs: {}
-  provisioningNetwork: Disabled
-  watchAllNamespaces: true
-EOF
-
-  set -x
-  oc get Provisioning provisioning-configuration -oyaml
-  set +x
-
-  get_storage_class_name
-
-  agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
-
-  if [ -z "${agent_serv_conf}" ]; then
-
-    echo "AgentServiceConfig 'agent' not found. Deploying it..." ;
-
-    cat << EOF | oc create -f -
-apiVersion: agent-install.openshift.io/v1beta1
-kind: AgentServiceConfig
-metadata:
- name: agent
-spec:
-  databaseStorage:
-    storageClassName: ${sc_name}
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: 20Gi
-  filesystemStorage:
-    storageClassName: ${sc_name}
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: 20Gi
-  imageStorage:
-    storageClassName: ${sc_name}
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: 50Gi
-  osImages:
-  - cpuArchitecture: x86_64
-    openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-    rootFSUrl: ${rootfs_url}
-    url: ${iso_url}
-    version: ${openshift_release}
-EOF
+  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})"|wc -l)
+  if [[ "${num_of_policies}" == "0" ]]; then
+    echo "no"
   else
-    echo "AgentServiceConfig 'agent' already exists. Patching it..." ;
-
-    oc patch AgentServiceConfig/agent --type=merge --patch-file=/dev/stdin <<-EOF
-spec:
-  osImages:
-  - cpuArchitecture: x86_64
-    openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-    rootFSUrl: ${rootfs_url}
-    url: ${iso_url}
-    version: ${openshift_release}
-EOF
+    echo "yes"
   fi
-
-  set -x
-  oc get AgentServiceConfig agent -oyaml
-  set +x
-
-  echo "Wait until Multicluster Engine PODs are avaliable..."
-  set -x
-  attempts=0 ;
-  while sleep 10s ; do
-    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || exit 1;
-    assisted_service_pod_name=$( \
-      oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
-      grep "^assisted-service" || echo)
-    [ -n "${assisted_service_pod_name}" ] && \
-    oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} && break ;
-  done ;
-  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
-  oc -n multicluster-engine get sc,pv,pod,pvc
-  set +x
 }
 
 function main {
-  set_hub_cluster_kubeconfig
-  check_hub_cluster_is_alive
-  extract_rhcos_images
-  generate_agent_service_config
-  generate_site_config
-  push_site_config
+
+  if [[ "$(are_there_polices_to_be_defined)" == "yes" ]]; then
+    echo
+    echo "Pushing defined policies..."
+    echo
+    set_hub_cluster_kubeconfig
+    check_git_repo_is_alive
+    push_source_crs
+    generate_policy_related_files
+    push_policies
+  else
+    echo
+    echo "No policies were defined..."
+    echo
+  fi
 }
 
 main
