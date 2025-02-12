@@ -25,7 +25,9 @@ echo "KUBECONFIG=${KUBECONFIG}"
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
+echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
+
 function exit_handler() {
   exitcode=$?
   set +e
@@ -89,6 +91,45 @@ spec:
           cpu: 1
     telemetry:
       enabled: false
+EOF
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  cat <<EOF >> central-cr.yaml
+  scannerV4:
+    # Explicitly enable, scannerV4 is currenlty opt-in
+    scannerComponent: Enabled
+    indexer:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "1500Mi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+    matcher:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          cpu: "600m"
+          memory: "5Gi"
+        limits:
+          cpu: "1000m"
+          memory: "5500Mi"
+    db:
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "2Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2500Mi"
+EOF
+else
+  cat <<EOF >> central-cr.yaml
   scanner:
     analyzer:
       scaling:
@@ -109,6 +150,10 @@ spec:
         limits:
           cpu: 2000m
           memory: 4Gi
+EOF
+fi
+
+  cat <<EOF >> central-cr.yaml
 ---
 apiVersion: v1
 kind: Secret
@@ -241,16 +286,27 @@ wait_created crd centrals.platform.stackrox.io
 
 oc new-project stackrox >/dev/null || true
 create_cr central
+echo ">>> Wait for 'stackrox-central-services' deployments"
+wait_deploy central-db
 wait_deploy central
 
 get_init_bundle
 wait_created crd securedclusters.platform.stackrox.io
 create_cr secured-cluster
-
-echo ">>> Wait for deployments"
-wait_deploy central-db
-wait_deploy scanner
-wait_deploy scanner-db
+echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  wait_deploy scanner-v4-indexer
+  wait_deploy scanner-v4-matcher
+  wait_deploy scanner-v4-db
+else
+  wait_deploy scanner
+  wait_deploy scanner-db
+fi
 wait_deploy sensor
 wait_deploy admission-control
-oc get deployments -n stackrox
+
+echo "Restart sensor to accelerate scanner start up..."
+oc rollout restart deployment sensor -n stackrox
+
+retry oc get deployments -n stackrox
+retry oc get pods --namespace stackrox
