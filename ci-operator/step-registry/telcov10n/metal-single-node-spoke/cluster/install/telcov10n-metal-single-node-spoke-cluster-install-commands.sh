@@ -10,6 +10,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function generate_cluster_image_set {
@@ -34,7 +40,11 @@ function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
   cat << EOF | oc apply -f -
@@ -57,7 +67,11 @@ function generate_baremetal_secret {
 
   echo "************ telcov10n Generate Baremetal Secrets ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
 
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
@@ -120,8 +134,8 @@ function checking_installation_progress {
       oc get clusterimagesets.hive.openshift.io $cis ;
       echo ;
       echo "######## Installation Progress ##########" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "message" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "message" ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
 
       now=$(date +%s)
       if [ ${timeout} -lt ${now} ] ; then

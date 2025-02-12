@@ -1,0 +1,181 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM registry.redhat.io/openshift4/ztp-site-generate-rhel8 AS ztp-gen
+      WORKDIR /home/ztp
+      FROM registry.ci.openshift.org/ci/telco-runner
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY --from=ztp-gen /home/ztp /output/ztp
+      RUN \
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+        chmod 700 /tmp/get_helm.sh && \
+        /tmp/get_helm.sh && \
+        rm -f /tmp/get_helm.sh
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-single-node-spoke-kpis
+  cluster: build05
+  cron: '* 4 * * *'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: 10.6.157.20
+      DU_PROFILE: v4.18
+      GITEA_NAMESPACE: ztp-gitea
+      GLOBAL_IGNITION_CONF_OVERRIDE: '{\"ignition\": {\"version\": \"3.2.0\"}, \"storage\":
+        {\"files\": [{\"overwrite\": true, \"path\": \"/etc/containers/policy.json\",
+        \"contents\": {\"source\":\"data:text/plain;base64,ewogICAgImRlZmF1bHQiOiBbCiAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIgogICAgICAgIH0KICAgIF0sCiAgICAidHJhbnNwb3J0cyI6CiAgICAgICAgewogICAgICAgICAgICAiZG9ja2VyLWRhZW1vbiI6CiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgIiI6IFt7InR5cGUiOiJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIn1dCiAgICAgICAgICAgICAgICB9CiAgICAgICAgfQp9Cgo=\"}}]}}'
+      INSTALL_CONFIG_OVERRIDES: |-
+        {
+          "capabilities": {
+            "baselineCapabilitySet": "None",
+            "additionalEnabledCapabilities": [
+              "marketplace",
+              "NodeTuning",
+              "OperatorLifecycleManager",
+              "Ingress"
+            ]
+          }
+        }
+      INTERNAL_NET_CIDR: 10.6.157.0/24
+      OCP_SPOKE_VERSION: "4.18"
+      PGT_RELATED_FILES: |-
+        - filename: site-policies/kustomization.yaml
+          content: |-
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - du
+            - resources
+        - filename: site-policies/resources/kustomization.yaml
+          content: |-
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - namespaces.yaml
+        - filename: site-policies/resources/namespaces.yaml
+          content: |-
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-lab
+              labels:
+                name: lab
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-common
+              labels:
+                name: common
+        #####################
+        # DU PROFILE SECTION
+        #####################
+        - filename: site-policies/du/kustomization.yaml
+          content: |-
+            ---
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            generators:
+            - common.yaml
+            - du-profile.yaml
+        - filename: site-policies/du/common.yaml
+          content: |-
+            ---
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              name: "bench-common"
+              namespace: "ztp-lab"
+            spec:
+              bindingRules:
+                deployment: "bench"
+              remediationAction: inform
+              sourceFiles:
+                - fileName: DisableSnoNetworkDiag.yaml
+                  policyName: "config-policy"
+                - fileName: DisableOLMPprof.yaml
+                  policyName: "config-policy"
+                - fileName: ReduceMonitoringFootprint.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    annotations:
+                      ran.openshift.io/ztp-deploy-wave: "10"
+                # - fileName: SriovOperatorConfigForSNO.yaml
+                #   policyName: "config-policy"
+                # - fileName: StorageLVMCluster.yaml
+                #   policyName: "config-policy"
+                #   spec:
+                #     storage:
+                #       deviceClasses:
+                #       - name: vg1
+                #         thinPoolConfig:
+                #           name: thin-pool-1
+                #           sizePercent: 90
+                #           overprovisionRatio: 10
+                #################
+                # Subscriptions
+                #################
+                # SRIOV
+                - fileName: SriovSubscriptionNS.yaml
+                  policyName: "subscription-policy"
+                - fileName: SriovSubscriptionOperGroup.yaml
+                  policyName: "subscription-policy"
+                - fileName: SriovSubscription.yaml
+                  policyName: "subscription-policy"
+                  spec:
+                    source: redhat-operators
+                # LVM
+                - fileName: StorageLVMSubscriptionNS.yaml
+                  policyName: "subscription-policy"
+                  labels:
+                    openshift.io/cluster-monitoring: "true"
+                    pod-security.kubernetes.io/enforce: privileged
+                    pod-security.kubernetes.io/audit: privileged
+                    pod-security.kubernetes.io/warn: privileged
+                - fileName: StorageLVMSubscriptionOperGroup.yaml
+                  policyName: "subscription-policy"
+                - fileName: StorageLVMSubscription.yaml
+                  policyName: "subscription-policy"
+                  spec:
+                    channel: stable-4.16
+                    source: redhat-operators
+        - filename: site-policies/du/du-profile.yaml
+          content: |-
+            ---
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              name: "bench-du-m"
+              namespace: "ztp-lab"
+            spec:
+              bindingRules:
+                deployment: "bench"
+              mcp: "master"
+              sourceFiles:
+                - fileName: TunedPerformancePatch.yaml
+                  policyName: "perf-policy"
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      SOCKS5_PROXY: socks5h://10.6.157.20:3124
+    test:
+    - ref: telcov10n-single-node-spoke-kpis-tests
+    workflow: telcov10n-single-node-spoke-kpis
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: nightly-4.18-ztp-kpis

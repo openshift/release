@@ -22,7 +22,7 @@ function main {
   run_tests
 
   echo
-  echo "Success!!! The Site Config file has been pushed correctly."
+  echo "Success!!! The Policies have been pushed correctly."
 }
 
 main
