@@ -165,6 +165,9 @@ END
       - mirrors:
         - virthost.ostest.test.metalkube.org:5000/openshift4/ose-kube-rbac-proxy
         source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
+      - mirrors:
+        - virthost.ostest.test.metalkube.org:5000/rhel9/postgresql-15
+        source: registry.redhat.io/rhel9/postgresql-15
 END
 
 EOF
