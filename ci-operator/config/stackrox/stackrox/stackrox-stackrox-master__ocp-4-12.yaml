@@ -20,14 +20,20 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.12"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.12
       TEST_SUITE: ocp-qa-e2e-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
+    workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - always_run: false
   as: scanner-v4-install-tests
@@ -51,13 +57,19 @@ tests:
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.13"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
-      OCP_VERSION: ocp/stable-4.12
       TEST_SUITE: ocp-operator-e2e-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
+    workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - always_run: false
   as: sensor-integration-tests
