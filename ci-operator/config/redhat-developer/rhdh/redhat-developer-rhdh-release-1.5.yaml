@@ -1,8 +1,8 @@
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+    name: mapt
+    namespace: ci
+    tag: v0.7.3
   use_build_cache: true
 releases:
   latest:
@@ -19,16 +19,14 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: e2e-tests
-  commands: |
-    echo "branch"
-    echo "PULL_BASE_REF : $PULL_BASE_REF"
-    BRANCH=$(jq -r '.refs.base_ref' <<< "$JOB_SPEC")
-    echo "Running tests on branch: $BRANCH"
-    BRANCH_NEW=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
-    echo "Running tests on BRANCH_NEW: $BRANCH_NEW"
-  container:
-    from: src
+- as: e2e-tests-nightly
+  cron: 0 7 * * *
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-nightly
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-1.5
   org: redhat-developer

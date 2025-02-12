@@ -6,22 +6,24 @@ presubmits:
     - ^release-1\.5$
     - ^release-1\.5-
     cluster: build03
-    context: ci/prow/e2e-tests
+    context: ci/prow/e2e-tests-nightly
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-rhdh-release-1.5-e2e-tests
-    rerun_command: /test e2e-tests
+    name: pull-ci-redhat-developer-rhdh-release-1.5-e2e-tests-nightly
+    optional: true
+    rerun_command: /test e2e-tests-nightly
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-tests
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-tests-nightly
         command:
         - ci-operator
         image: ci-operator:latest
@@ -31,6 +33,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -45,6 +50,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -54,4 +62,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-tests-nightly,?($|\s.*)
