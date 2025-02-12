@@ -111,7 +111,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 /tmp/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -127,9 +127,10 @@ echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV LEFTOVERS <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
+echo "LEFTOVERS=@$LEFTOVERS@"
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -139,7 +140,7 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 /tmp/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
