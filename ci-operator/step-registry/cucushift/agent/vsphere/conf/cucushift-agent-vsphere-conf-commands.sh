@@ -71,13 +71,13 @@ build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
 extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org"' ${build02_secrets})
 final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
+echo "${final_pull_secret}" >>/tmp/pull-secrets
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
 base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
 
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+pull_secret=$(<"/tmp/pull-secrets")
 
 # Create cluster-name.txt
 echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
@@ -91,7 +91,7 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-
+rm /tmp/pull-secrets
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
 oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
@@ -176,13 +176,13 @@ done >"${SHARED_DIR}"/mac-addresses.txt
 declare -a hostnames=()
 for ((i = 0; i < MASTERS; i++)); do
   hostname="${cluster_name}-master-$i"
-  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
   hostnames+=("${hostname}")
 done
 
 for ((i = 0; i < WORKERS; i++)); do
   hostname="${cluster_name}-worker-$i"
-  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
   hostnames+=("${hostname}")
 done
 
