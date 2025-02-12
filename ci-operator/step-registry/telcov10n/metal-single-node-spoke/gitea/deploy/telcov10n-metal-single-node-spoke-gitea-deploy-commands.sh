@@ -86,8 +86,39 @@ EOF
   helm install gitea gitea-charts/gitea --version ${GITEA_HELM_VERSION} --values ${helm_gitea_values} -n ${gitea_project} --wait
   set +x
 
+  create_nodeport_extra_ssh_service
+
   setup_openshift_route
 
+}
+
+function create_nodeport_extra_ssh_service {
+
+  echo "************ telcov10n Create Extra Gitea Node Port service into the Hub cluster ************"
+
+  set -x
+  gitea_ssh_service_name=$(oc -n ${gitea_project} get svc -oname|grep 'ssh'|grep -v '\-np$'|cut -d'/' -f2)
+  set +x
+
+  cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gitea
+  name: ${gitea_ssh_service_name}-np
+  namespace: ${gitea_project}
+spec:
+  ports:
+  - name: ssh-np
+    protocol: TCP
+    port: $(oc -n ${gitea_project} get svc ${gitea_ssh_service_name} -ojsonpath='{.spec.ports[0].port}')
+    targetPort: $(oc -n ${gitea_project} get svc ${gitea_ssh_service_name} -ojsonpath='{.spec.ports[0].targetPort}')
+  selector:
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/name: gitea
+  type: NodePort
+EOF
 }
 
 function wait_until_command_is_ok {
@@ -195,9 +226,13 @@ function generate_gitea_ssh_uri {
   gitea_ssh_host="gitea-ssh.${gitea_project}"
   gitea_ssh_port="2222"
   gitea_ssh_uri="ssh://git@${gitea_ssh_host}:${gitea_ssh_port}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
-
+  gitea_ssh_nodeport_host=$(oc get node -ojsonpath='{.items[0].status.addresses[?(.type=="InternalIP")].address}')
+  gitea_ssh_nodeport_service_name=$(oc -n ${gitea_project} get service -oname|grep 'ssh-np$'|cut -d'/' -f2)
+  gitea_ssh_nodeport_service_port=$(oc -n ${gitea_project} get service -ojsonpath='{.items[?(.metadata.name == "'${gitea_ssh_nodeport_service_name}'")].spec.ports[0].nodePort}')
+  gitea_ssh_nodeport_service="ssh://git@${gitea_ssh_nodeport_host}:${gitea_ssh_nodeport_service_port}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
   set -x
   echo -n "${gitea_ssh_uri}" > ${SHARED_DIR}/gitea-ssh-uri.txt
+  echo -n "${gitea_ssh_nodeport_service}" > ${SHARED_DIR}/gitea-ssh-nodeport-uri.txt
   set +x
 }
 
