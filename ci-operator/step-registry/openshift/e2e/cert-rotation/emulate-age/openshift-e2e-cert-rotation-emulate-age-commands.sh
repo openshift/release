@@ -77,10 +77,12 @@ chmod +x "${SHARED_DIR}"/cluster-age-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cluster-age-test.sh "root@${IP}:/usr/local/bin"
 
 timeout \
+  -v \
 	--kill-after 10m \
 	8h \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-v \
 	"root@${IP}" \
 	/usr/local/bin/cluster-age-test.sh \
 	${CLUSTER_AGE_DAYS} \

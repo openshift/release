@@ -291,6 +291,7 @@ timeout \
 	--kill-after 10m \
 	120m \
 	ssh \
+	-v \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
 	/usr/local/bin/local-mirror.sh

@@ -16,7 +16,7 @@ cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
 set -euxo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -v -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no' }
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -61,8 +61,11 @@ function copy-file-from-first-master {
 run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+  set +e
+  trap 'echo "external interrupt"' TERM INT KILL
+
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  until oc --request-timeout=5s get nodes; do sleep 30; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
   echo "Approving CSRs at $(date)"
@@ -71,11 +74,13 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
     until (( approved_csrs >= required_csrs )); do
+      echo "." >&3;
       mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
       if [[ ${#csrs[@]} -gt 0 ]]; then
+        echo
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      sleep 10
+      sleep 30
     done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
   echo "All CSRs approved at $(date)"
@@ -91,7 +96,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
       fi
       TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
       sleep 1
-    done 3> >(/usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null)
+    done | /usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null
   done
   echo "All nodes are ready at $(date)"
 EOZ
@@ -106,6 +111,8 @@ function wait-for-nodes-to-be-ready {
 }
 
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+  set +e
+  trap 'echo "external interrupt"' TERM INT KILL
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done
@@ -119,6 +126,8 @@ function wait-for-valid-lb-ext-kubeconfig {
 }
 
 cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+  set +e
+  trap 'echo "external interrupt"' TERM INT KILL
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   # TODO: kube-apiserver never starts progressing in 4.19+
@@ -134,6 +143,8 @@ function wait-for-kubeapiserver-to-start-progressing {
 }
 
 cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+  set +e
+  trap 'echo "external interrupt"' TERM INT KILL
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
@@ -241,6 +252,12 @@ oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
+
+# Set ClientAliveInterval
+echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config
+echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config
+run-on-all-nodes "echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config"
+run-on-all-nodes "echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config"
 
 # Sync host and node timezones to avoid possible errors when skewing time
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
@@ -375,9 +392,11 @@ chmod +x "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh "root@${IP}:/usr/local/bin"
 
 timeout \
+  -v \
 	--kill-after 10m \
 	120m \
 	ssh \
+	-v \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
 	/usr/local/bin/prepare-nodes-for-shutdown.sh \

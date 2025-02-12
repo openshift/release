@@ -25,7 +25,7 @@ sudo systemctl stop chronyd
 
 SKEW=${1:-90d}
 OC=${OC:-oc}
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no'}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -48,6 +48,8 @@ run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${S
 run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
 # Shutdown nodes
+python -m ensurepip && python -m pip install tqdm
+
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
 set +x
 for vm in ${VMS[@]}; do
@@ -60,11 +62,10 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo -n "."
+    echo "." >&3; echo;
     sleep 10
-  done
+  done 3> >(/usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null)
 done
 
 # Set date for host
@@ -83,11 +84,10 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo -n "."
+    echo "." >&3; echo;
     sleep 10
-  done
+  done 3> >(/usr/local/bin/tqdm --desc "Starting ${vm} VM" --null)
 done
 set -x
 
@@ -112,9 +112,11 @@ chmod +x "${SHARED_DIR}"/time-skew-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-test.sh "root@${IP}:/usr/local/bin"
 
 timeout \
+  -v \
 	--kill-after 10m \
 	120m \
 	ssh \
+  -v \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
 	/usr/local/bin/time-skew-test.sh \
