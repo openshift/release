@@ -51,7 +51,7 @@ sg_id="$(openstack security group create -f value -c id mirror-${CLUSTER_NAME}-$
   --description "Mirror security group for $CLUSTER_NAME")"
 >&2 echo "Created mirror security group for ${CLUSTER_NAME}: ${sg_id}"
 openstack security group rule create --ingress --protocol tcp --dst-port 22 --description "${CLUSTER_NAME} SSH" "$sg_id" >/dev/null
-openstack security group rule create --ingress --protocol tcp --ethertype IPv6 --remote-ip "::/0" --dst-port 5000 --description "${CLUSTER_NAME} mirror registry" "$sg_id" >/dev/null
+openstack security group rule create --ingress --protocol tcp --ethertype IPv6 --remote-ip "::/0" --dst-port 8443 --description "${CLUSTER_NAME} mirror registry" "$sg_id" >/dev/null
 >&2 echo "Created necessary security group rules in ${sg_id}"
 
 server_params="--network $CONTROL_PLANE_NETWORK --image $BASTION_IMAGE --flavor $BASTION_FLAVOR \
@@ -99,10 +99,13 @@ if ! retry 60 5 ssh_via_proxy "uname -a"; then
     openstack console log show ${server_id}
 		exit 1
 fi
+MIRROR_REGISTRY_CREDENTIALS=$(<"/var/run/vault/mirror-registry/registry_creds")
+USER="foo"
+PASSWORD="foo"
+#USER="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f1 )"
+#PASSWORD="$(echo $MIRROR_REGISTRY_CREDENTIALS | cut -d':' -f2 )"
 
 MIRROR_REGISTRY_DNS_NAME="mirror-registry.${CLUSTER_NAME}.${BASE_DOMAIN}"
-MIRROR_REGISTRY_CREDENTIALS=$(<"/var/run/vault/mirror-registry/registry_creds")
-scp_via_proxy "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" $BASTION_USER@$mirror_ipv4:/tmp/htpasswd
 
 echo "Deploying the mirror registry"
 >&2 cat << EOF > $WORK_DIR/deploy_mirror.sh
@@ -111,30 +114,27 @@ set -e
 sudo mkfs.xfs /dev/vdc
 sudo mkdir -p /opt/registry/{auth,certs,data}
 sudo mount /dev/vdc /opt/registry/data
-sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /opt/registry/certs/domain.key -x509 -days 1 -subj "/CN=mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -addext "subjectAltName=DNS:$MIRROR_REGISTRY_DNS_NAME,DNS:mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -out /opt/registry/certs/domain.crt
-sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt   
-sudo mv /tmp/htpasswd /opt/registry/auth/htpasswd
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 1 -subj "/CN=mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -addext "subjectAltName=DNS:$MIRROR_REGISTRY_DNS_NAME,DNS:mirror-$CLUSTER_NAME-${CONFIG_TYPE}" -out domain.crt
+sudo cp domain.crt /opt/registry/certs/domain.crt
+sudo cp domain.key /opt/registry/certs/domain.key
+sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt
 sudo update-ca-trust
 sudo dnf install -y podman
-sudo podman create --name registry -p 5000:5000 --net host \
-    -e "REGISTRY_AUTH=htpasswd" \
-    -e "REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd" \
-    -e "REGISTRY_AUTH_HTPASSWD_REALM='Registry Realm'" \
-    -v /opt/registry/auth:/auth:Z \
-    -v /opt/registry/certs:/certs:Z \
-    -v /opt/registry/data:/var/lib/registry:z \
-    -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
-    -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
-    quay.io/libpod/registry:2.8.2
-sudo podman start registry
-curl -u "$MIRROR_REGISTRY_CREDENTIALS" --connect-timeout 5 --max-time 10 --retry 5 --retry-delay 0 --retry-max-time 40 https://mirror-$CLUSTER_NAME-${CONFIG_TYPE}:5000/v2/_catalog
+curl -L -o mirror-registry.tar.gz https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz --retry 12
+tar -xzvf mirror-registry.tar.gz
+echo "Running the mirror registry"
+./mirror-registry install --sslCert domain.crt --sslKey domain.key --quayHostname mirror-$CLUSTER_NAME-${CONFIG_TYPE} --initPassword ${PASSWORD} --initUser ${USER} -v
+echo "Finished the mirror registry"
+podman login -u ${USER} -p ${PASSWORD} https://mirror-$CLUSTER_NAME-${CONFIG_TYPE}:8443"
 EOF
 
 scp_via_proxy $WORK_DIR/deploy_mirror.sh $BASTION_USER@$mirror_ipv4:/tmp
 ssh_via_proxy "chmod +x /tmp/deploy_mirror.sh"
 ssh_via_proxy "bash -c /tmp/deploy_mirror.sh"
 
-echo "${MIRROR_REGISTRY_DNS_NAME}:5000" >"${SHARED_DIR}/mirror_registry_url"
+echo "Finished running mirror"
+
+echo "${MIRROR_REGISTRY_DNS_NAME}:8443" >"${SHARED_DIR}/mirror_registry_url"
 scp_via_proxy $BASTION_USER@$mirror_ipv4:/opt/registry/certs/domain.crt ${SHARED_DIR}/additional_trust_bundle
 echo $mirror_ipv4 > "${SHARED_DIR}/MIRROR_SSH_IP"
 echo $mirror_ipv6 > "${SHARED_DIR}/MIRROR_REGISTRY_IP"
