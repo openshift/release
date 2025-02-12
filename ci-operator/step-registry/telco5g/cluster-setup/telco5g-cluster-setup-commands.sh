@@ -53,6 +53,8 @@ if [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
     CL_SEARCH="internalbos"
 fi
 
+CL_SEARCH="internalbos"
+
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
