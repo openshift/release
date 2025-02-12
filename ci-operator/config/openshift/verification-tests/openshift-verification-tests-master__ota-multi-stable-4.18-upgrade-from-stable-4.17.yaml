@@ -36,6 +36,12 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  intermediateretarget:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.18"
   latest:
     release:
       architecture: multi
@@ -85,6 +91,32 @@ tests:
     - ref: cucushift-upgrade-healthcheck
     - ref: cucushift-ota-postupgrade
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: baremetal-ipi-ovn-ipv4-arm-f28
+  cluster: build05
+  cron: 5 18 27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      ENABLE_OTA_TEST: OCP-25473
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${INTERMEDIATE_RETARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: INTERMEDIATE_RETARGET
+        name: release:intermediateretarget
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
