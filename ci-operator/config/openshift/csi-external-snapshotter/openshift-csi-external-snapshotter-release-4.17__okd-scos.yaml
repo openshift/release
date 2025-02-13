@@ -1,0 +1,67 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+  origin_scos-4.17_base-stream9:
+    name: scos-4.17
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.webhook.openshift.rhel7
+  from: origin_scos-4.17_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: csi-snapshot-validation-webhook
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.openshift
+  from: origin_scos-4.17_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: csi-external-snapshotter
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
+  from: origin_scos-4.17_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: csi-snapshot-controller
+promotion:
+  to:
+  - name: scos-4.17
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-4.17
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: csi-external-snapshotter
+  variant: okd-scos

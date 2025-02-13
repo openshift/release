@@ -1,0 +1,37 @@
+workflow:
+  as: optional-operators-ci-operator-sdk-hypershift
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-rbac
+    - chain: hypershift-hostedcluster-create
+    - as: prepare-aws-creds-on-hypershift
+      cli: latest
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      commands: |
+        echo "CLUSTER_PROFILE_DIR" && ls ${CLUSTER_PROFILE_DIR}
+        echo "SHARED_DIR" && ls ${SHARED_DIR}
+        
+        echo "AWS_AK"
+        export AWS_AK=$(< "${CLUSTER_PROFILE_DIR}/.awscred" grep aws_access_key_id | sed -e 's/aws_access_key_id = //g')
+        
+        echo "AWS_SK"
+        export AWS_SK=$(< "${CLUSTER_PROFILE_DIR}/.awscred" grep aws_secret_access_key | sed -e 's/aws_secret_access_key = //g')
+        
+        oc create secret generic aws-creds -n kube-system \
+          --from-literal aws_access_key_id="${AWS_AK}" \
+          --from-literal aws_secret_access_key="${AWS_SK}"
+    - ref: optional-operators-operator-sdk
+    post:
+    - chain: hypershift-hostedcluster-dump
+    - chain: hypershift-hostedcluster-destroy
+  documentation: |-
+    Installs a Hypershift cluster with a default configuration and installs an
+    optional operator using the built index image that refers to build bundle
+    images. Currently only supported on AWS due to usage of the introspection credentials from
+    CLUSTER_PROFILE_DIR so that tests relying on the AWS APIs still succeed. It also uses the ipi-install-rbac step to expose the Bundle Images
+    similarly to IPI for usage in a Hypershift Cluster

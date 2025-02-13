@@ -1,0 +1,83 @@
+binary_build_commands: 'mkdir -p .workspace; echo {\"gitref\": \"$(git rev-parse \
+  --short HEAD)\"} > .workspace/metadata.json'
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  use_build_cache: true
+images:
+- build_args:
+  - name: NVIDIA
+    value: "1"
+  - name: BASE_IMAGE
+    value: nvcr.io/nvidia/cuda:11.8.0-runtime-ubi8
+  - name: RELEASE_BASE_IMAGE
+    value: nvcr.io/nvidia/cuda:11.8.0-runtime-ubi8
+  - name: BASE_OS
+    value: redhat
+  - name: PROJECT_VERSION
+    value: 2024.3.0
+  - name: ov_source_branch
+    value: releases/2024/3
+  - name: ov_source_org
+    value: opendatahub-io
+  - name: ov_contrib_branch
+    value: releases/2024/3
+  - name: ov_contrib_org
+    value: opendatahub-io
+  - name: ov_tokenizers_branch
+    value: releases/2024/3
+  - name: ov_use_binary
+    value: "0"
+  - name: CHECK_COVERAGE
+    value: "0"
+  - name: RUN_TESTS
+    value: "0"
+  - name: debug_bazel_flags
+    value: --strip=always --define MEDIAPIPE_DISABLE=0 --define PYTHON_DISABLE=0 --//:distro=redhat
+      --local_ram_resources=23552 --local_cpu_resources=16
+  - name: CMAKE_BUILD_TYPE
+    value: Release
+  - name: GPU
+    value: "1"
+  - name: JOBS
+    value: "16"
+  dockerfile_path: Dockerfile.redhat
+  to: model-server-release-cuda-intel-gpu-2.15
+promotion:
+  to:
+  - namespace: red-hat-data-services
+    tag: rhoai-2.15-final
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  model-server-release-cuda-intel-gpu-2.15:
+    limits:
+      cpu: "12"
+      memory: 24Gi
+    requests:
+      cpu: "6"
+      memory: 12Gi
+tests:
+- as: stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu-2.15
+    env:
+      IMAGE_REPO: openvino_model_server
+      RELEASE_VERSION: rhoai-2.15
+    workflow: red-hat-data-services-ci-image-mirror
+zz_generated_metadata:
+  branch: rhoai-2.15
+  org: red-hat-data-services
+  repo: openvino_model_server

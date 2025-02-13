@@ -18,25 +18,7 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ROOT_SECRET_EXIST="yes"
-if [[ "$(oc -n kube-system get secret/aws-creds --ignore-not-found)" == "" ]]; then
-  echo "Root secret is not exist, temply using the shared secret instead"
-  ROOT_SECRET_EXIST="no"
-fi
-
-# In all CCO mode manual and some mint mode test clusters doesn't have the root secret
-# temply create the root secret using for create efs volume
-if [[ "${ROOT_SECRET_EXIST}" == "no" ]]; then
-  AWS_AK=$(< "$AWS_SHARED_CREDENTIALS_FILE" grep aws_access_key_id | sed -e 's/aws_access_key_id = //g')
-  AWS_SK=$(< "${AWS_SHARED_CREDENTIALS_FILE}" grep aws_secret_access_key | sed -e 's/aws_secret_access_key = //g')
-  oc create secret generic aws-creds -n kube-system \
-  --from-literal aws_access_key_id="${AWS_AK}" \
-  --from-literal aws_secret_access_key="${AWS_SK}"
-  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --namespace openshift-cluster-csi-drivers
-  oc -n kube-system delete secret/aws-creds
-else
-  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --namespace openshift-cluster-csi-drivers
-fi
+/usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers
 
 echo "Using storageclass ${STORAGECLASS_LOCATION}"
 cat ${STORAGECLASS_LOCATION}
@@ -54,6 +36,12 @@ spec:
 EOF
 
 echo "Created cluster CSI driver object"
+
+if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
+    cp /usr/share/aws-efs-csi-driver/ocp-manifest.yaml  ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
+    cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+fi
 
 # For debugging
 echo "Using ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}:"

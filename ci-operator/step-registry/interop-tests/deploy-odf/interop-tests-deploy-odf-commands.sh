@@ -10,6 +10,9 @@ ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
+ODF_DEFAULT_STORAGE_CLASS="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd"
+# ODF_DEFAULT_STORAGE_CLASS=ocs-storagecluster-ceph-rbd-virtualization
+DEFAULT_STORAGE_CLASS=${DEFAULT_STORAGE_CLASS:-${ODF_DEFAULT_STORAGE_CLASS}}
 
 readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 readonly ODF_CATALOG_NAME=odf-catalogsource
@@ -37,9 +40,9 @@ function monitor_progress() {
   local status=''
   while true; do
     echo "Checking progress..."
-    oc get storagecluster.ocs.openshift.io/ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" \
+    oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" -n "${ODF_INSTALL_NAMESPACE}" \
       -o jsonpath='{range .status.conditions[*]}{@}{"\n"}{end}'
-    status=$(oc get "storagecluster.ocs.openshift.io/ocs-storagecluster" -n openshift-storage -o jsonpath="{.status.phase}")
+    status=$(oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" -n openshift-storage -o jsonpath="{.status.phase}")
     if [[ "$status" == "Ready" ]]; then
       echo "StorageCluster is Ready"
       exit 0
@@ -51,7 +54,7 @@ function monitor_progress() {
 function run_must_gather_and_abort_on_fail() {
   local odf_must_gather_image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
   # Wait for StorageCluster to be deployed, and on fail run must gather
-  oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
+  oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
     -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m' || \
   oc adm must-gather --image="${odf_must_gather_image}" --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
   # exit 1
@@ -62,7 +65,7 @@ wait_mcp_for_updated() {
   local attempts=${1:-60}
   local mcp_updated="false"
   local mcp_stat_file=''
-  
+
   mcp_stat_file="$(mktemp "${TMPDIR:-/tmp}"/mcp-stat.XXXXX)"
 
   sleep 30
@@ -192,7 +195,7 @@ cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
 metadata:
-  name: ocs-storagecluster
+  name: ${ODF_STORAGE_CLUSTER_NAME}
   namespace: openshift-storage
 spec:
   storageDeviceSets:
@@ -219,14 +222,14 @@ monitor_progress &
 run_must_gather_and_abort_on_fail &
 
 echo "⏳ Wait for StorageCluster to be deployed"
-oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
+oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
     -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='180m'
 
-echo "Remove is-default-class annotation from all the storage classes"
+echo " 🚮 Remove is-default-class annotation from all the storage classes"
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
 
-echo "Make ocs-storagecluster-ceph-rbd the default storage class"
-oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
+echo " ⭐ Make ${DEFAULT_STORAGE_CLASS} the default storage class"
+oc annotate storageclass ${DEFAULT_STORAGE_CLASS} storageclass.kubernetes.io/is-default-class=true
 
 
 echo "ODF/OCS Operator is deployed successfully"

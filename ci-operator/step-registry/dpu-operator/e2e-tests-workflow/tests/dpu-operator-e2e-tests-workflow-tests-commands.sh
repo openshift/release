@@ -1,110 +1,80 @@
 #!/bin/bash
 
-manage_queue() {
-	GET_QUEUE=$(curl -k -s --resolve "$endpoint_resolve" "https://${endpoint}/queue/api/json")
+echoerr() { echo "$@" 1>&2; }
 
-	QUEUE_FILTERED_JOB_NAME=$(echo $GET_QUEUE | jq --arg testname "$test_name" '.items[] | select(.task.name == $testname)')
-	if [[ $? != 0 ]]; then
-		echo "jq command failed exiting"
-		exit 1
-	fi
-	QUEUE_FILTERED_PULL_REQUEST=$(echo $QUEUE_FILTERED_JOB_NAME | jq --arg pullnumber "$PULL_NUMBER" '.items[] | select(.actions[] | select(._class == "hudson.model.ParametersAction" and (.parameters[] | select(.name == "pullnumber" and .value == $pullnumber))))')
-	
-	if [[ $? != 0 ]]; then
-        	echo "jq command failed exiting"
-                exit 1
+check_timeout_status() {
+        curl --resolve "${endpoint_resolve}" -X POST "$queue_url/check_timed_out_job" -H "Content-Type: application/json" -d "{\"pull_pull_sha\": \"${PULL_PULL_SHA}\"}"
+}
+
+trigger_build() {
+	curl --resolve "${endpoint_resolve}" -X POST "$queue_url" -H "Content-Type: application/json" -d "{\"pullnumber\": \"${PULL_NUMBER}\", \"pull_pull_sha\": \"${PULL_PULL_SHA}\"}"
+
+}
+
+
+handle_job_status() {
+    local response="$1"
+    
+    return_code=$(echo "$response" | jq -r '.return_code')
+
+    if [[ "$return_code" == '200' ]] || [[ "$return_code" == '400' ]]; then
+        job_status=$(echo "$response" | jq -r '.message')
+        job_console=$(echo "$response" | jq -r '.console_logs')
+
+        echo "$job_console"
+
+        if [[ "$job_status" == 'SUCCESS' ]]; then
+            exit 0
+        else
+            exit 1
         fi
+    fi
+}
 
+# Main function to check the pull number and handle retries
+check_pull_number() {
+    check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
 
-	if [[ -z "$QUEUE_FILTERED_PULL_REQUEST" ]]; then
-        	echo "Job does not exist in queue proceeding..."
+    handle_job_status "$check_pull_number_response"
 
-	else
-        	QUEUE_ID=$(echo $QUEUE_FILTERED_PULL_REQUEST | jq -r '.id')
-        	curl -X POST -k --resolve "$endpoint_resolve" "https://${endpoint}/queue/cancelItem?id=$QUEUE_ID" "$header"
+    while true; do
+        check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
+        
+        handle_job_status "$check_pull_number_response"
+
+        sleep 300
+    done
+}
+
+queue_url=$(cat "/var/run/token/dpu-token/queue-url")
+queue_endpoint=$(cat "/var/run/token/dpu-token/queue-endpoint")
+ip_address=$(cat "/var/run/token/dpu-token/ip-address")
+endpoint_resolve="${queue_endpoint}:80:${ip_address}"
+
+#Check timeout wa
+timed_out_response=$(check_timeout_status)
+
+check_timed_out_return_code=$(echo "$timed_out_response" | jq -r '.return_code')
+
+if [ "$check_timed_out_return_code" -eq 400 ]; then
+	queue_put_response=$(trigger_build)
+
+	if [ $? -ne 0 ]; then
+	    echoerr "Error: Failed to trigger build."
+	    exit 1
 	fi
 
-}
+	put_queue_return_code=$(echo "$queue_put_response" | jq -r '.return_code')
 
-wait_for_job_to_run() {
-	echo "Waiting for job to start..."
-	max_sleep_duration=432000  # Maximum sleep duration in seconds (5 days)
-	sleep_counter=0
-
-	while :
-	do
-    		job_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json")
-
-    		pullnumber_job=$(echo "$job_info" | jq -r '.actions[] | select(.parameters) | .parameters[] | select(.name == "pullnumber") | .value')
-
-    		if [[ "$pullnumber_job" == "$PULL_NUMBER" ]]; then
-			ID=$(echo "$job_info" | jq -r '.id')	
-			break
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting- job has not started for longer than 5 days..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
-	done
-}
-
-wait_for_job_to_finish_running() {
-	job_url_id="https://${endpoint}/job/view/dpu-test/job/$test_name/$ID"
-	max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
-	sleep_counter=0
-
-	while :
-	do
-    		job_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url_id}/api/json")
-
-    		# Extract the result field
-    		result=$(echo "$job_info" | jq -r '.result')
-
-    		if [[ "$result" != "null" ]]; then
-        		# Job has completed
-        		echo "Job Result: $result"
-	
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url_id}/consoleText")
-			echo "$curl_info"
-        
-			if [ "$result" == "SUCCESS" ]; then
-            			exit 0
-        		else
-            			exit 1
-        		fi
-    		else
-        		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-            			echo "Exiting due to long sleep duration..."
-            			exit 1
-        		fi
-        		sleep_counter=$((sleep_counter + 60))
-        		sleep 60
-    		fi
-	done
-}
-token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
-endpoint=$(cat "/var/run/token/dpu-token/url")
-header=$(cat "/var/run/token/dpu-token/header")
-test_name="bare-test"
-
-job_url="https://${endpoint}/view/dpu-test/job/${test_name}/lastBuild"
-endpoint_resolve="${endpoint}:443:10.0.180.88"
-
-BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
-
-if [[ "$PULL_NUMBER" == "$BUILD_NUMBER" ]]; then
-	curl -k -s --resolve "$endpoint_resolve" "${job_url}/stop"
-	sleep 20
+	if [ "$put_queue_return_code" -eq 200 ]; then
+	    echo "Success: Successfully added to queue. Return_code is 200"
+	    uuid=$(echo "$queue_put_response" | jq -r '.message')
+	    check_pull_number "$uuid"
+	else
+	    echo "Error: Queue is full. Returned with: $put_queue_return_code. Try again later."
+	fi
+else
+	echo "Previous run has timed out. This pull requests sha is being tested or has already finished testing"
+	uuid=$(echo "$timed_out_response" | jq -r '.message')
+	check_pull_number "$uuid"
 fi
-
-manage_queue
-
-curl -k --resolve "${endpoint_resolve}" "https://${endpoint}/view/dpu-test/job/${test_name}/buildWithParameters?token=$token_dpu_operator_key&pullnumber=$PULL_NUMBER"
-
-wait_for_job_to_run
-
-wait_for_job_to_finish_running
-

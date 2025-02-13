@@ -47,7 +47,7 @@ function copy-file-from-first-master {
 echo "control nodes: ${control_nodes[@]}"
 echo "compute nodes: ${compute_nodes[@]}"
 
-ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
@@ -88,6 +88,14 @@ run-on-first-master "
     sleep 30
   done
   oc get nodes
+"
+
+# Pod restart workarounds
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
+  # Restart Multus before proceeding
+  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
 "
 
 # Wait for operators to stabilize

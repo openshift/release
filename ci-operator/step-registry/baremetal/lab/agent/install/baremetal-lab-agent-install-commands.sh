@@ -46,11 +46,11 @@ function get_ready_nodes_count() {
 
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -70,11 +70,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -98,55 +97,17 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
    name: master
    replicas: ${masters}
-"
-
-if [ "${masters}" -eq 1 ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-platform:
-  none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-"
-fi
-
-if [ "${masters}" -gt 1 ]; then
-  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
-platform:
-  none: {}
 "
-  else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
-"
-  fi
-fi
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
 
@@ -156,7 +117,19 @@ do
   if test -f "${f}"
   then
       echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+  fi
+done
+
+echo "[INFO] Looking for patches to the agent-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_agent_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/agent-config.yaml" "$f"
   fi
 done
 
@@ -195,6 +168,9 @@ case "${BOOT_MODE}" in
   oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
+  if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
+  fi
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
@@ -245,6 +221,14 @@ export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
+
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+echo -e "\nGenerating coreOS stream file..."
+
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}/coreos-stream.json" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/coreos-stream.json"
 
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
@@ -272,17 +256,27 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
+  # Used by observer pod
+  touch "${SHARED_DIR}/failure"
   # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
 fi
 
-update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch "${SHARED_DIR}/failure"
   # TODO: gather logs??
   exit 1
 fi
+update_image_registry
+
+# Used by observer pod
+touch  "${SHARED_DIR}/success"
+
+echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

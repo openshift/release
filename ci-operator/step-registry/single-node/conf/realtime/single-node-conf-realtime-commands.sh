@@ -15,28 +15,37 @@ then
     exit 1
   fi
 
-  max_cpus=$((BASH_REMATCH[2] * 4)) # Calculate virtual cores for xl instances (assumed xl)
+  max_cpus=$((BASH_REMATCH[2] * 4)) # Calculate the cores from the instance type (assumed XL)
+else
+  echo "${SINGLE_NODE_AWS_INSTANCE_TYPE} is not a supported instance type"
+  exit 1
 fi
 
-# Isolate half the cores
-isolated_cpus=$((max_cpus / 2))
+# Make sure we are not designating all the cores to reserved
+if [[ $RESERVED_CPU_COUNT -ge $max_cpus ]]; then
+  echo "ERROR: not enough cores available to specify isolated CPUs. Reserved CPUs: ${RESERVED_CPU_COUNT}, Total CPUs: ${max_cpus}"
+  exit 1
+fi
 
 echo "Creating new performance profile manifest for the cluster"
 oc create -f - <<EOF
 apiVersion: performance.openshift.io/v2
 kind: PerformanceProfile
 metadata:
-  name: openshift-node-cpu-rt-master
+  name: openshift-single-node-cpu-rt-master
 spec:
   realTimeKernel:
     enabled: true
   cpu:
-    isolated: 0-$isolated_cpus
-    reserved: $((isolated_cpus + 1))-$((max_cpus - 1))
+    reserved: 0-$((RESERVED_CPU_COUNT - 1))
+    isolated: $RESERVED_CPU_COUNT-$((max_cpus - 1))
   machineConfigPoolSelector:
     pools.operator.machineconfiguration.openshift.io/master: ""
   nodeSelector:
     node-role.kubernetes.io/master: ""
+  workloadHints:
+    highPowerConsumption: true
+    realTime: true
 EOF
 
 # Wait for the node restart to trigger, this can take a few minutes
@@ -71,6 +80,7 @@ done
 
 echo
 
+# Wait for and validate the new kernel version to be reflected
 echo "Validating the updated kernel version"
 node_name=$(oc get nodes -o jsonpath='{.items[*].metadata.name}')
 kernel_info=$(oc debug --to-namespace='default' --quiet node/${node_name} -- uname -r)

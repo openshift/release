@@ -138,3 +138,16 @@ oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --for=condition=AllNodesHealthy --al
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 health_check
+
+#check 4.18 container runtime
+TARGET_MAIN_VERSION="$(echo "$TARGET_VERSION" | cut -d '.' -f 1-2)"
+if (( $(awk 'BEGIN {print ("'"$TARGET_MAIN_VERSION"'" >= 4.18)}') )); then
+  while read -r name _ _ _; do
+    runtime=$(oc debug node/"${name}" -- chroot /host bash -c 'cat /etc/crio/crio.conf.d/00-default' | grep runtime)
+    echo "$runtime"
+    if [[ "$runtime" != *"crun"* ]]; then
+      echo "runtime is not crun"
+      exit 1
+    fi
+  done < <(oc get node --no-headers)
+fi

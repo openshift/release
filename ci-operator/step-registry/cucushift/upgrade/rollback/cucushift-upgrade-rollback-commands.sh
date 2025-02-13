@@ -60,7 +60,7 @@ function run_command() {
 
 # Rollback the cluster to target release
 function rollback() {
-    res=$(oc adm upgrade rollback 2>&1 || true)
+    res=$(env "OC_ENABLE_CMD_UPGRADE_ROLLBACK=true" oc adm upgrade rollback 2>&1 || true)
     out="Requested rollback from ${SOURCE_VERSION} to ${TARGET_VERSION}"
     if [[ ${res} == *"${out}"* ]]; then
         echo "Rolling back cluster from ${SOURCE_VERSION} to ${TARGET_VERSION} started..."

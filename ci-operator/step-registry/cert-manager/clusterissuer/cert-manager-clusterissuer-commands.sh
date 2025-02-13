@@ -4,49 +4,70 @@ set -e
 set -u
 set -o pipefail
 
-function wait_cert_manager_rollout() {
-    local OLD_POD=$1
-    local MAX_RETRY=12
-    local INTERVAL=10
-    local COUNTER=0
-    while :;
-    do
-        NEW_POD_OUTPUT=$(oc get po -l app.kubernetes.io/name=cert-manager -n cert-manager)
-        if [[ ! "$NEW_POD_OUTPUT" =~ $OLD_POD ]] && [[ "$NEW_POD_OUTPUT" == *1/1*Running* ]]; then
-            echo "The cert-manager pod finished rollout." && break
-        fi
-        ((++COUNTER))
-        if [[ $COUNTER -eq $MAX_RETRY ]]; then
-            echo "The cert-manager pod still does not finish rollout after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-            oc get po -n cert-manager
-            exit 1
-        fi
-        sleep $INTERVAL
-    done
+function timestamp() {
+    date -u --rfc-3339=seconds
 }
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-    echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
-fi
+function run_command() {
+    local cmd="$1"
+    echo "Running Command: ${cmd}"
+    eval "${cmd}"
+}
 
-# Check cert-manager Operator is already installed
-if ! CM_OP_VERSION=$(oc get subscription openshift-cert-manager-operator -n cert-manager-operator '-o=jsonpath={.status.installedCSV}'); then
-    echo "The cert-manager Operator is not already installed. Please ensure the cert-manager-install ref is executed first."
-    exit 1
-elif echo "${CM_OP_VERSION#cert-manager-operator.v}" 1.13 | awk '{ print ($1 < $2) ? "true" : "false" }' | grep -q true; then
-    echo -e "Only cert-manager Operator >= v1.13 is supported but the cert-manager Operator is ${CM_OP_VERSION#cert-manager-operator.v}.\nSkipping ..."
-    exit 1
-fi
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "Setting proxy configuration..."
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "No proxy settings found. Skipping proxy configuration..."
+    fi
+}
 
-BASE_DOMAIN=$(oc get dns cluster -o=jsonpath='{.spec.baseDomain}')
-TARGET_DNS_DOMAIN=$(cut -d '.' -f 1 --complement <<< "$BASE_DOMAIN")
-PUBLIC_ZONE_ID=$(oc get dns cluster '-o=jsonpath={.spec.publicZone.id}')
-CLUSTERISSUER_NAME=cluster-certs-clusterissuer # This clusterissuer is consumed by the cert-manager-custom-apiserver-cert ref et al
+function wait_for_state() {
+    local object="$1"
+    local state="$2"
+    local timeout="$3"
+    local namespace="${4:-}"
+    local selector="${5:-}"
 
-case "${CLUSTER_TYPE}" in
-aws|aws-arm64)
-    oc create -f - << EOF
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
+    for _ in {1..30}; do
+        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+    done
+
+    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
+    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    return $?
+}
+
+function check_cm_operator() {
+    echo "Checking the persence of the cert-manager Operator as prerequisite..."
+    if ! oc wait deployment/cert-manager-operator-controller-manager -n cert-manager-operator --for=condition=Available --timeout=0; then
+        echo "The cert-manager Operator is not installed or unavailable. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
+function configure_cloud_credentials() {
+    local manifest="$1"
+    local secret_name="$2"
+
+    echo "Creating a CredentialsRequest object for '$secret_name'..."
+    oc apply -f - <<< "${manifest}"
+
+    echo "Patching the generated secret to the Subscription as ambient credentials for DNS01 challenge validation..."
+    local json_path='{"spec":{"config":{"env":[{"name":"CLOUD_CREDENTIALS_SECRET_NAME","value":"'"${secret_name}"'"}]}}}'
+    oc patch subscription openshift-cert-manager-operator --type=merge -p "$json_path" -n cert-manager-operator
+
+    echo "Configuring the DNS nameservers for DNS01 recursive self-check..."
+    json_path='{"spec":{"controllerConfig":{"overrideArgs":["--dns01-recursive-nameservers=1.1.1.1:53,8.8.4.4:53", "--dns01-recursive-nameservers-only"]}}}'
+    oc patch certmanager cluster --type=merge -p "$json_path"
+
+    wait_for_state "deployment/cert-manager" "condition=Available" "2m" "cert-manager"
+}
+
+function create_aws_route53_clusterissuer() {
+    aws_credential_request=$(cat <<EOF
 apiVersion: cloudcredential.openshift.io/v1
 kind: CredentialsRequest
 metadata:
@@ -76,14 +97,17 @@ spec:
   serviceAccountNames:
   - cert-manager
 EOF
-    OLD_CERT_MANAGER_POD="$(oc get po -l app.kubernetes.io/name=cert-manager -n cert-manager '-o=jsonpath={.items[*].metadata.name}')"
-    oc -n cert-manager-operator patch subscription openshift-cert-manager-operator --type=merge -p '{"spec":{"config":{"env":[{"name":"CLOUD_CREDENTIALS_SECRET_NAME","value":"aws-creds"}]}}}'
-    # We must do below oc patch otherwise `oc get challenge -o wide` later will be stuck in "Waiting for DNS-01 challenge propagation: NS ns-0.awsdns-00.com.:53 returned REFUSED for _acme-challenge.alt-api.BASE_DOMAIN." as same as test case OCP-62582
-    oc patch certmanager cluster --type=merge -p='{"spec":{"controllerConfig":{"overrideArgs":["--dns01-recursive-nameservers=1.1.1.1:53,8.8.4.4:53", "--dns01-recursive-nameservers-only"]}}}'
-    wait_cert_manager_rollout "$OLD_CERT_MANAGER_POD"
+)
+    configure_cloud_credentials "${aws_credential_request}" "aws-creds"
 
-    # hostedZoneID must be specified when alternative Api FQDN is used, otherwise `oc get challenge -o wide` later will be stuck in "failed to determine Route 53 hosted zone ID: zone  not found in Route 53 for domain _acme-challenge.alt-api.BASE_DOMAIN."
-    oc create -f - << EOF
+    echo "Retrieving configs to be used in the ClusterIssuer spec..."
+    base_domain=$(oc get dns cluster -o=jsonpath='{.spec.baseDomain}')
+    target_dns_domain=$(cut -d '.' -f 1 --complement <<< "$base_domain")
+    public_zone_id=$(oc get dns cluster -o=jsonpath='{.spec.publicZone.id}')
+    region=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.aws.region}')
+
+    echo "Creating an ACME DNS01 ClusterIssuer configured with AWS Route53..."
+    oc apply -f - << EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -96,37 +120,85 @@ spec:
     solvers:
     - selector:
         dnsZones:
-        - "$TARGET_DNS_DOMAIN"
+        - "$target_dns_domain"
       dns01:
         route53:
-          region: us-east-2
-          hostedZoneID: "$PUBLIC_ZONE_ID"
+          region: $region
+          hostedZoneID: $public_zone_id
 EOF
+}
 
+function create_gcp_clouddns_clusterissuer() {
+    gcp_credential_request=$(cat <<EOF
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: cert-manager
+  namespace: openshift-cloud-credential-operator
+spec:
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: GCPProviderSpec
+    predefinedRoles:
+    - roles/dns.admin
+  secretRef:
+    name: gcp-credentials
+    namespace: cert-manager
+  serviceAccountNames:
+  - cert-manager
+EOF
+)
+    configure_cloud_credentials "${gcp_credential_request}" "gcp-credentials"
+
+    echo "Retrieving configs to be used in the ClusterIssuer spec..."
+    project_id=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.gcp.projectID}')
+
+    echo "Creating an ACME DNS01 ClusterIssuer configured with Google CloudDNS..."
+    oc apply -f - << EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: $CLUSTERISSUER_NAME
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: acme-dns01-account-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: $project_id
+EOF
+}
+
+function is_clusterisser_ready() {
+    if wait_for_state "clusterissuer/$CLUSTERISSUER_NAME" "condition=Ready" "2m"; then
+        echo "ClusterIssuer is ready"
+    else
+        echo "Timed out after 2m. Dumping resources for debugging..."
+        run_command "oc describe clusterissuer $CLUSTERISSUER_NAME"
+        exit 1
+    fi
+}
+
+timestamp
+set_proxy
+check_cm_operator
+
+echo "Creating the ClusterIssuer based on CLUSTER_TYPE '${CLUSTER_TYPE}'..."
+case "${CLUSTER_TYPE}" in
+aws|aws-arm64)
+    create_aws_route53_clusterissuer
+    ;;
+gcp|gcp-arm64)
+    create_gcp_clouddns_clusterissuer
     ;;
 *)
-    echo "Cluster type '${CLUSTER_TYPE}' is not supported currently." >&2
+    echo "Cluster type '${CLUSTER_TYPE}' unsupported, exiting..." >&2
     exit 1
     ;;
 esac
 
-# Wait for the clusterissuer to become ready
-MAX_RETRY=12
-INTERVAL=10
-COUNTER=0
-while :;
-do
-    echo "Checking the $CLUSTERISSUER_NAME clusterissuer status for the #${COUNTER}-th time ..."
-    if [[ "$(oc get --no-headers clusterissuer $CLUSTERISSUER_NAME)" =~ True ]]; then
-        echo "[$(date -u --rfc-3339=seconds)] The $CLUSTERISSUER_NAME clusterissuer has become ready."
-        break
-    fi
-    ((++COUNTER))
-    if [[ $COUNTER -eq $MAX_RETRY ]]; then
-        echo "The $CLUSTERISSUER_NAME clusterissuer status is still not ready after $((MAX_RETRY * INTERVAL)) seconds. Dumping status:"
-        oc get clusterissuer $CLUSTERISSUER_NAME -o jsonpath='{.status}'
-        exit 1
-    fi
-    sleep $INTERVAL
-done
+is_clusterisser_ready
 
+echo "[$(timestamp)] Succeeded in creating a ClusterIssuer configured with Let's Encrypt ACME DNS01 type!"

@@ -6,28 +6,28 @@ objects:
   metadata:
     name: cluster
   spec:
-    tokenConfig:
-      accessTokenMaxAgeSeconds: 2419200 # 28d
     identityProviders:
-      - name: RedHat_Internal_SSO
-        mappingMethod: claim
-        type: OpenID
-        openID:
-          clientID: "${build02_id}"
-          clientSecret:
-            name: dex-rh-sso
-          extraScopes:
+    - mappingMethod: claim
+      name: RedHat_Internal_SSO
+      openID:
+        claims:
+          email:
           - email
-          - profile
-          claims:
-            preferredUsername:
-            - preferred_username
-            - email
-            name:
-            - name
-            email:
-            - email
-          issuer: https://idp.ci.openshift.org
+          name:
+          - name
+          preferredUsername:
+          - preferred_username
+          - email
+        clientID: ${build02_id}
+        clientSecret:
+          name: dex-rh-sso
+        extraScopes:
+        - email
+        - profile
+        issuer: https://idp.ci.openshift.org
+      type: OpenID
+    tokenConfig:
+      accessTokenMaxAgeSeconds: 2419200
 parameters:
 - description: build02_id
   name: build02_id

@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -23,8 +16,19 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
+  as: ping-bastion
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+- always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -36,12 +40,30 @@ tests:
     - chain: openshift-qe-node-density-heavy
   timeout: 7h0m0s
 - always_run: false
+  as: krkn-metal-pod-etcd-disruption
+  capabilities:
+  - vpn
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      DISRUPTION_COUNT: "2"
+      LAB_CLOUD: cloud31
+      TYPE: mno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - ref: redhat-chaos-pod-scenarios-etcd-disruption
+  timeout: 7h0m0s
+- always_run: false
   as: data-path-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
@@ -52,7 +74,9 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -65,7 +89,9 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -80,7 +106,9 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: day2-label-infra
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -91,7 +119,9 @@ tests:
     - chain: openshift-qe-installer-bm-day2-label
 - always_run: false
   as: day2-label-webburner
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -101,21 +131,103 @@ tests:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-day2-label
 - always_run: false
+  as: day2-metallb
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2-metallb
+- always_run: false
+  as: day2-perf-profile-rds-core
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2-perf-profile-rds-core
+- always_run: false
   as: day2-sriov
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-day2-sriov
 - always_run: false
-  as: day2-metallb
-  cluster: build05
+  as: day2-lso
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     test:
     - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2-metallb
+    - chain: openshift-qe-installer-bm-day2-lso
+- always_run: false
+  as: day2-odf
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2-lso
+    - chain: openshift-qe-installer-bm-day2-odf
+- always_run: false
+  as: health-check
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      LAB_CLOUD: cloud19
+      TYPE: sno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - chain: openshift-qe-cluster-health
+- always_run: false
+  as: virt-density
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - chain: openshift-qe-virt-density
+- always_run: false
+  as: virt-cnv-density
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-virt-density
+- always_run: false
+  as: foreman-1node
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-foreman
 zz_generated_metadata:
   branch: main
   org: openshift-qe

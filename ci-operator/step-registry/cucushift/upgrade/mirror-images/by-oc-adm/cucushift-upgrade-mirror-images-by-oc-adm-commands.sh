@@ -78,7 +78,7 @@ function mirror_image(){
     cmd="oc adm release mirror -a ${PULL_SECRET} ${mirror_options} --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
     if [[ "${APPLY_SIG}" == "true" ]]; then
         cmd="${cmd} --release-image-signature-to-dir=${SAVE_SIG_TO_DIR}"
-        if [[ "${apply_sig_together=}" == "true" ]]; then
+        if [[ "${apply_sig_together}" == "true" ]]; then
             set_proxy_env
             cmd="${cmd} --apply-release-image-signature --overwrite"
         fi
@@ -207,7 +207,7 @@ do
         echo "You're mirroring an unsigned images, don't apply signature"
         APPLY_SIG="false"
         SAVE_SIG_TO_DIR=""
-        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-69968"; then
+        if check_ota_case_enabled "OCP-30832" "OCP-27986"; then
             echo "The case need to run against a signed target image!"
             exit 1
         fi
@@ -221,7 +221,7 @@ do
 
     extract_oc
 
-    if check_ota_case_enabled "OCP-30832" "OCP-69968"; then
+    if check_ota_case_enabled "OCP-30832"; then
         MIRROR_RELEASE_IMAGE_REPO="${MIRROR_REGISTRY_HOST}/ota_auto/ocp"
         mirror_apply_sig_together="true"
     else

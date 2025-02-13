@@ -1,0 +1,94 @@
+base_images:
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+canonical_go_repository: github.com/redhat-cne/cloud-event-proxy
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: cloud-event-proxy
+promotion:
+  to:
+  - disabled: true
+    name: ptp-4.14
+    namespace: origin
+  - name: 4.14-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.14
+        ci-job-fullname redhat-cne-cloud-event-proxy-release-4.14
+        ci-job-type e2e-aws
+        ci-repo-name cloud-event-proxy
+        ci-org-name redhat-cne
+    test:
+    - as: functests
+      cli: latest
+      commands: |
+        # Make kubectl available by creating a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        export CNE_IMG=${IMAGE_CLOUD_EVENT_PROXY}
+        hack/deploy_test.sh deploy
+        make functests
+      dependencies:
+      - env: IMAGE_CLOUD_EVENT_PROXY
+        name: pipeline:cloud-event-proxy
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/|^hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: cloud-event-proxy
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: cloud-event-proxy

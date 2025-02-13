@@ -1,0 +1,56 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.assisted-installer
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  to: assisted-installer-controller
+promotion:
+  to:
+  - name: "2.7"
+    namespace: stolostron
+releases:
+  latest:
+    integration:
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+        OSCI_RELEASE_BRANCH=backplane-2.7
+      RELEASE_REF: backplane-2.7
+    workflow: ocm-ci-manifest-update
+- as: publish-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+        OSCI_RELEASE_BRANCH=backplane-2.7
+      RELEASE_REF: backplane-2.7
+    workflow: ocm-ci-manifest-update
+zz_generated_metadata:
+  branch: release-ocm-2.12
+  org: openshift
+  repo: assisted-installer
+  variant: mce

@@ -1,28 +1,28 @@
 base_images:
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
+  ocp_4.19_base-rhel9:
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.19
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager-operator
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19
   to: cli-manager-operator
 promotion:
   to:
-  - name: 4.17-priv
+  - name: 4.19-priv
     namespace: ocp-private
 resources:
   '*':
@@ -30,7 +30,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.17-priv
+  name: 4.19-priv
   namespace: ocp-private
 tests:
 - as: verify
@@ -41,10 +41,21 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: fips-image-scan-cli-manager
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: cli-manager-operator
+    test:
+    - ref: fips-check-image-scan
 - as: e2e-aws-operator
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
     test:
+    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
       commands: make test-e2e
@@ -55,6 +66,7 @@ tests:
     workflow: ipi-aws
 - as: security
   optional: true
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
 zz_generated_metadata:

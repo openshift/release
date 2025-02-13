@@ -39,11 +39,11 @@ Conditions:
 Mappings:
  VolumeSize:
    MetalMachine:
-     PrimaryVolumeSize: "300"
+     PrimaryVolumeSize: "500"
      SecondaryVolumeSize: "0"
      Throughput: 500
    VirtualMachine:
-     PrimaryVolumeSize: "200"
+     PrimaryVolumeSize: "400"
      SecondaryVolumeSize: "10"
      Throughput: 125
 Parameters:

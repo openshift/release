@@ -32,7 +32,7 @@ declare MULTI_TENANT_CAPABLE_WORKFLOWS
 # shellcheck source=/dev/null
 source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
 
-DEFAULT_NETWORK_TYPE="single-tenant"
+DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"single-tenant"}
 for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
   if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
     log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
@@ -60,7 +60,11 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]]; then
+      jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
+    else
+      jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    fi
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
@@ -177,6 +181,11 @@ else
    log "determined this is an IPI job"
 fi
 
+if [[ -n "${MULTI_NIC_IPI}" ]]; then
+  echo "multi-nic is enabled, an additional NIC will be attached to nodes"
+  VSPHERE_EXTRA_LEASED_RESOURCE=1
+fi
+
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   log "creating extra lease resources"
 
@@ -205,7 +214,6 @@ spec:
   i=$((i + 1))
   done
 fi
-
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
@@ -255,7 +263,11 @@ for POOL in "${pools[@]}"; do
     requiredPool="required-pool: $POOL"
     log "setting required pool ${requiredPool}"
   fi
-
+  networks_number=1
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    # Only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, others kept pending when creating lease
+    networks_number=2
+  fi
   # shellcheck disable=SC1078
   echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
@@ -273,11 +285,10 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
-  networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
+  networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
 
 log "waiting for lease to be fulfilled..."
-
 n=0
 until [ "$n" -ge 5 ]
 do
@@ -298,16 +309,27 @@ fi
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
+declare -A vcenter_portgroups_2
 
 # reconcile leases
 log "Extracting portgroups from leases..."
+vsphere_extra_portgroup=""
 LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${LEASE}" -o json > /tmp/lease.json
   VCENTER=$(jq -r '.status.server' < /tmp/lease.json )
-  NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
-  NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+
+  required_pool=$(jq -r '.spec."required-pool"' < /tmp/lease.json)
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    network_index=1
+    NETWORK_PATH=$(jq -r ".status.topology.networks[$network_index]" < /tmp/lease.json)
+    # select the second network
+    NETWORK_RESOURCE=$(jq -r '[.metadata.ownerReferences[] | select(.kind=="Network") | .name][1]' < /tmp/lease.json)
+  else
+    NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
+    NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+  fi
 
   log "got lease ${LEASE}"
 
@@ -337,14 +359,20 @@ EOF
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
+  vsphere_extra_portgroup="${portgroup_name}"
 
   else
-    vcenter_portgroups[$VCENTER]=${portgroup_name}
-    log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
+    if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+      # select the second network
+      vcenter_portgroups_2[$VCENTER]=${portgroup_name}
+      log "discovered portgroup ${vcenter_portgroups_2[$VCENTER]}"
+    else
+      vcenter_portgroups[$VCENTER]=${portgroup_name}
+      log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
+    fi
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-
 done
 
 # debug, confirm correct subnets.json
@@ -361,6 +389,13 @@ log "building local variables and failure domains"
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
+
+  if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
+    log "storing primary lease as LEASE_single"
+    cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
+  fi
+
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
   oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
@@ -378,19 +413,39 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   pool_passwords[$VCENTER]=${vsphere_password}
 
   name=$(jq -r '.spec.name' < /tmp/pool.json)
+  shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
   server=$(jq -r '.spec.server' < /tmp/pool.json)
   region=$(jq -r '.spec.region' < /tmp/pool.json)
   zone=$(jq -r '.spec.zone' < /tmp/pool.json)
   cluster=$(jq -r '.spec.topology.computeCluster' < /tmp/pool.json)
   datacenter=$(jq -r '.spec.topology.datacenter' < /tmp/pool.json)
   datastore=$(jq -r '.spec.topology.datastore' < /tmp/pool.json)
-  network="${vcenter_portgroups[${server}]}"
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $name == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    network="${vcenter_portgroups_2[${server}]}"
+  else
+    network="${vcenter_portgroups[${server}]}"
+  fi
   if [ $IPI -eq 0 ]; then
     resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
   else
     resource_pool=${cluster}/Resources/ipi-ci-clusters
   fi
-  platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+
+  # prevent duplicate failure domains if in the event we have a network-only lease in addition to the primary lease
+  add_failure_domain=0
+  failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
+  if [[ $failure_domain_count == 0 ]]; then
+    add_failure_domain=1
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$shortName" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+    add_failure_domain=1
+  fi
+
+  if [[ $add_failure_domain == 1 ]] ; then
+    if [ -n "${MULTI_NIC_IPI}" ]; then
+      network="${network}\",\"${vsphere_extra_portgroup}"
+    fi
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${shortName}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+  fi
 
   # Add / Update vCenter list
   if echo "${platformSpec}" | jq -e --arg VCENTER "$VCENTER" '.vcenters[] | select(.server == $VCENTER) | length > 0' ; then
@@ -416,14 +471,19 @@ fi
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-cp /tmp/lease.json "${SHARED_DIR}"/LEASE_single.json
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
 source /tmp/envvars
+
+
+if [[ -z "${GOVC_URL}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF

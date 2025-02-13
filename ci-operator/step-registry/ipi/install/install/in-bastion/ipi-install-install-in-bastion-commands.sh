@@ -63,18 +63,26 @@ function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  current_time=$(date +%s)
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
   sed -i '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/terraform.txt"
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
+  fi
 }
 
 function write_install_status() {
@@ -105,6 +113,11 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   exit 1
 fi
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
 if [[ -f "${SHARED_DIR}/bastion_public_address" ]]; then
     BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
     BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
@@ -113,8 +126,8 @@ else
     exit 1
 fi
 
-REMOTE_DIR="/tmp/"
-REMOTE_INSTALL_DIR="/tmp/installer/"
+REMOTE_DIR="/home/${BASTION_SSH_USER}"
+REMOTE_INSTALL_DIR="${REMOTE_DIR}/installer/"
 REMOTE_ENV_FILE="/tmp/remote_env_file"
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -175,7 +188,7 @@ run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "
 
 # Create manifests
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create manifests" &
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_DIR}/$(basename $REMOTE_ENV_FILE); ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create manifests" &
 wait "$!"
 
 echo "Will include manifests:"
@@ -202,7 +215,7 @@ echo "export TF_LOG_PATH='${REMOTE_INSTALL_DIR}/terraform.txt'" >> ${REMOTE_ENV_
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${REMOTE_ENV_FILE}" "${REMOTE_DIR}"
 
 set +o errexit
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_DIR}/$(basename $REMOTE_ENV_FILE); ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"

@@ -67,6 +67,15 @@ create_ds() {
 	local img=""
 	img=$(grep -i 'quay.io' $TEST_IMAGES_YAML | awk -F "'" '{print $2}')
 
+	# Switch to python 3.10 for model server image v0.7.11 or higher
+	# TODO: Remove this once older CI jobs are deprecated/removed
+	local cmd=""
+	if [[ $img =~ model_server:v0.7.12 ]]; then
+		cmd="[\"model-server\", \"-l\", \"info\"]"
+	else
+		cmd="[\"python3.8\", \"-u\", \"src/server/model_server.py\"]"
+	fi
+
 	echo "creating dummy model-server daemonset inside default namespace using image: $img"
 	oc apply -n default -f - <<EOF
   apiVersion: apps/v1
@@ -92,10 +101,10 @@ create_ds() {
         - name: model-server
           image: $img
           imagePullPolicy: Always
-          command: ["python3.8","-u","src/server/model_server.py"]
+          command: $cmd
 EOF
 
-	validate_ds default dummy-model-server 5 20 || {
+	validate_ds default dummy-model-server 10 30 || {
 		echo "daemonset not in ready state"
 		oc get daemonset -n default -o yaml | tee "$LOGS_DIR/model-server-ds.yaml" >/dev/null
 		return 1

@@ -4,10 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ ${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS} == "yes" ]]; then
+  if [[ ! -f "${SHARED_DIR}/aws_minimal_permission_ccoctl" ]]; then
+    echo "ERROR: AWS_CCOCTL_USE_MINIMAL_PERMISSIONS is enabled, but the credential file \"aws_minimal_permission_ccoctl\" is missing."
+    echo "ERROR: Note, the credential file is created by chain \"aws-provision-iam-user-minimal-permission\", please check."
+    echo "Exit now."
+    exit 1
+  fi
+  echo "Setting AWS credential with minimal permision for ccoctl"
+  export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission_ccoctl
+else
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
 REGION="${LEASED_RESOURCE}"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
@@ -122,14 +135,16 @@ fi
 
 # create required credentials infrastructure and installer manifests
 ccoctl_ouptut="/tmp/ccoctl_output"
-ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" &> "${ccoctl_ouptut}"
-cat "${ccoctl_ouptut}"
+ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" 2>&1 | tee "${ccoctl_ouptut}"
 
 # save oidc_provider info for upgrade
-oidc_provider_arn=$(grep "Identity Provider created with ARN:" "${ccoctl_ouptut}" | awk -F"ARN: " '{print $NF}')
+oidc_provider_arn=$(grep "Identity Provider created with ARN:" "${ccoctl_ouptut}" | awk -F"ARN: " '{print $NF}' || true)
 if [[ -n "${oidc_provider_arn}" ]]; then
   echo "Saving oidc_provider_arn: ${oidc_provider_arn}"
   echo "${oidc_provider_arn}" > "${SHARED_DIR}/aws_oidc_provider_arn"
+else
+  echo "Did not find Identity Provider ARN"
+  exit 1
 fi
 
 # copy generated service account signing from ccoctl target directory into shared directory

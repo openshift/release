@@ -10,22 +10,6 @@ function info() {
 	printf '%s: %s\n' "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
-function wait_for_cpms_done() {
-  info 'INFO: Waiting for masters to be updated...'
-  if
-    ! oc wait --timeout=90m --for=condition=Progressing=false controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster 1>/dev/null || \
-    ! oc wait --timeout=90m --for=jsonpath='{.spec.replicas}'=3 controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster 1>/dev/null || \
-    ! oc wait --timeout=90m --for=jsonpath='{.status.updatedReplicas}'=3 controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster 1>/dev/null || \
-    ! oc wait --timeout=90m --for=jsonpath='{.status.replicas}'=3 controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster 1>/dev/null || \
-    ! oc wait --timeout=90m --for=jsonpath='{.status.readyReplicas}'=3 controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster 1>/dev/null; then
-      info "ERROR: CPMS not scaled to 3 replicas"
-      oc get controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster
-      oc describe controlplanemachineset.machine.openshift.io cluster --namespace openshift-machine-api
-      exit 1
-  fi
-  info "INFO: All masters updated"
-}
-
 function wait_for_machineconfig_done() {
   info 'INFO: Waiting up to 5m for the Machines to pick up the new MachineConfig...'
   oc wait --timeout=5m --for=condition=Updating=True machineconfigpool/master
@@ -79,14 +63,6 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-info "INFO: Adding additionalBlockDevices to the control plane machineset"
-oc patch ControlPlaneMachineSet/cluster -n openshift-machine-api --type json -p '[{"op": "add", "path": "/spec/template/machines_v1beta1_machine_openshift_io/spec/providerSpec/value/additionalBlockDevices", "value": [{"name": "etcd", "sizeGiB": 10, "storage": {"type": "Local"}}]}]'
-
-info 'INFO: Waiting up to 5 minutes for the CPMS operator to pick up the edit...'
-oc wait --timeout=5m --for=condition=Progressing=true controlplanemachineset.machine.openshift.io -n openshift-machine-api cluster
-
-wait_for_cpms_done
-
 info 'INFO: Waiting up to 30m for clusteroperators to finish progressing...'
 oc wait clusteroperators --timeout=30m --all --for=condition=Progressing=false
 
@@ -96,15 +72,6 @@ if [[ $(echo "${cp_machines}" | wc -l) -ne 3 ]]; then
   exit 1
 fi
 info 'INFO: Found 3 control plane machines'
-
-for machine in ${cp_machines}; do
-  if ! oc get machine -n openshift-machine-api "${machine}" -o jsonpath='{.spec.providerSpec.value.additionalBlockDevices}' | grep -q 'etcd'; then
-    info "ERROR: Machine ${machine} does not have the etcd block device"
-    exit 1
-  fi
-  info "INFO: Machine ${machine} has the etcd block device"
-done
-info 'INFO: All control plane machines have the etcd block device'
 
 info 'INFO: Create 98-var-lib-etcd MachineConfig'
 oc create -f - <<EOF
@@ -117,36 +84,15 @@ metadata:
 spec:
   config:
     ignition:
-      version: 3.2.0
+      version: 3.4.0
     systemd:
       units:
       - contents: |
           [Unit]
-          Description=Make File System on /dev/vdb
-          DefaultDependencies=no
-          BindsTo=dev-vdb.device
-          After=dev-vdb.device var.mount
-          Before=systemd-fsck@dev-vdb.service
-
-          [Service]
-          Type=oneshot
-          RemainAfterExit=yes
-          ExecStart=/usr/sbin/mkfs.xfs -f /dev/vdb
-          TimeoutSec=0
-
-          [Install]
-          WantedBy=var-lib-containers.mount
-        enabled: true
-        name: systemd-mkfs@dev-vdb.service
-      - contents: |
-          [Unit]
-          Description=Mount /dev/vdb to /var/lib/etcd
-          Before=local-fs.target
-          Requires=systemd-mkfs@dev-vdb.service
-          After=systemd-mkfs@dev-vdb.service var.mount
+          Description=Mount local-etcd to /var/lib/etcd
 
           [Mount]
-          What=/dev/vdb
+          What=/dev/disk/by-label/local-etcd
           Where=/var/lib/etcd
           Type=xfs
           Options=defaults,prjquota
@@ -157,76 +103,64 @@ spec:
         name: var-lib-etcd.mount
       - contents: |
           [Unit]
-          Description=Sync etcd data if new mount is empty
+          Description=Create local-etcd filesystem
           DefaultDependencies=no
-          After=var-lib-etcd.mount var.mount
-          Before=crio.service
+          After=local-fs-pre.target
+          ConditionPathIsSymbolicLink=!/dev/disk/by-label/local-etcd
 
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecCondition=/usr/bin/test ! -d /var/lib/etcd/member
-          ExecStart=/usr/sbin/setenforce 0
-          ExecStart=/bin/rsync -ar /sysroot/ostree/deploy/rhcos/var/lib/etcd/ /var/lib/etcd/
-          ExecStart=/usr/sbin/setenforce 1
-          TimeoutSec=0
+          ExecStart=/bin/bash -c "[ -L /dev/disk/by-label/ephemeral0 ] || ( >&2 echo Ephemeral disk does not exist; /usr/bin/false )"
+          ExecStart=/usr/sbin/mkfs.xfs -f -L local-etcd /dev/disk/by-label/ephemeral0
 
           [Install]
-          WantedBy=multi-user.target graphical.target
+          RequiredBy=dev-disk-by\x2dlabel-local\x2detcd.device
         enabled: true
-        name: sync-var-lib-etcd-to-etcd.service
+        name: create-local-etcd.service
       - contents: |
           [Unit]
-          Description=Restore recursive SELinux security contexts
-          DefaultDependencies=no
+          Description=Migrate existing data to local etcd
           After=var-lib-etcd.mount
           Before=crio.service
 
+          Requisite=var-lib-etcd.mount
+          ConditionPathExists=!/var/lib/etcd/member
+          ConditionPathIsDirectory=/sysroot/ostree/deploy/rhcos/var/lib/etcd/member
+
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecStart=/sbin/restorecon -R /var/lib/etcd/
-          TimeoutSec=0
+          
+          ExecStart=/bin/bash -c "if [ -d /var/lib/etcd/member.migrate ]; then rm -rf /var/lib/etcd/member.migrate; fi" 
+
+          ExecStart=/usr/bin/cp -aZ /sysroot/ostree/deploy/rhcos/var/lib/etcd/member/ /var/lib/etcd/member.migrate
+          ExecStart=/usr/bin/mv /var/lib/etcd/member.migrate /var/lib/etcd/member
 
           [Install]
-          WantedBy=multi-user.target graphical.target
+          RequiredBy=var-lib-etcd.mount
         enabled: true
-        name: restorecon-var-lib-etcd.service
-EOF
-
-wait_for_machineconfig_done
-
-info 'INFO: Replacing the 98-var-lib-etcd MachineConfig with a modified version that removes the logic for creating and syncing the device and that prevents the nodes from rebooting...'
-oc replace -f - <<EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: master
-  name: 98-var-lib-etcd
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    systemd:
-      units:
+        name: migrate-to-local-etcd.service
       - contents: |
           [Unit]
-          Description=Mount /dev/vdb to /var/lib/etcd
-          Before=local-fs.target
-          Requires=systemd-mkfs@dev-vdb.service
-          After=systemd-mkfs@dev-vdb.service var.mount
+          Description=Relabel /var/lib/etcd
 
-          [Mount]
-          What=/dev/vdb
-          Where=/var/lib/etcd
-          Type=xfs
-          Options=defaults,prjquota
+          After=migrate-to-local-etcd.service
+          Before=crio.service
+          Requisite=var-lib-etcd.mount
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+
+          ExecCondition=/bin/bash -c "[ -n \"$(/usr/sbin/restorecon -nv /var/lib/etcd)\" ]" 
+
+          ExecStart=/usr/sbin/restorecon -R /var/lib/etcd
 
           [Install]
-          WantedBy=local-fs.target
+          RequiredBy=var-lib-etcd.mount
         enabled: true
-        name: var-lib-etcd.mount
+        name: relabel-var-lib-etcd.service
 EOF
 
 wait_for_machineconfig_done

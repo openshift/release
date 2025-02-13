@@ -123,7 +123,7 @@ function create_catalog_sources()
 {
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
-    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
     echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
@@ -243,15 +243,16 @@ EOF
 }
 
 # from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+# since OCP4.18, OLMv1 is a new capability: OperatorLifecycleManagerV1
 function check_olm_capability(){
-    # check if OLM capability is added 
+    # check if OLMv0 capability is added 
     knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
-    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
-        echo "knownCapabilities contains OperatorLifecycleManager"
-        # check if OLM capability enabled
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager\"," ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManagerv0"
+        # check if OLMv0 capability enabled
         enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
-          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
-              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager\"," ]]; then
+              echo "OperatorLifecycleManagerv0 capability is not enabled, skip the following tests..."
               exit 0
           fi
     fi

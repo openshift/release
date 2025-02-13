@@ -1,0 +1,86 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.63.4
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+binary_build_commands: make
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/release-controller/Dockerfile
+  from: tools
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-controller
+  to: release-controller
+- dockerfile_path: images/release-controller-api/Dockerfile
+  from: tools
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-controller-api
+  to: release-controller-api
+- dockerfile_path: images/release-payload-controller/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-payload-controller
+  to: release-payload-controller
+- dockerfile_path: images/release-reimport-controller/Dockerfile
+  from: tools
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-reimport-controller
+  to: release-reimport-controller
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: govulncheck
+  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
+  container:
+    from: govulncheck
+  optional: true
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift/release-controller
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release-controller

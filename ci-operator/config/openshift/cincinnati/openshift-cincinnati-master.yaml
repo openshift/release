@@ -18,7 +18,7 @@ images:
     ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
     RUN chgrp root /opt/app-root/src/cincinnati && \
         chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq python38 && \
+        dnf install -y jq python38 gcc openssl-devel && \
         dnf clean all
     # build: Rust stable toolchain
     RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
@@ -29,6 +29,7 @@ images:
       mkdir -p $HOME/.cargo/git/ && \
       find $HOME/. -type d -exec chmod 777 {} \; && \
       find $HOME/. -type f -exec chmod ugo+rw {} \;
+    RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     USER 1001
   from: ubi
   inputs:

@@ -18,9 +18,9 @@ spec:
   restartPolicy: Never
   containers:
   - name: run-nfd
-    image: quay.io/ocp-edge-qe/eco-gotests:v4.15.0
+    image: quay.io/ocp-edge-qe/eco-gotests:latest
     command: [ "/bin/bash", "-c", "--" ]
-    args: [ "scripts/test-runner.sh && sleep 120" ]
+    args: [ "scripts/test-runner.sh && sleep 500" ]
     env:
     - name: KUBECONFIG
       value: "/kubeconfig/kubeconfig"
@@ -88,6 +88,5 @@ while : ; do
 done
 
 echo "Retrieve test results..."
-oc exec testpod -- cat /home/testuser/reports/upgrade_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_upgrade_suite_test.xml
 oc exec testpod -- cat /home/testuser/reports/nfd_suite_test_junit.xml > ${ARTIFACT_DIR}/junit_nfd_suite_test.xml
 oc exec testpod -- cat /home/testuser/reports/report_testrun.xml > ${ARTIFACT_DIR}/junit_report_testrun.xml

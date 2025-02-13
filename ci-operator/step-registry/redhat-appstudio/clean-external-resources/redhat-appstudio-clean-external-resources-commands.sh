@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export GITHUB_USER GITHUB_TOKEN GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING CLEAN_REPOS_STATUS CLEAN_WEBHOOK_STATUS CLEAN_GITLAB_WEBHOOK_STATUS DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN PAC_GITLAB_TOKEN PAC_GITLAB_URL PAC_PROJECT_ID
+export GITHUB_USER GITHUB_TOKEN GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING CLEAN_REPOS_STATUS CLEAN_WEBHOOK_STATUS CLEAN_GITLAB_WEBHOOK_STATUS DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN GITLAB_BOT_TOKEN GITLAB_PROJECT_ID
 
 GITHUB_USER=""
 GITHUB_TOKEN=""
@@ -20,9 +20,8 @@ DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/default-quay-org-token)
 QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-host)
 QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-token)
-PAC_GITLAB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-token)
-PAC_GITLAB_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-url)
-PAC_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-project-id)
+GITLAB_BOT_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/gitlab-bot-token)
+GITLAB_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/gitlab-project-id)
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"

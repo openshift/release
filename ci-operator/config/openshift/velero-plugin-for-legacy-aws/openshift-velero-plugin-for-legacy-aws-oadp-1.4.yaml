@@ -1,0 +1,42 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.22.5
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ubi
+  to: velero-plugin-for-legacy-aws-oadp-1.4
+promotion:
+  to:
+  - name: velero-plugin-for-legacy-aws
+    namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  optional: true
+  steps:
+    test:
+    - as: unit
+      commands: go mod vendor && go test -v ./...
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.4
+  org: openshift
+  repo: velero-plugin-for-legacy-aws

@@ -1,0 +1,132 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  rhtap-installer:
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhtap-installer
+build_root:
+  project_image:
+    dockerfile_path: ci/Dockerfile
+images:
+- dockerfile_path: ci/Dockerfile
+  from: src
+  to: rhtap-cli
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+    RUN yum install -y skopeo
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
+  from: src
+  to: rhdh-prerelease-install
+promotion:
+  to:
+  - name: redhat-appstudio
+    namespace: ci
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhtap-cli-install-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 */24 * * *
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-cli
+- as: rhtap-cli-gitops-prerelease
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 0 30 7 *
+  steps:
+    env:
+      NEW_OPERATOR_CHANNEL: latest
+      NEW_SOURCE: gitops-iib
+      PRODUCT: gitops
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-cli-gitops-prerelease
+- as: rhtap-cli-pipelines-prerelease
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 2 * * 1
+  steps:
+    env:
+      NEW_OPERATOR_CHANNEL: latest
+      NEW_SOURCE: pipelines-iib
+      PRODUCT: pipelines
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-cli-pipelines-prerelease
+- as: rhtap-cli-rhdh-prerelease
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 4 * * 1
+  steps:
+    env:
+      NEW_OPERATOR_CHANNEL: fast
+      NEW_SOURCE: rhdh-fast
+      PRODUCT: rhdh
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-cli-rhdh-prerelease
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: rhtap-cli

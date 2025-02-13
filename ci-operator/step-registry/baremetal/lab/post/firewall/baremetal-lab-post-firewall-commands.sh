@@ -11,6 +11,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 if [ x"${DISCONNECTED}" != x"true" ]; then
   echo 'Skipping firewall configuration deprovisioning as not in a disconnected environment'
   exit 0
@@ -36,6 +41,6 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
-    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
   done
 EOF

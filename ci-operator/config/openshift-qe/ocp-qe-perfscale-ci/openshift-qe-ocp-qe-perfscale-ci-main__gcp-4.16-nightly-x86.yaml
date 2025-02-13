@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-gcp-416
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -62,6 +55,20 @@ tests:
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
 - always_run: false
+  as: cluster-density-v2-etcd-fips-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: e2-standard-4
+      PROFILE_TYPE: reporting
+      SIZE_VARIANT: large
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
+- always_run: false
   as: control-plane-24nodes
   steps:
     allow_skip_on_success: true
@@ -106,6 +113,20 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: control-plane-etcd-fips-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: e2-standard-8
+      PROFILE_TYPE: reporting
+      SIZE_VARIANT: large
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe

@@ -1,24 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
-HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
+trap_subprocesses_on_term
+trap_install_status_exit_code $EXIT_CODE_RPM_INSTALL_FAILURE
 
 cat << EOF > /tmp/config.yaml
 apiServer:
@@ -35,9 +22,8 @@ cat <<EOF > /tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
 
-sudo subscription-manager register \
-  --org="$(cat /var/run/rhsm/subscription-manager-org)" \
-  --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
+source /tmp/ci-functions.sh
+ci_subscription_register
 
 sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
@@ -47,10 +33,37 @@ cd ~/microshift
 EOF
 chmod +x /tmp/install.sh
 
+if "${SRC_FROM_GIT}"; then
+  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+  # MicroShift repo is recent enough to use main instead of master.
+  if [ "${branch}" == "master" ]; then
+    branch="main"
+  fi
+  CLONEREFS_OPTIONS=$(jq -n --arg branch "${branch}" '{
+    "src_root": "/go",
+    "log":"/dev/null",
+    "git_user_name": "ci-robot",
+    "git_user_email": "ci-robot@openshift.io",
+    "fail": true,
+    "refs": [
+      {
+        "org": "openshift",
+        "repo": "microshift",
+        "base_ref": $branch,
+        "workdir": true
+      }
+    ]
+  }')
+  export CLONEREFS_OPTIONS
+fi
+ci_clone_src
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
+  "${SHARED_DIR}/ci-functions.sh" \
   /tmp/install.sh \
+  /var/run/rhsm/subscription-manager-org \
+  /var/run/rhsm/subscription-manager-act-key \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
   /tmp/microshift.tgz \
   /tmp/config.yaml \

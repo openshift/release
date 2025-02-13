@@ -1,14 +1,12 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
-    tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal-415
-promotion:
-  to:
-  - namespace: ci
     tag: latest
 releases:
   latest:
@@ -24,20 +22,41 @@ resources:
 tests:
 - always_run: false
   as: deploy-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.15
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: deploy-sno
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      OCP_VERSION: latest-4.15
+      PUBLIC_VLAN: "true"
+      TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -45,6 +64,7 @@ tests:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.15
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -53,15 +73,19 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.15
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
@@ -72,7 +96,9 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -88,7 +114,9 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:

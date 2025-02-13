@@ -1,0 +1,32 @@
+ref:
+  as: openshift-e2e-test-clusterinfra-qe
+  from: cluster-api-actuator-pkg-test
+  grace_period: 10m
+  commands: openshift-e2e-test-clusterinfra-qe-commands.sh
+  cli: latest
+  timeout: 12h0m0s
+  env:
+  - name: TEST_FILTERS_CLUSTERINFRASTRUCTURE
+    default: "!disruptive"
+    documentation: |
+      It is filters to select case based on some case attribution which is in case title.
+  - name: FORCE_SUCCESS_EXIT
+    default: "yes"
+    documentation: |-
+      Setting this to 'yes' will allow some statements in the scripts not to let the step fail, and further steps can
+      run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements 
+      to stop the job and trigger the deprovisioning steps. Default: yes.
+      See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  - name: IS_ACTIVE_CLUSTER_OPENSHIFT
+    default: "true"
+    documentation: |-
+      Indicates if the active cluster is an OpenShift cluster or a derivative (e.g., Hypershift, Microshift).
+      A value of "true" means the cluster is OpenShift or a derivative, while "false" means it is not (e.g., AKS).
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 6Gi
+  documentation: |-
+    This step run cluster_infrastructure team cluster-api-actuator-pkg repo cases.

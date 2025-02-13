@@ -12,7 +12,7 @@ echo "************ openshift cert rotation shutdown test command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 echo "### Copying test binaries"
-scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
+scp "${SSHOPTS[@]}" /usr/bin/openshift-tests "root@${IP}:/usr/local/bin"
 
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It stops kubelet service, kills all containers on each node, kills all pods,
@@ -42,8 +42,18 @@ wget https://github.com/cloudflare/cfssl/releases/download/${CFSSL_VERSION}/cfss
 chmod +x cfssljson
 sudo mv cfssljson /usr/local/bin
 
-HOSTNAME="${1}"
+# deploy registry addon
+export MINIKUBE_HOME=/home/assisted/minikube_home
+MINIKUBE_PROFILE="minikube"
+if minikube profile list | grep assisted-hub-cluster; then
+    MINIKUBE_PROFILE="assisted-hub-cluster"
+fi
+minikube addons enable registry -p ${MINIKUBE_PROFILE}
+kubectl patch service registry -n kube-system --type json -p='[{"op": "replace", "path": "/spec/type", "value":"LoadBalancer"}]'
+sleep 10
+REGISTRY_HOSTNAME=$(kubectl -n kube-system get svc/registry --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
+# prepare custom certificates
 mkdir /tmp/create-registry-certs
 pushd /tmp/create-registry-certs
 cat > ca-config.json << EOZ
@@ -78,7 +88,7 @@ cat > ca-csr.json << EOZ
 {
     "CN": "Test Registry Self Signed CA",
     "hosts": [
-        "${HOSTNAME}"
+        "${REGISTRY_HOSTNAME}"
     ],
     "key": {
         "algo": "rsa",
@@ -98,7 +108,7 @@ cat > server.json << EOZ
 {
     "CN": "Test Registry Self Signed CA",
     "hosts": [
-        "${HOSTNAME}"
+        "${REGISTRY_HOSTNAME}"
     ],
     "key": {
         "algo": "ecdsa",
@@ -125,6 +135,7 @@ cp server.pem /etc/pki/ca-trust/source/anchors/
 cp ca.pem /etc/pki/ca-trust/source/anchors/
 update-ca-trust extract
 
+# Update registry deployment to use custom certs
 kubectl -n kube-system create configmap registry-auth --from-file=htpasswd=htpasswd
 kubectl -n kube-system create configmap registry-certs --from-file=server.pem=server.pem --from-file=server-key.pem=server-key.pem
 
@@ -178,26 +189,16 @@ EOZ
 kubectl apply -f /tmp/patch.yml
 kubectl -n kube-system delete pod -l kubernetes.io/minikube-addons=registry
 
-# Enable registry access from VMs
-firewall-cmd --add-port=5000/tcp --zone=internal --permanent
-firewall-cmd --add-port=5000/tcp --zone=public   --permanent
-firewall-cmd --add-port=5000/tcp --zone=libvirt   --permanent
-# FIXME: open access to assisted-service too
-firewall-cmd --add-port=6000/tcp --zone=internal --permanent
-firewall-cmd --add-port=6000/tcp --zone=public   --permanent
-firewall-cmd --add-port=6000/tcp --zone=libvirt   --permanent
-firewall-cmd --reload
-
-
 # Wait for registry to come up again
 retries=0
-export LOCAL_REG="${HOSTNAME}:5000"
+export LOCAL_REG="${REGISTRY_HOSTNAME}:80"
 set +e
 while ! curl -u test:test https://"${LOCAL_REG}"/v2/_catalog && [ $retries -lt 10 ]; do
   if [ $retries -eq 9 ]; then
     exit 1
   fi
   (( retries++ ))
+  sleep 10
 done
 set -e
 
@@ -212,10 +213,18 @@ export OCP_RELEASE=$( oc adm release -a ~/pull-secret info "${RELEASE_IMAGE_LATE
 export LOCAL_REPO='ocp/openshift4'
 
 # Mirror release
-oc adm release mirror -a ~/pull-secret \
-    --from="${RELEASE_IMAGE_LATEST}" \
-    --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
-    --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output
+set +e
+for imagestream in $(seq 1 5)
+do
+    echo "[$(date)] Retrying mirror"
+    oc adm release mirror -a ~/pull-secret \
+        --from="${RELEASE_IMAGE_LATEST}" \
+        --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
+        --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output \
+    && break
+    sleep 15
+done
+set -e
 
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
@@ -256,18 +265,20 @@ cat /etc/pki/ca-trust/source/anchors/server.pem >> $HOME/custom_manifests/ca.pem
 echo "export REGISTRY_CA_PATH=$HOME/custom_manifests/ca.pem" >> ~/config.sh
 
 kubectl patch deployment -n assisted-installer assisted-service --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mirror-registry-ca", "mountPath": "/etc/pki/tls/certs/ca-bundle.crt", "readOnly": true, "subPath": "mirror_ca.pem"}}]'
-kubectl -n assisted-installer rollout status deploy/assisted-service
-kubectl -n assisted-installer get -o yaml deploy/assisted-service
+kubectl -n assisted-installer rollout status deploy/assisted-service --timeout=5m
 
 # Point assisted service to mirror first
 MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
 MIRRORED_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" -o template --template='{{.digest}}' )
 MUST_GATHER_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=must-gather | cut -f 2 -d '@' )
 MIRRORED_MUST_GATHER_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${MUST_GATHER_DIGEST}"
+HYPERKUBE_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=hyperkube | cut -f 2 -d '@' )
+MIRRORED_HYPERKUBE_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${HYPERKUBE_DIGEST}"
 
 echo "export RELEASE_IMAGE_LATEST=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> ~/config.sh
+echo "export HYPERKUBE_IMAGE=${MIRRORED_HYPERKUBE_IMAGE}" >> ~/config.sh
 #TODO: Fix assisted-test-infra to pass CA bundle in skipper
 echo "export OPENSHIFT_VERSION=4.14" >> ~/config.sh
 
@@ -282,5 +293,4 @@ timeout \
 	ssh \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
-	/usr/local/bin/local-mirror.sh \
-  "${IP}"
+	/usr/local/bin/local-mirror.sh

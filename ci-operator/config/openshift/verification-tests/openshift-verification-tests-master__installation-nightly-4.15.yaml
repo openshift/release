@@ -23,11 +23,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   arm64-latest:
     candidate:
@@ -44,6 +43,12 @@ releases:
   multi-latest:
     candidate:
       architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  target:
+    candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.15"
@@ -71,7 +76,7 @@ tests:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
 - as: aws-ipi-proxy-reboot-nodes-arm-f28
-  cron: 5 19 24 * *
+  cron: 41 2 24 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -86,7 +91,7 @@ tests:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-usertags-arm-f14
-  cron: 13 23 6,22 * *
+  cron: 28 18 12,28 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -127,6 +132,21 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-ipi-additional-ca-always-arm-f14
+  cron: 44 16 7,21 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
 - as: azure-ipi-custom-nsg-f28
   cron: 7 19 3 * *
   steps:
@@ -254,8 +274,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DS4
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+      COMPUTE_NODE_TYPE: Standard_B4ms
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_B4ms
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -281,7 +301,7 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-generation
 - as: azure-mag-ipi-fullyprivate-reboot-nodes-f14
-  cron: 36 10 5,19 * *
+  cron: 4 17 9,23 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -309,7 +329,7 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-disconnected
 - as: azure-upi-proxy-reboot-nodes-f14
-  cron: 52 5 8,24 * *
+  cron: 0 3 16,30 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -341,6 +361,15 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-nested-virtualization-osdisk-type-size
+- as: gcp-ipi-f28-ota
+  cron: 22 13 10 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-32747
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-xpn-cco-manual-users-static-f28
   cron: 50 16 4 * *
   steps:
@@ -348,8 +377,15 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
+- as: ibmcloud-ipi-default-f28
+  cron: 24 14 13 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
 - as: ibmcloud-ipi-private-custom-cos-endpoint-reboot-nodes-f28
-  cron: 16 21 2 * *
+  cron: 7 9 4 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -358,15 +394,28 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
 - as: ibmcloud-ipi-private-sshkey-f28
-  cron: 23 4 30 * *
+  cron: 0 1 20 * *
   steps:
     cluster_profile: ibmcloud-qe
+    env:
+      ZONES_COUNT: "1"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-sshkey
+- as: ibmcloud-ipi-subnet-paging-f28
+  cron: 23 16 2 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "no"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "9"
+      PICKUP_SUBNETS_ORDER: 2Paging
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: nutanix-ipi-zones-single-f28
   cluster: build01
-  cron: 23 1 14 * *
+  cron: 3 2 4 * *
   steps:
     cluster_profile: nutanix-qe-zone
     env:

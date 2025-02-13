@@ -191,7 +191,7 @@ function create_cr() {
     && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
     echo "INFO: Diff in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
   fi
-  oc apply -f "${app}-cr.yaml"
+  retry oc apply -f "${app}-cr.yaml" --timeout=30s
 }
 
 function retry() {

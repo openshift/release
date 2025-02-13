@@ -49,6 +49,7 @@ oinst agent create config-image
 echo -e "\nPreparing KUBECONFIG files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 ### Copy the agent configuration image to the auxiliary host
 echo -e "\nCopying the agent configuration image into the bastion host..."

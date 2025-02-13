@@ -71,7 +71,15 @@ key_kid=$(az keyvault key show --name ${kv_key_name} --vault-name ${kv_name} --q
 user_assigned_identity_id=$(az identity show -g ${kv_rg} -n ${user_assigned_identity} --query "id" -otsv)
 
 #query encryption on storage account
-sa_name=$(az storage account list -g ${CLUSTER_RESOURCE_GROUP} --query '[].name' -otsv | grep "cluster")
+sa_name=$(az storage account list -g ${CLUSTER_RESOURCE_GROUP} -oyaml | yq-go r - "(name==cluster*).name")
+# Starting from 4.17, the default install method is CAPI-based,
+# the format of storage account name is changed to ${infraId}sa instead of "clusterxxxxx",
+# and the name could not be more than 24 characters.
+if [[ -z "${sa_name}" ]]; then
+    sa_prefix=${INFRA_ID//-}
+    sa_prefix=${sa_prefix::22}
+    sa_name=$(az storage account list -g "${CLUSTER_RESOURCE_GROUP}" -oyaml | yq-go r - "(name==${sa_prefix}sa).name")
+fi
 sa_blob_public_access=$(az storage account show -n ${sa_name} -g ${CLUSTER_RESOURCE_GROUP} --query 'allowBlobPublicAccess' -otsv)
 sa_kv_uri=$(az storage account show -n ${sa_name} -g ${CLUSTER_RESOURCE_GROUP} --query 'encryption.keyVaultProperties.keyVaultUri' -otsv)
 sa_key_kid=$(az storage account show -n ${sa_name} -g ${CLUSTER_RESOURCE_GROUP} --query 'encryption.keyVaultProperties.currentVersionedKeyIdentifier' -otsv)

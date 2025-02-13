@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.21-linux
+  stolostron_builder_go1.22-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.22-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -19,6 +23,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
@@ -26,6 +33,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
@@ -33,6 +43,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
@@ -47,6 +60,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
@@ -54,6 +70,9 @@ images:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+    stolostron_builder_go1.22-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
   to: grafana-dashboard-loader
 promotion:
   to:
@@ -79,12 +98,94 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror-multicluster-observability-operator
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-observability-operator
+    env:
+      IMAGE_REPO: multicluster-observability-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-rbac-query-proxy
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rbac-query-proxy
+    env:
+      IMAGE_REPO: rbac-query-proxy
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-endpoint-monitoring-operator
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: endpoint-monitoring-operator
+    env:
+      IMAGE_REPO: endpoint-monitoring-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-grafana-dashboard-loader
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grafana-dashboard-loader
+    env:
+      IMAGE_REPO: grafana-dashboard-loader
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-metrics-collector
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: metrics-collector
+    env:
+      IMAGE_REPO: metrics-collector
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make"
     VERBOSE="-v" make unit-tests
   container:
     from: src
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: |
+        echo "MULTICLUSTER_OBSERVABILITY_OPERATOR_IMAGE_REF=$MULTICLUSTER_OBSERVABILITY_OPERATOR_IMAGE_REF"
+        echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
+        echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
+        echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
+        echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+        export SELF="make"
+        set -o pipefail
+        make e2e-tests-in-kind 2>&1 | tee ${ARTIFACT_DIR}/run-e2e-in-kind.log
+        set +o pipefail
+      dependencies:
+      - env: MULTICLUSTER_OBSERVABILITY_OPERATOR_IMAGE_REF
+        name: multicluster-observability-operator
+      - env: ENDPOINT_MONITORING_OPERATOR_IMAGE_REF
+        name: endpoint-monitoring-operator
+      - env: GRAFANA_DASHBOARD_LOADER_IMAGE_REF
+        name: grafana-dashboard-loader
+      - env: METRICS_COLLECTOR_IMAGE_REF
+        name: metrics-collector
+      - env: RBAC_QUERY_PROXY_IMAGE_REF
+        name: rbac-query-proxy
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 - as: test-e2e
   skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
@@ -95,9 +196,9 @@ tests:
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-416
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-417
       CLUSTERPOOL_LIFETIME: 1h
-      CLUSTERPOOL_MANAGED_FILTER: sno-416
+      CLUSTERPOOL_MANAGED_FILTER: sno-417
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl

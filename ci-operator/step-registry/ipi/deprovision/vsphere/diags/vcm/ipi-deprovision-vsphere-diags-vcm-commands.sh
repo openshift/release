@@ -38,28 +38,45 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
+function collect_sosreport {
+  ADDRESS=$1
+  echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
+  ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
+  echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
+  ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
+  ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
+  echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
+  scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
+}
+
+function collect_sosreports {
+  NODES=$(oc get nodes -o=jsonpath='{.items[*].metadata.name}')
+  for NODE in $NODES; do
+    ADDRESS=$(oc get nodes -o=jsonpath='{.status.addresses[0].address}' ${NODE})
+    collect_sosreport $ADDRESS
+  done
+}
+
 function collect_sosreport_from_unprovisioned_machines {
   set +e
   echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
 
   MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -o=jsonpath='{.items[*].metadata.name}')
+
+  echo "$(date -u --rfc-3339=seconds) - found machines ${MACHINES}"
+
   for MACHINE in ${MACHINES}; do
     echo "$(date -u --rfc-3339=seconds) - checking if machine $MACHINE lacks a nodeRef"
     NODEREF=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.nodeRef}')
+      
     if [ -z "$NODEREF" ]; then
-      echo "$(date -u --rfc-3339=seconds) - no nodeRef found, attempting to collect sos report"
+      echo "$(date -u --rfc-3339=seconds) - attempting to collect sos report"
       ADDRESS=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.addresses[0].address}')
       if [ -z "$ADDRESS" ]; then
         echo "$(date -u --rfc-3339=seconds) - could not derive address from machine. unable to collect sos report"
         continue
       fi
-      echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
-      echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
-      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core
-      ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
-      echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
-      scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
+      collect_sosreport $ADDRESS
     fi
   done
   set -e
@@ -148,60 +165,77 @@ function collect_diagnostic_data {
   unset GOVC_RESOURCE_POOL
 
   echo "Gathering information from hosts and virtual machines associated with segment"
-
   JSON_DATA='{"vms": [], "hosts": []}'
-  IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
-  IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${vsphere_portgroup})"
-  for network in "${networks[@]}"; do
 
-      IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
-      if [ -z ${vms:-} ]; then
-        govc find . -type m -runtime.powerState poweredOn -network $network
-        echo "No VMs found"
-        continue
-      fi
-      for vm in "${vms[@]}"; do
-          datacenter=$(echo "$vm" | cut -d'/' -f 2)
-          vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
+  # Get each vCenter and iterate through them
+  VCENTER_COUNT=$(jq '.vcenters | length' "$SHARED_DIR"/platform.json)
+  v_idx=0
 
-          if [ ! -z "${vm_host}" ]; then
-              hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
-              if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then
-                  full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)
-                  if [ -z "${full_hostpath:-}" ]; then
-                    continue
-                  fi
-                  echo "Collecting Host metrics for ${vm_host}"
-                  hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
-                  govc metric.sample -dc="${datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
-                  govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
-                  govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
-                  HOST_METRIC_FILE="${vcenter_state}/${hostname}.metrics.json"
-                  JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
-              fi
-          fi
-          echo "Collecting VM metrics for ${vm}"
-          vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
-          govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
-          govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
+  while [[ $v_idx -lt $VCENTER_COUNT ]]; do
+    VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
+    GOVC_URL=$(echo $VCENTER | jq -r '.server')
+    # shellcheck disable=SC2034
+    GOVC_USERNAME=$(echo $VCENTER | jq -r '.user')
+    # shellcheck disable=SC2034
+    GOVC_PASSWORD=$(echo $VCENTER | jq -r '.password')
 
-          echo "Collecting alarms from ${vm}"
-          govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
+    echo "Processing vcenter $GOVC_URL"
 
-          # press ENTER on the console if screensaver is running
-          echo "Keystoke enter in ${vmname} console"
-          govc vm.keystrokes -dc="${datacenter}" -vm.ipath="${vm}" -c 0x28
+    IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
+    IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${vsphere_portgroup})"
+    for network in "${networks[@]}"; do
 
-          echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
-          govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
+        IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
+        if [ -z ${vms:-} ]; then
+          govc find . -type m -runtime.powerState poweredOn -network $network
+          echo "No VMs found"
+          continue
+        fi
+        for vm in "${vms[@]}"; do
+            datacenter=$(echo "$vm" | cut -d'/' -f 2)
+            vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
 
-          METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
-          JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
-      done
+            if [ ! -z "${vm_host}" ]; then
+                hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+                if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then
+                    full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)
+                    if [ -z "${full_hostpath:-}" ]; then
+                      continue
+                    fi
+                    echo "Collecting Host metrics for ${vm_host}"
+                    hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+                    govc metric.sample -dc="${datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
+                    govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
+                    govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
+                    HOST_METRIC_FILE="${vcenter_state}/${hostname}.metrics.json"
+                    JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
+                fi
+            fi
+            echo "Collecting VM metrics for ${vm}"
+            vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
+            govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
+            govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
+
+            echo "Collecting alarms from ${vm}"
+            govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
+
+            # press ENTER on the console if screensaver is running
+            echo "Keystoke enter in ${vmname} console"
+            govc vm.keystrokes -dc="${datacenter}" -vm.ipath="${vm}" -c 0x28
+
+            echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
+            govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
+
+            METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
+            JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
+        done
+    done
+    target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
+    echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
+    echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
+
+    v_idx=$((v_idx+1));
   done
-  target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
-  echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
-  echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
 
   write_html
 
@@ -213,6 +247,32 @@ function write_html() {
   generate_vm_input
   generate_host_input
   write_results_html
+}
+
+function embed_topology_data() {
+  echo "<hr>" >> "${RESULT_HTML}"
+  for LEASE in "${SHARED_DIR}"/LEASE_*; do
+    if [[ $LEASE == *_single.json* ]]; then
+        continue
+    fi
+
+    POOL=$(jq --compact-output -r .status.name < "${LEASE}")
+    SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
+    CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
+    DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
+    DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
+    NETWORKS=$(jq --compact-output -r .status.topology.networks[] < "${LEASE}")
+    NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
+
+    echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
+    echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+    echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+    echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+    echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+    echo "<br>" >> "${RESULT_HTML}"
+  done
 }
 
 function generate_vm_input() {
@@ -326,6 +386,11 @@ function write_results_html() {
           <dt class="text-light bg-secondary ps-1 mb-1">Info</dt>
           <dd>This report contains metrics for both the Virtual Machines used in the CI tests as well as the hosts the VMs ran on.</dd>
       </dl>
+EOF
+
+embed_topology_data
+
+cat >> "${RESULT_HTML}" << EOF      
     </data>
     <data id="vm-data">
       <div id="vm-data-content">
@@ -557,4 +622,10 @@ EOF
 }
 
 collect_diagnostic_data
-collect_sosreport_from_unprovisioned_machines
+
+if [ -n "${FORCE_SOS_REPORT:-}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - FORCE_SOS_REPORT enabled. will collect sos reports for each node"
+  collect_sosreports
+else
+  collect_sosreport_from_unprovisioned_machines
+fi

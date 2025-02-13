@@ -7,6 +7,7 @@ set -o xtrace
 set -x
 ls
 
+
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 30

@@ -47,7 +47,10 @@ chainsaw test \
 --test-dir \
 tests/e2e \
 tests/e2e-openshift \
-tests/e2e-openshift-ossm || any_errors=true
+tests/e2e-openshift-serverless \
+tests/e2e-openshift-ossm \
+tests/e2e-long-running \
+tests/operator-metrics || any_errors=true
 
 # Get the platform type
 dt_platform_type=$(oc get infrastructures cluster -o=jsonpath='{.status.platformStatus.type}')

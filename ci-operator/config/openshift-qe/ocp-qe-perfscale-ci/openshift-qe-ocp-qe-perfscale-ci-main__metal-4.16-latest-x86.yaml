@@ -3,13 +3,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-metal-416
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -23,42 +16,67 @@ resources:
       memory: 200Mi
 tests:
 - as: weekly-6nodes
-  cluster: build05
-  cron: 0 8 * * 0
+  capabilities:
+  - vpn
+  cron: 0 0 * * 0
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
     - chain: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-installer-bm-day2-sriov
     - chain: openshift-qe-data-path-tests
-    - chain: openshift-qe-web-burner
     - chain: openshift-qe-node-density-heavy
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: deploy-sno
+  capabilities:
+  - vpn
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      LAB_CLOUD: cloud31
+      OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
+      TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -67,6 +85,7 @@ tests:
       KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -75,15 +94,19 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
@@ -94,7 +117,9 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
@@ -111,7 +136,9 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  capabilities:
+  - vpn
+  restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:

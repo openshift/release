@@ -17,8 +17,3 @@ This Jenkins integration works by using build remote triggers in Jenkins to fire
 # What does the telco-runner image look like?
 
 You can find the telco-runner image configuration [here](https://github.com/openshift/release/blob/master/clusters/app.ci/supplemental-ci-images/telco-runner.yaml).
-
-# Dual pipeline documentation
-
-You can find the dual pipeline documentation [here](https://docs.ci.openshift.org/docs/how-tos/creating-a-pipeline/).
-

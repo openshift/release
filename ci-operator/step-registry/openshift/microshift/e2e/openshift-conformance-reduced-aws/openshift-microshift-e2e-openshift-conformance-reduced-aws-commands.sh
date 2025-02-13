@@ -1,8 +1,9 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+trap_subprocesses_on_term
 
 cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing mutating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"

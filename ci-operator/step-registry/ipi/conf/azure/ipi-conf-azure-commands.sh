@@ -37,6 +37,8 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
+minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 echo "get ocp version: ${version}"
 rm pull-secret
 popd
@@ -69,8 +71,13 @@ fi
 if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
     master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
 fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
+
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
+echo "Using compute node replicas: ${workers}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
@@ -80,6 +87,7 @@ platform:
 controlPlane:
   architecture: ${OCP_ARCH}
   name: master
+  replicas: ${master_replicas}
   platform:
     azure:
       type: ${master_type}
@@ -109,6 +117,13 @@ EOF
   fi
 fi
 
+# User tags went GA in 4.14. In 4.14+, tag resources with an expiration date to facilitate cleanup.
+if (( minor_version > 13 && major_version == 4 )); then
+  expiration_date=$(date -d '8 hours' --iso=minutes --utc)
+  printf 'Setting user tag expirationDate: %s\n' "${expiration_date}"
+  yq-go write -i "${CONFIG}" "platform.azure.userTags.expiration_date" "${expiration_date}"
+fi
+
 printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
 do
   printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
@@ -125,12 +140,12 @@ PUBLISH=$(yq-go r "${CONFIG}" "publish")
 echo "publish: ${PUBLISH}"
 echo "is Old Version: ${isOldVersion}"
 if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
-  echo "Write the 'baseDomainResourceGroupName: os4-common' to install-config"
+  echo "Write the 'baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}' to install-config"
   PATCH="${SHARED_DIR}/install-config-baseDomainRG.yaml.patch"
     cat > "${PATCH}" << EOF
 platform:
   azure:
-    baseDomainResourceGroupName: os4-common
+    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
 else

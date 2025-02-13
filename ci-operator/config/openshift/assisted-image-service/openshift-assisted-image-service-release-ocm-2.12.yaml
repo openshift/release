@@ -1,0 +1,127 @@
+base_images:
+  assisted-installer:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: ocm-2.12
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.image-service
+  to: assisted-image-service
+- dockerfile_path: Dockerfile.image-service-build
+  to: assisted-image-service-build
+promotion:
+  to:
+  - name: ocm-2.12
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.12
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: assisted-image-service-build
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: test
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make test
+  container:
+    clone: true
+    from: assisted-image-service-build
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-image-service-codecov-token
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: test-postsubmit
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make test
+  container:
+    clone: true
+    from: assisted-image-service-build
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-image-service-codecov-token
+- as: e2e-ai-operator-ztp
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
+    workflow: assisted-baremetal-operator-ztp
+zz_generated_metadata:
+  branch: release-ocm-2.12
+  org: openshift
+  repo: assisted-image-service

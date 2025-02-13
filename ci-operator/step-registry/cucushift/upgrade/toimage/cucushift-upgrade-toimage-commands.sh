@@ -340,15 +340,48 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-73352
+function check_upgrade_recommend_when_upgrade_inprogress() {
+    if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] || [[ "${TARGET_MINOR_VERSION}" -eq "19" ]] ; then
+        # So far, this is a TP feature in OCP 4.18 and OCP 4.19, so need to enable the gate 
+        export OC_ENABLE_CMD_UPGRADE_RECOMMEND=true
+    fi
+    
+    local out 
+    local info="info: An update is in progress.  You may wish to let this update complete before requesting a new update."
+    local no_update="No updates available. You may still upgrade to a specific release image with --to-image or wait for new updates to be available."
+    local error="error: no updates available, so cannot display context for the requested release 4.999.999"
+
+    echo "OCP-73352: Checking \"oc adm upgrade recommend\" command"
+    out="$(oc adm upgrade recommend)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${no_update}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend\" should output \"${info}\" and \"${no_update}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    out="$(oc adm upgrade recommend --show-outdated-releases)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${no_update}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend --show-outdated-releases\" should output \"${info}\" and \"${no_update}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    out="$(oc adm upgrade recommend --version 4.999.999 2>&1)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${error}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend --version 4.999.999\" should output \"${info}\" and \"${error}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    echo "OCP-73352: \"oc adm upgrade recommend\" command works normal"
+    return 0
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
         cluster_version="${TARGET_VERSION}"
     fi
-    echo "Starting the upgrade checking on $(date "+%F %T")"
+    echo -e "Upgrade checking start at $(date "+%F %T")\n"
+    start_time=$(date "+%s")
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -372,8 +405,18 @@ function check_upgrade_status() {
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
-            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
+            end_time=$(date "+%s")
+            echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
+        fi
+        if [ "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" ] &&  check_ota_case_enabled "OCP-73352"; then
+            # "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" is used to make sure run check_upgrade_recommend_when_upgrade_inprogress once
+            # and "TIMEOUT - 10" is used to make sure upgrade is started
+            if ! check_upgrade_recommend_when_upgrade_inprogress; then
+                echo "OCP-73352: failed"
+                return 1
+            fi
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
             UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
@@ -382,7 +425,10 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
+        end_time=$(date "+%s")
+        echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        return 1
     fi
 }
 
@@ -433,11 +479,11 @@ run_command "oc version --client"
 run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
+export TARGET_MINOR_VERSION=""
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
-export TARGET_MINOR_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -450,7 +496,7 @@ export FORCE_UPDATE="false"
 if ! check_signed; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
-    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
+    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-56083"; then
         echo "The case need to run against a signed target image!"
         exit 1
     fi

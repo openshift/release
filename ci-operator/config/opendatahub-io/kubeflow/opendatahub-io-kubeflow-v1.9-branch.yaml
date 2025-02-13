@@ -1,0 +1,122 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- context_dir: components
+  dockerfile_path: notebook-controller/Dockerfile
+  from: ubi_minimal
+  to: kf-notebook-controller
+- context_dir: components
+  dockerfile_path: odh-notebook-controller/Dockerfile
+  from: ubi_minimal
+  to: odh-notebook-controller
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: "1.9"
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: kf-notebook-controller-unit
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
+  steps:
+    test:
+    - as: unit
+      commands: |
+        unset GOFLAGS
+        pushd components/notebook-controller
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: odh-notebook-controller-unit
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*|components/odh-notebook-controller/.*)
+  steps:
+    test:
+    - as: unit
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: kf-notebook-controller-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kf-notebook-controller
+    env:
+      IMAGE_REPO: kubeflow-notebook-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: kf-notebook-controller-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kf-notebook-controller
+    env:
+      IMAGE_REPO: kubeflow-notebook-controller
+      RELEASE_VERSION: "1.9"
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-notebook-controller-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-notebook-controller
+    env:
+      IMAGE_REPO: odh-notebook-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-notebook-controller-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-notebook-controller
+    env:
+      IMAGE_REPO: odh-notebook-controller
+      RELEASE_VERSION: "1.9"
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp-opendatahub
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make run-ci-e2e-tests
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: v1.9-branch
+  org: opendatahub-io
+  repo: kubeflow

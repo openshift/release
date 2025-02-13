@@ -79,12 +79,11 @@ function check_vpc() {
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
 }
 
-
 ibmcloud_login
 resource_group=$(cat "${SHARED_DIR}/ibmcloud_resource_group")
 "${IBMCLOUD_CLI}" target -g ${resource_group}
 
-DEFAULT_PRIVATE_ENDPOINTS=$(mktemp)
+DEFAULT_PRIVATE_ENDPOINTS="${SHARED_DIR}/eps_default.json"
 REGION="${LEASED_RESOURCE}"
 cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
 {
@@ -95,7 +94,11 @@ cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
     "DNSServices": "https://api.private.dns-svcs.cloud.ibm.com/v1",
     "COS": "https://s3.direct.${REGION}.cloud-object-storage.appdomain.cloud",
     "GlobalSearch": "https://api.private.global-search-tagging.cloud.ibm.com",
-    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com"
+    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com",
+    "COSConfig": "https://config.direct.cloud-object-storage.cloud.ibm.com/v1",
+    "GlobalCatalog": "https://private.globalcatalog.cloud.ibm.com",
+    "KeyProtect": "https://private.${REGION}.kms.cloud.ibm.com",
+    "HyperProtect": "https://api.private.${REGION}.hs-crypto.cloud.ibm.com"
 }
 EOF
 vpcName=$(<"${SHARED_DIR}/ibmcloud_vpc_name")
@@ -105,11 +108,12 @@ vpcID=$(cat "${vpc_info_file}" | jq -r '.vpc.id')
 sgID=$(cat "${vpc_info_file}" | jq -r '.vpc.default_security_group.id')
 subnetID=$(cat "${vpc_info_file}" | jq -r '.subnets[0].id')
 clusterName="${NAMESPACE}-${UNIQUE_HASH}"
-allTargetsFile=$(mktemp)
+allTargetsFile="${ARTIFACT_DIR}/ep_targets.json"
 ibmcloud is endpoint-gateway-targets -q -output JSON > ${allTargetsFile} || exit 1
 run_command "ibmcloud is security-group-rule-add ${sgID} inbound tcp --remote '0.0.0.0/0' --port-min=443 --port-max=443" || exit 1
 
-srv_array=("IAM" "VPC" "ResourceController" "ResourceManager" "DNSServices" "COS" "GlobalSearch" "GlobalTagging")
+srv_array=("IAM" "VPC" "ResourceController" "ResourceManager" "DNSServices" "COS" "GlobalSearch" "GlobalTagging" "KeyProtect" "HyperProtect" "COSConfig" "GlobalCatalog")
+
 for srv in "${srv_array[@]}"; do
     real_srv_endpoint_url=""
     eval srv_endpoint_url='$'SERVICE_ENDPOINT_${srv}
@@ -128,7 +132,7 @@ for srv in "${srv_array[@]}"; do
         fi
         target=$(findTarget "${allTargetsFile}" "${real_srv_endpoint_url}")
         if [[ -z "${target}" ]]; then
-            echo "ERROR: Did not find out endpoint gateway target"
+            echo "ERROR: Did not find out endpoint gateway target of $srv"
             exit 1
         fi
         echo "INFO: service ${srv} endpoint - ${real_srv_endpoint_url} gateway target is: ${target}"

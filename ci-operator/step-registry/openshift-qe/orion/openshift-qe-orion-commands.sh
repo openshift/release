@@ -1,7 +1,4 @@
 #!/bin/bash
-set -o errexit
-set -o nounset
-set -o pipefail
 set -x
 
 if [ ${RUN_ORION} == false ]; then
@@ -22,6 +19,11 @@ git clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
 pip install -r requirements.txt
+
+# Download the latest ACK file
+if [ ${JUNIT} == true ]; then
+  curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
+fi
 
 if [[ ${ES_TYPE} == "qe" ]]; then
     ES_PASSWORD=$(cat "/secret/qe/password")
@@ -45,6 +47,7 @@ if [ ${JUNIT} == true ]; then
   export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
   export EXTRA_FLAGS+=" --output-format junit"
   export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+  export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
   export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 
@@ -52,10 +55,30 @@ if [[ -n "$ORION_CONFIG" ]]; then
   export CONFIG="${ORION_CONFIG}"
 fi
 
-orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+if [[ -n "$ORION_ENVS" ]]; then
+  ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
+  IFS=',' read -r -a env_array <<< "$ORION_ENVS"
+  for env_pair in "${env_array[@]}"; do
+    env_pair=$(echo "$env_pair" | xargs)
+    env_key=$(echo "$env_pair" | cut -d'=' -f1)
+    env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+    export "$env_key"="$env_value"
+  done
+fi
+
+if [[ -n "$LOOKBACK_SIZE" ]]; then
+  export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+set +e
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+orion_exit_status=$?
+set -e
 
 if [ ${JUNIT} == true ]; then
   cp *.xml ${ARTIFACT_DIR}/
 else
   cat *.csv
 fi
+
+exit $orion_exit_status

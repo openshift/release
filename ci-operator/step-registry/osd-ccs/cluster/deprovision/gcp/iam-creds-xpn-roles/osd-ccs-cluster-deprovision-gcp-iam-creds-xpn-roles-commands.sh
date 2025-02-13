@@ -55,7 +55,7 @@ while [[ $i -lt $num_roles ]]; do
 	j=0
 	while [[ $j -lt $num_members ]]; do
 		member=$(jq -r .bindings[$i].members[$j] "${BINDINGS_JSON}")
-		if [[ "${member}" =~ deleted:serviceAccount:osd-managed-admin- ]]; then
+		if [[ "${member}" =~ deleted:serviceAccount: ]]; then
  			CMD="gcloud projects remove-iam-policy-binding ${VPC_PROJECT_ID} --role=\"${role}\" --member=\"${member}\" 1>/dev/null"
 			backoff "${CMD}"
 		fi

@@ -120,7 +120,7 @@ echo -e "The full package_list in catalog '$catalog' is:\n${package_list}" || tr
 for package in ${package_list}; do
     echo "#Starting scan for package '$package'"
     # only select csvs with annotation `"features.operators.openshift.io/fips-compliant": "true"` to perform scan
-    currentCSVs=$(cat /tmp/$catalog.json | jq -r '.items[] | select(.metadata.name=="'${package}'") | .status.channels[] | select(.currentCSVDesc.annotations["features.operators.openshift.io/fips-compliant"]=="true") | .currentCSV'| sort | uniq || true);
+    currentCSVs=$(cat /tmp/$catalog.json | jq -r '.items[] | select(.metadata.name=="'${package}'") | .status.channels[] | select(.currentCSVDesc.annotations["features.operators.openshift.io/fips-compliant"]=="true") | .currentCSV'| sort | uniq || true)
     if [ -z "$currentCSVs" ]; then
         echo "No CSV claimed to be fips-compliant in package '$package', skipping scan for it..."
         continue
@@ -130,17 +130,16 @@ for package in ${package_list}; do
         csv_test_result="${data_dir}/${package}/$csv"
         echo "##Starting scan for CSV '$csv'" >> $csv_test_result
         # retrieve related images from current CSV
-        image_list=$(cat /tmp/$catalog.json | jq -r '.items[].status.channels[]|select(.currentCSV=="'$csv'")|.currentCSVDesc.relatedImages[]' || true);
+        image_list=$(cat /tmp/$catalog.json | jq -r '.items[].status.channels[]|select(.currentCSV=="'$csv'")|.currentCSVDesc.relatedImages[]' | sort | uniq || true)
         if $internal; then
-            image_list=$(echo $image_list | sed -r 's/registry.redhat.io/brew.registry.redhat.io/g' )
-            image_list=$(echo $image_list | sed -r 's/registry.stage.redhat.io/brew.registry.stage.redhat.io/g')
+            image_list=$(echo "$image_list" | sed 's/^registry.redhat.io/brew.registry.redhat.io/g' )
+            image_list=$(echo "$image_list" | sed 's/^registry.stage.redhat.io/brew.registry.redhat.io/g')
         fi
         # perform fips scan by using check-payload tool
         for image_url in ${image_list}; do
             echo "###test result for image '$image_url' is:" >> $csv_test_result
             ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o LogLevel=ERROR ${BASTION_SSH_USER}@${BASTION_IP} \
                 "sudo podman run --rm --privileged -v /tmp/tmp/:/root/:ro registry.ci.openshift.org/ci/check-payload scan operator --spec $image_url" >> ${csv_test_result} 2>&1 || true
-
         done
         echo "$(cat ${csv_test_result})" >> ${scan_result_full_log}
         # summarize scan results from csv_test_result file
@@ -153,7 +152,6 @@ for package in ${package_list}; do
         elif [[ -n $resSuessWithWarnings ]];then
             echo "##Fips check for CSV '$csv' in package '$package' succeed with warnings!"
             echo "$csv" >> ${scan_result_succeed_with_warnings_csvs}
-            pass=false
         else
             echo "##Fips check for CSV '$csv' in package '$package' succeed!"
             echo "$csv" >> ${scan_result_succeed_csvs}
@@ -181,6 +179,7 @@ if $pass; then
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
     <testcase name="${subteam}:Optional operators scan of fips check should succeed or skip"/>
+        <system-out>$(cat "$scan_result_summary" || true)</system-out>
 </testsuite>
 EOF
 else

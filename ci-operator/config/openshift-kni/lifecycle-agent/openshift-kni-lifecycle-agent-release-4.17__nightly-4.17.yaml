@@ -1,0 +1,58 @@
+base_images:
+  installer:
+    name: "4.17"
+    namespace: ocp
+    tag: installer
+  lca-operator:
+    name: "4.17"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  tests:
+    name: "4.17"
+    namespace: ocp
+    tag: tests
+releases:
+  latest:
+    integration:
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: seedgen-aws-ocp-4-17
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lca-operator
+    env:
+      LCA_PULL_REF_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator:4.17
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.17"
+      SEED_FLOATING_TAG: "4.17"
+      SEED_IMAGE_TAG_FORMAT: nightly
+    workflow: openshift-image-based-upgrade-seed-create
+- as: image-based-install
+  cluster: build02
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lca-operator
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.17"
+      SEED_IMAGE_TAG_FORMAT: nightly
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-kni
+  repo: lifecycle-agent
+  variant: nightly-4.17

@@ -74,6 +74,7 @@ fi
 command -v az
 az --version
 
+azure_role_assignment_file="${SHARED_DIR}/azure_role_assignment_ids"
 azure_identity_auth_file="${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json"
 if [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "user-defined" ]]; then
     # create user-defined managed identity
@@ -85,10 +86,16 @@ if [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "user-defined" ]]; then
     run_command "az vm identity assign --identities ${user_identity_name} -g ${bastion_rg} -n ${bastion_name}"
 
     # assign role
-    echo "Assign role 'Contributor' 'User Access Administrator' to the identity"
+    echo "Assign role 'Contributor' 'User Access Administrator' 'Storage Blob Data Contributor' to the identity"
     user_identity_id=$(az identity show -g ${bastion_rg} -n ${user_identity_name} --query 'principalId' -otsv)
     run_command "az role assignment create --role 'Contributor' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
     run_command "az role assignment create --role 'User Access Administrator' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
+    # 4.16 OCPBUGS-38821, 4.18 OCPBUGS-37587
+    # additonal permission is required when allowSharedKeyAccess of storage account is disabled and switching to use Azure AD for authentication
+    run_command "az role assignment create --role 'Storage Blob Data Contributor' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
+    # save role assignment id for destroy
+    az role assignment list --assignee ${user_identity_id} --query '[].id' -otsv >> ${azure_role_assignment_file}
+    
 
     # save azure auth json file
     user_identity_clientid=$(az vm identity show -g "${bastion_rg}" -n "${bastion_name}" --query "userAssignedIdentities.\"/subscriptions/${AZURE_AUTH_SUBSCRIPTION}/resourceGroups/${bastion_rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${user_identity_name}\".clientId" -otsv)
@@ -99,10 +106,15 @@ EOF
 elif [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "system" ]]; then
     # enable system managed identity on bastion
     # assign "Contributor" and "User Access Administrator role" to identity
-    echo "Enable system managed identity on bastion vm, and assign role 'Contributor' 'User Access Administrator' to the identity"
+    echo "Enable system managed identity on bastion vm, and assign role 'Contributor' 'User Access Administrator' 'Storage Blob Data Contributor' to the identity"
     run_command "az vm identity assign -g ${bastion_rg} -n ${bastion_name} --role Contributor --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
     system_identity_id=$(az vm identity show -g "${bastion_rg}" -n "${bastion_name}" --query 'principalId' -otsv)
     run_command "az role assignment create --role 'User Access Administrator' --assignee ${system_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
+    # 4.16 OCPBUGS-38821, 4.18 OCPBUGS-37587
+    # additonal permission is required when allowSharedKeyAccess of storage account is disabled and switching to use Azure AD for authentication
+    run_command "az role assignment create --role 'Storage Blob Data Contributor' --assignee ${system_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION}"
+    # save role assignment id for destroy
+    az role assignment list --assignee ${system_identity_id} --query '[].id' -otsv >> ${azure_role_assignment_file}
 
     # save azure auth json file
     cat > "${azure_identity_auth_file}" << EOF

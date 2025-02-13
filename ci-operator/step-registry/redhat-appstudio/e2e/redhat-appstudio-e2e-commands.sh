@@ -8,8 +8,9 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT OFFLINE_TOKEN TOOLCHAIN_API_URL KEYLOAK_URL EXODUS_PROD_KEY EXODUS_PROD_CERT CGW_USERNAME CGW_TOKEN REL_IMAGE_CONTROLLER_QUAY_ORG REL_IMAGE_CONTROLLER_QUAY_TOKEN BYOC_KUBECONFIG GITHUB_TOKENS_LIST \
-    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN MULTI_PLATFORM_AWS_ACCESS_KEY MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY MULTI_PLATFORM_AWS_SSH_KEY MULTI_PLATFORM_IBM_API_KEY PAC_GITLAB_TOKEN PAC_GITLAB_URL PAC_PROJECT_ID
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT OFFLINE_TOKEN TOOLCHAIN_API_URL KEYLOAK_URL EXODUS_PROD_KEY EXODUS_PROD_CERT CGW_USERNAME CGW_TOKEN REL_IMAGE_CONTROLLER_QUAY_ORG REL_IMAGE_CONTROLLER_QUAY_TOKEN RELEASE_PUBLIC_KEY BYOC_KUBECONFIG GITHUB_TOKENS_LIST \
+    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN MULTI_PLATFORM_AWS_ACCESS_KEY MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY MULTI_PLATFORM_AWS_SSH_KEY MULTI_PLATFORM_IBM_API_KEY PAC_GITLAB_TOKEN PAC_GITLAB_URL GITLAB_PROJECT_ID \
+    GITLAB_BOT_TOKEN
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/default-quay-org-token)
@@ -30,6 +31,7 @@ CGW_USERNAME=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cgw_use
 CGW_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cgw_token)
 REL_IMAGE_CONTROLLER_QUAY_ORG=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release_image_controller_quay_org)
 REL_IMAGE_CONTROLLER_QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release_image_controller_quay_token)
+RELEASE_PUBLIC_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release_public_key)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
@@ -45,7 +47,8 @@ MULTI_PLATFORM_AWS_SSH_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstu
 MULTI_PLATFORM_IBM_API_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/multi-platform-ibm-api-key)
 PAC_GITLAB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-token)
 PAC_GITLAB_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-url)
-PAC_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-project-id)
+GITLAB_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/gitlab-project-id)
+GITLAB_BOT_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/gitlab-bot-token)
 
 
 # user stored: username:token,username:token

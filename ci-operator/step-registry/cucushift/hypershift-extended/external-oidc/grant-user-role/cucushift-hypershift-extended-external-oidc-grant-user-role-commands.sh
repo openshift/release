@@ -16,7 +16,7 @@ echo "Restoring external OIDC cache dir"
 mkdir -p ~/.kube/cache/oc
 cat "$SHARED_DIR/oc-oidc-token" > ~/.kube/cache/oc/"$(cat "$SHARED_DIR/oc-oidc-token-filename")"
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     echo "Setting up proxy"
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
