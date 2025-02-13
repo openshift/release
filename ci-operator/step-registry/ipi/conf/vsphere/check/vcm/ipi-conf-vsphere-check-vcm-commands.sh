@@ -60,7 +60,11 @@ function networkToSubnetsJson() {
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
-    jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]]; then
+      jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json" > /tmp/tmpfile && mv /tmp/tmpfile "${SHARED_DIR}/subnets.json"
+    else
+      jq -s '.[0] * .[1]' "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
+    fi
   else
     cp "${TMPSUBNETSJSON}" "${SHARED_DIR}/subnets.json"
   fi
@@ -259,7 +263,11 @@ for POOL in "${pools[@]}"; do
     requiredPool="required-pool: $POOL"
     log "setting required pool ${requiredPool}"
   fi
-
+  networks_number=1
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $POOL == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    # Only vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster have multi-network, others kept pending when creating lease
+    networks_number=2
+  fi
   # shellcheck disable=SC1078
   echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
@@ -277,11 +285,10 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
-  networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
+  networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
 
 log "waiting for lease to be fulfilled..."
-
 n=0
 until [ "$n" -ge 5 ]
 do
@@ -302,6 +309,7 @@ fi
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
+declare -A vcenter_portgroups_2
 
 # reconcile leases
 log "Extracting portgroups from leases..."
@@ -311,8 +319,17 @@ for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${LEASE}" -o json > /tmp/lease.json
   VCENTER=$(jq -r '.status.server' < /tmp/lease.json )
-  NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
-  NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+
+  required_pool=$(jq -r '.spec."required-pool"' < /tmp/lease.json)
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    network_index=1
+    NETWORK_PATH=$(jq -r ".status.topology.networks[$network_index]" < /tmp/lease.json)
+    # select the second network
+    NETWORK_RESOURCE=$(jq -r '[.metadata.ownerReferences[] | select(.kind=="Network") | .name][1]' < /tmp/lease.json)
+  else
+    NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
+    NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+  fi
 
   log "got lease ${LEASE}"
 
@@ -345,8 +362,14 @@ EOF
   vsphere_extra_portgroup="${portgroup_name}"
 
   else
-    vcenter_portgroups[$VCENTER]=${portgroup_name}
-    log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
+    if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+      # select the second network
+      vcenter_portgroups_2[$VCENTER]=${portgroup_name}
+      log "discovered portgroup ${vcenter_portgroups_2[$VCENTER]}"
+    else
+      vcenter_portgroups[$VCENTER]=${portgroup_name}
+      log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
+    fi
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
@@ -390,13 +413,18 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   pool_passwords[$VCENTER]=${vsphere_password}
 
   name=$(jq -r '.spec.name' < /tmp/pool.json)
+  shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
   server=$(jq -r '.spec.server' < /tmp/pool.json)
   region=$(jq -r '.spec.region' < /tmp/pool.json)
   zone=$(jq -r '.spec.zone' < /tmp/pool.json)
   cluster=$(jq -r '.spec.topology.computeCluster' < /tmp/pool.json)
   datacenter=$(jq -r '.spec.topology.datacenter' < /tmp/pool.json)
   datastore=$(jq -r '.spec.topology.datastore' < /tmp/pool.json)
-  network="${vcenter_portgroups[${server}]}"
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $name == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+    network="${vcenter_portgroups_2[${server}]}"
+  else
+    network="${vcenter_portgroups[${server}]}"
+  fi
   if [ $IPI -eq 0 ]; then
     resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
   else
@@ -408,7 +436,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   failure_domain_count=$(echo "${platformSpec}" | jq '.failureDomains | length')
   if [[ $failure_domain_count == 0 ]]; then
     add_failure_domain=1
-  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$name" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
+  elif [ -z "$(echo "${platformSpec}" | jq -e --arg NAME "$shortName" '.failureDomains[] | select(.name == $NAME) | length == 0')" ]; then
     add_failure_domain=1
   fi
 
@@ -416,7 +444,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
     if [ -n "${MULTI_NIC_IPI}" ]; then
       network="${network}\",\"${vsphere_extra_portgroup}"
     fi
-    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${name}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${shortName}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
   fi
 
   # Add / Update vCenter list

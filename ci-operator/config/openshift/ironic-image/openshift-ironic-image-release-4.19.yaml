@@ -7,10 +7,6 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-base-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-openshift-4.19
 build_root:
   from_repository: true
 images:
@@ -30,8 +26,8 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-19-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-19-rhel-9-server-ironic.repo
-    from: ocp_builder_rhel-9-base-openshift-4.19
+      curl http://base-4-19-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-19-rhel-9-server-ironic.repo
+    from: ocp_4.19_base-rhel9
     to: ironic-base
 releases:
   initial:
@@ -57,24 +53,27 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 5h0m0s
 - as: check-requirements
   commands: |-
     #!/bin/bash
     set -euxo pipefail
     # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="master"
+    export CHECK_RELEASE="main"
     make check-reqs
   container:
     from: src

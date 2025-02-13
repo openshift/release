@@ -29,7 +29,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${SSH_KEY}")
 
 # Run commands from the bastion
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "kni@${JUMP_SERVER_ADDRESS}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "telcov10n@${JUMP_SERVER_ADDRESS}" bash -s -- \
   "'${VPN_URL}'" "'${VPN_USERNAME}'" "'${VPN_PASSWORD}'" "'${IFNAME}'" "'${BASTION_ADDRESS}'" << 'EOF'
     set -o nounset
     set -o errexit

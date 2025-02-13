@@ -257,6 +257,14 @@ periodics:
     ci.openshift.io/area: openshift-kni
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-openshift-kni
+  reporter_config:
+    slack:
+      channel: '#telco-platform-alerts'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@channel Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
   spec:
     automountServiceAccountToken: true
     containers:
@@ -799,6 +807,46 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
+    ci.openshift.io/area: ols-load-generator
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-ols-load-generator
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - command:
+      - /tp-entrypoint.sh
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_ols_load_generator
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: .dockerconfigjson
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-ols-load-generator
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
     ci.openshift.io/area: observability-ui
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-observability-ui
@@ -837,6 +885,96 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay-io-observability-ui
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: ksan-operator
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-ksan-operator
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - command:
+      - /tp-entrypoint.sh
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_ksan_operator
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-ksan-operator
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  decoration_config:
+    timeout: 5h0m0s
+  labels:
+    ci.openshift.io/area: telcov10n-ci
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-telcov10n-ci
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ' :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> :volcano: '
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - command:
+      - /tp-entrypoint.sh
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_telcov10n-ci
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-telcov10n-ci
     - configMap:
         name: image-mirror-mappings
       name: config

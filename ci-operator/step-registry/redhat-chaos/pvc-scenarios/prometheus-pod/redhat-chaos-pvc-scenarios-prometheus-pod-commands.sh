@@ -3,10 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
 
 function cluster_monitoring_config(){
 oc apply -f- <<EOF
@@ -27,11 +23,12 @@ data:
 EOF
 }
 
-#Check Storage Class
+# Check Storage Class
 echo "Checking Storage Class"
 DEFAULT_STORAGE_CLASS=$(oc get storageclass -o json | jq -r '.items[] | select(.metadata.annotations."storageclass.kubernetes.io/is-default-class" == "true") | .metadata.name')
 echo "Default Storage Class is $DEFAULT_STORAGE_CLASS"
-#Create PV and PVC for prometheus
+
+# Create PV and PVC for prometheus
 echo "Creating PV and PVC"
 cluster_monitoring_config $DEFAULT_STORAGE_CLASS
 echo "Sleeping for 60 seconds for the PV and PVC to be bound"

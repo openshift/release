@@ -1,0 +1,46 @@
+workflow:
+  as: hypershift-mce-kubevirt-azure-conformance
+  documentation: |-
+    The HyperShift KubeVirt conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in Azure account and is destroyed after tests complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - chain: ipi-azure-pre
+    - ref: hypershift-kubevirt-install-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-health-check
+    test:
+      - chain: hypershift-conformance
+    post:
+      - ref: hypershift-mce-dump
+      - chain: gather-core-dump
+      - chain: hypershift-mce-kubevirt-destroy
+      - chain: ipi-azure-post
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D16s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
+      ETCD_STORAGE_CLASS: managed-csi
+      KUBEVIRT_CSI_INFRA: managed-csi
+      ODF_BACKEND_STORAGE_CLASS: managed-csi
+      SKIP_MONITOR_TEST: "true"
+    leases:
+      - env: LEASED_RESOURCE
+        resource_type: azure-autorelease-qe-quota-slice

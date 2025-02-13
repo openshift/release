@@ -7,14 +7,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.18_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -22,12 +22,12 @@ canonical_go_repository: github.com/openshift/api
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cluster-config-api
 promotion:
   to:
@@ -59,17 +59,22 @@ tests:
   commands: |
     make verify-scripts verify-codegen-crds -k --warn-undefined-variables
   container:
-    from: bin
+    from: src
 - as: verify-crd-schema
   commands: |
     make verify-crd-schema -k --warn-undefined-variables
   container:
-    from: bin
+    from: src
+- as: verify-feature-promotion
+  commands: |
+    make verify-feature-promotion -k --warn-undefined-variables
+  container:
+    from: src
 - as: verify-deps
   commands: |
     make verify-deps -k --warn-undefined-variables
   container:
-    from: bin
+    from: src
 - as: unit
   commands: |
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
@@ -77,14 +82,14 @@ tests:
     from: test-bin
 - as: lint
   commands: |
-    make lint
+    make -k lint verify-lint-fix
   container:
-    from: bin
+    from: src
 - as: integration
   commands: |
     make integration -k --warn-undefined-variables
   container:
-    from: bin
+    from: src
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
@@ -100,7 +105,7 @@ tests:
     make generate
     go build ./...
   container:
-    from: bin
+    from: src
 - as: e2e-aws-ovn
   run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:

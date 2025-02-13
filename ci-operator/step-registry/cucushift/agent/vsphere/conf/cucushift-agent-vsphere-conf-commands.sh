@@ -174,16 +174,17 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/mac-addresses.txt
 
 declare -a hostnames=()
-for ((i = 0; i < total_host; i++)); do
-  if [ "${WORKERS}" -gt 0 ]; then
-    hostnames+=("${cluster_name}-master-$i")
-    hostnames+=("${cluster_name}-worker-$i")
-    echo "${hostnames[$i]}"
-  else
-    hostnames+=("${cluster_name}-master-$i")
-    echo "${hostnames[$i]}"
-  fi
-done >"${SHARED_DIR}"/hostnames.txt
+for ((i = 0; i < MASTERS; i++)); do
+  hostname="${cluster_name}-master-$i"
+  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=("${hostname}")
+done
+
+for ((i = 0; i < WORKERS; i++)); do
+  hostname="${cluster_name}-worker-$i"
+  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=("${hostname}")
+done
 
 for ((i = 0; i < total_host; i++)); do
   ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
@@ -241,7 +242,6 @@ cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 rendezvousIP: ${rendezvous_ip_address}
-minimalISO: ${MINIMAL_ISO}
 hosts: []
 EOF
 
@@ -249,6 +249,12 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 #Add hosts details to the agent-config.yaml
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
+
+if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+  cat >> "${SHARED_DIR}/agent-config.yaml" <<EOF
+minimalISO: ${MINIMAL_ISO}
+EOF
+fi
 
 echo "Creating agent image..."
 dir=/tmp/installer
@@ -259,6 +265,9 @@ cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
+
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 

@@ -61,23 +61,24 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
-      CLO_SUB_CHANNEL: stable-5.7
       COMPUTE_NODE_TYPE: Standard_D8ps_v5
       CONTROL_PLANE_NODE_TYPE: Standard_D8ps_v5
-      EO_SUB_CHANNEL: stable-5.7
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-5.7
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.7
       OCP_ARCH: arm64
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-logging","target_namespaces": "openshift-logging", "operator_group": "openshift-logging"}
+        ]
       TEST_FILTERS: Disruptive;Longduration
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
     - ref: enable-qe-catalogsource-logging
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-cluster-logging-operator
-    - ref: operatorhub-subscribe-loki-operator
+    - ref: install-operators
     - chain: openshift-e2e-test-logging-qe-disruptive
     workflow: cucushift-installer-rehearse-azure-upi
 zz_generated_metadata:

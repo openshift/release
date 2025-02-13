@@ -27,9 +27,6 @@ metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
-# Override the subscription source
-ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-15"
-# create the custom catalog source that points to 4.15 regardless of the OCP version
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
