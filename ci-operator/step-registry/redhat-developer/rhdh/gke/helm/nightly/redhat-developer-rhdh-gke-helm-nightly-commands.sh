@@ -13,13 +13,14 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 
-export QUAY_REPO="rhdh-community/rhdh"
-export RELEASE_BRANCH_NAME="main"
-RELEASE_TAG_NAME="next"
+export QUAY_REPO RELEASE_BRANCH_NAME
+QUAY_REPO="rhdh-community/rhdh"
+RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
+git checkout "$RELEASE_BRANCH_NAME" || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
@@ -53,9 +54,14 @@ for change in $PR_CHANGESET; do
 done
 
 if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    echo "Skipping wait for new PR image and proceeding with image tag : $RELEASE_TAG_NAME"
-    echo "updated image tag : $RELEASE_TAG_NAME"
-    TAG_NAME=$RELEASE_TAG_NAME
+    TAG_NAME="next"
+    QUAY_REPO="rhdh/rhdh-hub-rhel9"
+    if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
+        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
+        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    fi
+    echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
+    echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
     TIMEOUT=3000         # Maximum wait time of 50 mins (3000 seconds)
     INTERVAL=60             # Check every 60 seconds

@@ -55,6 +55,21 @@ if [[ -n "$ORION_CONFIG" ]]; then
   export CONFIG="${ORION_CONFIG}"
 fi
 
+if [[ -n "$ORION_ENVS" ]]; then
+  ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
+  IFS=',' read -r -a env_array <<< "$ORION_ENVS"
+  for env_pair in "${env_array[@]}"; do
+    env_pair=$(echo "$env_pair" | xargs)
+    env_key=$(echo "$env_pair" | cut -d'=' -f1)
+    env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+    export "$env_key"="$env_value"
+  done
+fi
+
+if [[ -n "$LOOKBACK_SIZE" ]]; then
+  export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
 set +e
 es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
 orion_exit_status=$?
