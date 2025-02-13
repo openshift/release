@@ -2,7 +2,7 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM quay.io/multi-arch/yq:4.30.5 as yq4
-      FROM registry.redhat.io/openshift4/ztp-site-generate-rhel8 AS ztp-gen
+      FROM quay.io/openshift-kni/ztp-site-generator:4.18.0 AS ztp-gen
       WORKDIR /home/ztp
       FROM registry.ci.openshift.org/ci/telco-runner
       COPY --from=yq4 /usr/bin/yq /usr/bin/yq
@@ -124,6 +124,7 @@ tests:
                   policyName: "subscriptions-policy"
                   spec:
                     source: redhat-operators-custom
+                    # channel: "stable-6.1"
                 - fileName: ClusterLogOperatorStatus.yaml
                   policyName: "subscriptions-policy"
                 - fileName: ClusterLogServiceAccount.yaml
@@ -151,8 +152,9 @@ tests:
                   metadata:
                       name: redhat-operators-custom
                   spec:
-                    displayName: Red Hat Operators Catalog
-                    image: registry.dev-kpi-02.hv4.ptp.eng.rdu2.dc.redhat.com:5000/olm/redhat-operators:v4.18
+                    displayName: Red Hat Custom Operators Catalog
+                    # image: quay.io/prega/prega-operator-index:v4.18.0
+                    image: registry.redhat.io/redhat/redhat-operator-index:v4.17
         - filename: site-policies/group-du-sno-ranGen.yaml
           content: |-
             ---
@@ -201,13 +203,13 @@ tests:
                 - fileName: PtpConfigSlaveForEvent.yaml
                   # Note: The KPI pipeline is using PtpConfigSlaveForEvent.yaml so that the
                   # PTP KPI test which relies on regular log output can function, even
-                  # though we're not using PtpOperatorConfigForEvent.yaml above
+                  # though we are not using PtpOperatorConfigForEvent.yaml above
                   policyName: "config-policy"
                   spec:
                     profile:
                     - name: "slave"
                       # This interface must match the hardware in this group
-                      interface: "ens2f3"
+                      interface: "ens2f0"
                 - fileName: SriovOperatorConfigForSNO.yaml
                   policyName: "config-policy"
                   # For existing clusters with node selector set as "master",
@@ -273,7 +275,8 @@ tests:
               namespace: "ztp-site"
             spec:
               bindingRules:
-                sites: "spree-03"
+                # sites: "spree-03"
+                group-du-sno: ""
               mcp: "master"
               sourceFiles:
                 - fileName: SriovNetwork.yaml
@@ -293,7 +296,7 @@ tests:
                     nicSelector:
                       pfNames: []
                       rootDevices:
-                        - 0000:70:00.0
+                        - 0000:ca:00.2
                       vendor: "8086"
                       deviceID: "1593"
                     numVfs: 8
@@ -316,7 +319,7 @@ tests:
                     nicSelector:
                       pfNames: []
                       rootDevices:
-                        - 0000:70:00.1
+                        - 0000:ca:00.3
                       vendor: "8086"
                       deviceID: "1593"
                     numVfs: 8
