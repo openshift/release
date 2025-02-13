@@ -15,8 +15,9 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 
+export RELEASE_BRANCH_NAME
 export QUAY_REPO="rhdh-community/rhdh"
-export RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
+RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"

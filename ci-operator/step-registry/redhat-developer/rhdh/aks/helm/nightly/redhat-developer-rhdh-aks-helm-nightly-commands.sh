@@ -72,8 +72,9 @@ echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 
+export RELEASE_BRANCH_NAME
 export QUAY_REPO="rhdh-community/rhdh"
-export RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
+RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 export RELEASE_TAG_NAME="next"
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
