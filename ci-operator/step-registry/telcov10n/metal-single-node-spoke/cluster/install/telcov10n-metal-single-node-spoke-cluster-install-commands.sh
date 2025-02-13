@@ -36,6 +36,32 @@ EOF
   set +x
 }
 
+function add_pre_ga_pull_secret_if_defined {
+
+  if [ -f /var/run/telcov10n/ztp-left-shifting/prega-pull-secret ];then
+
+    echo "Adding PreGA pull secret to pull the container image index from the Spoke cluster..."
+
+    rm -fv /tmp/dot-dockerconfig-data.json || echo
+    cp -v $SHARED_DIR/pull-secret /tmp/dot-dockerconfig-data.json
+
+    cat <<EOF >| /tmp/pre-ga.json
+{
+  "auths": {
+    "quay.io/prega": {
+      "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
+      "email": "prega@redhat.com"
+    }
+  }
+}
+EOF
+
+    set -x
+    jq -s '.[0] * .[1]' /tmp/dot-dockerconfig-data.json /tmp/pre-ga.json >| $SHARED_DIR/pull-secret
+    set +x
+  fi
+}
+
 function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
@@ -46,6 +72,8 @@ function generate_assisted_deployment_pull_secret {
     SPOKE_CLUSTER_NAME=${NAMESPACE}
   fi
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
+
+  add_pre_ga_pull_secret_if_defined
 
   cat << EOF | oc apply -f -
 apiVersion: v1

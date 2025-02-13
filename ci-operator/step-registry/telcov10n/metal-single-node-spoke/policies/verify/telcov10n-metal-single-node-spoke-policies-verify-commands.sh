@@ -13,8 +13,16 @@ function set_hub_cluster_kubeconfig {
 }
 
 function run_tests {
-  echo "************ telcov10n Verifying installation ************"
-  oc get managedcluster || echo "No ready..."
+
+  echo "************ telcov10n Verifying all Policies are Healthy ************"
+
+  set -x
+  oc -n ztp-install get cgu
+  oc -n openshift-gitops get apps/policies
+  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m
+  oc -n openshift-gitops get apps/policies
+  oc -n ztp-install get cgu
+  set +x
 }
 
 function main {
