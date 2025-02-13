@@ -93,7 +93,7 @@ function listMachineConfigPoolDetails() {
 
 # List details of machinesets, machines and nodes depending on Classic Rosa or HCP cluster
 function listDetails() {
-  if [ "$is_hcp_cluster" = "false" ]; then
+  if [ "$HOSTED_CP" = "false" ]; then
     echo "Listing machine pool config, machine and node details"
     listMachineConfigPoolDetails
     listMachineAndNodeDetails
@@ -240,8 +240,8 @@ else
 fi
 
 # Check if this is a HCP cluster
-is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
-log "hypershift.enabled is set to $is_hcp_cluster"
+HOSTED_CP="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
+log "hypershift.enabled is set to $HOSTED_CP"
 
 # Check if we modified the node counts to reduce day 2 op time and fix as necessary
 fixNodeScaling
