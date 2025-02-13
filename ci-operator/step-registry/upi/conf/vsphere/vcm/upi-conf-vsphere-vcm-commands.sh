@@ -402,9 +402,9 @@ if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
       echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
       if [ "${Z_VERSION}" -lt 14 ]; then
         echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
-        cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
+        cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${install_config}
       else
-        cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        cat ${PULL_THROUGH_CACHE_CONFIG} >>${install_config}
       fi
     else
       echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
