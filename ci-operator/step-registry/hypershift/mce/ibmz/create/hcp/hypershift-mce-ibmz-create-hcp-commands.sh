@@ -135,7 +135,8 @@ data:
 EOF
 
 # Creating AgentServiceConfig
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+# CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2) # This will calculate the compute nodes version based on the management cluster version, in case of multi-version testing this logic does not hold good
+CLUSTER_VERSION=$(echo $JOB_SPEC | jq -r '.extra_refs[].base_ref' | cut -d '-' -f 2) # Calculating the compute nodes version based on the hcp version
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
 cat <<EOF | oc apply -f -
