@@ -19,13 +19,13 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: qa-e2e-tests
+- as: t120m
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: stackrox
     product: ocp
-    timeout: 1h30m0s
+    timeout: 2h00m0s
     version: "4.12"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
@@ -36,27 +36,39 @@ tests:
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
 - always_run: false
-  as: scanner-v4-install-tests
+  as: t90m
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.12"
   optional: true
   run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.12
       TEST_SUITE: ocp-scanner-v4-install-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
+    workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: ebpf-qa-e2e-tests
+- as: t60m
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
   optional: true
   run_if_changed: ^COLLECTOR_VERSION
   steps:
     env:
       COLLECTION_METHOD: ebpf
-      OCP_VERSION: ocp/stable-4.12
       TEST_SUITE: ocp-qa-e2e-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
+    workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: operator-e2e-tests
+- as: t30m
   cluster_claim:
     architecture: amd64
     cloud: aws
