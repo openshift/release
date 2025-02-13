@@ -5,3 +5,5 @@ oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfig
 jq -s '.[0] * .[1]' existing-pull-secret.json /run/secrets/ci.openshift.io/cluster-profile/pull-secret > merged-pull-secret.json
 #Set Pull secret
 oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=merged-pull-secret.json
+
+#change the upgrade channel and patch CVO to desired version
