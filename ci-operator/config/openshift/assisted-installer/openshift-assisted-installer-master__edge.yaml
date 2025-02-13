@@ -134,13 +134,13 @@ tests:
   container:
     clone: true
     from: assisted-installer-build
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: format-check
   commands: make format-check
   container:
     clone: true
     from: assisted-installer-build
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test
   commands: |
     export GOCACHE=/tmp/gocache
@@ -152,7 +152,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export GOCACHE=/tmp/gocache
@@ -166,14 +166,15 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
 - as: e2e-metal-assisted-4-18
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv6-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -183,7 +184,8 @@ tests:
         IPv4=no
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-single-node-4-18
+- always_run: false
+  as: e2e-metal-assisted-single-node-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -192,7 +194,8 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4-17
+- always_run: false
+  as: e2e-metal-assisted-cnv-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -210,7 +213,8 @@ tests:
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-lvm-4-18
+- always_run: false
+  as: e2e-metal-assisted-lvm-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -224,7 +228,8 @@ tests:
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-17
+- always_run: false
+  as: e2e-metal-assisted-odf-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -238,7 +243,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -256,18 +261,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
-    workflow: assisted-oci
-- always_run: false
-  as: e2e-oci-assisted-4-17
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-      PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
   as: e2e-metal-assisted-external-4-18
@@ -289,20 +282,6 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         OPENSHIFT_VERSION=4.18
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-17
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.17
       PLATFORM: vsphere
     workflow: assisted-vsphere
 zz_generated_metadata:
