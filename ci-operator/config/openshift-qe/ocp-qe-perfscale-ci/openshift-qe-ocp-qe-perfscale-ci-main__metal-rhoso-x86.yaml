@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: weekly-compact-6nodes
+  capabilities:
+  - vpn
+  cron: 0 0 * * 5
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      LAB: performancelab
+      LAB_CLOUD: cloud31
+      NUM_NODES: "6"
+      NUM_WORKER_NODES: "0"
+      OCP_BUILD: ga
+      OCP_VERSION: latest
+      PUBLIC_VLAN: "true"
+      STARTING_NODE: "4"
+      TYPE: mno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-foreman
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: metal-rhoso-x86
