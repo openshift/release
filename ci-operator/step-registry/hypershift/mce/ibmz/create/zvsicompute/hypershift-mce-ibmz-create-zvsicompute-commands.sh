@@ -77,14 +77,14 @@ max_retries=6
 sleeptime=30
 while [ $count -lt $max_retries ]; do
   count=$(( count + 1 ))
-  echo "Try the $count time to create VPC..."
+  echo "Try $count/6: Waiting for VPC to be successfully created ..."
   ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
   create_status=$?
   if [ $create_status -eq 0 ]; then
         echo "VPC $infra_name-vpc is created successfully"
         break
     else
-        echo "Failed to create VPC on the $count time, the error code is $create_status"
+        echo "Failed to create VPC after $count/6 retry, the error code is $create_status"
         sleep $sleeptime
   fi
 done
