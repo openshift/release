@@ -58,26 +58,13 @@ tests:
       commands: |
         set -x
         cd /go/src/github.com/securesign/secure-sign-operator
+
+        # Prepare dev images
         make dev-images
-        cat > /tmp/image_config.patch <<EOF
-        {"spec": {"config":{"env": [
-        {"name": "TRILLIAN_LOG_SIGNER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianLogSignerImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "TRILLIAN_LOG_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianServerImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "TRILLIAN_DB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TrillianDbImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "FULCIO_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "FulcioServerImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "REKOR_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorRedisImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "REKOR_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorServerImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "REKOR_SEARCH_UI_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "RekorSearchUiImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "BACKFILL_REDIS_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "BackfillRedisImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "TUF_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TufImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "CTLOG_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CTLogImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "CLIENT_SERVER_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "ClientServerImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "SEGMENT_BACKUP_JOB_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "SegmentBackupImage" | grep -o '[^[:space:]]*@sha.*')},
-        {"name": "TIMESTAMP_AUTHORITY_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "TimestampAuthorityImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")},
-        {"name": "CREATE_TREE_IMAGE", "value": $(cat internal/controller/constants/images.go | grep "CreateTreeImage" | grep -o '[^[:space:]]*@sha.*' || echo "null")}
-        ]}}}
-        EOF
+        ./ci/related-image-patch.sh internal/images/images.env > /tmp/image_config.patch
         cat /tmp/image_config.patch
+
+        # Install Operator
         oc create ns openshift-rhtas-operator
         make operator-sdk
         ./bin/operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
