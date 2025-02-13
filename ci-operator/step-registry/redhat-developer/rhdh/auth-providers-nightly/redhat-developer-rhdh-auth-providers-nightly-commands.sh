@@ -12,9 +12,8 @@ GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 TAG_NAME="next"
 
-export RELEASE_BRANCH_NAME
-export QUAY_REPO="rhdh-community/rhdh"
-RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
+export QUAY_REPO="rhdh/rhdh-hub-rhel9"
+export RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
     TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
