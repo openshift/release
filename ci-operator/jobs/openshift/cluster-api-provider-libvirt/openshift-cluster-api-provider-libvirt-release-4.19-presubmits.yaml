@@ -419,7 +419,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -433,7 +433,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-libvirt-release-4.19-okd-scos-images
-    optional: true
     rerun_command: /test okd-scos-images
     spec:
       containers:
@@ -590,31 +589,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4.19$
-    - ^release-4.19-
-    cluster: build07
-    context: ci/prow/yaml-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-cluster-api-provider-libvirt-release-4.19-yaml-lint
-    rerun_command: /test yaml-lint
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test( | .* )yaml-lint,?($|\s.*)
