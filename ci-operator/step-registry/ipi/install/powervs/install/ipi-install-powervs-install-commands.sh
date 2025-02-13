@@ -765,7 +765,7 @@ echo "tgName in ${SHARED_DIR}/install-config.yaml"
 grep tgName "${SHARED_DIR}/install-config.yaml" || true
 
 # Remove this if test when https://issues.redhat.com/browse/OCPBUGS-50576 has been closed.
-if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
+if echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($2 == 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
 then
     echo "***************************************************************************************************"
     echo "4.19 hack OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE in use!"
