@@ -737,10 +737,20 @@ VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
 PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+ARCH=$(yq-v4 eval '.ARCH' "${SHARED_DIR}/powervs-conf.yaml")
+BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervs-conf.yaml")
+LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervs-conf.yaml")
 
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+echo "VPCREGION=${VPCREGION}"
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "PERSISTENT_TG=${PERSISTENT_TG}"
 echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
+
+# NOTE: If you want to test against a certain release, then do something like:
+# if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -753,6 +763,15 @@ export CLUSTER_NAME
 
 echo "tgName in ${SHARED_DIR}/install-config.yaml"
 grep tgName "${SHARED_DIR}/install-config.yaml" || true
+
+# Remove this if test when https://issues.redhat.com/browse/OCPBUGS-50576 has been closed.
+if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
+then
+    echo "***************************************************************************************************"
+    echo "4.19 hack OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE in use!"
+    echo "***************************************************************************************************"
+    export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-418-94-202410090804-0-ppc64le-powervs.ova.gz"
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"
