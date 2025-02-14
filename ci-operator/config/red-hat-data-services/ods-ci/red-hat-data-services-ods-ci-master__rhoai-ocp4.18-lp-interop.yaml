@@ -3,33 +3,32 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  rhoai-tests:
+    name: ods-ci
+    namespace: ci
+    tag: dev
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.19
-images:
-- context_dir: .
-  dockerfile_path: ods_ci/build/Dockerfile_interop
-  to: rhoai-tests
 releases:
   latest:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.18.0-0
-        stream: 4-stable
-        upper: 4.19.0-0
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
-      memory: 128Gi
+      cpu: "8"
+      memory: 32Gi
     requests:
-      cpu: 8000m
-      memory: 64Gi
+      cpu: "8"
+      memory: 32Gi
 tests:
 - as: rhoai-interop-aws
-  cron: 0 6 * * 1
+  cron: 0 0 11 6 *
   steps:
     cluster_profile: aws-rhoai-qe
     env:
@@ -47,6 +46,7 @@ tests:
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhoai-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: apodhrad@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -56,20 +56,21 @@ tests:
             {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
-            {"name": "rhods-operator", "source": "redhat-operators", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+            {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-pipelines", "operator_group":"openshift-pipelines-operator"},
+            {"name": "rhods-operator", "source": "rhoai-catalog-dev", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
         ]
-      RE_TRIGGER_ON_FAILURE: "false"
-      TEST_SUITE: Pre-Upgrade
       USER_TAGS: |
         scenario rhoai
+      TEST_SUITE: "Post-Upgrade"
     test:
     - ref: rhoai-setup-catalog
     - ref: install-operators
     - ref: rhoai-deploy-dsc
     - ref: rhoai-tests
     workflow: firewatch-ipi-aws
+  timeout: 4h0m0s
 zz_generated_metadata:
-  branch: release-2.16
+  branch: master
   org: red-hat-data-services
   repo: ods-ci
   variant: rhoai-ocp4.18-lp-interop
