@@ -147,48 +147,21 @@ EOF
 
 # Wait for cluster to be ready
 log "Waiting for cluster ready..."
-FAILED_INSTALL="no"
-cluster_info_json=$(mktemp)
-start_time=$(date +"%s")
-dyn_start_time=${start_time}
-CLUSTER_PREVIOUS_STATE="claim"
-record_cluster "timers" "status" "claim"
-while true; do
-  rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
-  CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
-  log "Cluster state: ${CLUSTER_STATE}"
-  current_time=$(date +"%s")
-  if [[ "${CLUSTER_STATE}" == "error" ]] || (( "${current_time}" - "${start_time}" >= "${CLUSTER_TIMEOUT}" )); then
-    record_cluster "timers" "status" "${CLUSTER_STATE}"
-    FAILED_INSTALL="yes"
-    break
-  fi
-  if [[ "${CLUSTER_STATE}" != "${CLUSTER_PREVIOUS_STATE}" ]] ; then
-    record_cluster "timers" "status" "${CLUSTER_STATE}"
-    record_cluster "timers.install" "${CLUSTER_PREVIOUS_STATE}" $(( "${current_time}" - "${dyn_start_time}" ))
-    dyn_start_time=${current_time}
-    CLUSTER_PREVIOUS_STATE=${CLUSTER_STATE}
-    if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-      break
-    fi
-  else
-      if [[ ${CLUSTER_STATE} == "installing" ]]; then
-      	sleep 60
-      else
-        sleep 1
-      fi
-  fi
-  if [[ "${CLUSTER_STATE}" == "waiting" ]] && [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${BYO_OIDC}" == "false" ]]; then
-    # Adding ingress role to trust policy
-    post_shared_vpc_auto ${cluster_info_json}
-  fi
-done
-cat $cluster_config_file | jq -r '.timers'
 
-if [[ "$FAILED_INSTALL" == "yes" ]]; then
-  rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log"
+export TEST_PROFILE=${TEST_PROFILE}
+# Variables
+if [[ -z "$TEST_PROFILE" ]]; then
+  log "ERROR: " "TEST_PROFILE is mandatory."
   exit 1
 fi
+
+cluster_info_json=$(mktemp)
+
+record_cluster "timers" "status" "claim"
+
+rosatest --ginkgo.v --ginkgo.no-color \
+  --ginkgo.timeout "60m" \
+  --ginkgo.label-filter "day1-readiness" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Verify the subnets of the cluster to remove the 'Inflight Checks' warning
 if [[ "$ENABLE_BYOVPC" == "true" ]]; then

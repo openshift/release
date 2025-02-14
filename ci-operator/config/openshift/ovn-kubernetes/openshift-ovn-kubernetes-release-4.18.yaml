@@ -342,6 +342,25 @@ tests:
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
 - always_run: false
+  as: qe-perfscale-payload-control-plane-6nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      ITERATION_MULTIPLIER_ENV: "15"
+      JUNIT: "true"
+      RUN_ORION: "false"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+- always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
   optional: true
   steps:
@@ -429,7 +448,7 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-installer-featuregate
-    workflow: openshift-qe-udn-density-l3-pods
+    workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l2
@@ -440,6 +459,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
       EXTRA_MG_ARGS: --host-network
       FEATURE: NetworkSegmentation
       ITERATION_MULTIPLIER_ENV: "3"
@@ -450,7 +470,7 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-installer-featuregate
-    workflow: openshift-qe-udn-density-l2-pods
+    workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
   optional: true
