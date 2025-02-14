@@ -158,6 +158,17 @@ function checking_installation_progress {
   echo
 }
 
+function add_proxy_to_kubeconfig_if_needed {
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    kc_s5_proxy_format="${SOCKS5_PROXY/socks5h:/socks5:}"
+    if [ "$(grep "${kc_s5_proxy_format}" "${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml")" == "" ]; then
+      echo "Adding '${kc_s5_proxy_format}' in the ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml file"
+      sed -i "/    server: / a\    proxy-url: ${kc_s5_proxy_format}" ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
+    fi
+  fi
+}
+
 function get_and_save_kubeconfig_and_creds {
 
   echo "************ telcov10n Get and Save Spoke kubeconfig and kubeadmin password ************"
@@ -169,6 +180,8 @@ function get_and_save_kubeconfig_and_creds {
     | jq -r '.data.kubeconfig' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
   oc -n ${SPOKE_CLUSTER_NAME} get secrets $secret_adm_pass -o json \
     | jq -r '.data.password' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml
+
+  add_proxy_to_kubeconfig_if_needed
 
   cp -v ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml ${ARTIFACT_DIR}/
 }
