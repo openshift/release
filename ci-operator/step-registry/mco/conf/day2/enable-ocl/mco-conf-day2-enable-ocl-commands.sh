@@ -4,6 +4,11 @@ set -e
 set -u
 set -o pipefail
 
+# v1 is used in clusters 4.19+
+MOSC_V1_API_VERSION="v1"
+# vialpha is used in clusters 4.18-
+MOSC_V1ALPHA_API_VERSION="v1alpha1"
+
 function set_proxy () {
     if [ -s "${SHARED_DIR}/proxy-conf.sh" ]; then
         echo "Setting the proxy ${SHARED_DIR}/proxy-conf.sh"
@@ -26,8 +31,14 @@ function debug_and_exit() {
     echo '####################################################'
     echo '####################################################'
     echo ''
+    echo 'Current scenario:'
+    run_command "oc -n openshift-machine-config-operator get mcp,nodes,machineosconfig,machineosbuild"
+    echo ''
+    echo '####################################################'
+    echo '####################################################'
+    echo ''
     echo 'All pods:'
-    run_command "oc get pods"
+    run_command "oc get pods -n openshift-machine-config-operator"
     echo ''
     echo '####################################################'
     echo '####################################################'
@@ -57,11 +68,19 @@ fi
 set_proxy
 
 IFS=" " read -r -a mcp_arr <<<"$MCO_CONF_DAY2_OCL_POOLS"
-for custom_mcp_name in "${mcp_arr[@]}"; do
+# Currently only v1 or v1alpha are provided and they are mutually exclusive. If anything  changes we want this step to fail, that's why we get [*] in the jsonpath
+# If more than one api is provided we need to analyse if it is right or not, and if necessary adapt this code
+MOSC_API_VERSION=$(oc get crd -oyaml machineosconfigs.machineconfiguration.openshift.io -ojsonpath='{.spec.versions[*].name}')
 
-    echo "Enable OCL in pool $custom_mcp_name"
+echo ""
+echo "Using MOSC API: $MOSC_API_VERSION"
 
-   oc create -f - << EOF
+if [ "$MOSC_API_VERSION" == "$MOSC_V1ALPHA_API_VERSION" ]; then
+    for custom_mcp_name in "${mcp_arr[@]}"; do
+        echo ""
+        echo "Enable OCL in pool $custom_mcp_name"
+    
+        oc create -f - << EOF
 apiVersion: machineconfiguration.openshift.io/v1alpha1
 kind: MachineOSConfig
 metadata:
@@ -85,41 +104,100 @@ spec:
             LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
 EOF
 
-    oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
 
+    done
+
+elif [ "$MOSC_API_VERSION" == "$MOSC_V1_API_VERSION" ] ; then
+    for custom_mcp_name in "${mcp_arr[@]}"; do
+        echo ""
+        echo "Enable OCL in pool $custom_mcp_name"
+    
+        oc create -f - << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineOSConfig
+metadata:
+  name: mosc-$custom_mcp_name
+spec:
+  machineConfigPool:
+    name: $custom_mcp_name
+  imageBuilder:
+    imageBuilderType: Job
+  renderedImagePushSecret:
+    name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
+  renderedImagePushSpec: "quay.io/mcoqe/layering:ocl-$custom_mcp_name"
+  containerFile:
+      - content: |-
+          LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
+EOF
+
+        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+
+    done
+
+else
+    echo "Suported MOSC API versions [$MOSC_V1ALPHA_API_VERSION, $MOSC_V1ALPHA_API_VERSION] MOSCO Unexpected MOSC API version: $MOSC_API_VERSION"
+    debug_and_exit
+fi
+
+for custom_mcp_name in "${mcp_arr[@]}"; do
+    echo ""
+    echo "Wait for the $custom_mcp_name MCP to start building the OCL image"
+    mosc_name="mosc-$custom_mcp_name"
+    echo "Waiting for a MOSB resource to be created for mosc $mosc_name"
+    if ! run_command "oc wait --for=jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}' machineosconfig $mosc_name --timeout=300s"
+    then
+        echo "ERROR. The $mosc_name MOSC resource was not updated with a new MOSB annotation"
+        debug_and_exit
+    fi
+
+    machine_os_build_name=$(oc get machineosconfig "$mosc_name" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
+    echo "Waiting for a $machine_os_build_name MOSB to exist"
+    if ! run_command "oc wait --for=create machineosbuild $machine_os_build_name --timeout=300s"
+    then
+        echo "ERROR. The $machine_os_build_name MOSB resource was not created"
+        debug_and_exit
+    fi
+
+    echo "Waiting for $machine_os_build_name MOSB to start building"
+    if ! run_command "oc wait --for=condition=Building  machineosbuild $machine_os_build_name --timeout=300s"
+    then
+        echo "ERROR. The $machine_os_build_name MOSB resource didn't start building the image"
+        debug_and_exit
+    fi
 done
 
 for custom_mcp_name in "${mcp_arr[@]}"; do
+    echo ""
+    echo "Wait for the $custom_mcp_name MCP to finish building the OCL image"
+    mosc_name="mosc-$custom_mcp_name"
+
+    machine_os_build_name=$(oc get machineosconfig "$mosc_name" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
+
+    echo "Waiting for $machine_os_build_name MOSB to succeed"
+    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s"
+    then
+        echo "ERROR. The $machine_os_build_name MOSB resource failed to build the image"
+        debug_and_exit
+    fi
+done
+
+for custom_mcp_name in "${mcp_arr[@]}"; do
+    echo ""
     echo "Waiting for $custom_mcp_name MachineConfigPool to start updating..."
-    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATING=True' --timeout=300s &>/dev/null"
+    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATING=True' --timeout=600s"
     then
-        debug_and_exit
-    fi
-done
-
-
-for custom_mcp_name in "${mcp_arr[@]}"; do
-    echo "Wait for the $custom_mcp_name MCP to start building the OCL build"
-    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
-    if ! run_command "oc wait --for=condition=Building  machineosbuild $machine_os_build_name --timeout=300s &>/dev/null"
-    then
+        echo "ERROR. The $custom_mcp_name MCP didn't get the UPDATING=True condition"
         debug_and_exit
     fi
 done
 
 for custom_mcp_name in "${mcp_arr[@]}"; do
-    echo "Wait for the $custom_mcp_name MCP OCL build to succeed"
-    machine_os_build_name="$custom_mcp_name-$(oc get machineconfigpool "$custom_mcp_name"  -ojsonpath='{.spec.configuration.name}')-builder"
-    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s &>/dev/null"
-    then
-        debug_and_exit
-    fi
-done
-
-for custom_mcp_name in "${mcp_arr[@]}"; do
+    echo ""
     echo "Waiting for $custom_mcp_name MachineConfigPool to finish updating..."
-    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATED=True' --timeout=45m 2>/dev/null"
+    if ! run_command "oc wait mcp $custom_mcp_name --for='condition=UPDATED=True' --timeout=45m"
     then
+        echo "ERROR. The $custom_mcp_name MCP didn't get the UPDATED=True condition"
         debug_and_exit
     fi
 done
