@@ -293,12 +293,12 @@ function extract_rhcos_images {
   get_openshift_baremetal_install_tool
 
   openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
-  if [ -z "${RHCOS_IMG_ROOTFS_URL}" ]; then
+  if [ -z "${RHCOS_IMG_ROOTFS_URL:-}" ]; then
     rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
   else
     rootfs_url="${RHCOS_IMG_ROOTFS_URL}"
   fi
-  if [ -z "${RHCOS_ISO_URL}" ]; then
+  if [ -z "${RHCOS_ISO_URL:-}" ]; then
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
     iso_url="${RHCOS_ISO_URL}"
