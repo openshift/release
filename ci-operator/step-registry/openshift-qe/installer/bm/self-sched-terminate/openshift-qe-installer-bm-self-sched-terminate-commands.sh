@@ -14,4 +14,4 @@ TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Con
 
 ASSIGNMENT_ID=$(cat "${SHARED_DIR}/assignment_id")
 
-curl -k -X POST -H "Authorization: Bearer $TOKEN" http://quads2-stage.rdu2.scalelab.redhat.com/api/v3/assignments/terminate/$ASSIGNMENT_ID
+curl -k -X POST -H "Authorization: Bearer $TOKEN" $QUADS_INSTANCE/api/v3/assignments/terminate/$ASSIGNMENT_ID
