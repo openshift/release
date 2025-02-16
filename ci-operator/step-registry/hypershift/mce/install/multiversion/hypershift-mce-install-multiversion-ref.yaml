@@ -1,0 +1,39 @@
+ref:
+  as: hypershift-mce-install-multiversion
+  from: upi-installer
+  grace_period: 5m0s
+  timeout: 60m0s
+  cli: latest
+  env:
+    - name: OVERRIDE_HO_IMAGE
+      default: ""
+      documentation: |-
+        Override the HyperShift operator image. If the default is an empty string, this will not override. 
+        E.g: quay.io/hypershift/hypershift-operator:latest (connected)
+        E.g: virthost.ostest.test.metalkube.org:6001/hypershift/hypershift-operator:latest (disconnected)
+    - name: DISCONNECTED
+      default: "false"
+      documentation: Should we work on top of a disconnected environment
+  dependencies:
+    - env: "MCE_VERSION"
+      name: "2.4"
+  commands: hypershift-mce-install-multiversion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+    - mount_path: /etc/acm-d-mce-quay-pull-credentials
+      name: acm-d-mce-quay-credentials
+      namespace: test-credentials
+  documentation: |-
+    install mce operator. doc: https://github.com/stolostron/deploy/blob/master/multiclusterengine/README.md
+
+    If you want to use this step in a disconnected environment, the following configurations are required:
+    - ref: enable-qe-catalogsource-baremetalds-proxy-server
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: hypershift-mce-install
+    and set MCE_USE_QE_CATALOG = "true"
