@@ -43,7 +43,7 @@ function run-on-first-master {
 }
 
 function run-on-first-master-long {
-  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo bash -eEuxo pipefail ${1}
 }
 
 function run-on-first-master-silent {
@@ -71,14 +71,13 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
     until (( approved_csrs >= required_csrs )); do
-      echo "." >&3;
       mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
       if [[ ${#csrs[@]} -gt 0 ]]; then
         echo
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
       sleep 30
-    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
+    done | /usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null
   done
   echo "All CSRs approved at $(date)"
 
@@ -102,7 +101,7 @@ timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control
 run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master-long "/usr/local/bin/ensure-nodes-are-ready.sh"
   run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
