@@ -1,0 +1,61 @@
+ref:
+  as: hypershift-conformance
+  from: tests
+  commands: hypershift-conformance-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-pool-aws-credentials
+    name: hypershift-pool-aws-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    name: hypershift-ci-jobs-azurecreds
+    namespace: test-credentials
+  timeout: 14400s
+  grace_period: 30m0s
+  env:
+  - name: TEST_ARGS
+    default: ""
+    documentation: |-
+      Additional arguments to be passed to 'openshift-test'
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: |-
+      The test suite to run. Defaults to openshift/conformance/parallel
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+      that are printed in Prow won't exactly match the list returned by openshift-tests.
+  - name: TEST_INCLUDES
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to include,
+      even if these tests were matched in the TEST_SKIPS expression.
+  - name: SKIP_MONITOR_TEST
+    default: ""
+    documentation: |-
+      if non-empty, ignores job failure which is as a result of a failure of the MonitorTest suite.
+      All conformance test cases need to pass for the job to pass, though.
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Should we work on top of a disconnected environment
+  - name: ARCHITECTURE
+    default: "amd64"
+    documentation: Set the architecture for disconnected conformance (amd64, arm64, ppc64le, s390x)
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+      program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+      details. The file must be present in ${SHARED_DIR}.
+  - name: HOSTED_CP
+    default: ""
+    documentation: Execute against a ROSA hosted control plane
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
