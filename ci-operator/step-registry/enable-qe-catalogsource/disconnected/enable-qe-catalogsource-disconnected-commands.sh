@@ -560,3 +560,5 @@ if [ $mirror -eq 1 ]; then
     mirror_optional_images
 fi 
 create_catalog_sources
+echo "========================debug ------------------------"
+sleep 2h
