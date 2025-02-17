@@ -10,6 +10,7 @@ CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/ocp-trt-nightly-hive-logs-read-only
 ROLE_SESSION_NAME=OSDGatherExtraInstallLogs
 
+# shellcheck disable=SC2183,SC2046
 export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" \
 	$(aws sts assume-role \
 		--role-arn "${ROLE_ARN}" \
