@@ -123,3 +123,6 @@ Example:
 ```
 
 The logs above indicates `unable to retrieve source image registry.ci.openshift.org/origin/scos-4.16 manifest #1 from manifest list: manifest unknown: manifest unknown`, following the message we can see that the manifest is `registry.ci.openshift.org/origin/scos-4.16:cluster-capi-operator`
+
+## Rehearse job on another cluster
+The (dynamic scheduler)[https://docs.ci.openshift.org/docs/internals/dynamic-scheduling/] would automatically set the cluster the job will run on, which does not honour the `cluster` field. We can workaround by both specifying `cluster` field and changing the `name` of the job to manually create a cache miss in order for the `cluster` field to be honoured.
