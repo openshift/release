@@ -9,7 +9,7 @@ base_images:
     tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/lws-operator
+canonical_go_repository: github.com/openshift/jobset-operator
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
@@ -19,13 +19,15 @@ images:
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: lws-operator
+  to: jobset-operator
 promotion:
   to:
   - name: 4.19-priv
     namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -49,11 +51,11 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: fips-image-scan-lws-operator
+- as: fips-image-scan-jobset-operator
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     dependencies:
-      SCAN_IMAGE: lws-operator
+      SCAN_IMAGE: jobset-operator
     test:
     - ref: fips-check-image-scan
 - as: security
@@ -64,4 +66,4 @@ tests:
 zz_generated_metadata:
   branch: main
   org: openshift-priv
-  repo: lws-operator
+  repo: jobset-operator
