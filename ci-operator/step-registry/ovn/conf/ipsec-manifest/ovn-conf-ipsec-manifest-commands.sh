@@ -32,7 +32,7 @@ EOF
 
 # adapt to newer ipsec config for ocp versions >= 4.15
 if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
-    /tmp/yq e '.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode = "Full"' -i ${SHARED_DIR}/manifest_cluster-network-03-config.yml
+    /tmp/yq e '.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode = env(IPSEC_MODE)' -i ${SHARED_DIR}/manifest_cluster-network-03-config.yml
 fi
 
 cat ${SHARED_DIR}/manifest_cluster-network-03-config.yml
