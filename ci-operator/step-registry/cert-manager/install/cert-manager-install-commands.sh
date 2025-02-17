@@ -9,11 +9,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
 fi
 
-CATSRC=qe-app-registry
-if [[ ! "$(oc get catalogsource qe-app-registry -n openshift-marketplace -o yaml)" =~ "lastObservedState: READY" ]]; then
-    echo "The catalogsource qe-app-registry is either not existing or not ready. Will use redhat-operators to install cert-manager Operator."
-    CATSRC=redhat-operators
-fi
+CATSRC=redhat-operators
 
 oc create -f - << EOF
 apiVersion: v1
