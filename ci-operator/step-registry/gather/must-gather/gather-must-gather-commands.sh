@@ -269,7 +269,7 @@ set -x # log the MG commands
 echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather
 oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --timeout=$MUST_GATHER_TIMEOUT --dest-dir ${ARTIFACT_DIR}/must-gather ${EXTRA_MG_ARGS} > ${ARTIFACT_DIR}/must-gather/must-gather.log
-find "${ARTIFACT_DIR}/must-gather" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
+find "${ARTIFACT_DIR}/must-gather" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 installCamgi
 /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"

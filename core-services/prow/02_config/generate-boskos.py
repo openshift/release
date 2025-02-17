@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 4,
+        'us-east-1': 7,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -188,7 +188,7 @@ CONFIG = {
         'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
-        'eastus2': 4
+        'eastus2': 7
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
@@ -222,7 +222,7 @@ CONFIG = {
         'us-central1': 4,
     },
     'gcp-autorelease-qe-quota-slice': {
-        'us-central1': 4,
+        'us-central1': 7,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -271,9 +271,10 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
-    'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+    'openstack-rhoso-quota-slice': {
+        '10.46.4.7': 1, # titan03.lab.eng.tlv2.redhat.com
+        '10.46.4.12': 1, # titan08.lab.eng.tlv2.redhat.com
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },

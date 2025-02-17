@@ -133,5 +133,5 @@ else
 fi
 
 # storing fip in shared dir to use in later steps
-echo zvsi_fip >> ${SHARED_DIR}/zvsi_fip
+echo $zvsi_fip >> ${SHARED_DIR}/zvsi_fip
 

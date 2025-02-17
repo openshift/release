@@ -49,23 +49,23 @@ done
 
 
 # Deleting the zVSI
-echo "Triggering the $infra_name-sno instance deletion in the $infra_name-vpc VPC."
-vsi_delete_status=$(ibmcloud is instance-delete $infra_name-sno --output JSON -f | jq -r '.[]|.result')
+echo "Triggering the $infra_name-vm instance deletion in the $infra_name-vpc VPC."
+vsi_delete_status=$(ibmcloud is instance-delete $infra_name-vm --output JSON -f | jq -r '.[]|.result')
 if [ "$vsi_delete_status" = 'false' ]; then
-    echo "Deletion of $infra_name-sno instance is not successful."
+    echo "Deletion of $infra_name-vm instance is not successful."
     exit 1
 else 
-    echo "Successfully deleted the $infra_name-sno instance in the $infra_name-vpc VPC."
+    echo "Successfully deleted the $infra_name-vm instance in the $infra_name-vpc VPC."
 fi
 
 # Deleting the zVSI Floating IP
-echo "Triggering the $infra_name-sno-ip Floating IP in the $infra_name-rg resource group."
-fip_delete_status=$(ibmcloud is ipd $infra_name-sno-ip --output JSON -f | jq -r '.[]|.result')
+echo "Triggering the $infra_name-vm-ip Floating IP in the $infra_name-rg resource group."
+fip_delete_status=$(ibmcloud is ipd $infra_name-vm-ip --output JSON -f | jq -r '.[]|.result')
 if [ "$fip_delete_status" = 'false' ]; then
-    echo "Deletion of $infra_name-sno-ip floating IP is not successful."
+    echo "Deletion of $infra_name-vm-ip floating IP is not successful."
     exit 1
 else 
-    echo "Successfully deleted the $infra_name-sno-ip floating IP in the $infra_name-rg resource group."
+    echo "Successfully deleted the $infra_name-vm-ip floating IP in the $infra_name-rg resource group."
 fi
 
 
