@@ -18,11 +18,11 @@ if [ "$CLUSTER_WIDE_PROXY" == "true" ] || [ "$DISCONNECTED" == "true" ]; then
  cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
  export HTTP_PROXY=${proxy}
  export HTTPS_PROXY=${proxy}
- export NO_PROXY="localhost,127.0.0.1,fd03::/112"
+ export NO_PROXY="localhost,127.0.0.1"
 
  export http_proxy=${proxy}
  export https_proxy=${proxy}
- export no_proxy="localhost,127.0.0.1,fd03::/112"
+ export no_proxy="localhost,127.0.0.1"
 EOF
 fi
 
