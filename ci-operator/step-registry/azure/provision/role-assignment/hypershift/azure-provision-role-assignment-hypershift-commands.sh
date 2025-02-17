@@ -50,17 +50,17 @@ for component in "${CONTROLPLANE_COMPONENTS[@]}"; do
     exit 1
   fi
 
-  ROLE="Contributor"
+  ROLE="b24988ac-6180-42a0-ab88-20f7382dd24c"
   scopes="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
 
   if [[ $component == "ingress" ]]; then
-    ROLE="Azure Red Hat OpenShift Cluster Ingress Operator Role"
+    ROLE="0336e1d3-7a87-462b-b6db-342b63f7802c"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$BASE_DOMAIN_RESOURCE_GROUP"
   fi
 
   if [[ $component == "cloudProvider" ]]; then
-    ROLE="Azure Red Hat OpenShift Cloud Controller Manager Role"
+    ROLE="a1f96423-95ce-4224-ab27-4e3dc72facd4"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
   fi
@@ -75,21 +75,21 @@ for component in "${CONTROLPLANE_COMPONENTS[@]}"; do
   fi
 
   if [[ $component == "disk" ]]; then
-    ROLE="Azure Red Hat OpenShift Storage Operator Role"
+    ROLE="5b7237c5-45e1-49d6-bc18-a1f62f400748"
   fi
 
   if [[ $component == "file" ]]; then
-    ROLE="Azure Red Hat OpenShift Azure Files Storage Operator Role"
+    ROLE="0d7aedc0-15fd-4a67-a412-efad370c947e"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
     scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
   fi
 
   if [[ $component == "network" ]]; then
-    ROLE="Azure Red Hat OpenShift Network Operator Role"
+    ROLE="be7a6435-15ae-4171-8f30-4a343eff9e8f"
   fi
 
   if [[ $component == "imageRegistry" ]]; then
-    ROLE="Azure Red Hat OpenShift Image Registry Operator Role"
+    ROLE="8b32b316-c2f5-4ddf-b05b-83dacd2d08b5"
   fi
 
   for scope in $scopes; do
@@ -107,15 +107,15 @@ for component in "${DATAPLANE_COMPONENTS[@]}"; do
   scope="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
 
   if [[ $component == "imageRegistryMSIClientID" ]]; then
-    ROLE="Azure Red Hat OpenShift Image Registry Operator Role"
+    ROLE="8b32b316-c2f5-4ddf-b05b-83dacd2d08b5"
   fi
 
   if [[ $component == "diskMSIClientID" ]]; then
-    ROLE="Azure Red Hat OpenShift Storage Operator Role"
+    ROLE="5b7237c5-45e1-49d6-bc18-a1f62f400748"
   fi
 
   if [[ $component == "fileMSIClientID" ]]; then
-    ROLE="Azure Red Hat OpenShift Azure Files Storage Operator Role"
+    ROLE="0d7aedc0-15fd-4a67-a412-efad370c947e"
   fi
 
   az role assignment create --assignee-object-id "$object_id" --role "$ROLE" --scope "$scope" --assignee-principal-type "ServicePrincipal"
