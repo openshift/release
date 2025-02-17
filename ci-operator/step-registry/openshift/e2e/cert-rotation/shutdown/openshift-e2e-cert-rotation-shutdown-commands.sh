@@ -63,9 +63,8 @@ for vm in ${VMS[@]}; do
     continue
   fi
   until virsh domstate ${vm} | grep "shut off"; do
-    echo "." >&3; echo;
     sleep 10
-  done 3> >(/usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null)
+  done | /usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null
 done
 
 # Set date for host
@@ -85,9 +84,8 @@ for vm in ${VMS[@]}; do
     continue
   fi
   until virsh domstate ${vm} | grep "running"; do
-    echo "." >&3; echo;
     sleep 10
-  done 3> >(/usr/local/bin/tqdm --desc "Starting ${vm} VM" --null)
+  done | /usr/local/bin/tqdm --desc "Starting ${vm} VM" --null
 done
 set -x
 
