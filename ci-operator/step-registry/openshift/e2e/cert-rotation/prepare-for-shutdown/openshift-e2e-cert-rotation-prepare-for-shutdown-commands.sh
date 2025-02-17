@@ -62,7 +62,7 @@ run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  until oc --request-timeout=5s get nodes; do sleep 30; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
+  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
   echo "Approving CSRs at $(date)"
@@ -76,7 +76,7 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
         echo
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      sleep 30
+      sleep 10
     done | /usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null
   done
   echo "All CSRs approved at $(date)"
