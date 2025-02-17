@@ -54,5 +54,7 @@ platform_spec = f"""platform:
           hostGroup: zone-2
 """
 
+print("hello world")
+
 with open(os.path.join(shared_dir, "nested-ansible-platform.yaml"), "w") as nested_ansible_platform_file:
     nested_ansible_platform_file.write(platform_spec)
