@@ -1,30 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cluster-api-provider-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   dev-scripts:
@@ -41,14 +41,6 @@ base_images:
     tag: postgresql-12-c8s
   tests:
     name: "4.18"
-    namespace: ocp
-    tag: tests
-  tests-4.12:
-    name: "4.12"
-    namespace: ocp
-    tag: tests
-  tests-4.13:
-    name: "4.13"
     namespace: ocp
     tag: tests
   tests-4.14:
@@ -71,6 +63,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -143,7 +139,7 @@ operator:
     with: postgresql-12-c8s
 promotion:
   to:
-  - name: ocm-2.13
+  - name: ocm-2.14
     namespace: edge-infrastructure
 releases:
   latest:
@@ -404,7 +400,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
-  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -413,6 +409,7 @@ tests:
     env:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
+  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-periodic
   cron: 00 01 * * 2,4,6
   steps:
@@ -425,7 +422,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters
-  optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -492,7 +488,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
-  optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -546,7 +541,9 @@ tests:
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-workers
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -612,7 +609,9 @@ tests:
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -674,7 +673,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi
-  optional: true
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -702,7 +700,6 @@ tests:
     workflow: assisted-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi
-  optional: true
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -842,9 +839,9 @@ tests:
         IPv4=no
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv4v6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv4v6-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -854,8 +851,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-none-4-18
-  optional: true
-  run_if_changed: ^(internal/provider/none/.*)$
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -863,9 +859,9 @@ tests:
         PLATFORM=none
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-sno-4-18
+- always_run: false
+  as: e2e-metal-assisted-sno-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -873,9 +869,9 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-static-ip-suite-4-18
+- always_run: false
+  as: e2e-metal-assisted-static-ip-suite-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -883,9 +879,9 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-bond-4-18
+- always_run: false
+  as: e2e-metal-assisted-bond-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -928,26 +924,6 @@ tests:
         DEPLOY_TARGET=onprem
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-12
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.12
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-13
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.13
-    workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-static-ip-suite-4-14
   optional: true
@@ -978,7 +954,6 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-14
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -989,7 +964,6 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-15
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1000,7 +974,6 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1011,7 +984,6 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-17
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1020,25 +992,8 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
     workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-cnv-4-16
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.16
-        MASTER_MEMORY=18700
-        MASTER_CPU=9
-        WORKER_MEMORY=9216
-        MASTER_DISK_COUNT=2
-        WORKER_DISK_COUNT=2
-        WORKER_CPU=5
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-4-17
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1055,7 +1010,7 @@ tests:
         WORKER_CPU=5
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mtv-4-17
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1072,7 +1027,7 @@ tests:
         WORKER_CPU=6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm-4-18
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1085,20 +1040,8 @@ tests:
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-odf-4-16
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.16
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-4-17
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1108,46 +1051,6 @@ tests:
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.17
       PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-mce-4-16
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
-        NUM_WORKERS=3
-        OPENSHIFT_VERSION=4.16
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-metallb-4-18
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=metallb
-        METALLB_API_IP=10.0.0.1
-        METALLB_INGRESS_IP=10.0.0.2
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-mce-sno-4-16
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        OPENSHIFT_VERSION=4.16
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-osc-sno-4-18
@@ -1165,9 +1068,8 @@ tests:
         MASTER_CPU=10
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-osc-4-18
-  optional: true
+- as: e2e-metal-assisted-osc-4-18
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1183,9 +1085,23 @@ tests:
         WORKER_CPU=3
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-4-18
+- always_run: false
+  as: e2e-metal-assisted-k8s-nmstate-4-17
   optional: true
-  run_if_changed: ^(data/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=nmstate
+        NUM_MASTERS=3
+        NUM_WORKERS=1
+        OPENSHIFT_VERSION=4.17
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-day2-4-18
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1193,9 +1109,9 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-sno-4-18
+- always_run: false
+  as: e2e-metal-assisted-day2-sno-4-18
   optional: true
-  run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1270,8 +1186,7 @@ tests:
         OPENSHIFT_VERSION=4.18-multi
     workflow: assisted-equinix
 - as: e2e-vsphere-assisted-4-18
-  optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1279,48 +1194,6 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         OPENSHIFT_VERSION=4.18
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-14
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-15
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.15
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-16
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.16
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
@@ -1338,8 +1211,7 @@ tests:
     workflow: assisted-vsphere
 - as: e2e-nutanix-assisted-4-18
   cluster: build01
-  optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: nutanix
     env:
@@ -1351,27 +1223,9 @@ tests:
         OPENSHIFT_VERSION=4.18
       PLATFORM: nutanix
     workflow: assisted-nutanix
-- as: e2e-nutanix-assisted-4-14
-  cluster: build01
-  optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
 - always_run: false
   as: e2e-nutanix-assisted-2workers-4-18
   cluster: build01
-  optional: true
   steps:
     cluster_profile: nutanix
     env:
@@ -1383,26 +1237,14 @@ tests:
         OPENSHIFT_VERSION=4.18
       PLATFORM: nutanix
     workflow: assisted-nutanix
-- as: e2e-oci-assisted-4-18
+- always_run: false
+  as: e2e-oci-assisted-4-18
   optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
-    workflow: assisted-oci
-- always_run: false
-  as: e2e-oci-assisted-4-14
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
   as: e2e-oci-assisted-iscsi-4-18
@@ -1414,21 +1256,8 @@ tests:
         OCI_BOOT_VOLUME_TYPE="ISCSI"
         OPENSHIFT_VERSION=4.18
     workflow: assisted-oci
-- always_run: false
-  as: e2e-metal-assisted-external-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
-    env:
-      ASSISTED_CONFIG: |
-        PLATFORM=external
-        OPENSHIFT_VERSION=4.14
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-external-4-18
-  optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1448,6 +1277,7 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-control-planes-4-18
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1491,6 +1321,19 @@ tests:
         IPv4=true
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-vsphere-assisted-umlb-4-18
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.18
+        LOAD_BALANCER_TYPE=user-managed
+      PLATFORM: vsphere
+    workflow: assisted-vsphere-external-lb
 zz_generated_metadata:
   branch: master
   org: openshift

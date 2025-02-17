@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-base-openshift-4.19:
-    name: builder
+  ocp_4.19_base-rhel9:
+    name: "4.19"
     namespace: ocp
-    tag: rhel-9-base-openshift-4.19
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
@@ -12,9 +12,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.19:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
@@ -34,6 +34,14 @@ tag_specification:
 tests:
 - as: verify
   commands: make verify-gofmt
+  container:
+    from: src
+- as: verify-codegen
+  commands: make verify-codegen
+  container:
+    from: src
+- as: verify-controller-manifests
+  commands: make verify-controller-manifests
   container:
     from: src
 - as: unit

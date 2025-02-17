@@ -29,8 +29,8 @@ az group create -l "${azure_region}" -n "${existing_rg}"
 # Assigne proper permissions to resource group where cluster will be created
 if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_RG}" ]]; then
     cluster_sp_id=${AZURE_AUTH_CLIENT_ID}
-    if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
-        cluster_sp_id=$(< "${SHARED_DIR}/azure_sp_id")
+    if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+        cluster_sp_id=$(jq -r '.clientId' "${SHARED_DIR}/azure_minimal_permission")
     fi
     resource_group_id=$(az group show -g "${existing_rg}" --query id -otsv)
     echo "Assigin role '${AZURE_PERMISSION_FOR_CLUSTER_RG}' to resource group ${existing_rg}"

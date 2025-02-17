@@ -212,6 +212,26 @@ function rhel_post_upgrade(){
         echo "oc logs checking command failed." && return 1
     fi
 
+    if [[ "$TARGET_MINOR_VERSION" -ge 14 ]]; then
+        cat > /tmp/post_check.yaml <<-'EOF'
+---
+- name: Run post check on the workers
+  hosts: workers
+  gather_facts: false
+  tasks:
+  - name: Ensure fixfiles_exclude_dirs contains '/var/lib/kubelet'
+    command: grep -q '/var/lib/kubelet' /etc/selinux/fixfiles_exclude_dirs
+    register: grep_result
+    ignore_errors: yes
+
+  - name: Fail the play if the expected dir is NOT found
+    fail:
+      msg: "'/var/lib/kubelet' was NOT found in fixfiles_exclude_dirs. Quitting..."
+    when: grep_result.rc != 0
+EOF
+        ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv
+    fi
+
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 

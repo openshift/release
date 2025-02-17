@@ -329,6 +329,9 @@ echo "CONFIG_PLATFORM_COMPUTE=${CONFIG_PLATFORM_COMPUTE}"
 echo "CONFIG_PLATFORM_WORKER=${CONFIG_PLATFORM_WORKER}"
 
 cat > "${SHARED_DIR}/powervs-conf.yaml" << EOF
+ARCH: ${ARCH}
+BRANCH: ${BRANCH}
+LEASED_RESOURCE: ${LEASED_RESOURCE}
 CLUSTER_NAME: ${CLUSTER_NAME}
 POWERVS_SERVICE_INSTANCE_ID: ${POWERVS_SERVICE_INSTANCE_ID}
 POWERVS_REGION: ${POWERVS_REGION}
@@ -440,6 +443,19 @@ if [ -n "${FEATURE_GATES}" ]; then
   cat >> "${CONFIG}" << EOF
 featureGates: ${FEATURE_GATES}
 EOF
+fi
+
+# If the branch is 4.18 or greater, then don't use the existing
+#   - Service Instance
+#   - Transit Gateway
+#   - Virtual Private Cloud
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+    echo "Removing existing service instance!"
+    sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
+    echo "Removing existing transit gateway!"
+    sed -i -e '/tgName/d' "${CONFIG}"
+    echo "Removing existing vpc!"
+    sed -i -e '/vpcName/d' "${CONFIG}"
 fi
 
 echo "tgName in ${CONFIG}:"

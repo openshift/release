@@ -134,6 +134,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTOIN_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 ROLE_DEFINITION="${ARTIFACT_DIR}/azure-custom-role-definition-minimal-permissions.json"
@@ -327,6 +328,7 @@ ${required_permissions}
 """
 fi
 
+custom_role_name_json="{}"
 if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
     sp_role="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
 else
@@ -334,7 +336,8 @@ else
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
     # for destroy
-    echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
+    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"cluster\":\"${CUSTOM_ROLE_NAME}\"}")
+    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
     sp_role="${CUSTOM_ROLE_NAME}"
 fi
 echo "Creating sp with custom role..."
@@ -391,7 +394,8 @@ if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
     create_role_definition_json "${sts_role_name}" "${sts_required_permissions}" "${sts_role_definition}"
     create_custom_role "${sts_role_definition}" "${sts_role_name}"
     # for destroy
-    echo "${sts_role_name}" >> "${SHARED_DIR}/azure_custom_role_name"
+    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"ccoctl\":\"${sts_role_name}\"}")
+    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
     sts_sp_role="${sts_role_name}"
 
     create_sp_with_custom_role "${sts_sp_name}" "${sts_sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sts_sp_output}"

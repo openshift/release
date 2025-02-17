@@ -52,7 +52,6 @@ then
   exit 0
 fi
 
-EXTRA_ARGS=""
 
 if [ -n "${KUBEVIRT_CSI_INFRA}" ]
 then
@@ -246,3 +245,5 @@ then
   done
   oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
 fi
+
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

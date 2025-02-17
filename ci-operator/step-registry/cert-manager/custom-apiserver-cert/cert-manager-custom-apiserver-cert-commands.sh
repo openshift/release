@@ -159,7 +159,7 @@ function extract_ca_from_secret() {
 
 function validate_serving_cert() {
     echo "Validating the serving certificate of '$NEW_API_URL'..."
-    output=$(curl -I -v --cacert $CA_FILE --connect-timeout 30 "$NEW_API_FQDN" 2>&1)
+    output=$(curl -I -v --cacert $CA_FILE --connect-timeout 30 "$NEW_API_URL" 2>&1)
     if [ $? -eq 0 ]; then
         echo "The certificate is served by API Server as expected"
     else

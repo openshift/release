@@ -105,10 +105,12 @@ fi
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")
 role_name="Owner"
 if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
-    role_name=$(< "${SHARED_DIR}/azure_custom_role_name")
-    if [ -f "${SHARED_DIR}/azure_sp_id" ]; then
-        cluster_sp_id=$(< "${SHARED_DIR}/azure_sp_id")
+    role_name=$(< "${SHARED_DIR}/azure_custom_role_name" jq -r .cluster)
+    if [[ -z "${role_name}" ]]; then
+        echo "Could not find cluster custom role name in file <SHARED_DIR>/azure_custom_role_name, which is created in step 'azure-provision-service-principal-minimal-permission'"
+        exit 1
     fi
+    cluster_sp_id=$(< "${SHARED_DIR}/azure_minimal_permission" jq -r .clientId)
 fi
 azure_des_json="{}"
 des_id=""

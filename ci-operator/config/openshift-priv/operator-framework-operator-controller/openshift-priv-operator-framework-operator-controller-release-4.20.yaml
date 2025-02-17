@@ -15,6 +15,19 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-operator-controller
 images:
+- dockerfile_path: openshift/catalogd.Dockerfile
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: olm-catalogd
+- context_dir: catalogd/testdata/catalogs
+  dockerfile_path: test-catalog.Dockerfile
+  from: src
+  to: test-catalog
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
     ocp_4.19_base-rhel9:
@@ -37,6 +50,7 @@ promotion:
   to:
   - excluded_images:
     - e2e-test-registry
+    - test-catalog
     name: 4.20-priv
     namespace: ocp-private
 releases:
@@ -106,6 +120,8 @@ tests:
       dependencies:
       - env: E2E_REGISTRY_IMAGE
         name: e2e-test-registry
+      - env: TEST_CATALOG_IMAGE
+        name: test-catalog
       from: src
       resources:
         requests:
