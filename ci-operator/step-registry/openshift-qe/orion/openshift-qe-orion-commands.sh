@@ -36,38 +36,39 @@ else
 fi
 
 pip install .
-export  EXTRA_FLAGS=""
-if [[ -n "$UUID" ]]; then
+export EXTRA_FLAGS=" --lookback ${LOOKBACK}d"
+if [[ ! -z "$UUID" ]]; then
     export EXTRA_FLAGS+=" --uuid ${UUID}"
 fi
 if [ ${HUNTER_ANALYZE} == "true" ]; then
- export EXTRA_FLAGS+=" --hunter-analyze"
+    export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 if [ ${JUNIT} == true ]; then
-  export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
-  export EXTRA_FLAGS+=" --output-format junit"
-  export EXTRA_FLAGS+=" --save-output-path=junit.xml"
-  export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
-  export EXTRA_FLAGS+=" --hunter-analyze"
+    export EXTRA_FLAGS+=" --output-format junit"
+    export EXTRA_FLAGS+=" --save-output-path=junit.xml"
 fi
 
-if [[ -n "$ORION_CONFIG" ]]; then
-  export CONFIG="${ORION_CONFIG}"
+if [[ ! -z "$ORION_CONFIG" ]]; then
+    export CONFIG="${ORION_CONFIG}"
 fi
 
-if [[ -n "$ORION_ENVS" ]]; then
-  ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
-  IFS=',' read -r -a env_array <<< "$ORION_ENVS"
-  for env_pair in "${env_array[@]}"; do
-    env_pair=$(echo "$env_pair" | xargs)
-    env_key=$(echo "$env_pair" | cut -d'=' -f1)
-    env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-    export "$env_key"="$env_value"
-  done
+if [[ ! -z "$ACK_FILE" ]]; then
+    export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
 fi
 
-if [[ -n "$LOOKBACK_SIZE" ]]; then
-  export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+if [[ -n "${ORION_ENVS:-}" ]]; then
+    ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
+    IFS=',' read -r -a env_array <<< "$ORION_ENVS"
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      export "$env_key"="$env_value"
+    done
+fi
+
+if [[ -n "${LOOKBACK_SIZE:-}" ]]; then
+    export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
 set +e

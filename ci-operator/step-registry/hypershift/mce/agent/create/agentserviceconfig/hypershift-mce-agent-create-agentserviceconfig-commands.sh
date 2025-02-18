@@ -80,8 +80,8 @@ metadata:
   labels:
     app: assisted-service
 data:
-  ca-bundle.crt: |-
-$(cat /tmp/ca-bundle-crt)
+$( [ "${DISCONNECTED}" = "true" ] && echo "  ca-bundle.crt: |")
+$( [ "${DISCONNECTED}" = "true" ] && cat /tmp/ca-bundle-crt)
   registries.conf: |
     unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
 
