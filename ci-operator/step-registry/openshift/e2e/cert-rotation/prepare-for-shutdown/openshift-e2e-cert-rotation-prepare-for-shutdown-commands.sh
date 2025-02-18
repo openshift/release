@@ -8,8 +8,10 @@ set -x
 echo "************ prepare openshift nodes for shutdown command ************"
 
 # Add ServerAliveCountMax
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/packet-conf.sh"
 cat >> "${SHARED_DIR}/packet-conf.sh" <<'EOF'
-export SSHOPTS=(${SSH_OPTS} -o 'ServerAliveCountMax=90')
+export SSHOPTS=${SSH_OPTS} -o 'ServerAliveCountMax=90'
 EOF
 
 # Fetch packet basic configuration
@@ -21,7 +23,7 @@ cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
 set -euxo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -v -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no' }
+SSH_OPTS=${SSH_OPTS:- -v -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no'}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -66,6 +68,7 @@ function copy-file-from-first-master {
 run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
 
 cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+  set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
@@ -112,6 +115,7 @@ function wait-for-nodes-to-be-ready {
 }
 
 cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+  set +e
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done
@@ -140,6 +144,7 @@ function wait-for-kubeapiserver-to-start-progressing {
 }
 
 cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+  set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
