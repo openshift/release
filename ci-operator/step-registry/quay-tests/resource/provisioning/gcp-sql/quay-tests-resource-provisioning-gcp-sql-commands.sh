@@ -12,6 +12,7 @@ GCP_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/passwor
 
 
 #Copy GCP auth.json from mounted secret to current directory
+QUAY_GCP_SQL_TERRAFORM_PACKAGE="QUAY_GCP_SQL_TERRAFORM_PACKAGE.tgz"
 mkdir -p QUAY_GCPSQL && cd QUAY_GCPSQL
 cp /var/run/quay-qe-gcp-secret/auth.json . 
 echo $GCP_AUTH_JSON > auth1.json
