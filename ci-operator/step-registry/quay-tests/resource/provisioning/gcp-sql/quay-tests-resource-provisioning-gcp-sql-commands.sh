@@ -185,16 +185,16 @@ terraform {
 
 provider "postgresql" {
   host            = var.quay_db_host
-  username        = ${GCP_POSTGRESQL_USERNAME}
-  password        = ${GCP_POSTGRESQL_PASSWORD}
-  expected_version = $DB_VERSION
+  username        = "${GCP_POSTGRESQL_USERNAME}"
+  password        = "${GCP_POSTGRESQL_PASSWORD}"
+  expected_version = "17"
   sslmode         = "require"
   connect_timeout = 15
 }
 
 resource "postgresql_extension" "pg_trgm" {
   name     = "pg_trgm"
-  database = ${GCP_POSTGRESQL_DBNAME}
+  database = "${GCP_POSTGRESQL_DBNAME}"
 }
 
 EOF
