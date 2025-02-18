@@ -1,0 +1,38 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-0.4.5
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: "8"
+      memory: 8000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: acs-tests-aws
+  steps:
+    cluster_profile: gcp
+    env:
+      BASE_DOMAIN: ocp.ci.rox.systems
+      SIZE_VARIANT: large
+    test:
+    - ref: stackrox-qa-e2e
+    workflow: ipi-gcp
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: stackrox
+  repo: stackrox
+  variant: ocp-4-12-gcp
