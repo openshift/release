@@ -65,6 +65,22 @@ for key in os.environ:
         continue
     print(f"export {key}={os.environ[key]}")
 
+#with open("./group_vars/all.yaml", "w") as group_vars_all:
+#    yaml_group_vars_all = yaml.safe_load(group_vars_all)
+#    for nfs in yaml_group_vars_all["vc_nfs_shares"]:
+#        nfs["server"] = "fsf-dal1003h-fz.adn.networklayer.com"
+#
+#    yaml.dump(yaml_group_vars_all, group_vars_all)
+
+
+with open("./group_vars/all.yml", "r+") as group_vars_all:
+    content = group_vars_all.read()
+
+    group_vars_all.seek(0)
+    group_vars_all.write(content.replace("161.26.99.159", "fsf-dal1003h-fz.adn.networklayer.com"))
+    group_vars_all.truncate()
+
+
 os.environ["ANSIBLE_TASK_TIMEOUT"] = str(20 * 60)
 
 r = ansible_runner.run_command(
