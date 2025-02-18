@@ -1,0 +1,40 @@
+clusterName: build07
+credentialsMode: Manual
+provision:
+  aws:
+    cloudFormationTemplates:
+    - stackName: build07-iam
+      templateBody: https://raw.githubusercontent.com/bear-redhat/tools/refs/heads/master/cluster-onboarding/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: ci.devcluster.openshift.com
+      - key: ProvisionUserName
+        value: build07-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build07-vpc
+      templateBody: https://raw.githubusercontent.com/bear-redhat/tools/refs/heads/master/cluster-onboarding/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build07
+      capabilities: ['CAPABILITY_IAM']
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  multiarch: true
+  multiarchBuilderController:
+    skip: true
+  certificate:
+    imageRegistryPublicHost: registry.build07.ci.openshift.org
+  cloudCredential:
+    aws: {}
+  passthrough:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MultiArchBuildConfig
+        name: managed-clonerefs
+      inline: [{"op": "add", "path": "/spec/build_spec/source/images/0/from/name", "value": "us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250205-e871edfd1"}]
