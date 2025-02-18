@@ -93,6 +93,26 @@ tests:
         OPENSHIFT_VERSION=4.18
       PACKET_PLAN: m3.small.x86
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-ha-kube-api-4-18
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        ISO_IMAGE_TYPE=minimal-iso
+        IPv4=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.18
+      PACKET_PLAN: c3.medium.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-sno-live-iso
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-sno
+    workflow: baremetalds-sno
 - always_run: false
   as: e2e-metal-assisted-onprem-4-18
   optional: true
@@ -640,36 +660,6 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ha-kube-api-4-18
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.18
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ha-kube-api-ipv4-4-18
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        IPv4=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-18
   optional: true
   steps:
@@ -781,11 +771,6 @@ tests:
         OPENSHIFT_VERSION=4.14
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-sno-live-iso
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
 - as: e2e-metal-sno-with-worker-live-iso
   run_if_changed: .*bootstrap_in_place.*
   steps:
@@ -1067,17 +1052,6 @@ tests:
         ENABLE_KUBE_API=true
         LOAD_BALANCER_TYPE=user-managed
         IPv4=true
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-4-18
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        ENABLE_KUBE_API=true
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 zz_generated_metadata:
