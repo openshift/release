@@ -1,4 +1,12 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -45,21 +53,47 @@ tests:
   commands: make GOFLAGS= XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache verify-generated
   container:
     from: src
-  optional: true
 - as: test
   commands: make GOFLAGS= KUBEBUILDER_ASSETS_DIR=/tmp/data test
   container:
     from: src
-  optional: true
 - as: lint
   commands: make GOFLAGS= XDG_CACHE_HOME=/tmp/cache lint
   container:
     from: src
-  optional: true
 - as: security
-  optional: true
   steps:
     workflow: openshift-ci-security
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vexxhost-quota-slice
+    test:
+    - chain: hypershift-openstack-e2e
+    workflow: hypershift-aws-e2e-external
+- as: e2e-techpreview
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-api-provider-openstack
+        git clone https://github.com/openshift/cluster-api-provider-openstack --branch main --depth=1 $dir
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make -C openshift e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
