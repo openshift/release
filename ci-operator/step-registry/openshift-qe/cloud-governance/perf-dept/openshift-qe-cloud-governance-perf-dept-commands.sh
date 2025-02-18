@@ -1,17 +1,18 @@
-# #!/bin/bash
+#!/bin/bash
 
-# cat "/secret/perf-dept-creds"  > /tmp/creds.sh
-# chmod 755 /tmp/creds.sh
-# source /tmp/creds.sh
-# export es_host="$(cat /secret/es_host)"
-# export es_port="$(cat /secret/es_port)"
+cat "/secret/perf-dept-creds"  > /tmp/creds.sh
+chmod 755 /tmp/creds.sh
+source /tmp/creds.sh
+es_host="$(cat /secret/es_host)"
+export es_host
+es_port="$(cat /secret/es_port)"
+export es_port
 
-# python3 /usr/local/cloud_governance/main.py
+ python3 -c "
+from cloud_governance.common.ldap.ldap_search import LdapSearch
 
-set -o errexit
-set -o nounset
-set -o pipefail
-set -x
+ldap = LdapSearch(ldap_host_name='ldap.corp.redhat.com')
+print(ldap.get_user_details(user_name='athiruma'))
+"
 
-ping -c1 elasticsearch.app.intlab.redhat.com
-echo $?
+python3 /usr/local/cloud_governance/main.py
