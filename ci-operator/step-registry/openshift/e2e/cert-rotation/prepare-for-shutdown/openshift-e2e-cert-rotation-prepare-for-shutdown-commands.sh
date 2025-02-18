@@ -7,13 +7,6 @@ set -x
 
 echo "************ prepare openshift nodes for shutdown command ************"
 
-# Add ServerAliveCountMax
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
-cat >> "${SHARED_DIR}/packet-conf.sh" <<'EOF'
-export SSHOPTS=${SSH_OPTS} -o 'ServerAliveCountMax=90'
-EOF
-
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
@@ -398,6 +391,7 @@ timeout \
 	ssh \
 	-v \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveCountMax=90' \
 	"root@${IP}" \
 	/usr/local/bin/prepare-nodes-for-shutdown.sh \
 	${SKEW}

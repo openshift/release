@@ -116,6 +116,7 @@ timeout \
 	ssh \
   -v \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveCountMax=90' \
 	"root@${IP}" \
 	/usr/local/bin/time-skew-test.sh \
 	${SKEW}

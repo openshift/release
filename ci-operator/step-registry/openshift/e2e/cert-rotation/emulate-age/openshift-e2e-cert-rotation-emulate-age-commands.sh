@@ -82,6 +82,7 @@ timeout \
 	8h \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveCountMax=90' \
 	-v \
 	"root@${IP}" \
 	/usr/local/bin/cluster-age-test.sh \
