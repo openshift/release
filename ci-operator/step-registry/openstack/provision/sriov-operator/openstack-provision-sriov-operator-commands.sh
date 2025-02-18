@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 # For disconnected or otherwise unreachable environments, we want to
+# 
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
