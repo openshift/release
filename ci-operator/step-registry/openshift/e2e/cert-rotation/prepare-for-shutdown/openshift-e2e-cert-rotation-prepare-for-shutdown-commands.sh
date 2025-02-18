@@ -7,6 +7,11 @@ set -x
 
 echo "************ prepare openshift nodes for shutdown command ************"
 
+# Add ServerAliveCountMax
+cat >> "${SHARED_DIR}/packet-conf.sh" <<'EOF'
+export SSHOPTS=(${SSH_OPTS} -o 'ServerAliveCountMax=90')
+EOF
+
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
