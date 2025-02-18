@@ -66,7 +66,7 @@ EOF
             - ${INTERNAL_NET_IPV6}
         routes:
           config:
-          - destination: 0.0.0.0/0
+          - destination: ::/0
             next-hop-address: ${INTERNAL_NET_IPV6}
             next-hop-interface: ${baremetal_iface}
 EOF
