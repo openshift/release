@@ -3,10 +3,8 @@
 set -o nounset
 set -o errexit
 
-ls -lah /var/run/hcm-jobs-logs-s3-bucket-storage/
-
-AWS_ACCOUNT_ID=$(cat /var/run/hcm-jobs-logs-s3-bucket-storage/account_id)
-HIVE_LOGS_BUCKET=$(cat /var/run/hcm-jobs-logs-s3-bucket-storage/bucket)
+AWS_ACCOUNT_ID=$(cat /var/run/hcm-job-logs-s3-bucket-storage/account_id)
+HIVE_LOGS_BUCKET=$(cat /var/run/hcm-job-logs-s3-bucket-storage/bucket)
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/ocp-trt-nightly-hive-logs-read-only
