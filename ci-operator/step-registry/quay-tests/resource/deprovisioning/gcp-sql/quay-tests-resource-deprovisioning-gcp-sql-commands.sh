@@ -17,13 +17,24 @@ tar -xzvf $QUAY_GCP_SQL_TERRAFORM_PACKAGE && ls
 echo "Start to destroy quay gcp sql instance ..."
 terraform --version
 terraform init
-des=$(terraform destroy -auto-approve) 
-if ! $des; then
-  echo "Failed to destroy quay gcp sql instance"
+terraform state list
+
+# Run terraform destroy and capture exit status
+if ! terraform destroy -auto-approve; then
+  echo "Failed to destroy quay GCP SQL instance"
+
+  # Wait before retrying
   sleep 1m
-  terraform state rm google_sql_user.users
+
+  # Check if google_sql_user exists in state before removing
+  if terraform state list | grep -q "google_sql_user.users"; then
+    terraform state rm google_sql_user.users
+  fi
+
+  # Try destroying again
   terraform destroy -auto-approve || true
 fi
+
 
 
 

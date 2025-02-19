@@ -209,11 +209,5 @@ terraform init
 terraform apply -auto-approve 
 
 
-
-#Get openshift CA Cert, include into secret bundle
-# oc extract cm/kube-root-ca.crt -n openshift-apiserver --confirm
-# create_cert || true
-# echo "gcp-sql cert successfully created"
-
 #Finally Copy certs to SHARED_DIR and archive them
 # trap copyCerts EXIT
