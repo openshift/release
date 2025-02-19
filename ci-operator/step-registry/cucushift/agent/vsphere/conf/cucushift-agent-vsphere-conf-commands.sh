@@ -71,13 +71,13 @@ build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
 extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org"' ${build02_secrets})
 final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
+echo "${final_pull_secret}" >>/tmp/pull-secrets
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
 base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
 
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+pull_secret=$(<"/tmp/pull-secrets")
 
 # Create cluster-name.txt
 echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
@@ -91,7 +91,7 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-
+rm /tmp/pull-secrets
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
 oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
@@ -176,13 +176,13 @@ done >"${SHARED_DIR}"/mac-addresses.txt
 declare -a hostnames=()
 for ((i = 0; i < MASTERS; i++)); do
   hostname="${cluster_name}-master-$i"
-  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
   hostnames+=("${hostname}")
 done
 
 for ((i = 0; i < WORKERS; i++)); do
   hostname="${cluster_name}-worker-$i"
-  echo $hostname >>"${SHARED_DIR}"/hostnames.txt
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
   hostnames+=("${hostname}")
 done
 
@@ -256,52 +256,8 @@ minimalISO: ${MINIMAL_ISO}
 EOF
 fi
 
-echo "Creating agent image..."
-dir=/tmp/installer
-mkdir "${dir}/"
-pushd ${dir}
-cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
-
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
-
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
-
-/tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
-
-if ! wait $!; then
-  cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
-  exit 1
-fi
-
-# Why do we want this silent? We want to see what curl is doing
-# vsphere_context.sh now contains SSL_CERT_FILE that needs to be unset for curl
-env -u SSL_CERT_FILE curl -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o ${HOME}/glx.tar.gz
-
-tar -C ${HOME} -xvf ${HOME}/glx.tar.gz govc && rm -f ${HOME}/glx.tar.gz
-
-echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
-agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
-
-echo "uploading ${agent_iso} to datastore ${vsphere_datastore}"
-
-for ((i = 0; i < 3; i++)); do
-  if env -u SSL_CERT_FILE -u GOVC_TLS_CA_CERTS /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
-    echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
-    status=0
-    break
-  else
-    echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
-    status=1
-    sleep 2
-  fi
-done
-if [ "$status" -ne 0 ]; then
-  echo "Agent ISO upload failed after 3 attempts!!!"
-  exit 1
-fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for post installation..."
 cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
@@ -314,10 +270,3 @@ export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
 export VSPHERE_NETWORK='${vsphere_portgroup}'
 export VSPHERE_FOLDER="${cluster_name}"
 EOF
-
-echo "Copying kubeconfig to the shared directory..."
-cp -t "${SHARED_DIR}" \
-  "${dir}/auth/kubeadmin-password" \
-  "${dir}/auth/kubeconfig" \
-  "${dir}/.openshift_install_state.json"
-popd
