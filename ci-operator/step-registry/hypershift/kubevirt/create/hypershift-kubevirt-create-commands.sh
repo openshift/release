@@ -245,3 +245,5 @@ then
   done
   oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
 fi
+
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

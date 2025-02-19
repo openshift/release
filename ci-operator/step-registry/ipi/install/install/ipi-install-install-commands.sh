@@ -649,7 +649,11 @@ openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
-nutanix) ;;
+nutanix)
+    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+    fi
+    ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
