@@ -22,46 +22,81 @@ fi
 ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
-# Use a timestamp to ensure the caller reference is unique, as we've found
-# cluster name can get reused in specific situations.
-TIMESTAMP=$(date +%s)
-CALLER_REFERENCE_STR="${ROUTE53_HOSTED_ZONE_NAME}-${TIMESTAMP}"
 
-
+# ---------------------------------------------------------------------------
 # Create PHZ
+# in PHZ account
+# ---------------------------------------------------------------------------
 echo "AWS Account: using shared account"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
-echo "Creating PHZ ..."
-# default VPC is only for create *PRIVATE* hosted zone.
-vpc_for_phz_creation=$(aws --region ${REGION} ec2 describe-vpcs | jq -r '.Vpcs[] | select(.IsDefault==true) | .VpcId')
-if [[ ${vpc_for_phz_creation} == "" ]] || [[ ${vpc_for_phz_creation} == "null" ]]; then
-  echo "No default VPC found in shared account, can not create private hosted zone, exit now"
-  exit 1
-fi
+cat > /tmp/vpc_phz.yaml << EOF
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [ !Ref "AWS::StackName", "cf" ] ]
+  PHZ:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      Name: "${ROUTE53_HOSTED_ZONE_NAME}"
+      VPCs:
+        -
+          VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+      HostedZoneTags:
+        - Key: 'Name'
+          Value: !Join [ "-", [ !Ref "AWS::StackName", "phz" ] ]
+Outputs:
+  PrivateHostedZoneId:
+    Value: !Ref PHZ
+  VpcId:
+    Value: !Ref VPC
+EOF
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-tmpvpc"
+echo ${STACK_NAME} > "${SHARED_DIR}/to_be_removed_cf_stack_list_shared_account"
 
-HOSTED_ZONE_CREATION=$(aws --region ${REGION} route53 create-hosted-zone --name "${ROUTE53_HOSTED_ZONE_NAME}" --caller-reference "${CALLER_REFERENCE_STR}" --vpc VPCRegion=${REGION},VPCId=${vpc_for_phz_creation})
-HOSTED_ZONE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.HostedZone.Id' | awk -F / '{printf $3}')"
-echo "${HOSTED_ZONE_ID}" > "${SHARED_DIR}/hosted_zone_id"
-
-CHANGE_ID="$(echo "${HOSTED_ZONE_CREATION}" | jq -r '.ChangeInfo.Id' | awk -F / '{printf $3}')"
-aws --region "${REGION}" route53 wait resource-record-sets-changed --id "${CHANGE_ID}" &
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
+aws --region "${REGION}" cloudformation create-stack \
+  --stack-name "${STACK_NAME}" \
+  --template-body "$(cat /tmp/vpc_phz.yaml)" \
+  --tags "${TAGS}" &
 wait "$!"
-echo "Hosted zone ${HOSTED_ZONE_ID} successfully created."
+echo "Created stack ${STACK_NAME}"
+aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${STACK_NAME}" &
+wait "$!"
+echo "Waited for stack ${STACK_NAME}"
+
+aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${SHARED_DIR}/vpc_phz_stack_output"
+
+HOSTED_ZONE_ID=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateHostedZoneId") | .OutputValue' "${SHARED_DIR}/vpc_phz_stack_output")
+TEMP_PHZ_VPC_ID=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="VpcId") | .OutputValue' "${SHARED_DIR}/vpc_phz_stack_output")
+echo "${HOSTED_ZONE_ID}" > "${SHARED_DIR}/hosted_zone_id"
+echo "Created Private Hosted Zone ${HOSTED_ZONE_ID} associated ${TEMP_PHZ_VPC_ID}."
 
 echo "Creating VPC association authorization ..."
 aws --region ${REGION} route53 create-vpc-association-authorization --hosted-zone-id ${HOSTED_ZONE_ID} --vpc VPCRegion=${REGION},VPCId=${VPC_ID}
 
-
+# ---------------------------------------------------------------------------
 # Associate VPC with hosted zone
 # in VPC account 
+# ---------------------------------------------------------------------------
 echo "AWS Account: using VPC account"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 echo "Associating PHZ ${HOSTED_ZONE_ID} with VPC ${VPC_ID} ..."
 CHANGE_ID=$(aws --region ${REGION} route53 associate-vpc-with-hosted-zone --hosted-zone-id ${HOSTED_ZONE_ID} --vpc VPCRegion=${REGION},VPCId=${VPC_ID} | jq -r '.ChangeInfo.Id' | awk -F / '{printf $3}')
 CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
 
+
+# ---------------------------------------------------------------------------
 # in PHZ account
+# ---------------------------------------------------------------------------
 echo "AWS Account: using shared account"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 

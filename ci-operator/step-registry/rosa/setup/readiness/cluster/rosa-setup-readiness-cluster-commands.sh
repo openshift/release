@@ -54,6 +54,8 @@ else
   exit 1
 fi
 
+export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+
 read_profile_file() {
   local file="${1}"
   if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
@@ -77,73 +79,6 @@ else
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
-
-# Get shared_vpc mask
-if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
-    echo "Error: Shared VPC is enabled, but not find .awscred_shared_account, exit now"
-    exit 1
-  fi
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-
-  SHARED_VPC_AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text | awk '{print $1}')
-  SHARED_VPC_AWS_ACCOUNT_ID_MASK=$(echo "${SHARED_VPC_AWS_ACCOUNT_ID:0:4}***")
-
-  # reset
-  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-fi
-
-function post_shared_vpc_auto(){
-  local -r cluster_info_json=$1; shift
-  echo "Shared-VPC: Auto mode is enabled, adding ingress operator arn to shrared-role's trust policy"
-  status_description=$(cat $cluster_info_json | jq -r '.status.description')
-  match=$(echo ${status_description} | grep -E "^Failed to verify ingress operator for shared VPC:.*OCM is not authorized to perform: sts:AssumeRole on resource:.*" || true)
-  echo "Shared-VPC: cluster status: ${status_description}" \
-    | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
-
-  if [[ ${match} != "" ]]; then
-    echo "Shared-VPC: Status match, waiting for 2 mins to make sure operator role is ready."
-    sleep 120
-
-    account_intaller_role_arn=$(cat "${cluster_info_json}" | jq -r '.aws.sts.role_arn')
-    ingress_operator_arn=$(cat "${cluster_info_json}" | jq -r '.aws.sts.operator_iam_roles[] | select(.namespace=="openshift-ingress-operator") .role_arn')
-    shared_role_name=$(cat "${cluster_info_json}" | jq -r '.aws.private_hosted_zone_role_arn' | cut -d '/' -f 2)
-    echo "Shared-VPC: ingress: ${ingress_operator_arn}, shared_role: ${shared_role_name}, installer: ${account_intaller_role_arn}" \
-      | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" \
-      | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
-
-    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-    trust_policy=$(mktemp)
-    cat > ${trust_policy} <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Effect": "Allow",
-          "Principal": {
-              "AWS": [
-                "${account_intaller_role_arn}",
-                "${ingress_operator_arn}"
-              ]
-          },
-          "Action": "sts:AssumeRole",
-          "Condition": {}
-      }
-  ]
-}
-EOF
-    aws iam update-assume-role-policy --role-name ${shared_role_name} --policy-document file://${trust_policy}
-    echo "Shared-VPC: Applied new policy."
-
-    echo "Shared-VPC: waiting for 2 mins to make sure the cluster status is up to date."
-    sleep 120
-
-    # reset
-    export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  else
-    echo "Shared-VPC: Status not match, continuing"
-  fi
-}
 
 # Wait for cluster to be ready
 log "Waiting for cluster ready..."
