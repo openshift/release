@@ -1,28 +1,26 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
-  cron: 30 05 * * 1,3,5
+  cluster: build03
+  cron: 47 3 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: release-ocm-2.13
     org: openshift
-    repo: assisted-test-infra
+    repo: cluster-api-provider-agent
   labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-release-ocm-2.13-e2e-metal-assisted-ha-kube-api-4-18-periodic
+  name: periodic-ci-openshift-cluster-api-provider-agent-release-ocm-2.13-mirror-nightly-image
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-ha-kube-api-4-18-periodic
+      - --target=mirror-nightly-image
       command:
       - ci-operator
       image: ci-operator:latest
@@ -32,9 +30,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -52,12 +47,6 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
