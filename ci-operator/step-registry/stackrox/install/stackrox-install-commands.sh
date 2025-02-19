@@ -128,7 +128,7 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
           cpu: "1000m"
           memory: "2500Mi"
 EOF
-else
+fi
   cat <<EOF >> central-cr.yaml
   scanner:
     analyzer:
@@ -151,7 +151,6 @@ else
           cpu: 2000m
           memory: 4Gi
 EOF
-fi
 
   cat <<EOF >> central-cr.yaml
 ---

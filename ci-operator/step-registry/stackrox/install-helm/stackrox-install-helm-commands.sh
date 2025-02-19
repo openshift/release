@@ -202,9 +202,9 @@ function curl_central() {
 
 function install_secured_cluster_with_helm() {
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
-  --values "${SCRATCH}/helm-init-bundle-values.yaml" \
-  --set clusterName=remote \
-  --set imagePullSecrets.allowNone=true
+    --values "${SCRATCH}/helm-init-bundle-values.yaml" \
+    --set clusterName=remote \
+    --set imagePullSecrets.allowNone=true
 }
 
 fetch_last_nightly_tag
