@@ -93,13 +93,13 @@ resource "google_sql_database_instance" "quay_postgres_prow" {
 resource "google_sql_database" "database" {
   name     = var.database_name
   instance = google_sql_database_instance.quay_postgres_prow.name
+  depends_on = [google_sql_user.users]
 }
 
 resource "google_sql_user" "users" {
   name     = var.database_username
   instance = google_sql_database_instance.quay_postgres_prow.name
   password = var.database_password  
-  depends_on = [google_sql_database.database]
 }
 
 #https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/sql_ssl_cert#private_key-1
@@ -149,9 +149,10 @@ terraform apply -auto-approve
 
 QUAY_DB_PUBLIC_IP=$(terraform output quay_db_public_ip | tr -d '""' | tr -d '\n')
 echo "Quay DB Public IP is $QUAY_DB_PUBLIC_IP"
-terraform output db_latest_ca_cert| sed 's/^<<EOT//' | sed 's/EOT$//' > server-ca.pem;
-terraform output client_key | sed 's/^<<EOT//' | sed 's/EOT$//' > client-key.pem;
-terraform output client_cert | sed 's/^<<EOT//' | sed 's/EOT$//' > client-cert.pem
+#The -raw flag forces Terraform to remove <<EOT and EOT markers
+terraform output -raw db_latest_ca_cert > server-ca.pem;
+terraform output -raw client_key > client-key.pem;
+terraform output -raw client_cert > client-cert.pem
 chmod 0600 client-key.pem
 
 

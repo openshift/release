@@ -12,14 +12,16 @@ mkdir -p terraform_quay_gcp_sql && cd terraform_quay_gcp_sql
 cp "${SHARED_DIR}"/$QUAY_GCP_SQL_TERRAFORM_PACKAGE .
 tar -xzvf $QUAY_GCP_SQL_TERRAFORM_PACKAGE && ls
 
-#Destroy Google cloud SQL instance
+#Destroy Google cloud SQL instance, Terrform destroy issue:"Error, failed to deleteuser ..." 
+#https://github.com/hashicorp/terraform-provider-google/issues/3820, https://github.com/concourse/infrastructure/issues/13
 echo "Start to destroy quay gcp sql instance ..."
 terraform --version
 terraform init
-terraform destroy -auto-approve 
-if [ $? -ne 0 ]; then
+des=$(terraform destroy -auto-approve) 
+if ! $des; then
   echo "Failed to destroy quay gcp sql instance"
-  sleep 3m
+  sleep 1m
+  terraform state rm google_sql_user.users
   terraform destroy -auto-approve || true
 fi
 

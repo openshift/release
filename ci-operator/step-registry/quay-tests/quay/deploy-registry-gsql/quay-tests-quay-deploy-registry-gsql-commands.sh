@@ -18,6 +18,7 @@ cp  "${SHARED_DIR}/server-ca.pem" .
 cp  "${SHARED_DIR}/client-key.pem" .
 GCP_SQL_HOSTIP=$(cat "${SHARED_DIR}/gsql_db_public_ip")
 chmod 0600 client-key.pem
+chmod 0644 client-cert.pem server-ca.pem
 
 echo "Create registry ${QUAYREGISTRY} with Google Cloud SQL in ns ${QUAYNAMESPACE}"
 
@@ -111,6 +112,7 @@ for i in {1..60}; do
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
       --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' >"$SHARED_DIR"/quay_oauth2_token || true
     
+    sleep 5m
     exit 0
   fi
   sleep 15
