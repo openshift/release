@@ -32,8 +32,6 @@ fi
 
 pip install .
 export EXTRA_FLAGS=" --lookback ${LOOKBACK}d"
-# Download the latest ACK file
-curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
 
 if [[ ! -z "$UUID" ]]; then
     export EXTRA_FLAGS+=" --uuid ${UUID}"
@@ -60,6 +58,8 @@ if [[ ! -z "$ORION_CONFIG" ]]; then
 fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
+    # Download the latest ACK file
+    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
     export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
 fi
 
