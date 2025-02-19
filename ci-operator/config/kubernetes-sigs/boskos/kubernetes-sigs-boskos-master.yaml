@@ -1,0 +1,37 @@
+base_images:
+  os:
+    name: ubi-minimal
+    namespace: ocp
+    tag: '9'
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_path: images/boskos/Dockerfile
+  from: os
+  to: boskos
+  build_args:
+    - name: DOCKER_TAG
+      value: 
+    - name: go_version
+      value: '1.23'
+    - name: cmd
+      value: boskos
+promotion:
+  to:
+  - name: boskos
+    namespace: ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+zz_generated_metadata:
+  branch: master
+  org: kubernetes-sigs
+  repo: boskos
