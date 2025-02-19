@@ -40,3 +40,39 @@ onboard:
       - kind: MultiArchBuildConfig
         name: managed-clonerefs
       inline: [{"op": "add", "path": "/spec/build_spec/source/images/0/from/name", "value": "us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250218-15dd4c208"}]
+  ciSchedulingWebhook:
+    aws:
+      workloads:
+        builds:
+          amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+          aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+        longtests:
+          amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+          aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+        prowjobs:
+          amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+          aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+        tests:
+          amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+          aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+        builds-highperf:
+          amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+builds\-highperf.+'
+      inline:
+      - {"op": "add", "path": "/spec/template/spec/metadata/labels/ci-workload", "value": "builds"}
+      - {"op": "add", "path": "/spec/template/spec/metadata/labels/ci-instance-type", "value": "high-perf"}
+      - {"op": "replace", "path": "/spec/template/spec/taints", "value": []}
+      - {"op": "add", "path": "/spec/template/spec/taints/-", "value": {"effect": "NoSchedule", "key": "node-role.kubernetes.io/ci-builds-worker", "value": "ci-builds-worker"}}
+      - {"op": "add", "path": "/spec/template/spec/taints/-", "value": {"effect": "NoSchedule", "key": "ci-instance-type", "value": "high-perf"}}
+      - {"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "c7a.12xlarge"}
+    - type: json-patch
+      matches:
+      - kind: MachineAutoscaler
+        name: '.+builds\-highperf.+'
+      inline:
+      - {"op": "replace", "path": "/spec/maxReplicas", "value": 1}
+      - {"op": "replace", "path": "/spec/minReplicas", "value": 0}
