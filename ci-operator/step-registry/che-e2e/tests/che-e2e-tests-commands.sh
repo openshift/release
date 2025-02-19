@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'sleep 2h' EXIT TERM INT ERR SIGNINT
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
