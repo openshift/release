@@ -93,16 +93,16 @@ resource "google_sql_database_instance" "quay_postgres_prow" {
 }
 
 
+resource "google_sql_database" "database" {
+  name     = var.database_name
+  instance = google_sql_database_instance.quay_postgres_prow.name
+}
+
 resource "google_sql_user" "users" {
   name     = var.database_username
   instance = google_sql_database_instance.quay_postgres_prow.name
   password = var.database_password  
-  depends_on = [google_sql_database_instance.quay_postgres_prow]
-}
-
-resource "google_sql_database" "database" {
-  name     = var.database_name
-  instance = google_sql_database_instance.quay_postgres_prow.name
+  depends_on = [google_sql_database.database]
 }
 
 #https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/sql_ssl_cert#private_key-1
@@ -163,6 +163,9 @@ tar -cvzf "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" --exclude=".terraform" *
 echo "Copy Google Cloud SQL terraform tf files"
 cp "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" "${SHARED_DIR}"
 
+#copy for create secret bundle
+cp client-cert.pem client-key.pem server-ca.pem "${SHARED_DIR}"
+echo "$QUAY_DB_PUBLIC_IP" > "${SHARED_DIR}"/quay_db_public_ip
 
 #install extension
 mkdir -p extension && cd extension

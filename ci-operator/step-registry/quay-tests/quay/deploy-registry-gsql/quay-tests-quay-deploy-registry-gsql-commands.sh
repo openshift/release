@@ -9,53 +9,61 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
-echo "Create registry ${QUAYREGISTRY} in ns ${QUAYNAMESPACE}"
+GCP_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/dbname)
+GCP_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/username)
+GCP_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
-#create secret bundle with odf/noobaa
+cp  "${SHARED_DIR}/client-cert.pem" .
+cp  "${SHARED_DIR}/server-ca.pem" .
+cp  "${SHARED_DIR}/client-key.pem" .
+GCP_SQL_HOSTIP=$(cat "${SHARED_DIR}/gsql_db_public_ip")
+chmod 0600 client-key.pem
+
+echo "Create registry ${QUAYREGISTRY} with Google Cloud SQL in ns ${QUAYNAMESPACE}"
+
+#create secret bundle with Google Cloud SQL
+
 cat >>config.yaml <<EOF
-CREATE_PRIVATE_REPO_ON_PUSH: true
-CREATE_NAMESPACE_ON_PUSH: true
-FEATURE_EXTENDED_REPOSITORY_NAMES: true
-FEATURE_QUOTA_MANAGEMENT: true
-FEATURE_AUTO_PRUNE: true
-FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
+BROWSER_API_CALLS_XHR_ONLY: false
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
+CREATE_REPOSITORY_ON_PUSH_PUBLIC: true
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+CREATE_PRIVATE_REPO_ON_PUSH: true
+CREATE_NAMESPACE_ON_PUSH: true
+FEATURE_QUOTA_MANAGEMENT: true
+FEATURE_PROXY_CACHE: true
+FEATURE_USER_INITIALIZE: true
+FEATURE_GENERAL_OCI_SUPPORT: true
+FEATURE_HELM_OCI_SUPPORT: true
 FEATURE_PROXY_STORAGE: true
 IGNORE_UNKNOWN_MEDIATYPES: true
-FEATURE_UI_V2: true
-FEATURE_SUPERUSERS_FULL_ACCESS: true
 SUPER_USERS:
   - quay
-FEATURE_ANONYMOUS_ACCESS: true
-BROWSER_API_CALLS_XHR_ONLY: false
-FEATURE_USERNAME_CONFIRMATION: false
-AUTHENTICATION_TYPE: Database
-FEATURE_LISTEN_IP_VERSION: IPv4
-REPO_MIRROR_ROLLBACK: false
-AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
-DEFAULT_TAG_EXPIRATION: 2w
+FEATURE_UI_V2: true
+FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_AUTO_PRUNE: true
 TAG_EXPIRATION_OPTIONS:
+  - 1w
   - 2w
+  - 4w
   - 1d
+  - 1h
+DB_CONNECTION_ARGS:
+    autorollback: true
+    sslmode: verify-ca
+    sslrootcert: /.postgresql/root.crt
+    sslcert: /.postgresql/postgresql.crt
+    sslkey: /.postgresql/postgresql.key
+    threadlocals: true
+DB_URI: postgresql://"${GCP_POSTGRESQL_USERNAME}":"${GCP_POSTGRESQL_PASSWORD}"@"$GCP_SQL_HOSTIP":5432/"${GCP_POSTGRESQL_DBNAME}"?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt  
 EOF
 
-# Create secret bundle upon env variable TLS, by default it is false.
-# tls certs get from $SHARED_DIR folder
-if [[ "$TLS" == "true" ]]; then
-  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
-elif [[ "$TLS" = "false" ]]; then
-  
-  #config virtual builder for quay
-  if [[ -e "$SHARED_DIR"/config_builder.yaml ]]; then
-    cat "$SHARED_DIR"/config_builder.yaml >> config.yaml
-  fi
-
-  oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file ssl.cert="$SHARED_DIR"/ssl.cert \
-    --from-file ssl.key="$SHARED_DIR"/ssl.key --from-file extra_ca_cert_build_cluster.crt="$SHARED_DIR"/build_cluster.crt \
-    config-bundle-secret
-fi
+oc create secret generic postgresql-client-certs -n "${QUAYNAMESPACE}" \
+  --from-file=config.yaml=./config.yaml \
+  --from-file=tls.crt=client-cert.pem \
+  --from-file=tls.key=client-key.pem \
+  --from-file=ca.crt=server-ca.pem
 
 #Deploy Quay registry, here disable monitoring component
 echo "Creating Quay registry..." >&2
@@ -69,7 +77,7 @@ spec:
   configBundleSecret: config-bundle-secret
   components:
   - kind: postgres
-    managed: true
+    managed: false
   - kind: objectstorage
     managed: true
   - kind: monitoring
@@ -83,10 +91,12 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: ${TLS}
+    managed: true
   - kind: route
     managed: true
 EOF
+
+sleep 300  # wait for pods to be ready
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
@@ -104,6 +114,6 @@ for i in {1..60}; do
     exit 0
   fi
   sleep 15
-  echo "Wait for quay registry ready $((i*15))s"
+  echo "Wait for quay registry ready $((i*15+300))s"
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Timed out waiting for Quay to become ready afer 20 mins" >&2
