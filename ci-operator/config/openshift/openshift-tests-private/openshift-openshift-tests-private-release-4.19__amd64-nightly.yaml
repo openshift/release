@@ -139,12 +139,8 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: DisconnectedOnly&
-      TEST_SCENARIOS: OTA
     test:
-    - chain: openshift-e2e-test-qe-longrun
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-localzone-fips-f7-nokubeadmin
   cron: 52 11 1,10,17,24 * *
@@ -1520,12 +1516,9 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: OTA
-      TEST_TIMEOUT: "75"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-qkk8nx2/release:latest
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: wait
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidentialvm-vmgueststateonly-f7
   cron: 42 3 4,11,18,25 * *
@@ -2291,7 +2284,7 @@ tests:
       masters: "1"
       workers: "0"
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: wait
     workflow: baremetal-lab-agent-install-network-dynamic-ipv6
 - as: baremetal-sno-agent-ipv6-dynamic-f14
   cluster: build05
@@ -2544,12 +2537,9 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-0rs5cft/release:latest
     test:
-    - chain: openshift-e2e-test-mco-qe-longrun
+    - ref: wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f9-longduration-mco-g1
   cron: 3 15 6,15,24 * *
@@ -2558,12 +2548,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
     test:
-    - chain: openshift-e2e-test-mco-qe-longrun
+    - ref: wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f9-longduration-mco-g2
   cron: 11 19 1,10,22 * *
@@ -2675,6 +2661,7 @@ tests:
       TEST_SCENARIOS: OTA
       TEST_TIMEOUT: "75"
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: gcp-ipi-ovn-winc-f7
@@ -3755,6 +3742,7 @@ tests:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f28-destructive
