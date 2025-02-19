@@ -157,14 +157,12 @@ function install_central_with_helm() {
       installflags+=('--set' 'central.db.resources.requests.cpu=500m')
       installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
       installflags+=('--set' 'central.db.resources.limits.cpu=1')
-      if [[ "${ROX_SCANNER_V4:-true}" != "true" ]]; then
-          installflags+=('--set' 'scanner.autoscaling.disable=true')
-          installflags+=('--set' 'scanner.replicas=1')
-          installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
-          installflags+=('--set' 'scanner.resources.requests.cpu=500m')
-          installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
-          installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
-      fi
+      installflags+=('--set' 'scanner.autoscaling.disable=true')
+      installflags+=('--set' 'scanner.replicas=1')
+      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
   fi
 
   if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
