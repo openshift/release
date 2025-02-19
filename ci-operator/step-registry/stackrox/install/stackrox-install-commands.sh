@@ -25,9 +25,7 @@ echo "KUBECONFIG=${KUBECONFIG}"
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
-echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
-
 function exit_handler() {
   exitcode=$?
   set +e
