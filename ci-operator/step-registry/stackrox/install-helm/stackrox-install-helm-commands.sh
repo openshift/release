@@ -223,10 +223,9 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   wait_deploy scanner-v4-matcher
   wait_deploy scanner-v4-db
-else
-  wait_deploy scanner
-  wait_deploy scanner-db
 fi
+wait_deploy scanner
+wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
 
