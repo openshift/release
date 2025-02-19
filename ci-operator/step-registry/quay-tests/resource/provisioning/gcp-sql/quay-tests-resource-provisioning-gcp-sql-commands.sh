@@ -165,7 +165,7 @@ cp "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" "${SHARED_DIR}"
 
 #copy for create secret bundle
 cp client-cert.pem client-key.pem server-ca.pem "${SHARED_DIR}"
-echo "$QUAY_DB_PUBLIC_IP" > "${SHARED_DIR}"/quay_db_public_ip
+echo "$QUAY_DB_PUBLIC_IP" > "${SHARED_DIR}"/gsql_db_public_ip
 
 #install extension
 mkdir -p extension && cd extension
