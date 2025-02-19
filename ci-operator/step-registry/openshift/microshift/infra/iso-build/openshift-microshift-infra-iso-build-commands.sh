@@ -36,8 +36,7 @@ chmod +x /tmp/iso.sh
 # GBRN=mybranch
 # git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
-#ci_clone_src
-git clone https://github.com/ggiguash/microshift.git -b brew_package_tests /go/src/github.com/openshift/microshift
+ci_clone_src
 
 # Attempt downloading MicroShift RPMs from brew.
 # This requires VPN access, which is only enabled for the cache jobs.
