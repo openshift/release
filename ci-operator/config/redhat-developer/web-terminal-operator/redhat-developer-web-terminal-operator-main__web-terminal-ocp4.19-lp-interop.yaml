@@ -1,0 +1,105 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  e2e-che-interop:
+    name: e2e-che-interop
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM e2e-che-interop
+    COPY . /workdir
+  from: e2e-che-interop
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: che-e2e-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: web-terminal-aws
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "che-e2e-tests", "failure_type": "pod_failure", "classification": "test failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "che-e2e-tests", "failure_type": "test_failure", "classification": "test failure", "jira_project": "TODO", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","web-terminal-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      OPERATORS: |
+        [
+            {"name": "web-terminal", "source": "redhat-operators", "channel": "fast", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario wto
+    test:
+    - ref: install-operators
+    - ref: che-e2e-tests
+    workflow: firewatch-ipi-aws
+- as: web-terminal-aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "che-e2e-tests", "failure_type": "pod_failure", "classification": "test failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "che-e2e-tests", "failure_type": "test_failure", "classification": "test failure", "jira_project": "TODO", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","fips","web-terminal-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      FIPS_ENABLED: "true"
+      OPERATORS: |
+        [
+            {"name": "web-terminal", "source": "redhat-operators", "channel": "fast", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario wto
+    test:
+    - ref: install-operators
+    - ref: che-e2e-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: redhat-developer
+  repo: web-terminal-operator
+  variant: web-terminal-ocp4.19-lp-interop

@@ -8,10 +8,17 @@ CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
-IDP_USER="rosa-admin"
+
+# Fetch user creds
+if [[ "${TEST_PLATFORM}" == "rosa" ]]; then
+  IDP_USER="rosa-admin"
+  IDP_LOGIN_PATH=$(cat $SHARED_DIR/api.login)
+  IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
+else
+  IDP_USER="kubeadmin"
+  IDP_PASSWD=$(cat ${SHARED_DIR}/kubeadmin-password)
+fi
 export IDP_USER
-IDP_LOGIN_PATH=$(cat $SHARED_DIR/api.login)
-IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
 export IDP_PASSWD
 export CHE_NAMESPACE
 export TEST_POD_NAME
