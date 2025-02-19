@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 AWS_ACCOUNT_ID=$(cat /var/run/hcm-job-logs-s3-bucket-storage/account_id)
 HIVE_LOGS_BUCKET=$(cat /var/run/hcm-job-logs-s3-bucket-storage/bucket)
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
