@@ -14,13 +14,20 @@ source "${SHARED_DIR}/packet-conf.sh"
 # This file has commonly used functions for cert rotation steps
 cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -v -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no'}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
 LONG_COMMAND_TIMEOUT=30m
+
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "$KUBECONFIG" ]; then
+  for kubeconfig in $(find ${KUBECONFIG} -type f); do
+    export KUBECONFIG=${kubeconfig}
+  done
+fi
 
 if [ ! -f /srv/control_node_ips ]; then
   mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
@@ -35,8 +42,8 @@ if [ ! -f /srv/control_node_ips ]; then
 
   echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
 else
-  mapfile -d ' ' -t control_node_ips < /srv/control_node_ips
-  mapfile -d ' ' -t compute_node_ips < /srv/compute_node_ips
+  mapfile -d ' ' -t control_nodes < /srv/control_node_ips
+  mapfile -d ' ' -t compute_nodes < /srv/compute_node_ips
 fi
 
 function run-on-all-nodes {
@@ -44,11 +51,11 @@ function run-on-all-nodes {
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
 
 function run-on-first-master-long {
-  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo bash -eEuxo pipefail ${1}
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo bash -eEuo pipefail ${1}
 }
 
 function run-on-first-master-silent {
@@ -100,7 +107,7 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
       done | /usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null
     done
     echo "All nodes are ready at $(date)"
-  EOZ
+EOZ
   chmod a+x /tmp/ensure-nodes-are-ready.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
   run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
@@ -118,7 +125,7 @@ if [ ! -f /tmp/wait-for-valid-lb-ext-kubeconfig.sh ]; then
     echo "Waiting for lb-ext kubeconfig to be valid"
     export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
     until oc --request-timeout=5s get nodes; do sleep 10; done
-  EOZ
+EOZ
   chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
   run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh && chmod a+x /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
@@ -135,7 +142,7 @@ if [ -f /tmp/wait-for-kubeapiserver-to-start-progressing.sh ]; then
     # TODO: kube-apiserver never starts progressing in 4.19+
     # oc --request-timeout=5s wait --for=condition=Progressing=True clusteroperator/kube-apiserver --timeout=300s
     sleep 300
-  EOZ
+EOZ
   chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
   run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh && chmod a+x /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
@@ -162,7 +169,7 @@ if [ ! -f /tmp/pod-restart-workarounds.sh ]; then
     # Restart console and console-operator pods
     oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
     oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
-  EOZ
+EOZ
   chmod a+x /tmp/pod-restart-workarounds.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
   run-on-first-master "mv /tmp/pod-restart-workarounds.sh /usr/local/bin/pod-restart-workarounds.sh && chmod a+x /usr/local/bin/pod-restart-workarounds.sh"
@@ -193,6 +200,37 @@ function wait-for-operators-to-stabilize {
 
 EOF
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cert-rotation-functions.sh "root@${IP}:/usr/local/share"
+
+cat >"${SHARED_DIR}"/set-client-ssh-settings.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+source /usr/local/share/cert-rotation-functions.sh
+
+# Set ClientAliveInterval
+run-on-all-nodes "echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config && echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config"
+set +e
+run-on-all-nodes "reboot"
+set -e
+for n in ${control_nodes[@]} ${compute_nodes[@]}; do
+  until timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" true >/dev/null 2>&1; do
+    echo "."
+  done
+done
+run-on-first-master-long "/usr/local/bin/ensure-nodes-are-ready.sh"
+EOF
+
+chmod +x "${SHARED_DIR}"/set-client-ssh-settings.sh
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/set-client-ssh-settings.sh "root@${IP}:/usr/local/bin"
+
+timeout \
+	--kill-after 10m \
+	30m \
+	ssh \
+	"${SSHOPTS[@]}" \
+	-o 'ServerAliveCountMax=90' \
+	"root@${IP}" \
+	/usr/local/bin/set-client-ssh-settings.sh
 
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It rotates node kubeconfigs so that it could be shut down earlier than 24 hours
@@ -257,11 +295,6 @@ oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
-# Set ClientAliveInterval
-echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config
-echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config
-run-on-all-nodes "echo 'ClientAliveInterval 90' | sudo tee -a /etc/ssh/sshd_config"
-run-on-all-nodes "echo 'ClientAliveMax 100' | sudo tee -a /etc/ssh/sshd_config"
 
 # Sync host and node timezones to avoid possible errors when skewing time
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
@@ -396,13 +429,10 @@ chmod +x "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh "root@${IP}:/usr/local/bin"
 
 timeout \
-  -v \
 	--kill-after 10m \
 	120m \
 	ssh \
-	-v \
 	"${SSHOPTS[@]}" \
 	-o 'ServerAliveCountMax=90' \
 	"root@${IP}" \
-	/usr/local/bin/prepare-nodes-for-shutdown.sh \
-	${SKEW}
+	/usr/local/bin/prepare-nodes-for-shutdown.sh

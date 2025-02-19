@@ -25,7 +25,7 @@ sudo systemctl stop chronyd
 
 SKEW=${1:-90d}
 OC=${OC:-oc}
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR -o 'TCPKeepAlive=no'}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -110,11 +110,9 @@ chmod +x "${SHARED_DIR}"/time-skew-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-test.sh "root@${IP}:/usr/local/bin"
 
 timeout \
-  -v \
 	--kill-after 10m \
 	120m \
 	ssh \
-  -v \
 	"${SSHOPTS[@]}" \
 	-o 'ServerAliveCountMax=90' \
 	"root@${IP}" \

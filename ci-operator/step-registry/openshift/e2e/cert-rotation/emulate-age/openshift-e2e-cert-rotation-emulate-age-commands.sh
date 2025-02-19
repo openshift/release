@@ -18,8 +18,8 @@ fi
 # TODO: Run suite of conformance tests after recovery
 cat >"${SHARED_DIR}"/cluster-age-before.sh <<'EOF'
 #!/bin/bash
+set -euo pipefail
 
-set -euxo pipefail
 sudo systemctl stop chronyd
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
@@ -44,21 +44,18 @@ chmod +x "${SHARED_DIR}"/cluster-age-before.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cluster-age-before.sh "root@${IP}:/usr/local/bin"
 
 timeout \
-	-v \
 	--kill-after 10m \
 	8h \
 	ssh \
 	"${SSHOPTS[@]}" \
 	-o 'ServerAliveCountMax=90' \
-	-v \
 	"root@${IP}" \
 	/usr/local/bin/cluster-age-before.sh
 
 
 cat >"${SHARED_DIR}"/cluster-age-test.sh <<'EOF'
 #!/bin/bash
-
-set -euxo pipefail
+set -euo pipefail
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
@@ -102,13 +99,11 @@ modulo=$((${CLUSTER_AGE_DAYS}%${CLUSTER_AGE_STEP}))
 if [[ ${full_steps} -gt 0 ]]; then
   for i in $(seq 1 ${full_steps}); do
     timeout \
-      -v \
       --kill-after 10m \
       8h \
       ssh \
       "${SSHOPTS[@]}" \
       -o 'ServerAliveCountMax=90' \
-      -v \
       "root@${IP}" \
       /usr/local/bin/cluster-age-test.sh \
       ${CLUSTER_AGE_STEP}
@@ -116,13 +111,11 @@ if [[ ${full_steps} -gt 0 ]]; then
 fi
 if [[ ${modulo} -gt 0 ]]; then
    timeout \
-      -v \
       --kill-after 10m \
       8h \
       ssh \
       "${SSHOPTS[@]}" \
       -o 'ServerAliveCountMax=90' \
-      -v \
       "root@${IP}" \
       /usr/local/bin/cluster-age-test.sh \
       ${modulo}

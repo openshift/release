@@ -55,7 +55,6 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-e2e-tests.sh "root@${IP}:/usr/local/bin"
 # Tests execution
 echo "### Running tests"
 timeout \
-    -v \
     --kill-after 10m \
     480m \
     ssh \
