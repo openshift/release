@@ -20,11 +20,11 @@ terraform init
 terraform state list
 
 # Run terraform destroy and capture exit status
-if ! terraform destroy -auto-approve; then
+# if ! terraform destroy -auto-approve; then
   echo "Failed to destroy quay GCP SQL instance"
 
   # Wait before retrying
-  sleep 1m
+#   sleep 1m
 
   # Check if google_sql_user exists in state before removing
   if terraform state list | grep -q "google_sql_user.users"; then
@@ -32,7 +32,10 @@ if ! terraform destroy -auto-approve; then
   fi
 
   # Try destroying again
-  terraform destroy -auto-approve || true
+if ! terraform destroy -auto-approve; then
+    echo "Failed to destroy quay GCP SQL instance"
+    oc delete quayregistry quay -n quay-enterprise
+    terraform destroy -auto-approve || true
 fi
 
 
