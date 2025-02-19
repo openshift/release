@@ -22,8 +22,6 @@ cat auth1.json
 
 echo "Fetch auth.json for Google Cloud SQL provision..." 
 echo "Database version is $DB_VERSION"
-sleep 3m
-# temp_dir=$(mktemp -d)
 
 cat >> variables.tf << EOF
 variable "region" {
@@ -91,7 +89,6 @@ resource "google_sql_database_instance" "quay_postgres_prow" {
 
   }
 }
-
 
 resource "google_sql_database" "database" {
   name     = var.database_name

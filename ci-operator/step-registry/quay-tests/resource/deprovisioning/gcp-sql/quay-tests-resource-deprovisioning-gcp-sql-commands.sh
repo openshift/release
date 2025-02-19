@@ -16,4 +16,13 @@ tar -xzvf $QUAY_GCP_SQL_TERRAFORM_PACKAGE && ls
 echo "Start to destroy quay gcp sql instance ..."
 terraform --version
 terraform init
-terraform destroy -auto-approve || true
+terraform destroy -auto-approve 
+if [ $? -ne 0 ]; then
+  echo "Failed to destroy quay gcp sql instance"
+  sleep 3m
+  terraform destroy -auto-approve || true
+fi
+
+
+
+

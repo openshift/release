@@ -56,7 +56,7 @@ DB_CONNECTION_ARGS:
     sslcert: /.postgresql/postgresql.crt
     sslkey: /.postgresql/postgresql.key
     threadlocals: true
-DB_URI: postgresql://"${GCP_POSTGRESQL_USERNAME}":"${GCP_POSTGRESQL_PASSWORD}"@"$GCP_SQL_HOSTIP":5432/"${GCP_POSTGRESQL_DBNAME}"?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt  
+DB_URI: postgresql://${GCP_POSTGRESQL_USERNAME}:${GCP_POSTGRESQL_PASSWORD}@$GCP_SQL_HOSTIP:5432/${GCP_POSTGRESQL_DBNAME}?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt  
 EOF
 
 oc create secret generic postgresql-client-certs -n "${QUAYNAMESPACE}" \
@@ -74,7 +74,7 @@ metadata:
   name: ${QUAYREGISTRY}
   namespace: ${QUAYNAMESPACE}
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: postgresql-client-certs
   components:
   - kind: postgres
     managed: false
