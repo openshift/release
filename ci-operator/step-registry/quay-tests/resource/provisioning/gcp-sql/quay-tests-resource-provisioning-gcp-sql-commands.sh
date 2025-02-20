@@ -159,8 +159,6 @@ function copyCerts() {
 
 }
 
-trap copyCerts EXIT
-
 #install extension
 function install_extension() {
   mkdir -p extension && cd extension
@@ -205,5 +203,7 @@ EOF
 
 }
 
-install_extension
+
+copyCerts || true
+install_extension || true
 echo "Google Cloud SQL instance created successfully"
