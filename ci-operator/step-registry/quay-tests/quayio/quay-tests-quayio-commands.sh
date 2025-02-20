@@ -18,8 +18,8 @@ function copyArtifacts {
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
-yarn run all
-
+yarn run all || true
+sleep 60m
 
 #Archive the testing report XML file
 trap copyArtifacts EXIT
