@@ -39,7 +39,7 @@ if ! terraform destroy -auto-approve; then
 
     echo "Failed to destroy quay GCP SQL instance"
     oc delete quayregistry quay -n quay-enterprise
-    sleep 2m
+    sleep 3m
     terraform destroy -auto-approve || true
 fi
 
