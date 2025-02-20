@@ -7,7 +7,12 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-MCE_VERSION=${MCE_VERSION:-"2.2"}
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
+    MCE_VERSION=MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION
+fi
+
+echo "$MCE_VERSION"
+
 _REPO="quay.io/acm-d/mce-custom-registry"
 if [[ "$DISCONNECTED" == "true" ]]; then
   _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
