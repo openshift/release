@@ -12,40 +12,35 @@ mkdir -p terraform_quay_gcp_sql && cd terraform_quay_gcp_sql
 cp "${SHARED_DIR}"/$QUAY_GCP_SQL_TERRAFORM_PACKAGE .
 tar -xzvf $QUAY_GCP_SQL_TERRAFORM_PACKAGE && ls
 
-#Destroy Google cloud SQL instance, Terrform destroy issue:"Error, failed to deleteuser ..." 
+#Destroy Google cloud SQL instance, two problems here:
+#1, Terrform destroy issue: "Error, failed to deleteuser, ... ,cannot be dropped because some objects depend on it"
 #https://github.com/hashicorp/terraform-provider-google/issues/3820, https://github.com/concourse/infrastructure/issues/13
-echo "Start to destroy quay gcp sql instance ..."
+#2, After workaround #1, there is another problem: "Error when reading or editing Database: googleapi: Error 400: Invalid request: failed to delete database"
+
+echo "Start to destroy Google Cloud SQL instance ..."
 terraform --version
 terraform init
 terraform state list
-terraform state rm google_sql_user.users
- terraform state rm google_sql_database.database
-#  terraform destroy -auto-approve || true
 
-# Run terraform destroy and capture exit status
-# if ! terraform destroy -auto-approve; then
-  echo "Start to destroy quay GCP SQL instance"
-if ! terraform destroy -auto-approve; then
-  # Wait before retrying
-#   sleep 1m
-
-  # Check if google_sql_user exists in state before removing
-  if terraform state list | grep -q "google_sql_user.users"; then
+# Workaround to avoid #1,#2 issues
+if terraform state list | grep -q "google_sql_user.users"; then
     terraform state rm google_sql_user.users
-  fi
-
- if terraform state list | grep -q "google_sql_database.database"; then
-  terraform state rm google_sql_database.database
-  fi
-
-  # Try destroying again
-
-    echo "Failed to destroy quay GCP SQL instance"
-    oc delete quayregistry quay -n quay-enterprise
-    terraform destroy -auto-approve || true
+fi
+if terraform state list | grep -q "google_sql_database.database"; then
+    terraform state rm google_sql_database.database
 fi
 
-echo "End to destroy quay GCP SQL instance"
+# Run terraform destroy and capture exit status
+echo "Start to destroy GCP SQL instance"
+terraform destroy -auto-approve && echo "Destroy GCP SQL instance successfully" || {
 
-
-
+  # Retry destroy GCP SQL instance if failed
+  echo "Failed to destroy GCP SQL instance"
+  # Remove Quay registry to close connections to GCP SQL instance
+  oc delete quayregistry quay -n quay-enterprise || true
+  sleep 3m
+  
+  # Retry terraform destroy
+  terraform destroy -auto-approve || true
+}
+echo "Destroy GCP SQL instance finished"

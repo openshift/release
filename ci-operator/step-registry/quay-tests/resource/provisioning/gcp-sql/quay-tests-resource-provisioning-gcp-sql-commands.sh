@@ -4,26 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
-GCP_AUTH_JSON=$(cat /var/run/quay-qe-gcp-secret/auth.json)
 GCP_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/dbname)
 GCP_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/username)
 GCP_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
-
-#Copy GCP auth.json from mounted secret to current directory
 QUAY_GCP_SQL_TERRAFORM_PACKAGE="QUAY_GCP_SQL_TERRAFORM_PACKAGE.tgz"
 mkdir -p QUAY_GCPSQL && cd QUAY_GCPSQL
-cp /var/run/quay-qe-gcp-secret/auth.json . 
-echo $GCP_AUTH_JSON > auth1.json
+#Copy GCP auth.json from mounted secret to current directory
+cp /var/run/quay-qe-gcp-secret/auth.json .
 
-cat auth.json 
-cat auth1.json
+echo "Google Cloud SQL Database version is ${DB_VERSION}"
 
-echo "Fetch auth.json for Google Cloud SQL provision..." 
-echo "Database version is $DB_VERSION"
-
-cat >> variables.tf << EOF
+cat >>variables.tf <<EOF
 variable "region" {
 default  = "us-central1"
 }
@@ -51,23 +43,22 @@ variable "database_password" {
 
 EOF
 
-cat >> create_gcp_sql.tf << EOF
+cat >>create_gcp_sql.tf <<EOF
 provider "google" {
   credentials = file("auth.json")
   project = "openshift-qe"  # dedicated project ID
   region  = var.region
 }
 
-resource "google_sql_database_instance" "quay_postgres_prow" {
-  name             = "quay-postgres-ci"
+resource "google_sql_database_instance" "instance" {
+  name             = "quay-postgres-prow$RANDOM"
   database_version = var.database_version
   region           = var.region
   
-  # set 'deletion_protection' to true, will ensure cannot accidentally delete, and can't be detroied by Terraform either
+  # If not set or set to true, will NOT be detroied by Terraform
   deletion_protection = false
 
   settings {
-    #tier = "db-custom-2-7680"  # Choose an appropriate machine type (2 vCPUs, 7.5GB RAM)
     tier = var.tier
     edition = "ENTERPRISE"
     availability_type = "ZONAL"  # Use "ZONAL" for single-zone deployments, "REGIONAL" for multi-zone deployments
@@ -92,24 +83,24 @@ resource "google_sql_database_instance" "quay_postgres_prow" {
 
 resource "google_sql_database" "database" {
   name     = var.database_name
-  instance = google_sql_database_instance.quay_postgres_prow.name
+  instance = google_sql_database_instance.instance.name
   depends_on = [google_sql_user.users]
 }
 
 resource "google_sql_user" "users" {
   name     = var.database_username
-  instance = google_sql_database_instance.quay_postgres_prow.name
+  instance = google_sql_database_instance.instance.name
   password = var.database_password  
 }
 
 #https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/sql_ssl_cert#private_key-1
 resource "google_sql_ssl_cert" "postgres_client_cert" {
   common_name = "quay-certclient"
-  instance    = google_sql_database_instance.quay_postgres_prow.name
+  instance    = google_sql_database_instance.instance.name
 }
 
 output "quay_db_public_ip" {
-    value = google_sql_database_instance.quay_postgres_prow.public_ip_address
+    value = google_sql_database_instance.instance.public_ip_address
 
 }
 
@@ -124,7 +115,7 @@ output "client_key" {
 }
 #https://cloud.google.com/sql/docs/postgres/configure-ssl-instance#terraform_2
 data "google_sql_ca_certs" "ca_certs" {
-  instance = google_sql_database_instance.quay_postgres_prow.name
+  instance = google_sql_database_instance.instance.name
 }
 
 locals {
@@ -145,36 +136,41 @@ output "db_latest_ca_cert" {
 EOF
 
 terraform init
-terraform apply -auto-approve 
+terraform apply -auto-approve
 
 QUAY_DB_PUBLIC_IP=$(terraform output quay_db_public_ip | tr -d '""' | tr -d '\n')
-echo "Quay DB Public IP is $QUAY_DB_PUBLIC_IP"
+echo "GSQL DB IP is $QUAY_DB_PUBLIC_IP"
+
 #The -raw flag forces Terraform to remove <<EOT and EOT markers
-terraform output -raw db_latest_ca_cert > server-ca.pem;
-terraform output -raw client_key > client-key.pem;
-terraform output -raw client_cert > client-cert.pem
+terraform output -raw db_latest_ca_cert >server-ca.pem
+terraform output -raw client_key >client-key.pem
+terraform output -raw client_cert >client-cert.pem
 chmod 0600 client-key.pem
 
+# Copy certs to SHARED_DIR
+function copyCerts() {
+  tar -cvzf "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" --exclude=".terraform" *
+  echo "Copy Google Cloud SQL terraform tf files"
+  cp "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" "${SHARED_DIR}"
 
-#Share the Terraform Var and Terraform Directory
-tar -cvzf "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" --exclude=".terraform" *
-echo "Copy Google Cloud SQL terraform tf files"
-cp "$QUAY_GCP_SQL_TERRAFORM_PACKAGE" "${SHARED_DIR}"
+  #copy for create secret bundle
+  cp client-cert.pem client-key.pem server-ca.pem "${SHARED_DIR}"
+  echo "$QUAY_DB_PUBLIC_IP" >"${SHARED_DIR}"/gsql_db_public_ip
 
-#copy for create secret bundle
-cp client-cert.pem client-key.pem server-ca.pem "${SHARED_DIR}"
-echo "$QUAY_DB_PUBLIC_IP" > "${SHARED_DIR}"/gsql_db_public_ip
-
-#install extension
-mkdir -p extension && cd extension
-
-cat >> variables.tf << EOF
-variable "quay_db_host" {
 }
 
+trap copyCerts EXIT
+
+#install extension
+function install_extension() {
+  mkdir -p extension && cd extension
+
+  cat >>variables.tf <<EOF
+variable "quay_db_host" {
+}
 EOF
 
-cat >> install_extension.tf << EOF
+  cat >>install_extension.tf <<EOF
 terraform {
   required_providers {
     postgresql = {
@@ -197,17 +193,17 @@ resource "postgresql_extension" "pg_trgm" {
   name     = "pg_trgm"
   database = "${GCP_POSTGRESQL_DBNAME}"
 }
-
 EOF
 
-export TF_VAR_quay_db_host=$QUAY_DB_PUBLIC_IP
-export PGSSLCERT="../client-cert.pem";
-export PGSSLKEY="../client-key.pem";
-export PGSSLROOTCERT="../server-ca.pem";
+  export TF_VAR_quay_db_host=$QUAY_DB_PUBLIC_IP
+  export PGSSLCERT="../client-cert.pem"
+  export PGSSLKEY="../client-key.pem"
+  export PGSSLROOTCERT="../server-ca.pem"
 
-terraform init
-terraform apply -auto-approve 
+  terraform init
+  terraform apply -auto-approve
 
+}
 
-#Finally Copy certs to SHARED_DIR and archive them
-# trap copyCerts EXIT
+install_extension
+echo "Google Cloud SQL instance created successfully"
