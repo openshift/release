@@ -103,6 +103,9 @@ set +x
 # Collect load test results at the end
 trap './tests/load-tests/ci-scripts/collect-results.sh "$SCENARIO"; trap EXIT' SIGINT EXIT
 
+export INFRA_DEPLOYMENTS_ORG='rh-rahulshetty'
+export INFRA_DEPLOYMENTS_BRANCH='increase-tenant-quotas'
+
 # Setup OpenShift cluster
 ./tests/load-tests/ci-scripts/setup-cluster.sh "$SCENARIO"
 
