@@ -30,15 +30,20 @@ if ! terraform destroy -auto-approve; then
   if terraform state list | grep -q "google_sql_user.users"; then
     terraform state rm google_sql_user.users
   fi
+  if terraform state list | grep -q "google_sql_database.database"; then
+     terraform state rm google_sql_database.database
+  fi
 
-  terraform state rm google_sql_database.database
 
   # Try destroying again
 
     echo "Failed to destroy quay GCP SQL instance"
-    # oc delete quayregistry quay -n quay-enterprise
+    oc delete quayregistry quay -n quay-enterprise
+    sleep 2m
     terraform destroy -auto-approve || true
 fi
+
+echo "Destroy GCP SQL instance finished"
 
 
 
