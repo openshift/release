@@ -37,18 +37,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-ibmcloud-default
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-dw823ib/release:latest
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-5j7fi22/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-rk02h72/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 1m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
@@ -74,7 +81,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-5j7fi22/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-rk02h72/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       SLEEP_DURATION: 1m
@@ -89,7 +96,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-5j7fi22/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-rk02h72/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     test:
