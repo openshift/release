@@ -8,7 +8,7 @@ QUAY_API_TOKEN=$(cat /var/run/quay-qe-quayio-secret/oauth2token)
 GITHUB_ACCESS_TOKEN=$(cat /var/run/quay-qe-quayio-secret/accesstoken)
 
 git clone https://"$GITHUB_ACCESS_TOKEN"@github.com/quay/quay-tests.git
-sleep 10m
+sleep 60m
 cd quay-tests/quay-io-tests
 yarn install
 
