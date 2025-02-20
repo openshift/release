@@ -678,6 +678,8 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
+set-cluster-version-spec-update-service
+
 echo "=============== openshift-install version =============="
 openshift-install version
 openshift-install --dir="${dir}" create manifests &
@@ -717,8 +719,6 @@ EOF
     fi
     ;;
 esac
-
-set-cluster-version-spec-update-service
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
