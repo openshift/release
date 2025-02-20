@@ -18,6 +18,9 @@ echo "Start to destroy quay gcp sql instance ..."
 terraform --version
 terraform init
 terraform state list
+terraform state rm google_sql_user.users
+ terraform state rm google_sql_database.database
+ terraform destroy -auto-approve || true
 
 # Run terraform destroy and capture exit status
 # if ! terraform destroy -auto-approve; then
@@ -31,7 +34,9 @@ if ! terraform destroy -auto-approve; then
     terraform state rm google_sql_user.users
   fi
 
+ if terraform state list | grep -q "google_sql_database.database"; then
   terraform state rm google_sql_database.database
+  fi
 
   # Try destroying again
 
