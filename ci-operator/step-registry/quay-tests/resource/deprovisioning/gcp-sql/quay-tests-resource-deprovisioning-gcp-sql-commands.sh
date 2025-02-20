@@ -20,7 +20,7 @@ terraform init
 terraform state list
 terraform state rm google_sql_user.users
  terraform state rm google_sql_database.database
- terraform destroy -auto-approve || true
+#  terraform destroy -auto-approve || true
 
 # Run terraform destroy and capture exit status
 # if ! terraform destroy -auto-approve; then
@@ -45,7 +45,7 @@ if ! terraform destroy -auto-approve; then
     terraform destroy -auto-approve || true
 fi
 
-
+echo "End to destroy quay GCP SQL instance"
 
 
 
