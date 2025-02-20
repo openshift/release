@@ -18,10 +18,11 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
-  to: volsync-addon-controller
+  to: cluster-backup-controller
 promotion:
   to:
-  - name: "2.13"
+  - disabled: true
+    name: "2.14"
     namespace: stolostron
 resources:
   '*':
@@ -29,14 +30,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
+- as: crd-and-gen-files-check
   commands: |
-    export SELF="make -f Makefile"
+    export SELF="make -f Makefile.prow"
     export HOME="/tmp"
-    make -f Makefile test
+    # Check that crd manifests are up-to-date
+    make -f Makefile.prow manifests
+    diff=$(git diff --color --ignore-space-change config/crd/bases)
+    if [ -n "$diff" ]; then
+      echo "$diff"
+      echo "***** config/crd/bases is out-of-date *****"
+      echo "*****     run 'make manifests'      *****"
+      exit 1
+    fi
+    # Check that generated deepcopy files are up-to-date
+    make -f Makefile.prow generate
+    diff=$(git diff --color --ignore-space-change api/v1beta1/*generated*.go)
+    if [ -n "$diff" ]; then
+      echo "$diff"
+      echo "***** api/v1beta1 generated files are out-of-date *****"
+      echo "*****     run 'make generate'      *****"
+      exit 1
+    fi
   container:
     from: src
-- as: sonar-pre-submit
+- as: unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+- as: sonar
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
@@ -57,21 +82,37 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-backup-controller
+    env:
+      IMAGE_REPO: cluster-backup-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-backup-controller
+    env:
+      IMAGE_REPO: cluster-backup-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: volsync-addon-controller
+      SOURCE_IMAGE_REF: cluster-backup-controller
     env:
-      IMAGE_REPO: volsync-addon-controller
+      IMAGE_REPO: cluster-backup-controller
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="volsync-addon-controller"
-        export OSCI_COMPONENT_VERSION="2.13.0"
+        export OSCI_COMPONENT_NAME="cluster-backup-controller"
         make -f Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
@@ -84,6 +125,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.13
+  branch: release-2.14
   org: stolostron
-  repo: volsync-addon-controller
+  repo: cluster-backup-operator
