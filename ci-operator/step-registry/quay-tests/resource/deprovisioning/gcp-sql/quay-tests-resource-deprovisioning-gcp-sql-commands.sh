@@ -32,7 +32,6 @@ fi
 
 # Run terraform destroy and capture exit status
 echo "Start to destroy GCP SQL instance"
-
 terraform destroy -auto-approve && echo "Destroy GCP SQL instance successfully" || {
 
   # Retry destroy GCP SQL instance if failed

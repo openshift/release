@@ -55,7 +55,7 @@ resource "google_sql_database_instance" "instance" {
   database_version = var.database_version
   region           = var.region
   
-  # set 'deletion_protection' to true, will ensure cannot accidentally delete, and can't be detroied by Terraform either
+  # If not set or set to true, will NOT be detroied by Terraform
   deletion_protection = false
 
   settings {
@@ -139,7 +139,7 @@ terraform init
 terraform apply -auto-approve
 
 QUAY_DB_PUBLIC_IP=$(terraform output quay_db_public_ip | tr -d '""' | tr -d '\n')
-echo "Quay DB Public IP is $QUAY_DB_PUBLIC_IP"
+echo "GSQL DB IP is $QUAY_DB_PUBLIC_IP"
 
 #The -raw flag forces Terraform to remove <<EOT and EOT markers
 terraform output -raw db_latest_ca_cert >server-ca.pem
