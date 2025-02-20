@@ -3,6 +3,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ci
   from: root
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/kubernetes-sigs-kueue
   to: kueue-controller
 promotion:
   to:
@@ -21,6 +26,27 @@ tests:
   commands: make vet
   container:
     from: src
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: make -f Makefile-test-ocp.mk test-e2e-ocp
+      dependencies:
+      - env: IMAGE_TAG
+        name: kueue-controller
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
 zz_generated_metadata:
   branch: main
   org: openshift

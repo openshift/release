@@ -1,27 +1,27 @@
 presubmits:
-  openshift/kubernetes-sigs-kueue:
+  sohankunkerkar/kueue:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build10
-    context: ci/prow/e2e-aws-ocp
+    - ^ci-fix$
+    - ^ci-fix-
+    cluster: build03
+    context: ci/prow/e2e-kueue
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-main-e2e-aws-ocp
-    rerun_command: /test e2e-aws-ocp
+    name: pull-ci-sohankunkerkar-kueue-ci-fix-e2e-kueue
+    rerun_command: /test e2e-kueue
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp
+        - --target=e2e-kueue
         command:
         - ci-operator
         image: ci-operator:latest
@@ -31,14 +31,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -51,12 +45,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -66,19 +54,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-kueue,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build10
+    - ^ci-fix$
+    - ^ci-fix-
+    cluster: build03
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-main-images
+    name: pull-ci-sohankunkerkar-kueue-ci-fix-images
     rerun_command: /test images
     spec:
       containers:
@@ -87,7 +77,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -124,15 +113,17 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build10
+    - ^ci-fix$
+    - ^ci-fix-
+    cluster: build03
     context: ci/prow/vet
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-main-vet
+    name: pull-ci-sohankunkerkar-kueue-ci-fix-vet
     rerun_command: /test vet
     spec:
       containers:
