@@ -64,83 +64,6 @@ presubmits:
     - ^release-next$
     - ^release-next-
     cluster: build10
-    context: ci/prow/413-test-conformance
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-413-test-conformance
-    rerun_command: /test 413-test-conformance
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-conformance
-        - --variant=413
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-conformance,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-next$
-    - ^release-next-
-    cluster: build10
     context: ci/prow/413-test-e2e
     decorate: true
     decoration_config:
@@ -444,7 +367,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )413-test-reconciler-keda,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -459,6 +382,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-images
     rerun_command: /test 417-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
@@ -502,79 +426,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )417-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-next$
-    - ^release-next-
-    cluster: build06
-    context: ci/prow/417-test-conformance
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/variant: "417"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-test-conformance
-    rerun_command: /test 417-test-conformance
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-conformance
-        - --variant=417
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )417-test-conformance,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -590,6 +442,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-test-e2e
     rerun_command: /test 417-test-e2e
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
@@ -646,7 +499,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )417-test-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -662,6 +515,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-test-reconciler
     rerun_command: /test 417-test-reconciler
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
@@ -718,7 +572,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )417-test-reconciler,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -734,6 +588,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-test-reconciler-encryption-auth
     rerun_command: /test 417-test-reconciler-encryption-auth
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
@@ -790,7 +645,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )417-test-reconciler-encryption-auth,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -806,6 +661,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-next-417-test-reconciler-keda
     rerun_command: /test 417-test-reconciler-keda
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:

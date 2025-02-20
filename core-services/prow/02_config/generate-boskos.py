@@ -87,6 +87,9 @@ CONFIG = {
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
+    'metal-perfscale-selfsched-quota-slice': {
+        'metal-perfscale-selfsched': 3,
+    },
     'metal-perfscale-telco-quota-slice': {
         'metal-perfscale-telco-rdu2': 1,
     },
@@ -247,6 +250,9 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    'libvirt-s390x-vpn-quota-slice': {
+        'libvirt-s390x-0-1': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -271,9 +277,10 @@ CONFIG = {
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
-    'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+    'openstack-rhoso-quota-slice': {
+        '10.46.4.7': 1, # titan03.lab.eng.tlv2.redhat.com
+        '10.46.4.12': 1, # titan08.lab.eng.tlv2.redhat.com
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },

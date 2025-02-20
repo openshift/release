@@ -388,3 +388,28 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: secret-provider-class-creator
+  rules:
+  - apiGroups:
+    - secrets-store.csi.x-k8s.io
+    resources:
+    - secretproviderclasses
+    verbs:
+    - create
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: secret-provider-class-creator-ci-operator
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: secret-provider-class-creator
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
