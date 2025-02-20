@@ -91,6 +91,10 @@ sleep 20
 oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
+if [ -n "$TUNING_POLICY" ]; then
+  oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/tuningPolicy", "value": "$TUNING_POLICY"}]'
+fi
+
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
