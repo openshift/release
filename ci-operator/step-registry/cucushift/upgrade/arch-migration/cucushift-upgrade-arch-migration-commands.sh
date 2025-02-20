@@ -68,18 +68,22 @@ function run_command_oc() {
 }
 
 # Wait upgrade to start, https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-25473
-# Progressing=True
-# ReleaseAccepted=True
-# Upgradeable=False (wait for https://issues.redhat.com/browse/OTA-861)
+# Following conditions will be used to determine if an upgrade is started
+#   Progressing=True
+#   ReleaseAccepted=True
+#   Upgradeable=False (for ocp 4.18 and later)
+# If not all above conditions check passed, we print a message and returns 1
 function wait_upgrade_start(){
     local retry=0 output
     echo "Wait for the upgrade to start"
     while [[ retry -lt 5 ]]; do
-        output="$(${OC} get clusterversion version -ojson)"
-        if [[ "$(echo $output | jq -r '.status.conditions[] | select(.type == "Progressing").status')" == "True" ]] \
-            && [[ "$(echo $output | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" == "True" ]]; then
+        output="$(oc get clusterversion version -ojson)"
+        if [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Progressing").status')" == "True" ]] \
+            && [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" == "True" ]] \
+            && [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Upgradeable").status')" == "False" ]];  then
+            
             echo "Upgrade is processing"
-            return
+            return 0
         fi
         retry=$(( retry+1 ))
         sleep 1m
