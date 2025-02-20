@@ -5,9 +5,11 @@ set -euo pipefail
 QUAY_USERNAME=$(cat /var/run/quay-qe-quayio-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quayio-secret/password)
 QUAY_API_TOKEN=$(cat /var/run/quay-qe-quayio-secret/oauth2token)
+GITHUB_ACCESS_TOKEN=$(cat /var/run/quay-qe-quayio-secret/accesstoken)
 
+git clone https://"$GITHUB_ACCESS_TOKEN"@github.com/quay/quay-tests.git
 sleep 10m
-cd quay-io-tests
+cd quay-tests/quay-io-tests
 yarn install
 
 function copyArtifacts {
