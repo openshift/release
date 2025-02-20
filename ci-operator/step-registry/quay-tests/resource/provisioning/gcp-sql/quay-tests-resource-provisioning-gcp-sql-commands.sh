@@ -59,7 +59,7 @@ provider "google" {
 }
 
 resource "google_sql_database_instance" "quay_postgres_prow" {
-  name             = "quay-postgres-prow"
+  name             = "quay-postgres-ci"
   database_version = var.database_version
   region           = var.region
   
