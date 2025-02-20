@@ -23,7 +23,6 @@ chmod 0644 client-cert.pem server-ca.pem
 echo "Create registry ${QUAYREGISTRY} with Google Cloud SQL in ns ${QUAYNAMESPACE}"
 
 #create secret bundle with Google Cloud SQL
-
 cat >>config.yaml <<EOF
 BROWSER_API_CALLS_XHR_ONLY: false
 PERMANENTLY_DELETE_TAGS: true
@@ -112,7 +111,7 @@ for i in {1..60}; do
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
       --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' >"$SHARED_DIR"/quay_oauth2_token || true
     
-    sleep 5
+    echo "Quay registry is ready"
     exit 0
   fi
   sleep 15
