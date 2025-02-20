@@ -1,27 +1,22 @@
 postsubmits:
-  opendatahub-io/kserve:
+  openshift/osd-cluster-ready:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-v0\.11$
-    cluster: build01
+    - ^master$
+    cluster: build11
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-opendatahub-io-kserve-release-v0.11-images
+    name: branch-ci-openshift-osd-cluster-ready-master-post-leading-zero-check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=post-leading-zero-check
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,9 +35,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -54,9 +46,6 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
