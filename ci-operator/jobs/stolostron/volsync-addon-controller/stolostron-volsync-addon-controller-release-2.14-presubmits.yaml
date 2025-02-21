@@ -1,22 +1,20 @@
 presubmits:
-  RedHatQE/interop-testing:
+  stolostron/volsync-addon-controller:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^cnv-4\.16$
-    - ^cnv-4\.16-
-    cluster: build10
-    context: ci/prow/cnv-odf-ocp4.16-lp-interop-images
+    - ^release-2\.14$
+    - ^release-2\.14-
+    cluster: build03
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: cnv-odf-ocp4.16-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-RedHatQE-interop-testing-cnv-4.16-cnv-odf-ocp4.16-lp-interop-images
-    rerun_command: /test cnv-odf-ocp4.16-lp-interop-images
+    name: pull-ci-stolostron-volsync-addon-controller-release-2.14-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -24,7 +22,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=cnv-odf-ocp4.16-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,32 +54,91 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )cnv-odf-ocp4.16-lp-interop-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^cnv-4\.16$
-    - ^cnv-4\.16-
-    cluster: build10
-    context: ci/prow/ocp-cnv-odf-4.16-images
+    - ^release-2\.14$
+    - ^release-2\.14-
+    cluster: build03
+    context: ci/prow/sonar-pre-submit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp-cnv-odf-4.16
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-RedHatQE-interop-testing-cnv-4.16-ocp-cnv-odf-4.16-images
-    rerun_command: /test ocp-cnv-odf-4.16-images
+    name: pull-ci-stolostron-volsync-addon-controller-release-2.14-sonar-pre-submit
+    rerun_command: /test sonar-pre-submit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=ocp-cnv-odf-4.16
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-pre-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.14$
+    - ^release-2\.14-
+    cluster: build03
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-volsync-addon-controller-release-2.14-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -115,4 +171,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-cnv-odf-4.16-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
