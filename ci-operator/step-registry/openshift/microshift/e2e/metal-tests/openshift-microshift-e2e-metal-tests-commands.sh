@@ -56,3 +56,4 @@ ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} EXCLUDE_CNCF_CONF
 # Run wait -n since we only have one background command. Should this change, please update the exit
 # status handling.
 wait -n
+# Test only
