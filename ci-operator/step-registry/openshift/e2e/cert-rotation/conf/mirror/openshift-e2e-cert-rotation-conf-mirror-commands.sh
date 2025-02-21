@@ -231,9 +231,8 @@ DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
 echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.8  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
-# until we land k8s 1.28 we need to mirror both the 3.8 (current image) and 3.9 (coming in k8s 1.28)
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.9  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.redhat.io/rhel8/httpd-24:latest ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-12-registry-k8s-io-e2e-test-images-httpd-2-4-38-4-lYFH2l3oSS5xEICa
+
 
 # Build registries.conf
 tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
