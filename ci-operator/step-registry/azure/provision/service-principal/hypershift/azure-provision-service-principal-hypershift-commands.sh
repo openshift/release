@@ -109,3 +109,19 @@ cat <<EOF >"${SHARED_DIR}"/hypershift_azure_mi_file.json
     }
 }
 EOF
+
+# Create and Save Managed Identities for the Data Plane Component
+AZURE_DISK_MI_NAME="${SP_NAME_PREFIX}-dp-mi-disk"
+AZURE_FILE_MI_NAME="${SP_NAME_PREFIX}-dp-mi-file"
+IMAGE_REGISTRY_MI_NAME="${SP_NAME_PREFIX}-dp-mi-image-registry"
+AZURE_DISK_CLIENT_ID=$(az identity create --name $AZURE_DISK_MI_NAME --resource-group $RG_NSG --query clientId -o tsv)
+AZURE_FILE_CLIENT_ID=$(az identity create --name $AZURE_FILE_MI_NAME --resource-group $RG_NSG --query clientId -o tsv)
+IMAGE_REGISTRY_CLIENT_ID=$(az identity create --name $IMAGE_REGISTRY_MI_NAME --resource-group $RG_NSG --query clientId -o tsv)
+
+cat <<EOF >"${SHARED_DIR}"/hypershift_azure_dp_mi_file.json
+{
+  "imageRegistryMSIClientID": ${IMAGE_REGISTRY_CLIENT_ID},
+  "diskMSIClientID": ${AZURE_DISK_CLIENT_ID},
+  "fileMSIClientID": ${AZURE_FILE_CLIENT_ID}
+}
+EOF
