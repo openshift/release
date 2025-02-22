@@ -45,7 +45,7 @@ TEST_SUITE="Post-Upgrade"
 export TEST_SUITE
 
 # create quay pull secret
-QUAY_INFO="/tmp/secrets/ci"
+QUAY_INFO="/tmp/secrets/quay"
 secrets=$(mktemp -d)
 
 oc extract secret/pull-secret -n openshift-config --to="${secrets}"
