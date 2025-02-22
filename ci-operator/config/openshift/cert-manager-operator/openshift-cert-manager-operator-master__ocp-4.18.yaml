@@ -1,0 +1,60 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+  use_build_cache: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_SCENARIOS: cert-manager
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-operator-disconnected
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_SCENARIOS: cert-manager
+    test:
+    - ref: cert-manager-disconnected
+    - ref: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: ocp-4.18
