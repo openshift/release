@@ -38,5 +38,7 @@ platform_spec = f"""platform:
             - "VM Network"
 """
 
+print("hello world")
+
 with open(os.path.join(shared_dir, "nested-ansible-platform.yaml"), "w") as nested_ansible_platform_file:
     nested_ansible_platform_file.write(platform_spec)
