@@ -13,9 +13,8 @@ OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
 export OCP_CRED_PSW
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
-QUAY_INFO="/tmp/secrets/ci"
-
 # create quay pull secret
+QUAY_INFO="/tmp/secrets/ci"
 secrets=$(mktemp -d)
 oc extract secret/pull-secret -n openshift-config --to="${secrets}"
 if ! grep 'quay.io/rhoai' < "${secrets}"/.dockerconfigjson
