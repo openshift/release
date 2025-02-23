@@ -41,43 +41,27 @@ function run_cmd_with_retries_save_output()
     return 0
 }
 
-function create_role_definition_json() {
-
-    local role_name=$1 permissions=$2 role_definition_file=$3
-
-    role_description="the custom role ${role_name} with minimal permissions for cluster ${CLUSTER_NAME}"
-    assignable_scopes="""
-\"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
-"""
-
-    # create role definition json file
-    jq --null-input \
-       --arg role_name "${role_name}" \
-       --arg description "${role_description}" \
-       --argjson assignable_scopes "[ ${assignable_scopes} ]" \
-       --argjson permission_list "[ ${permissions} ]" '
+function run_cmd_with_retries()
 {
-  "Name": $role_name,
-  "IsCustom": true,
-  "Description": $description,
-  "assignableScopes": $assignable_scopes,
-  "Actions": $permission_list,
-  "notActions": [],
-  "dataActions": [],
-  "notDataActions": []
-}' > "${role_definition_file}"
-}
+    local cmd="$1" retries="${2:-}"
+    local try=0 ret=0
+    [[ -z ${retries} ]] && max="20" || max=${retries}
+    echo "Trying ${max} times max to run '${cmd}'"
 
-function create_custom_role() {
-    local role_definition="$1"
-    local custom_role_name="$2"
-
-    # create custom role
-    cmd="az role definition create --role-definition ${role_definition}"
-    run_command "${cmd}" || return 1
-
-    echo "Sleep 1 min to wait for custom role created"
-    sleep 60
+    res=$(eval "${cmd}") || ret=$?
+    while [[ ${ret} -ne 0 || -z "${res}" ]] && [ ${try} -lt ${max} ]; do
+        echo "'${cmd}' did not return success or return empty, waiting 60 sec....."
+        sleep 60
+        try=$(( try + 1 ))
+        ret=0
+        res=$(eval "${cmd}") || ret=$?
+    done
+    if [ ${try} -eq ${max} ]; then
+        echo "Never succeed or Timeout"
+        return 1
+    fi
+    echo "Succeed"
+    return 0
 }
 
 function create_sp_with_custom_role() {
@@ -90,27 +74,6 @@ function create_sp_with_custom_role() {
     # sometimes, failed to create sp as role assignment creation failed, retry
     run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
-
-if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
-    echo "AZURE_INSTALL_USE_MINIMAL_PERMISSIONS is set to no, skip this step to create sp with minimal permission!"
-    exit 0
-fi
-
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
-mkdir -p "${XDG_RUNTIME_DIR}"
-# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
-# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
-# so that the credentials of the build farm registry can be saved in docker client config file.
-# A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
-ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -137,282 +100,51 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 az account set --subscription ${AZURE_AUTH_SUBSCRIPTOIN_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-ROLE_DEFINITION="${ARTIFACT_DIR}/azure-custom-role-definition-minimal-permissions.json"
-CUSTOM_ROLE_NAME="${CLUSTER_NAME}-custom-role"
-SP_NAME="${CLUSTER_NAME}-sp"
-SP_OUTPUT="$(mktemp)"
 
-required_permissions="""
-\"Microsoft.Authorization/policies/audit/action\",
-\"Microsoft.Authorization/policies/auditIfNotExists/action\",
-\"Microsoft.Authorization/roleAssignments/read\",
-\"Microsoft.Authorization/roleAssignments/write\",
-\"Microsoft.Compute/availabilitySets/read\",
-\"Microsoft.Compute/availabilitySets/write\",
-\"Microsoft.Compute/availabilitySets/delete\",
-\"Microsoft.Compute/disks/beginGetAccess/action\",
-\"Microsoft.Compute/disks/delete\",
-\"Microsoft.Compute/disks/read\",
-\"Microsoft.Compute/disks/write\",
-\"Microsoft.Compute/galleries/images/read\",
-\"Microsoft.Compute/galleries/images/versions/read\",
-\"Microsoft.Compute/galleries/images/versions/write\",
-\"Microsoft.Compute/galleries/images/write\",
-\"Microsoft.Compute/galleries/read\",
-\"Microsoft.Compute/galleries/write\",
-\"Microsoft.Compute/snapshots/read\",
-\"Microsoft.Compute/snapshots/write\",
-\"Microsoft.Compute/snapshots/delete\",
-\"Microsoft.Compute/virtualMachines/delete\",
-\"Microsoft.Compute/virtualMachines/powerOff/action\",
-\"Microsoft.Compute/virtualMachines/read\",
-\"Microsoft.Compute/virtualMachines/write\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/write\",
-\"Microsoft.Network/dnsZones/A/write\",
-\"Microsoft.Network/dnsZones/CNAME/write\",
-\"Microsoft.Network/dnszones/CNAME/read\",
-\"Microsoft.Network/dnszones/read\",
-\"Microsoft.Network/loadBalancers/backendAddressPools/join/action\",
-\"Microsoft.Network/loadBalancers/backendAddressPools/read\",
-\"Microsoft.Network/loadBalancers/backendAddressPools/write\",
-\"Microsoft.Network/loadBalancers/read\",
-\"Microsoft.Network/loadBalancers/write\",
-\"Microsoft.Network/networkInterfaces/delete\",
-\"Microsoft.Network/networkInterfaces/join/action\",
-\"Microsoft.Network/networkInterfaces/read\",
-\"Microsoft.Network/networkInterfaces/write\",
-\"Microsoft.Network/networkSecurityGroups/join/action\",
-\"Microsoft.Network/networkSecurityGroups/read\",
-\"Microsoft.Network/networkSecurityGroups/securityRules/delete\",
-\"Microsoft.Network/networkSecurityGroups/securityRules/read\",
-\"Microsoft.Network/networkSecurityGroups/securityRules/write\",
-\"Microsoft.Network/networkSecurityGroups/write\",
-\"Microsoft.Network/privateDnsZones/A/read\",
-\"Microsoft.Network/privateDnsZones/A/write\",
-\"Microsoft.Network/privateDnsZones/A/delete\",
-\"Microsoft.Network/privateDnsZones/SOA/read\",
-\"Microsoft.Network/privateDnsZones/read\",
-\"Microsoft.Network/privateDnsZones/virtualNetworkLinks/read\",
-\"Microsoft.Network/privateDnsZones/virtualNetworkLinks/write\",
-\"Microsoft.Network/privateDnsZones/write\",
-\"Microsoft.Network/publicIPAddresses/delete\",
-\"Microsoft.Network/publicIPAddresses/join/action\",
-\"Microsoft.Network/publicIPAddresses/read\",
-\"Microsoft.Network/publicIPAddresses/write\",
-\"Microsoft.Network/virtualNetworks/join/action\",
-\"Microsoft.Network/virtualNetworks/read\",
-\"Microsoft.Network/virtualNetworks/subnets/join/action\",
-\"Microsoft.Network/virtualNetworks/subnets/read\",
-\"Microsoft.Network/virtualNetworks/subnets/write\",
-\"Microsoft.Network/virtualNetworks/write\",
-\"Microsoft.Resourcehealth/healthevent/Activated/action\",
-\"Microsoft.Resourcehealth/healthevent/InProgress/action\",
-\"Microsoft.Resourcehealth/healthevent/Pending/action\",
-\"Microsoft.Resourcehealth/healthevent/Resolved/action\",
-\"Microsoft.Resourcehealth/healthevent/Updated/action\",
-\"Microsoft.Resources/subscriptions/resourceGroups/read\",
-\"Microsoft.Resources/subscriptions/resourcegroups/write\",
-\"Microsoft.Resources/tags/write\",
-\"Microsoft.Storage/storageAccounts/blobServices/read\",
-\"Microsoft.Storage/storageAccounts/blobServices/containers/write\",
-\"Microsoft.Storage/storageAccounts/fileServices/read\",
-\"Microsoft.Storage/storageAccounts/fileServices/shares/read\",
-\"Microsoft.Storage/storageAccounts/fileServices/shares/write\",
-\"Microsoft.Storage/storageAccounts/fileServices/shares/delete\",
-\"Microsoft.Storage/storageAccounts/listKeys/action\",
-\"Microsoft.Storage/storageAccounts/read\",
-\"Microsoft.Storage/storageAccounts/write\",
-\"Microsoft.Authorization/roleAssignments/delete\",
-\"Microsoft.Compute/disks/delete\",
-\"Microsoft.Compute/galleries/delete\",
-\"Microsoft.Compute/galleries/images/delete\",
-\"Microsoft.Compute/galleries/images/versions/delete\",
-\"Microsoft.Compute/virtualMachines/delete\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/delete\",
-\"Microsoft.Network/dnszones/read\",
-\"Microsoft.Network/dnsZones/A/read\",
-\"Microsoft.Network/dnsZones/A/delete\",
-\"Microsoft.Network/dnsZones/CNAME/read\",
-\"Microsoft.Network/dnsZones/CNAME/delete\",
-\"Microsoft.Network/loadBalancers/delete\",
-\"Microsoft.Network/networkInterfaces/delete\",
-\"Microsoft.Network/networkSecurityGroups/delete\",
-\"Microsoft.Network/privateDnsZones/read\",
-\"Microsoft.Network/privateDnsZones/A/read\",
-\"Microsoft.Network/privateDnsZones/delete\",
-\"Microsoft.Network/privateDnsZones/virtualNetworkLinks/delete\",
-\"Microsoft.Network/publicIPAddresses/delete\",
-\"Microsoft.Network/virtualNetworks/delete\",
-\"Microsoft.Resourcehealth/healthevent/Activated/action\",
-\"Microsoft.Resourcehealth/healthevent/Resolved/action\",
-\"Microsoft.Resourcehealth/healthevent/Updated/action\",
-\"Microsoft.Resources/subscriptions/resourcegroups/delete\",
-\"Microsoft.Storage/storageAccounts/delete\",
-\"Microsoft.Storage/storageAccounts/listKeys/action\"
-"""
+sp_list=""
+[[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]] && sp_list="${sp_list} cluster"
+[[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]] && sp_list="${sp_list} sts"
 
-# optional permissions for external dns operator
-required_permissions="""
-\"Microsoft.Network/privateDnsZones/CNAME/read\",
-\"Microsoft.Network/privateDnsZones/CNAME/write\",
-\"Microsoft.Network/privateDnsZones/CNAME/delete\",
-\"Microsoft.Network/privateDnsZones/TXT/read\",
-\"Microsoft.Network/privateDnsZones/TXT/write\",
-\"Microsoft.Network/privateDnsZones/TXT/delete\",
-${required_permissions}
-"""
-
-
-# optional permission to gather bootstrap bundle log
-required_permissions="""
-\"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",
-${required_permissions}
-"""
-
-# New permissions are instroduced when using CAPZ to provision IPI cluster
-if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
-    # routeTables relevant perssions can be removed once OCPBUGS-37663 is fixed.
-    required_permissions="""
-\"Microsoft.Network/routeTables/read\",
-\"Microsoft.Network/routeTables/write\",
-\"Microsoft.Network/routeTables/join/action\",
-\"Microsoft.Network/loadBalancers/inboundNatRules/read\",
-\"Microsoft.Network/loadBalancers/inboundNatRules/write\",
-\"Microsoft.Network/loadBalancers/inboundNatRules/join/action\",
-\"Microsoft.Network/loadBalancers/inboundNatRules/delete\",
-${required_permissions}
-"""
+if [[ -z "${sp_list}" ]]; then
+    echo "Both AZURE_INSTALL_USE_MINIMAL_PERMISSIONS and ENABLE_MIN_PERMISSION_FOR_STS are disabled, skip this step to create service principal with minimal permission!"
+    exit 0
 fi
 
+for sp_type in ${sp_list}; do
+    sp_name="${CLUSTER_NAME}-sp-${sp_type}"
+    sp_output="$(mktemp)"
+    if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]] && [[ "${sp_type}" == "cluster" ]]; then
+        role_name="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
+    else
+        [[ ! -f "${SHARED_DIR}/azure_custom_role_name" ]] && echo "Unable to find file <SHARED_DIR>/azure_custom_role_name, abort..." && exit 1
+        role_name=$(jq -r ".${sp_type}" "${SHARED_DIR}/azure_custom_role_name")
+    fi
 
-if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
-    required_permissions="""
-\"Microsoft.Compute/images/read\",
-\"Microsoft.Compute/images/write\",
-\"Microsoft.Compute/images/delete\",
-\"Microsoft.Compute/virtualMachines/deallocate/action\",
-\"Microsoft.Storage/storageAccounts/blobServices/containers/read\",
-\"Microsoft.Resources/deployments/read\",
-\"Microsoft.Resources/deployments/write\",
-\"Microsoft.Resources/deployments/validate/action\",
-\"Microsoft.Resources/deployments/operationstatuses/read\",
-${required_permissions}
-"""
-fi
-
-if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then
-    required_permissions="""
-\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/read\",
-\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/write\",
-\"Microsoft.Compute/images/read\",
-\"Microsoft.Compute/images/write\",
-\"Microsoft.Compute/images/delete\",
-${required_permissions}
-"""    
-fi
-
-if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
-    required_permissions="""
-\"Microsoft.Compute/diskEncryptionSets/read\",
-\"Microsoft.Compute/diskEncryptionSets/write\",
-\"Microsoft.Compute/diskEncryptionSets/delete\",
-\"Microsoft.KeyVault/vaults/read\",
-\"Microsoft.KeyVault/vaults/write\",
-\"Microsoft.KeyVault/vaults/delete\",
-\"Microsoft.KeyVault/vaults/deploy/action\",
-\"Microsoft.KeyVault/vaults/keys/read\",
-\"Microsoft.KeyVault/vaults/keys/write\",
-${required_permissions}
-"""
-fi
-
-custom_role_name_json="{}"
-if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
-    sp_role="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
-else
-    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}"
-    echo "Creating custom role..."
-    create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
-    # for destroy
-    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"cluster\":\"${CUSTOM_ROLE_NAME}\"}")
-    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
-    sp_role="${CUSTOM_ROLE_NAME}"
-fi
-echo "Creating sp with custom role..."
-create_sp_with_custom_role "${SP_NAME}" "${sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
-sp_id=$(jq -r .appId "${SP_OUTPUT}")
-sp_password=$(jq -r .password "${SP_OUTPUT}")
-sp_tenant=$(jq -r .tenant "${SP_OUTPUT}")
-if [[ "${sp_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
-    echo "Unable to get service principal id or password, exit..."
-    exit 1
-fi
-echo "New service principal id: ${sp_id}"
-cat <<EOF > "${SHARED_DIR}/azure_minimal_permission"
-{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
-EOF
-# for destroy
-echo "${sp_id}" > "${SHARED_DIR}/azure_sp_id"
-rm -f ${SP_OUTPUT}
-
-# create SP with minimal permission for CCO to create required Azure resources when using workload identity
-if [[ "${ENABLE_MIN_PERMISSION_FOR_STS}" == "true" ]]; then
-    sts_required_permissions="""
-\"Microsoft.Resources/subscriptions/resourceGroups/read\",
-\"Microsoft.Resources/subscriptions/resourceGroups/write\",
-\"Microsoft.Resources/subscriptions/resourceGroups/delete\",
-\"Microsoft.Authorization/roleAssignments/read\",
-\"Microsoft.Authorization/roleAssignments/delete\",
-\"Microsoft.Authorization/roleAssignments/write\",
-\"Microsoft.Authorization/roleDefinitions/read\",
-\"Microsoft.Authorization/roleDefinitions/write\",
-\"Microsoft.Authorization/roleDefinitions/delete\",
-\"Microsoft.Storage/storageAccounts/listkeys/action\",
-\"Microsoft.Storage/storageAccounts/delete\",
-\"Microsoft.Storage/storageAccounts/read\",
-\"Microsoft.Storage/storageAccounts/write\",
-\"Microsoft.Storage/storageAccounts/blobServices/containers/write\",
-\"Microsoft.Storage/storageAccounts/blobServices/containers/delete\",
-\"Microsoft.Storage/storageAccounts/blobServices/containers/read\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/delete\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/write\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/delete\",
-\"Microsoft.Storage/register/action\",
-\"Microsoft.ManagedIdentity/register/action\"
-"""
-    sts_role_name="${CLUSTER_NAME}-custom-role-sts"
-    sts_role_definition="${ARTIFACT_DIR}/azure-custom-role-definition-sts-minimal-permissions.json"
-    sts_sp_name="${CLUSTER_NAME}-sp-sts"
-    sts_sp_output=$(mktemp)
-
-    echo "Create SP with minimal permission for CCO"
-    create_role_definition_json "${sts_role_name}" "${sts_required_permissions}" "${sts_role_definition}"
-    create_custom_role "${sts_role_definition}" "${sts_role_name}"
-    # for destroy
-    custom_role_name_json=$(echo "${custom_role_name_json}" | jq -c -S ". +={\"ccoctl\":\"${sts_role_name}\"}")
-    echo "${custom_role_name_json}" > "${SHARED_DIR}/azure_custom_role_name"
-    sts_sp_role="${sts_role_name}"
-
-    create_sp_with_custom_role "${sts_sp_name}" "${sts_sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sts_sp_output}"
-    sts_sp_id=$(jq -r .appId "${sts_sp_output}")
-    sts_sp_password=$(jq -r .password "${sts_sp_output}")
-    sts_sp_tenant=$(jq -r .tenant "${sts_sp_output}")
-
-    if [[ "${sts_sp_id}" == "" ]] || [[ "${sts_sp_password}" == "" ]]; then
+    echo "Creating ${sp_type} sp with role ${role_name} granted..."
+    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sp_output}"    
+    sp_id=$(jq -r .appId "${sp_output}")
+    sp_password=$(jq -r .password "${sp_output}")
+    sp_tenant=$(jq -r .tenant "${sp_output}")
+    if [[ "${sp_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
         echo "Unable to get service principal id or password, exit..."
         exit 1
     fi
 
-    echo "New service principal id: ${sts_sp_id}"
-    cat <<EOF > "${SHARED_DIR}/azure_minimal_permission_sts"
-{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sts_sp_id}","tenantId":"${sts_sp_tenant}","clientSecret":"${sts_sp_password}"}
+    echo "New service principal id: ${sp_id}"
+    os_sp_file_name="azure_minimal_permission"
+    if [[ "${sp_type}" != "cluster" ]]; then
+        os_sp_file_name="azure_minimal_permission_${sp_type}"
+    fi
+    cat <<EOF > "${SHARED_DIR}/${os_sp_file_name}"
+{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
 EOF
+
     # for destroy
-    echo "${sts_sp_id}" >> "${SHARED_DIR}/azure_sp_id"
-    rm -rf ${sts_sp_output}
-fi
+    echo "${sp_id}" >> "${SHARED_DIR}/azure_sp_id"
+    rm -f ${sp_output}
+
+    # ensure that role assignment creation is successful
+    echo "Ensure that role ${role_name} assigned successfully"
+    cmd="az role assignment list --role '${role_name}'"
+    run_cmd_with_retries "${cmd}"
+done
