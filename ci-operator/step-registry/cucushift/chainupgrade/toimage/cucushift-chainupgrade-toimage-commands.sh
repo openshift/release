@@ -255,6 +255,28 @@ EOF
 }
 
 # Do sdn migration to ovn since sdn is not supported from 4.17 version
+function addportinaws(){
+    CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+    AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+    if [[ -f "${AWSCRED}" ]]; then
+      export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+      export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+    else
+      echo "Did not find compatible cloud provider cluster_profile"
+      exit 1
+    fi
+    
+    CLUSTER_NAME=$(oc get infrastructure cluster -o json | jq -r '.status.apiServerURL' | awk -F.  '{print$2}')
+    echo "Updating security group rules for data-path test on cluster $CLUSTER_NAME"
+    VPC=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t | grep $CLUSTER_NAME | awk '{print $7}' | grep -v '^$' | sort -u)
+    echo "VPC ID $VPC"
+    
+    for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" --output json | jq -r .SecurityGroups[].GroupId);
+    do
+        echo "Adding rule to SG $sg"
+        aws ec2 authorize-security-group-ingress --group-id $sg --protocol udp --port 6081 --cidr 0.0.0.0/0
+    done
+}
 function sdn2ovn(){
     oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}' 
     oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}' 
@@ -1052,6 +1074,9 @@ for target in "${TARGET_RELEASES[@]}"; do
     health_check
     currentPlugin=$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')
     if [[ ${TARGET_MINOR_VERSION} == "16" && ${currentPlugin} == "OpenShiftSDN" ]]; then
+	if [[ $(oc get clusterversion -o yaml | grep "4.1.41") ]]; then
+	   addportinaws
+	fi
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
 	health_check
