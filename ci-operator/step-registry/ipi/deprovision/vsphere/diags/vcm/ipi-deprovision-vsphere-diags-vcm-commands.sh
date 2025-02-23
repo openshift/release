@@ -183,12 +183,17 @@ function collect_diagnostic_data {
 
     IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
     IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${vsphere_portgroup})"
+
+    if [ -z ${networks:-} ]; then          
+          echo "No networks found associated with port group ${vsphere_portgroup}: $(govc find -type=n -i=true -name ${vsphere_portgroup})"
+          continue
+    fi
+        
     for network in "${networks[@]}"; do
 
         IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
-        if [ -z ${vms:-} ]; then
-          govc find . -type m -runtime.powerState poweredOn -network $network
-          echo "No VMs found"
+        if [ -z ${vms:-} ]; then          
+          echo "No VMs found associated with network ${network} $(govc find . -type m -runtime.powerState poweredOn -network $network)"
           continue
         fi
         for vm in "${vms[@]}"; do
@@ -230,10 +235,14 @@ function collect_diagnostic_data {
             JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
         done
     done
+    
+    govc find . -type m -runtime.powerState poweredOn -network $network
+    echo "no virtual machines found in vCenter ${VCENTER}. not collecting hardware versions"
+  
     target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
     echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
     echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
-
+  
     v_idx=$((v_idx+1));
   done
 
