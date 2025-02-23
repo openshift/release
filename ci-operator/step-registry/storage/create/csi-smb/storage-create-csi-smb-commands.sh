@@ -60,3 +60,7 @@ spec:
   managementState: Managed
 EOF
 echo "Created ClusterCSIDriver ${CLUSTER_CSI_DRIVER_NAME}"
+
+sed -i 's/nodeExpansion: true/nodeExpansion: false/g' "${TEST_MANIFEST}"
+
+cat "${TEST_MANIFEST}"
