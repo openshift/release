@@ -438,7 +438,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 else
   ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
 fi
-
+echo "Sleeping for 7000 seconds"
 wait "$!"
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
