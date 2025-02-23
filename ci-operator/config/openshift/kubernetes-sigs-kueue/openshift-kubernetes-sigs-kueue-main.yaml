@@ -21,6 +21,42 @@ tests:
   commands: make vet
   container:
     from: src
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        curl -O https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_kustomize.v5.6.0_linux_amd64
+        mv kustomize_kustomize.v5.6.0_linux_amd64 kustomize
+        chmod +x kustomize
+
+        curl -O https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+        mv yq_linux_amd64 yq
+        chmod +x yq
+
+        # Download ginkgo v2.22.2
+        curl -O https://github.com/onsi/ginkgo/releases/download/v2.22.2/ginkgo_linux_amd64
+        mv ginkgo_linux_amd64 ginkgo
+        chmod +x ginkgo
+
+        export PATH=`pwd`:$PATH
+        export IMAGE_TAG=stable:kueue-controller
+
+        sed -E -i '/^test-e2e-ocp:/ { s/\b(kustomize|ginkgo|yq)\b//g; s/  */ /g }' Makefile-test-ocp.mk
+        make -f Makefile-test-ocp.mk test-e2e-ocp
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
 zz_generated_metadata:
   branch: main
   org: openshift
