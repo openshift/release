@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # Extract and format the cluster version to branch
+
+
+echo "DEBUGGINGGGGGG"
+echo "$KUBECONFIG"
+ls "/tmp"
+
 cluster_version_to_branch() {
   version=$(oc version | grep "Server Version:" | awk '{print $3}')
   major=$(echo "$version" | cut -d '.' -f 1)
