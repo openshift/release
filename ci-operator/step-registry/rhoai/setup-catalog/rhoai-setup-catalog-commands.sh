@@ -49,7 +49,7 @@ metadata:
 spec:
   displayName: OpenShift AI Pre-Release
   publisher: RHOAI Development Catalog
-  image: quay.io/rhoai/rhoai-fbc-fragment:rhoai-${UPGRADE_VERSION}
+  image: quay.io/rhoai/rhoai-fbc-fragment:rhoai-${CURRENT_VERSION}
   sourceType: grpc
   secrets:
      - pull-secret
