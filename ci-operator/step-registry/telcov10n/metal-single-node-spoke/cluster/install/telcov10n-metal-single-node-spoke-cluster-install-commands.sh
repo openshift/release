@@ -10,6 +10,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function generate_cluster_image_set {
@@ -30,12 +36,44 @@ EOF
   set +x
 }
 
+function add_pre_ga_pull_secret_if_defined {
+
+  if [ -f /var/run/telcov10n/ztp-left-shifting/prega-pull-secret ];then
+
+    echo "Adding PreGA pull secret to pull the container image index from the Spoke cluster..."
+
+    rm -fv /tmp/dot-dockerconfig-data.json || echo
+    cp -v $SHARED_DIR/pull-secret /tmp/dot-dockerconfig-data.json
+
+    cat <<EOF >| /tmp/pre-ga.json
+{
+  "auths": {
+    "quay.io/prega": {
+      "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
+      "email": "prega@redhat.com"
+    }
+  }
+}
+EOF
+
+    set -x
+    jq -s '.[0] * .[1]' /tmp/dot-dockerconfig-data.json /tmp/pre-ga.json >| $SHARED_DIR/pull-secret
+    set +x
+  fi
+}
+
 function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
+
+  add_pre_ga_pull_secret_if_defined
 
   cat << EOF | oc apply -f -
 apiVersion: v1
@@ -57,7 +95,11 @@ function generate_baremetal_secret {
 
   echo "************ telcov10n Generate Baremetal Secrets ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
 
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
@@ -120,8 +162,8 @@ function checking_installation_progress {
       oc get clusterimagesets.hive.openshift.io $cis ;
       echo ;
       echo "######## Installation Progress ##########" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "message" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "message" ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
 
       now=$(date +%s)
       if [ ${timeout} -lt ${now} ] ; then
@@ -144,6 +186,17 @@ function checking_installation_progress {
   echo
 }
 
+function add_proxy_to_kubeconfig_if_needed {
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    kc_s5_proxy_format="${SOCKS5_PROXY/socks5h:/socks5:}"
+    if [ "$(grep "${kc_s5_proxy_format}" "${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml")" == "" ]; then
+      echo "Adding '${kc_s5_proxy_format}' in the ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml file"
+      sed -i "/    server: / a\    proxy-url: ${kc_s5_proxy_format}" ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
+    fi
+  fi
+}
+
 function get_and_save_kubeconfig_and_creds {
 
   echo "************ telcov10n Get and Save Spoke kubeconfig and kubeadmin password ************"
@@ -155,6 +208,8 @@ function get_and_save_kubeconfig_and_creds {
     | jq -r '.data.kubeconfig' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
   oc -n ${SPOKE_CLUSTER_NAME} get secrets $secret_adm_pass -o json \
     | jq -r '.data.password' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml
+
+  add_proxy_to_kubeconfig_if_needed
 
   cp -v ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml ${ARTIFACT_DIR}/
 }

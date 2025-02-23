@@ -10,6 +10,12 @@ echo "************ telcov10n Fix user IDs in a container ************"
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function run_script_in_the_hub_cluster {
@@ -74,7 +80,7 @@ function test_gitea_deployment {
 
   set -x
   helm list --all-namespaces | grep "${gitea_project}"
-  curl -vkI ${gitea_url} || echo "Warning... maybe the proxy is no longer up and running"
+  ${_curl} -vkI ${gitea_url} || echo "Warning... maybe the proxy is no longer up and running"
   oc -n ${gitea_project} get all
   set +x
 

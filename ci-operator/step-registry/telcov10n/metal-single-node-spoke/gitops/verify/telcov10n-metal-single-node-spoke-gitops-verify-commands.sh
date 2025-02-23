@@ -30,13 +30,13 @@ function wait_for_argocd_apps {
 
   wait_until_command_is_ok "oc -n openshift-gitops get apps clusters | grep -w 'Synced'" 10s 100 && \
   wait_until_command_is_ok "oc -n openshift-gitops get apps policies | grep -w 'Synced'" 10s 100 && \
-  set -x
-  oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
+  set -x && \
   oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m && \
-  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
-  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m
+  oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
+  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m && \
   set +x
 }
+  # oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m &&
 
 function test_gitops_deployment {
 

@@ -86,10 +86,10 @@ function generate_network_config {
 
 function get_storage_class_name {
 
-  echo "Get the Storage Class name to be used..."
+  echo "************ telcov10n Get the Storage Class name to be used ************"
 
-  if [ -n "$(oc get pod -A | grep "openshift-storage.*lvms-operator" || echo)" ];then
-    cat <<EOF | oc apply -f -
+  if [ -n "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
+    cat <<EOF | oc create -f - 2>/dev/null || { set -x ; oc -n openshift-storage get LVMCluster lvmcluster -oyaml ; set +x ; }
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
@@ -106,9 +106,9 @@ spec:
         overprovisionRatio: 10
         sizePercent: 90
 EOF
-    #sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
-    sc_name="lvms-vg1"
     set -x
+    sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
+    # sc_name="lvms-vg1"
     attempts=0
     while sleep 10s ; do
       oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
@@ -155,7 +155,11 @@ function generate_site_config {
       exit 1
     fi
 
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
+    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+    else
+      SPOKE_CLUSTER_NAME=${NAMESPACE}
+    fi
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
@@ -293,12 +297,12 @@ function extract_rhcos_images {
   get_openshift_baremetal_install_tool
 
   openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
-  if [ -z "${RHCOS_IMG_ROOTFS_URL}" ]; then
+  if [ -z "${RHCOS_IMG_ROOTFS_URL:-}" ]; then
     rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
   else
     rootfs_url="${RHCOS_IMG_ROOTFS_URL}"
   fi
-  if [ -z "${RHCOS_ISO_URL}" ]; then
+  if [ -z "${RHCOS_ISO_URL:-}" ]; then
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
     iso_url="${RHCOS_ISO_URL}"

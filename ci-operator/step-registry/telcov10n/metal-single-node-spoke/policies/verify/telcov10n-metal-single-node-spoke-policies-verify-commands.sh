@@ -12,27 +12,22 @@ function set_hub_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
-function clean_up {
+function run_tests {
 
-  echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
-
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  echo "************ telcov10n Verifying all Policies are Healthy ************"
 
   set -x
-  oc -n ${SPOKE_CLUSTER_NAME} delete agentclusterinstalls.extensions.hive.openshift.io ${SPOKE_CLUSTER_NAME} || echo
+  oc -n ztp-install get cgu
+  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m
   set +x
 }
 
 function main {
   set_hub_cluster_kubeconfig
-  clean_up
+  run_tests
 
   echo
-  echo "Success!!! The SNO Spoke cluster related objects have been removed correctly."
+  echo "Success!!! The Policies have been pushed correctly."
 }
 
 main
