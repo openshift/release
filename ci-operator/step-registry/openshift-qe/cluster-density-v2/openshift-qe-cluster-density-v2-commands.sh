@@ -39,6 +39,13 @@ export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
+# generate CSV only if COMPARISON_CONFIG is set
+if [ -z "${COMPARISON_CONFIG}" ]; then
+  export GEN_CSV=false
+else
+  export GEN_CSV=true
+fi
+
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
