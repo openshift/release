@@ -75,7 +75,7 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   # disconnected requires the additional trust bundle containing the local registry certificate
   scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
   EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
-  EXTRA_ARGS+=" --olm-disable-default-sources "
+#  EXTRA_ARGS+=" --olm-disable-default-sources "
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 fi
 
