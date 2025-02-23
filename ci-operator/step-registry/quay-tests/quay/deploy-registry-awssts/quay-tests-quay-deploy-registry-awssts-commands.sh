@@ -75,6 +75,8 @@ metadata:
 spec:
   configBundleSecret: config-bundle-secret
   components:
+  - kind: postgres
+    managed: true
   - kind: objectstorage
     managed: false
   - kind: monitoring
