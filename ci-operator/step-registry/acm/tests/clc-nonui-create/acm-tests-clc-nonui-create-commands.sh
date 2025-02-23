@@ -31,6 +31,7 @@ export OCP_HUB_CLUSTER_PASSWORD
 # Version of spoke cluster to be provisioned.
 CLC_OCP_IMAGE_VERSION=$(cat $SECRETS_DIR/clc/ocp_image_version)
 export CLC_OCP_IMAGE_VERSION
+echo "------------ Spoke OCP version = $CLC_OCP_IMAGE_VERSION ------------"
 
 CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 echo $CLOUD_PROVIDERS
