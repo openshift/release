@@ -1,0 +1,1 @@
+../openshift-svt-regression-commands.sh
