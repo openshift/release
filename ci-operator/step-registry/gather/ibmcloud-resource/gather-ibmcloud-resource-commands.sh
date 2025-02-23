@@ -163,6 +163,12 @@ function gather_resources {
     gather_cis
 }
 
+function run_command() {
+    local CMD="$1"
+    echo "Running Command: ${CMD}"
+    eval "${CMD}"
+}
+
 ibmcloud_login
 
 ##in order to avoid "runtime error: invalid memory address or nil pointer dereference in 'ibmcloud is images -q'"
@@ -174,3 +180,44 @@ fi
 
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
+
+echo "IBMCLOUD_DNS_INSTANCE_NAME: $IBMCLOUD_DNS_INSTANCE_NAME, BASE_DOMAIN: $BASE_DOMAIN"
+if [ ! -z ${IBMCLOUD_DNS_INSTANCE_NAME} ] && [ ! -z ${BASE_DOMAIN} ]; then
+  cmd="${IBMCLOUD_CLI} dns zones -i ${IBMCLOUD_DNS_INSTANCE_NAME} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"
+  dns_zone_id=$(eval "${cmd}")
+  if [[ -z "${dns_zone_id}" ]]; then
+    echo "Debug: Did not find dns_zone_id per the output of '${cmd}'"
+  else
+    set +e
+    cmd="${IBMCLOUD_CLI} dns resource-records ${dns_zone_id} -i ${IBMCLOUD_DNS_INSTANCE_NAME} | grep -w ${CLUSTER_FILTER}"
+    count=$(eval "${cmd} -c")
+    set -e
+    if [ "${count}" -gt 0 ]; then
+      echo "created dns resource-records..."
+      run_command "${cmd}"
+    fi
+    echo "The  permitted-networks: "
+    cmd="${IBMCLOUD_CLI} dns permitted-networks ${dns_zone_id} -i ${IBMCLOUD_DNS_INSTANCE_NAME}"
+    run_command "${cmd}"
+  fi
+fi
+
+
+ibmcloud_cis_instance_name=$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")
+echo "DEBUG" "Checking the cis dns-records on ${ibmcloud_cis_instance_name}..."
+if [ ! -z ${BASE_DOMAIN} ] && [ ! -z ${ibmcloud_cis_instance_name} ]; then
+  cmd="${IBMCLOUD_CLI} cis domains -i ${ibmcloud_cis_instance_name} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"
+  domain_id=$(eval "${cmd}")
+  if [[ -z "${domain_id}" ]] ; then
+    echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
+  else
+    set +e
+    cmd="${IBMCLOUD_CLI} cis dns-records ${domain_id} -i ${ibmcloud_cis_instance_name} | grep -w ${CLUSTER_FILTER}"
+    count=$(eval "${cmd} -c")
+    set -e
+    if [ "${count}" -gt 0 ]; then
+      echo "Created cis dns-records..."
+      run_command "${cmd}"
+    fi
+  fi
+fi
