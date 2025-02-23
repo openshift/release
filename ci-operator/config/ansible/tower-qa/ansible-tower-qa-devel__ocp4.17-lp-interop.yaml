@@ -9,10 +9,12 @@ base_images:
     tag: upi-installer
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.17"
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-stable
+        upper: 4.19.0-0
 resources:
   '*':
     limits:
@@ -21,10 +23,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aap-interop-aws
+- as: aap-interop-ibmcloud
   cron: 0 23 31 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
@@ -35,7 +37,7 @@ tests:
               {"step": "aap-tests-integration", "failure_type": "test_failure", "classification": "Ansible Automation Platform Test Failure", "jira_project": "AAP", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","aap-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: fasta@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -43,44 +45,11 @@ tests:
         [
             {"name": "ansible-automation-platform-operator", "source": "redhat-operators", "channel": "stable-2.4", "install_namespace": "aap", "operator_group":"aap-operator", "target_namespaces": "aap"}
         ]
-      USER_TAGS: |
-        scenario aap
     test:
     - ref: install-operators
     - ref: aap-install-automation-controller
     - ref: aap-tests-integration
-    workflow: firewatch-ipi-aws
-- as: aap-interop-aws-fips
-  cron: 0 23 31 2 *
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      FIPS_ENABLED: "true"
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "aap-install-automation-controller", "failure_type": "all", "classification": "Ansible Automation Platform controller provisioning", "jira_project": "AAP", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "aap-tests-integration", "failure_type": "test_failure", "classification": "Ansible Automation Platform Test Failure", "jira_project": "AAP", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","aap-lp","fips"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: fasta@redhat.com
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      OPERATORS: |
-        [
-            {"name": "ansible-automation-platform-operator", "source": "redhat-operators", "channel": "stable-2.4", "install_namespace": "aap", "operator_group":"aap-operator", "target_namespaces": "aap"}
-        ]
-      USER_TAGS: |
-        scenario aap
-    test:
-    - ref: install-operators
-    - ref: aap-install-automation-controller
-    - ref: aap-tests-integration
-    workflow: firewatch-ipi-aws
-  timeout: 3h0m0s
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: devel
   org: ansible
