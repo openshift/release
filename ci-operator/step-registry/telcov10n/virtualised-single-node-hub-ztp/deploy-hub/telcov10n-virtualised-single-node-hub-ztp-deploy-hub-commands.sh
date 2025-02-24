@@ -468,11 +468,12 @@ function verify_virtualised_hub_cluster_installed {
     ls -lRhtr ${SHARED_DIR}
     echo
     grep -HiIn 'server:\|proxy-url:' ${SHARED_DIR}/kubeconfig
+    # echo
+    # sc="$(oc --kubeconfig ${SHARED_DIR}/kubeconfig get sc -oname | head -1)"
+    # oc --kubeconfig ${SHARED_DIR}/kubeconfig annotate ${sc} storageclass.kubernetes.io/is-default-class=true --overwrite
     echo
-    sc="$(oc --kubeconfig ${SHARED_DIR}/kubeconfig get sc -oname | head -1)"
-    oc --kubeconfig ${SHARED_DIR}/kubeconfig annotate ${sc} storageclass.kubernetes.io/is-default-class=true --overwrite
-    echo
-    oc --kubeconfig ${SHARED_DIR}/kubeconfig get nodes,sc -owide
+    # oc --kubeconfig ${SHARED_DIR}/kubeconfig get nodes,sc -owide
+    oc --kubeconfig ${SHARED_DIR}/kubeconfig get nodes -owide
 }
 
 function main {

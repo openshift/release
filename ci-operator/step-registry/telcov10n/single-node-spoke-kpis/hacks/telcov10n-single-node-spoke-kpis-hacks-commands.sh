@@ -108,7 +108,7 @@ function hack_spoke_deployment {
   update_host_and_master_yaml_files
   update_spoke_cluster_name
   update_base_domain
-  use_shared_ssh_keys_from_vault
+  # use_shared_ssh_keys_from_vault
 }
 
 function main {

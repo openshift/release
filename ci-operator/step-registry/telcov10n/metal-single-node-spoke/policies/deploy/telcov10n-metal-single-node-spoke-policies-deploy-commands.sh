@@ -44,7 +44,8 @@ $(cat ${script_file})
 EOF
   [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
   else
-    oc -n ${ns} run -i ${pod_name} \
+    pn="${pod_name}-$(date +%s%N)"
+    oc -n ${ns} run -i ${pn} \
       --image=${helper_img} --restart=Never -- \
         bash -s -- <<EOF
 $(cat ${script_file})
@@ -57,8 +58,15 @@ function push_source_crs {
 
   echo "************ telcov10n Pushing Source CR files ************"
 
+  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+  else
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
+  fi
+
   gitea_ssh_nodeport_uri="$(cat ${SHARED_DIR}/gitea-ssh-nodeport-uri.txt)"
   ssh_pri_key_file=/tmp/ssh-prikey
+  rm -fv ${ssh_pri_key_file}
   cp -v ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE} ${ssh_pri_key_file}
   chmod 0400 ${ssh_pri_key_file}
 
@@ -66,22 +74,29 @@ function push_source_crs {
   ztp_repo_dir=$(mktemp -d --dry-run)
   git config --global user.email "ztp-spoke-cluster@telcov10n.com"
   git config --global user.name "ZTP Spoke Cluster Telco Verification"
-  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git clone ${gitea_ssh_nodeport_uri} ${ztp_repo_dir}
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git clone ${gitea_ssh_nodeport_uri} ${ztp_repo_dir}
   pushd .
   cd ${ztp_repo_dir}
-  mkdir -pv site-policies
-  cp -a ${HOME}/ztp/source-crs site-policies/
+  mkdir -pv site-policies/${SPOKE_CLUSTER_NAME}
+  cp -a ${HOME}/ztp/source-crs site-policies/${SPOKE_CLUSTER_NAME}/
+  touch site-policies/${SPOKE_CLUSTER_NAME}/".ts-$(date -u +%s%N)"
   git add .
   git commit -m 'Generated PGT'
-  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main || {
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git pull -r origin main &&
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main ; }
+  set +x
   popd
 }
 
 function generate_policy_related_files {
 
+  set -x
+  policies_path="${1}"
+
   jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})" | while read -r entry; do
     # Extract the filename and content
-    filename=$(echo "$entry" | jq -r '.filename')
+    filename=${policies_path}/$(echo "$entry" | jq -r '.filename')
     content=$(echo "$entry" | jq -r '.content')
 
     # Create the file and write the content
@@ -113,16 +128,19 @@ set -x
 ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
-GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 cd \${ztp_repo_dir}
-rm -fv .placeholder*
-touch .placeholder-$(date +%s)
+policies_path="site-policies/${SPOKE_CLUSTER_NAME}"
+mkdir -pv \${policies_path}
+touch \${policies_path}/.ts-$(date -u +%s%N)
 ############## BEGIN of Policy GenTemplate files #####################################################
-$(generate_policy_related_files)
+$(generate_policy_related_files "\${policies_path}")
 ############## END of Policy GenTemplate files #######################################################
 git add .
 git commit -m 'Generated Policy files'
-GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main ; }
 EOF
 
   # cat ${run_script}
@@ -148,7 +166,6 @@ function main {
     set_hub_cluster_kubeconfig
     check_git_repo_is_alive
     push_source_crs
-    generate_policy_related_files
     push_policies
   else
     echo
