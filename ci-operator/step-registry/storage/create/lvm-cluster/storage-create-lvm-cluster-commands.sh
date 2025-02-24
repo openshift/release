@@ -22,7 +22,27 @@ then
 	source "${SHARED_DIR}/packet-conf.sh"
 fi
 
-cat <<EOF | oc apply -f -
+if [ "$LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES" == "true" ]; then
+    echo "Using auto-selecting available LVM devices mode ..."
+    cat <<EOF | oc apply -f -
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: my-lvmcluster
+  namespace: openshift-storage
+spec:
+  storage:
+    deviceClasses:
+    - name: vg1
+      default: true
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+EOF
+else
+    echo "LVM auto-selection is disabled ..."
+    cat <<EOF | oc apply -f -
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
@@ -33,14 +53,16 @@ spec:
     deviceClasses:
     - name: vg1
       deviceSelector:
-      paths:
-      - ${LVM_CLUSTER_DEVICE_PATH}
+        forceWipeDevicesAndDestroyAllData: ${LVM_CLUSTER_WIPE_DEVICE}
+        paths:
+        - ${LVM_CLUSTER_DEVICE_PATH}
       default: true
       thinPoolConfig:
         name: thin-pool-1
         sizePercent: 90
         overprovisionRatio: 10
 EOF
+fi
 
 echo "Create lvmcluster successfully, waiting for it becomes ready(max 10min)."
 iter=10

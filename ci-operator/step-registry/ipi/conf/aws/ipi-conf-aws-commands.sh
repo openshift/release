@@ -375,3 +375,13 @@ platform:
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
 fi
+
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  aws:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi

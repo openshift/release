@@ -27,11 +27,6 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -48,6 +43,12 @@ releases:
   multi-latest:
     candidate:
       architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  target:
+    candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.14"
@@ -275,6 +276,15 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-nested-virtualization-osdisk-type-size
+- as: gcp-ipi-f28-ota
+  cron: 36 19 8 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-32747
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-xpn-cco-manual-users-static-f28
   cron: 17 9 11 * *
   steps:
@@ -283,7 +293,7 @@ tests:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
 - as: ibmcloud-ipi-private-sshkey-reboot-nodes-f28
-  cron: 41 20 6 * *
+  cron: 14 8 3 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:

@@ -114,6 +114,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -140,6 +148,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -165,6 +181,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
 
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
@@ -378,7 +402,7 @@ elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export HYPERSHIFT_ENVIRONMENT=true
     export FEATURES_ENVIRONMENT=hypershift-ci
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
@@ -411,7 +435,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
+if [[ "$T5CI_VERSION" == "4.19" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.17"
 else
@@ -475,7 +499,7 @@ if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
 elif [[ "$CNF_BRANCH" == *"4.14"* ]]; then
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 else
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 

@@ -244,8 +244,11 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-# add USER_TAGS to help with cloud cost
-TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' || true)
+# Add USER_TAGS to help with cloud cost and make sure to remove
+# invalid tags so that CLI usage doesn't fail later.
+# The [ and ] characters are considered invalid tags, which are
+# used by CI accounts like "renovate[bot]".
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
 if [[ -z "$TAG_Author" ]]; then
   TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
 fi
@@ -366,7 +369,7 @@ fi
 
 CONFIGURE_CLUSTER_AUTOSCALER_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
-  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-balance-similar-node-groups --autoscaler-skip-nodes-with-local-storage --autoscaler-ignore-daemonsets-utilization --autoscaler-scale-down-enabled"
+  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-ignore-daemonsets-utilization --autoscaler-max-node-provision-time 10m --autoscaler-balancing-ignored-labels aaa --autoscaler-max-nodes-total 100 --autoscaler-min-cores 0 --autoscaler-max-cores 1000 --autoscaler-min-memory 0 --autoscaler-max-memory 4096 --autoscaler-scale-down-enabled --autoscaler-scale-down-utilization-threshold 0.5 --autoscaler-scale-down-delay-after-add 10s --autoscaler-scale-down-delay-after-delete 10s --autoscaler-scale-down-delay-after-failure 10s"
 fi
 
 ETCD_ENCRYPTION_SWITCH=""

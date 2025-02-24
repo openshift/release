@@ -86,8 +86,14 @@ spec:
           git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
-          sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
-          make docker-build
+          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
+            make docker-build
+          else
+            # Dockerfile is updated to upstream in 4.19+
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
+            podman build -t ${IMG} -f Dockerfile.ocp
+          fi
           podman push ${IMG} --tls-verify=false
           cd ..
       securityContext:
@@ -208,7 +214,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="master"
+export TEST_BRANCH="main"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"

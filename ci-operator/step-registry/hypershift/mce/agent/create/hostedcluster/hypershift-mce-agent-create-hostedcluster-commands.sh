@@ -138,3 +138,4 @@ done
 
 echo "Cluster became available, creating kubeconfig"
 /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

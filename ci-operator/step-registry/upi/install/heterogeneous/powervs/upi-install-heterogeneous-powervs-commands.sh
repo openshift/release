@@ -23,6 +23,9 @@ export WORKSPACE_NAME
 PATH=${PATH}:/tmp:"${IBMCLOUD_HOME}/ocp-install-dir"
 export PATH
 
+RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+export RESOURCE_GROUP
+
 ##### Functions
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
