@@ -6,11 +6,11 @@ set -o pipefail
 set -x
 
 declare -A guest_to_job_aws=(
-    [4.14]="periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-aws-critical"
-    [4.15]="periodic-ci-openshift-hypershift-release-4.15-periodics-mce-e2e-aws-critical"
-    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-critical"
-    [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-critical"
-    [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-critical"
+    [4.14]="periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-aws-ovn-conformance"
+    [4.15]="periodic-ci-openshift-hypershift-release-4.15-periodics-mce-e2e-aws-ovn-conformance"
+    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-ovn-conformance"
+    [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-ovn-conformance"
+    [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-ovn-conformance"
 )
 declare -A mce_to_guest=(
     [2.4]="4.14"
@@ -20,11 +20,11 @@ declare -A mce_to_guest=(
     [2.8]="4.14 4.15 4.16 4.17 4.18"
 )
 declare -A hub_to_mce=(
-    [4.14]="2.4 2.5 2.6"
-    [4.15]="2.5 2.6 2.7"
-    [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8"
-    [4.18]="2.8"
+    [4.14]="2.5"
+#    [4.15]="2.5 2.6 2.7"
+#    [4.16]="2.6 2.7 2.8"
+#    [4.17]="2.7 2.8"
+#    [4.18]="2.8"
 )
 
 function get_payload_list() {
@@ -105,8 +105,7 @@ for hub_version in "${!hub_to_mce[@]}"; do
                     ;;
             esac
             job_id=$(echo "$result" | grep "JOB_ID###" | cut -d'#' -f4 || true)
-            echo "$job_id"
-
+            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${guest_to_job_aws[$guest_version]}, JOB_ID=${job_id}" >> "${SHARED_DIR}/job_list"
             ((job_count++))
 
             if ((job_count > JOB_PARALLEL)); then
