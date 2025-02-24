@@ -27,13 +27,12 @@ declare -A hub_to_mce=(
     [4.18]="2.8"
 )
 
-#TODO It needs improvement; it's only stable for now.
 function get_payload_list() {
     declare -A payload_list
     local versions=("4.14" "4.15" "4.16" "4.17" "4.18")
 
     for version in "${versions[@]}"; do
-        image=$(curl -s https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-$version/release.txt | awk '/Pull From/ {print $3}')
+        image=$(curl -s "https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/api/v1/releasestream/${version}.0-0.nightly/latest" | jq -r '.pullSpec')
         payload_list["$version"]=$image
     done
 
@@ -81,7 +80,6 @@ function trigger_prow_job() {
 
 eval "$(get_payload_list)"
 
-SLEEP_TIME=10
 job_count=1
 for hub_version in "${!hub_to_mce[@]}"; do
     mce_versions="${hub_to_mce[$hub_version]}"
@@ -112,8 +110,8 @@ for hub_version in "${!hub_to_mce[@]}"; do
             ((job_count++))
 
             if ((job_count > JOB_PARALLEL)); then
-                echo "Reached $JOB_PARALLEL jobs, sleeping for $SLEEP_TIME seconds..."
-                sleep "$SLEEP_TIME"
+                echo "Reached $JOB_PARALLEL jobs, sleeping for ${JOB_DURATION} seconds..."
+                sleep "${JOB_DURATION}"
                 job_count=1
             fi
         done
@@ -121,6 +119,6 @@ for hub_version in "${!hub_to_mce[@]}"; do
 done
 
 if ((job_count > 1)); then
-    echo "Final batch, sleeping for $SLEEP_TIME seconds..."
-    sleep "$SLEEP_TIME"
+    echo "Final batch, sleeping for ${JOB_DURATION} seconds..."
+    sleep "${JOB_DURATION}"
 fi
