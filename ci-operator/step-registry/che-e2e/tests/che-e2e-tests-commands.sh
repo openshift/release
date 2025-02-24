@@ -19,6 +19,7 @@ if [[ "${TEST_PLATFORM}" == "rosa" ]]; then
 else
   IDP_USER="kubeadmin"
   IDP_PASSWD=$(cat ${SHARED_DIR}/kubeadmin-password)
+  #  oc login $OCP_API_URL --insecure-skip-tls-verify=true -u $IDP_USER -p $IDP_PASSWD
 fi
 export IDP_USER
 export IDP_PASSWD
@@ -47,6 +48,16 @@ spec:
     - name: interop-wto-test
       image: quay.io/eclipse/e2e-che-interop:latest
       imagePullPolicy: Always
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: "RuntimeDefault"
+        readOnlyRootFilesystem: false
+        runAsGroup: 0
       env:
         - name: USERSTORY
           value: WebTerminalUnderAdmin
@@ -82,6 +93,16 @@ spec:
     - name: download-reports
       image: eeacms/rsync
       imagePullPolicy: IfNotPresent
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: "RuntimeDefault"
+        readOnlyRootFilesystem: false
+        runAsGroup: 0
       volumeMounts:
         - name: test-run-results
           mountPath: /tmp/e2e/report/
@@ -100,3 +121,4 @@ sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
 cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/
+
