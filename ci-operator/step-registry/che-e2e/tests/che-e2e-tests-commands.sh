@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'sleep 2h' EXIT TERM INT ERR SIGNINT
+trap 'sleep 2h' EXIT TERM ERR SIGINT SIGTERM
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
