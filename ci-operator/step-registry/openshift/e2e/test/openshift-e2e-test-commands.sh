@@ -320,6 +320,8 @@ function suite() {
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
     fi &&
 
+    openshift-tests run-test "[sig-network] EndpointSlice should support a Service with multiple ports specified in multiple EndpointSlices [Suite:openshift/conformance/parallel] [Suite:k8s]"   
+
     set -x &&
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
