@@ -11,6 +11,9 @@ cat << EOF > /tmp/config.yaml
 apiServer:
   subjectAltNames:
   - ${IP_ADDRESS}
+
+debugging:
+  logLevel: trace
 EOF
 
 configure_vm_args=""
