@@ -66,7 +66,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "Tag name: $TAG_NAME"
-    IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    # IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
 fi
 
 PR_CHANGESET=$(git diff --name-only main)
