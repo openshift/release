@@ -14,6 +14,7 @@ function copyArtifacts {
 #Archive the testing report XML file
 trap copyArtifacts EXIT
 
+#Clone Quay-test repo to get the local test images
 git clone https://"$GITHUB_ACCESS_TOKEN"@github.com/quay/quay-tests.git
 cd quay-tests/quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
 yarn install
