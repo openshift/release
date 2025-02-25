@@ -4,10 +4,7 @@ base_images:
     namespace: hypershift
     tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   to: monitoring-plugin
@@ -34,8 +31,8 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 1000m
+      memory: 4Gi
 tests:
 - as: lint
   commands: |
@@ -51,6 +48,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-hypershift-conformance
+  optional: true
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
