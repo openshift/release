@@ -2,15 +2,16 @@
 
 set -o nounset
 # part 1, Quay performance test
-QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
+QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)  #https://quayhostname
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
 ELK_SERVER='https://search-quay-performance-mdaaozleo7nnmgvrze3fduygra.us-east-2.es.amazonaws.com'
 
+echo "QUAY_ROUTE: $QUAY_ROUTE"
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 quay_perf_organization="perftest"
 quay_perf_namespace="quay-perf"
 
-curl --location --request POST "https://${QUAY_ROUTE}/api/v1/organization/" \
+curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
     --header "Content-Type: application/json" \
     --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
     --data-raw '{
