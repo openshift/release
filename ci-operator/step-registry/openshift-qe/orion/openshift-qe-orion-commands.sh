@@ -67,7 +67,7 @@ if [ ${COLLAPSE} == "true" ]; then
     export EXTRA_FLAGS+=" --collapse"
 fi
 
-if [[ -n "${ORION_ENVS:-}" ]]; then
+if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
     IFS=',' read -r -a env_array <<< "$ORION_ENVS"
     for env_pair in "${env_array[@]}"; do
@@ -78,7 +78,7 @@ if [[ -n "${ORION_ENVS:-}" ]]; then
     done
 fi
 
-if [[ -n "${LOOKBACK_SIZE:-}" ]]; then
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
     export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
