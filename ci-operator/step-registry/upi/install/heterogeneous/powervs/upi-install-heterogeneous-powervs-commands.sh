@@ -67,7 +67,7 @@ function download_terraform_binary() {
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME}"/ocp-install-dir/terraform
     echo "Terraform installed. expect to see version"
-    terraform version -no-color
+    "${IBMCLOUD_HOME}/ocp-install-dir/terraform" version -no-color
 }
 
 # Cleans up the failed prior jobs
