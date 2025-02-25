@@ -23,8 +23,8 @@ T5CI_HCP_HOSTED_KUBECONFIG="${T5CI_HCP_HOSTED_KUBECONFIG:=${SHARED_DIR}/kubeconf
 source "${SHARED_DIR}"/main.env
 
 # Check if Inventory file exists
-if [[ -f $"{SHARED_DIR}"/inventory ]]; then
-    echo "No inventory file found we should stop here"
+if [[ -f "${SHARED_DIR}"/inventory ]]; then
+    echo "No inventory file found"
     exit 1;
 fi
 
@@ -40,14 +40,18 @@ cd "${SHARED_DIR}"/repos/ansible-automation
 pip3 install dnspython netaddr
 ansible-galaxy collection install -r ansible-requirements.yaml
 
+# Change the host to hypervisor
+echo "Change the host from localhost to hypervisor"
+sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/apply_registry_certs.yml
+sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/install_nrop.yml
 
 # Install certificates required for internal registries
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
-ansible-playbook -i $"{SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml -e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}"
-
+ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml \
+-e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}"
 
 # Install NUMAResources Operator Playbook
-ansible-playbook -i $"{SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
+ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
 -e hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
 -e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
 -e install_sources="${T5CI_NROP_SOURCE}"
