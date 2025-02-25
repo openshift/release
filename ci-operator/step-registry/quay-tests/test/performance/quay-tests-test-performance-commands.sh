@@ -142,6 +142,10 @@ spec:
 
 EOF
 
-echo "the Perf Job needs about 4~5 hours to complete"
+echo "the Perf Job needs about 3~4 hours to complete"
 echo "check the OCP Quay Perf Job, if it complete, go to Kibana to generate index pattern and get Quay Perf metrics"
-       
+
+#wait for the job to complete
+sleep 2h  
+oc wait --for=condition=complete --timeout=4h job/quay-perf-test-orchestrator -n "$quay_perf_namespace"
+     
