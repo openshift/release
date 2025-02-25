@@ -163,7 +163,7 @@ function configure_automation() {
 
     # Use existing pvs workspace.
     # Process the CRN into a variable
-    CRN="$(ibmcloud pi workspace ls 2> /dev/null | grep multi-arch-x-px-${POWERVS_REGION}-1 | awk '{print $1}' | grep crn | awk '{print $NF}')"
+    CRN=$(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-x-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     export CRN
     echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
     POWERVS_SERVICE_INSTANCE_ID="${CRN}"
