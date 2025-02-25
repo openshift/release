@@ -273,6 +273,30 @@ function embed_topology_data() {
     echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
     echo "<br>" >> "${RESULT_HTML}"
   done
+
+  echo "<hr>" >> "${RESULT_HTML}"
+
+  echo "VIPs: $(sed ':a;N;$!ba;s/\n/, /g' ${SHARED_DIR}/vips.txt)<br>" >> "${RESULT_HTML}"
+  echo "Machine CIDR: $(cat ${SHARED_DIR}/machinecidr.txt)<br>" >> "${RESULT_HTML}"
+  for NETWORK in "${SHARED_DIR}"/NETWORK_*; do
+    if [[ $NETWORK == *_single.json* ]]; then
+        continue
+    fi
+    NAME=$(jq --compact-output -r .metadata.name < "${NETWORK}")
+    VLAN=$(jq --compact-output -r .spec.vlanId < "${NETWORK}")
+    POD=$(jq --compact-output -r .spec.podName < "${NETWORK}")
+    DATACENTER=$(jq --compact-output -r .spec.datacenterName < "${NETWORK}")
+    CIDR=$(jq --compact-output -r .spec.machineNetworkCidr < "${NETWORK}")
+    GATEWAY=$(jq --compact-output -r .spec.gateway < "${NETWORK}")    
+
+    echo "Network: ${NAME}<br>" >> "${RESULT_HTML}"
+    echo "- VLAN: ${VLAN}<br>" >> "${RESULT_HTML}"
+    echo "- Pod: ${POD}<br>" >> "${RESULT_HTML}"
+    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+    echo "- CIDR: ${CIDR}<br>" >> "${RESULT_HTML}"
+    echo "- Gateway: ${GATEWAY}<br>" >> "${RESULT_HTML}"
+    echo "<br>" >> "${RESULT_HTML}"
+  done
 }
 
 function generate_vm_input() {

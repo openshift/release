@@ -36,7 +36,8 @@ GITHUB_REPOSITORY_NAME="rhdh"
 
 export QUAY_REPO RELEASE_BRANCH_NAME
 QUAY_REPO="rhdh-community/rhdh"
-RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
+# Get the base branch name based on job.
+RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
