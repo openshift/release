@@ -29,6 +29,9 @@ sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
+# temp override configure-vm.sh
+curl https://raw.githubusercontent.com/openshift/microshift/4ab404356165565d09d2e099964acdaf85d72ea9/scripts/devenv-builder/configure-vm.sh > ./scripts/devenv-builder/configure-vm.sh
+
 ./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret
 EOF
 chmod +x /tmp/install.sh
