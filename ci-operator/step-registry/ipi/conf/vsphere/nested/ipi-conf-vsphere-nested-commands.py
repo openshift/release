@@ -86,6 +86,8 @@ with open("nfs.yml", "w") as nfs_file:
 #    group_vars_all.write(content.replace("161.26.99.159", "fsf-dal1003h-fz.adn.networklayer.com"))
 #    group_vars_all.truncate()
 
+os.system("yq -i '.[2].rescue[2][\"community.vmware.vmware_guest\"].hardware.boot_firmware = \"efi\"' esxinested.yml")
+
 
 os.environ["ANSIBLE_TASK_TIMEOUT"] = str(20 * 60)
 
