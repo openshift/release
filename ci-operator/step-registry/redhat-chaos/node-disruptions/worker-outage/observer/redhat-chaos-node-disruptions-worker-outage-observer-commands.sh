@@ -22,6 +22,23 @@ while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
 done
 echo "starting node disruption scenario"
 
+# Define the path to the leases file
+LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
+
+# Ensure the leases file is present
+if [[ ! -f "${LEASE_CONF}" ]]; then
+  echo "Couldn't find lease config file"
+  exit 1
+fi
+
+# Retrieve the leased resource
+LEASED_RESOURCE=$(yq-v4 e 'keys | .[0]' "${LEASE_CONF}")
+cat $LEASED_RESOURCE
+# Ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
     mkdir -p $HOME/.aws
