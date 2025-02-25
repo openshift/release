@@ -20,11 +20,11 @@ declare -A mce_to_guest=(
     [2.8]="4.14 4.15 4.16 4.17 4.18"
 )
 declare -A hub_to_mce=(
-    [4.14]="2.4 2.5 2.6"
-    [4.15]="2.5 2.6 2.7"
-    [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8"
-    [4.18]="2.8"
+    [4.14]="2.6"
+    [4.15]="2.5"
+#    [4.16]="2.6 2.7 2.8"
+#    [4.17]="2.7 2.8"
+#    [4.18]="2.8"
 )
 
 function get_payload_list() {
@@ -77,6 +77,28 @@ function trigger_prow_job() {
     echo "Gangway API is still not available after $max_retries retries. Aborting." && return 0
 }
 
+function generate_junit_xml() {
+    total_tests=$(awk 'END {print NR}' "${SHARED_DIR}/job_list")
+    failures=$(grep -c "JOB_ID=$" "${SHARED_DIR}/job_list")
+
+    cat <<EOF > "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+<testsuite name="mce multi version test on ${HOSTEDCLUSTER_PLATFORM}" tests="${total_tests}" skipped="0" failures="${failures}" time="0">
+    <link/>
+    <script/>
+EOF
+    while IFS= read -r line; do
+        job_id=$(echo "$line" | sed -n 's/.*JOB_ID=\(.*\)/\1/p')
+        if [[ -z "$job_id" ]]; then
+            echo "    <testcase name=\"$line\" time=\"0\">" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "        <failure message=\"\">job trigger failed</failure>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "    </testcase>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+        else
+            echo "    <testcase name=\"$line\" time=\"0\"/>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+        fi
+    done < "${SHARED_DIR}/job_list"
+    echo "</testsuite>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+}
+
 
 eval "$(get_payload_list)"
 
@@ -105,8 +127,7 @@ for hub_version in "${!hub_to_mce[@]}"; do
                     ;;
             esac
             job_id=$(echo "$result" | grep "JOB_ID###" | cut -d'#' -f4 || true)
-            echo "$job_id"
-
+            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${guest_to_job_aws[$guest_version]}, JOB_ID=${job_id}" >> "${SHARED_DIR}/job_list"
             ((job_count++))
 
             if ((job_count > JOB_PARALLEL)); then
@@ -122,3 +143,5 @@ if ((job_count > 1)); then
     echo "Final batch, sleeping for ${JOB_DURATION} seconds..."
     sleep "${JOB_DURATION}"
 fi
+
+generate_junit_xml
