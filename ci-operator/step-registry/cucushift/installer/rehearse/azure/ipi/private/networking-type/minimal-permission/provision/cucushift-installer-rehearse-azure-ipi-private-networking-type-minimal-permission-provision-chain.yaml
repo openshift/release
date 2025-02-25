@@ -1,15 +1,16 @@
 chain:
   as: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission-provision
   steps:
-  - ref: azure-provision-service-principal-minimal-permission
+  - chain: ipi-conf-azure
   - ref: azure-provision-resourcegroup
   - ref: azure-provision-vnet
   - chain: azure-provision-bastionhost
   - ref: proxy-config-generate
-  - chain: ipi-conf-azure
   - ref: ipi-conf-azure-resourcegroup
   - ref: ipi-conf-azure-provisionednetwork
   - ref: ipi-conf-azure-networking-type
+  - ref: azure-provision-service-principal-minimal-permission
+  - ref: ipi-conf-azure-resourcegroup-assign-role
   - chain: ipi-install
   - ref: enable-qe-catalogsource
   - chain: cucushift-installer-check
@@ -19,10 +20,6 @@ chain:
     default: "Internal"
   - name: AZURE_INSTALL_USE_MINIMAL_PERMISSIONS
     default: "yes"
-  - name: AZURE_PERMISSION_FOR_VNET_RG
-    default: "Network Contributor"
-  - name: AZURE_PERMISSION_FOR_CLUSTER_RG
-    default: "Contributor"
   - name: AZURE_PERMISSION_FOR_CLUSTER_SP
     default: "User Access Administrator"
   documentation: |-
