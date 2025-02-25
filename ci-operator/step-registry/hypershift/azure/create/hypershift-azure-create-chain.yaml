@@ -108,6 +108,9 @@ chain:
     - name: AZURE_SA_TOKEN_ISSUER_KEY_PATH
       default: ""
       documentation: "The file location of the  private key for the service account token issuer"
+    - name: HYPERSHIFT_AZURE_FIPS
+      default: "true"
+      documentation: "Enable fips"
     commands: |-
       set -exuo pipefail
 
@@ -128,7 +131,9 @@ chain:
             break
           fi
         done < "$AZURE_OIDC_ISSUER_URL_LOCATION"
-      
+      else
+        AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-aro-oidc-issuer/hypershift-aro-oidc-issuer)"
+        AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-aro-oidc-issuer/hypershift-serviceaccount-signer-private"
       fi
       
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
@@ -184,7 +189,7 @@ chain:
         --vnet-id=${VNET_ID} \
         --subnet-id=${SUBNET_ID} \
         --network-security-group-id=${NSG_ID} \
-        --generate-ssh
+        --generate-ssh 
       )
       
       if [[ $ENABLE_ICSP == "true" ]]; then
@@ -203,7 +208,7 @@ chain:
         if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
           COMMAND+=(--managed-identities-file "/etc/hypershift-ci-jobs-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json")
         else
-          COMMAND+=(--managed-identities-file "${SHARED_DIR}/hypershift_azure_mi_file.json")
+          COMMAND+=(--managed-identities-file "${SHARED_DIR}/hypershift_azure_mi_file.json" --data-plane-identities-file "${SHARED_DIR}"/hypershift_azure_dp_mi_file.json)
         fi
       fi
       
@@ -278,6 +283,10 @@ chain:
         COMMAND+=(${EXTRA_ARGS})
       fi
       
+      if [[ $HYPERSHIFT_AZURE_FIPS == "true" ]]; then
+        COMMAND+=(--fips=true)
+      fi
+      
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -335,6 +344,9 @@ chain:
       namespace: test-credentials
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-aro-oidc-issuer
+      name: hypershift-aro-oidc-issuer
       namespace: test-credentials
     dependencies:
     - name: "release:latest"
