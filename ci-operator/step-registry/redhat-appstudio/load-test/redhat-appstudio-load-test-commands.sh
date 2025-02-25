@@ -111,6 +111,8 @@ export INFRA_DEPLOYMENTS_BRANCH='update-ns-limits'
 
 # This should create users & clear existing objects
 cd ./tests/load-tests/
+
+# shellcheck disable=SC1090
 source "/usr/local/ci-secrets/redhat-appstudio-load-test/load-test-scenario.${SCENARIO:-concurrent}"
 source "./ci-scripts/user-prefix.sh"
 go run loadtest.go \
