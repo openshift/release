@@ -79,9 +79,10 @@ function trigger_prow_job() {
 
 function generate_junit_xml() {
     total_tests=$(awk 'END {print NR}' "${SHARED_DIR}/job_list")
-    failures=$(grep -c "JOB_ID=$" "${SHARED_DIR}/job_list")
+    failures=$(grep -c "JOB_ID=$" "${SHARED_DIR}/job_list" || true)
 
-    cat <<EOF > "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+    cat << EOF > "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+<?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="mce multi version test on ${HOSTEDCLUSTER_PLATFORM}" tests="${total_tests}" skipped="0" failures="${failures}" time="0">
     <link/>
     <script/>
