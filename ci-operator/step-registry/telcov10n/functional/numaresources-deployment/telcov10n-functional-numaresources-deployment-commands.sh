@@ -41,7 +41,7 @@ ansible-playbook -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_re
 
 
 # Install NUMAResources Operator Playbook
-ansible-playbook -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yaml \
+ansible-playbook -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
 -e hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
 -e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
 -e install_sources="${T5CI_NROP_SOURCE}" -c local
