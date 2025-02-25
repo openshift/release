@@ -12,6 +12,9 @@ BRANCH=$(cluster_version_to_branch)
 MAIN_BRANCH="release-4.19"
 
 ADDITIONAL_NFTABLES_RULES_FILE_PATH="${SHARED_DIR}/additional-nftables-rules"
+OPEN_PORTS_TO_IGNORE_IN_DOC_FILE="${SHARED_DIR}/open-ports-to-ignore.csv"
+OPEN_PORTS_TO_IGNORE_IN_DOC_FORMAT="csv"
+
 SUITE=${SUITE:-"all"}
 
 echo "# Allow host level services dynamic port range
@@ -29,6 +32,10 @@ udp dport 10180 accept
 tcp dport 80 accept
 udp dport 80 accept" > ${ADDITIONAL_NFTABLES_RULES_FILE_PATH}
 
+echo "Direction,Protocol,Port,Namespace,Service,Pod,Container,Node Role,Optional
+Ingress,TCP,5051,openshift-machine-api,metal3-state,metal3,metal3-httpd,master,false
+" > ${OPEN_PORTS_TO_IGNORE_IN_DOC_FILE}
+
 if [ ${BRANCH} = ${MAIN_BRANCH} ]; then
   BRANCH="main"
 fi
@@ -39,5 +46,10 @@ git clone https://github.com/openshift-kni/commatrix ${SHARED_DIR}/commatrix
 pushd ${SHARED_DIR}/commatrix || exit
 git checkout ${BRANCH}
 go mod vendor
-EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" make e2e-test
+EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" \
+EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" \
+OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_FILE}" \
+OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_FORMAT}" \
+SUITE="${SUITE}" \
+make e2e-test
 popd || exit
