@@ -250,6 +250,9 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    'libvirt-s390x-vpn-quota-slice': {
+        'libvirt-s390x-0-1': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
