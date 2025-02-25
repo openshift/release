@@ -64,8 +64,8 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
-export MULTI_RELEASE_IMAGE="registry.ci.openshift.org/ocp/release:4.19.0-0.nightly-2025-02-25-035256"
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.ci.openshift.org/ocp/release:4.19.0-0.nightly-2025-02-25-035256"
+export MULTI_RELEASE_IMAGE="registry.ci.openshift.org/ocp/konflux-release:4.19.0-0.konflux-nightly-2025-02-19-141615"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.ci.openshift.org/ocp/konflux-release:4.19.0-0.konflux-nightly-2025-02-19-141615"
 
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
