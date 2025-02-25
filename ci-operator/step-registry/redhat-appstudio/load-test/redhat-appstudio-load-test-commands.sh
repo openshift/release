@@ -104,10 +104,31 @@ set +x
 trap './tests/load-tests/ci-scripts/collect-results.sh "$SCENARIO"; trap EXIT' SIGINT EXIT
 
 export INFRA_DEPLOYMENTS_ORG='rh-rahulshetty'
-export INFRA_DEPLOYMENTS_BRANCH='increase-tenant-quotas'
+export INFRA_DEPLOYMENTS_BRANCH='update-ns-limits'
 
 # Setup OpenShift cluster
 ./tests/load-tests/ci-scripts/setup-cluster.sh "$SCENARIO"
+
+# This should create users & clear existing objects
+cd ./tests/load-tests/
+source "/usr/local/ci-secrets/redhat-appstudio-load-test/load-test-scenario.${SCENARIO:-concurrent}"
+source "./ci-scripts/user-prefix.sh"
+go run loadtest.go \
+    --applications-count "${APPLICATIONS_COUNT:-1}" \
+    --components-count "${COMPONENTS_COUNT:-1}" \
+    --concurrency "${CONCURRENCY:-1}" \
+    --log-info \
+	--purge-only \
+    --purge="true" \
+    --quay-repo "${QUAY_REPO:-stonesoup_perfscale}" \
+    --username "$USER_PREFIX"
+cd ../../
+
+# Delete resource quotas for all userprefix namespaces
+for ns in $(kubectl get ns --no-headers | awk -v prefix="$USER_PREFIX" '$1 ~ "^" prefix {print $1}'); do
+  echo "Deleting resource quota from namespace: $ns"
+  kubectl -n "$ns" delete resourcequota --ignore-not-found=true compute-build compute-deploy storage || true
+done
 
 # Execute load test
 ./tests/load-tests/ci-scripts/load-test.sh "$SCENARIO"
