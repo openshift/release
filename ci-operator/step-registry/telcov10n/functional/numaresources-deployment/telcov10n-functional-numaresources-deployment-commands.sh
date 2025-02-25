@@ -22,6 +22,12 @@ T5CI_HCP_MGMT_KUBECONFIG="${T5CI_HCP_MGMT_KUBECONFIG:=${SHARED_DIR}/mgmt-kubecon
 T5CI_HCP_HOSTED_KUBECONFIG="${T5CI_HCP_HOSTED_KUBECONFIG:=${SHARED_DIR}/kubeconfig}"
 source "${SHARED_DIR}"/main.env
 
+# Check if Inventory file exists
+if [[ -f $"{SHARED_DIR}"/inventory ]]; then
+    echo "No inventory file found we should stop here"
+    exit 1;
+fi
+
 # Copy automation repo to local SHARED_DIR
 echo "Copy automation repo to local $SHARED_DIR"
 mkdir "${SHARED_DIR}"/repos
@@ -37,11 +43,11 @@ ansible-galaxy collection install -r ansible-requirements.yaml
 
 # Install certificates required for internal registries
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
-ansible-playbook -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml -e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" -c local
+ansible-playbook -i $"{SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml -e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}"
 
 
 # Install NUMAResources Operator Playbook
-ansible-playbook -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
+ansible-playbook -i $"{SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
 -e hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
 -e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
--e install_sources="${T5CI_NROP_SOURCE}" -c local
+-e install_sources="${T5CI_NROP_SOURCE}"
