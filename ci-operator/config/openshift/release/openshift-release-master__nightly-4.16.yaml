@@ -835,11 +835,26 @@ tests:
   restrict_network_access: false
   steps:
     env:
+      OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE: ${SHARED_DIR}/open-ports-to-ignore-in-doc-test-file.csv
+      OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT: csv
       T5CI_JOB_TYPE: network-flow-matrix-bm
       T5CI_VERSION: "4.16"
     observers:
       enable:
       - observers-resource-watch
+    pre:
+    - ref: telco5g-jobs-router
+    - ref: telco5g-cluster-setup
+    - as: pre
+      commands: |
+        echo "Direction,Protocol,Port,Namespace,Service,Pod,Container,Node Role,Optional
+        Ingress,TCP,5051,openshift-machine-api,metal3-state,metal3,metal3-httpd,master,false" \
+        > ${SHARED_DIR}/open-ports-to-ignore-in-doc-test-file.csv
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
