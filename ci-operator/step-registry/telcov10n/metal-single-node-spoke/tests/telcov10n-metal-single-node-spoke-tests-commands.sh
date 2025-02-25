@@ -37,7 +37,8 @@ $(cat ${script_file})
 EOF
   [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
   else
-    oc -n ${ns} run -i ${pod_name} \
+    pn="${pod_name}-$(date +%s%N)"
+    oc -n ${ns} run -i ${pn} \
       --image=${helper_img} --restart=Never -- \
         bash -s -- <<EOF
 $(cat ${script_file})

@@ -31,7 +31,8 @@ $(cat ${script_file})
 EOF
   [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
   else
-    oc -n ${ns} run -i ${pod_name} \
+    pn="${pod_name}-$(date +%s%N)"
+    oc -n ${ns} run -i ${pn} \
       --image=${helper_img} --restart=Never -- \
         bash -s -- <<EOF
 $(cat ${script_file})
@@ -62,7 +63,7 @@ test -f \${ztp_repo_dir}/README.md
 grep -w "$(cat ${ssh_pri_key_file}.pub)" \${ztp_repo_dir}/README.md
 EOF
 
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "gitea-pod-helper" "done"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper" "done"
 }
 
 function test_gitea_deployment {

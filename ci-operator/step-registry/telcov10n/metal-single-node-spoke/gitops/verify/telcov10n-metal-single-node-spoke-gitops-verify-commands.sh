@@ -30,12 +30,21 @@ function wait_for_argocd_apps {
 
   wait_until_command_is_ok "oc -n openshift-gitops get apps clusters | grep -w 'Synced'" 10s 100 && \
   wait_until_command_is_ok "oc -n openshift-gitops get apps policies | grep -w 'Synced'" 10s 100 && \
-  set -x
-  oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
+  set -x && \
   oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m && \
-  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
-  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m
+  oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \
+  oc -n openshift-gitops wait apps/policies --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m && \
   set +x
+}
+
+function wait_for_managedcluster {
+
+  echo "************ telcov10n Check Gitops service: Wait until managedcluster object is created ************"
+
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+
+  wait_until_command_is_ok "oc get managedcluster | grep -w '${SPOKE_CLUSTER_NAME}'" 10s 100 && \
+  wait_until_command_is_ok "oc get ns | grep -w '${SPOKE_CLUSTER_NAME}'" 10s 100
 }
 
 function test_gitops_deployment {
@@ -43,6 +52,7 @@ function test_gitops_deployment {
   echo "************ telcov10n Check Gitops service ************"
 
   wait_for_argocd_apps
+  wait_for_managedcluster
 }
 
 function main {

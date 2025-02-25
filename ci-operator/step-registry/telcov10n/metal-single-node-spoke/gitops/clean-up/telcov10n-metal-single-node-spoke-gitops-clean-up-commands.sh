@@ -12,12 +12,85 @@ function set_hub_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
+function run_script_in_the_hub_cluster {
+  local helper_img="${GITEA_HELPER_IMG}"
+  local script_file=$1
+  shift && local ns=$1
+  [ $# -gt 1 ] && shift && local pod_name="${1}"
+
+  set -x
+  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
+    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
+      oc -n ${ns} run ${pod_name} \
+        --image=${helper_img} --restart=Never -- sleep infinity ; \
+      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
+    }
+    oc -n ${ns} exec -i ${pod_name} -- \
+      bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
+  else
+    pn="${pod_name}-$(date +%s%N)"
+    oc -n ${ns} run -i ${pn} \
+      --image=${helper_img} --restart=Never -- \
+        bash -s -- <<EOF
+$(cat ${script_file})
+EOF
+  fi
+  set +x
+}
+
+function remove_related_git_info {
+
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+
+  echo "************ telcov10n Removing related Git into for the ${SPOKE_CLUSTER_NAME} spoke cluster ************"
+
+  gitea_ssh_uri="$(cat ${SHARED_DIR}/gitea-ssh-uri.txt)"
+  ssh_pri_key_file=${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}
+
+  run_script=$(mktemp --dry-run)
+
+  cat <<EOF > ${run_script}
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo "$(cat ${ssh_pri_key_file})" > /tmp/ssh-prikey
+chmod 0400 /tmp/ssh-prikey
+
+set -x
+ztp_repo_dir=\$(mktemp -d --dry-run)
+git config --global user.email "ztp-spoke-cluster@telcov10n.com"
+git config --global user.name "ZTP Spoke Cluster Telco Verification"
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
+
+if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
+  sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/site-configs/kustomization.yaml
+fi
+
+cd \${ztp_repo_dir}
+git add .
+git rm -r site-configs/${SPOKE_CLUSTER_NAME}
+git commit -m 'Delete Related ${SPOKE_CLUSTER_NAME} spoke cluster GitOps files'
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main ; }
+EOF
+
+  gitea_project="${GITEA_NAMESPACE}"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project}
+}
+
 function clean_up {
 
-  echo "************ telcov10n Clean up Gitops deployment ************"
-  set -x
-  oc -n openshift-gitops delete apps clusters policies || echo "Gitops k8s apps didn't exist..."
-  set +x
+  echo "************ telcov10n Clean up Gitops apps ************"
+  # set -x
+  # oc -n openshift-gitops delete apps clusters policies || echo "Gitops k8s apps didn't exist..."
+  # set +x
+
+  remove_related_git_info
 }
 
 function main {
@@ -25,7 +98,7 @@ function main {
   clean_up
 
   echo
-  echo "Success!!! The Gitops k8s service has been removed correctly."
+  echo "Success!!! The Gitops related info for the ${SPOKE_CLUSTER_NAME} spoke cluster have been removed correctly."
 }
 
 main
