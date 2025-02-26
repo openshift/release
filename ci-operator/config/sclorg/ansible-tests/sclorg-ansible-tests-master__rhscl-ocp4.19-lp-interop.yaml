@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
 build_root:
@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -39,7 +39,33 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhscl-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","rhscl-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: phracek@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario rhscl
+    test:
+    - ref: rhscl-deploy-and-test
+    workflow: firewatch-ipi-aws
+  timeout: 6h0m0s
+- as: rhscl-interop-aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "rhscl-deploy-and-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rhscl-deploy-and-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "RHEL", "group": {"name": "lp-tests", "priority": 1},"jira_additional_labels": ["sclorg","!default","interop-tests"],"jira_assignee":"phracek@redhat.com"}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","fips","rhscl-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: phracek@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
@@ -53,4 +79,4 @@ zz_generated_metadata:
   branch: master
   org: sclorg
   repo: ansible-tests
-  variant: rhscl-ocp4.18-lp-interop
+  variant: rhscl-ocp4.19-lp-interop
