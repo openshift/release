@@ -1,7 +1,7 @@
 kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
-  name: label-sync
+  name: commenter
   namespace: gcr-io
 spec:
   strategy:
@@ -16,23 +16,23 @@ spec:
       FROM registry.redhat.io/ubi9/ubi-minimal AS build
       COPY . /opt/app
       RUN microdnf install -y go
-      RUN cd /opt/app && go build -ldflags '-s -w' -o /usr/local/bin ./label_sync
+      RUN cd /opt/app && go build -ldflags '-s -w' -o /usr/local/bin ./robots/commenter/
 
       FROM registry.redhat.io/ubi9/ubi-minimal
       COPY --from=build /usr/local/bin /ko-app
-      ENTRYPOINT ["/ko-app/label_sync"]
+      CMD ["/ko-app/commenter"]
     git:
       uri: 'https://github.com/kubernetes/test-infra.git'
   runPolicy: Serial
   output:
     to:
       kind: "DockerImage"
-      name: "quay.io/openshift/ci:ci_label-sync_latest"
+      name: "quay.io/openshift/ci:ci_commenter_latest"
 ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: trigger-label-sync-build
+  name: trigger-commenter-build
   namespace: gcr-io
 spec:
   jobTemplate:
@@ -42,7 +42,7 @@ spec:
           containers:
           - args:
             - start-build
-            - label-sync
+            - commenter
             command:
             - oc
             image: registry.redhat.io/openshift4/ose-cli
