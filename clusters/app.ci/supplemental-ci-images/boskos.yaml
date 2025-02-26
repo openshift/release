@@ -1,13 +1,63 @@
-apiVersion: image.openshift.io/v1
-kind: ImageStream
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
 metadata:
+  namespace: ci
   name: boskos
+spec:
+  source:
+    type: Git
+    git:
+      uri: 'https://github.com/kubernetes-sigs/boskos'
+      ref: master
+    contextDir: ''
+  strategy:
+    type: Source
+    dockerStrategy:
+      dockerfilePath: images/default/Dockerfile
+      buildArgs:
+        - name: cmd
+          value: boskos
+        - name: go_version
+          value: 1.23.4
+        - name: DOCKER_TAG
+          value: latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'boskos:latest'
+  triggers:
+    - type: Generic
+      generic:
+        secretReference:
+          name: boskos-trigger
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trigger-boskos-build
   namespace: ci
 spec:
-  tags:
-  - name: latest
-    from:
-      kind: DockerImage
-      name: gcr.io/k8s-staging-boskos/boskos:latest
-    importPolicy:
-      scheduled: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - sh
+            - -c
+            - curl -k -X POST "$API_URL/`cat /boskos-trigger/WebHookSecretKey`/generic"
+            env:
+            - name: API_URL
+              value: https://api.ci.l2s4.p1.openshiftapps.com:6443/apis/build.openshift.io/v1/namespaces/ci/buildconfigs/boskos/webhooks
+            image: registry.access.redhat.com/ubi9/ubi-minimal
+            name: ubi-minimal
+            volumeMounts:
+            - mountPath: /boskos-trigger
+              name: boskos-trigger
+              readOnly: true
+          volumes:
+          - name: boskos-trigger
+            secret:
+              defaultMode: 420
+              secretName: boskos-trigger
+  schedule: '30 1 1,15 * *'

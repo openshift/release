@@ -68,7 +68,7 @@ tests:
     make lint
   container:
     from: assisted-test-infra-internal
-- as: e2e-metal-assisted-kube-api-4-14-periodic
+- as: e2e-metal-assisted-ha-kube-api-4-14-periodic
   cron: 30 05 * * 4
   steps:
     cluster_profile: packet-assisted
@@ -77,10 +77,11 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         ENABLE_KUBE_API=true
+        IPv4=true
         OPENSHIFT_VERSION=4.14
         SERVICE_BASE_REF=release-ocm-2.9
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-4-14
+- as: e2e-metal-assisted-ha-kube-api-4-14
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -89,6 +90,7 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         ENABLE_KUBE_API=true
+        IPv4=true
         OPENSHIFT_VERSION=4.14
         SERVICE_BASE_REF=release-ocm-2.9
     workflow: assisted-baremetal
@@ -139,38 +141,6 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
-        OPENSHIFT_VERSION=4.14
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ha-kube-api-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.9
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.14
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ha-kube-api-ipv4-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.9
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        IPv4=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.14
     workflow: assisted-baremetal
 - always_run: false

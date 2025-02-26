@@ -401,7 +401,7 @@ function destroy_resources() {
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
-  if [ -n "${PERSISTENT_TG}" ]; then
+  if [ -n "${PERSISTENT_TG:-}" ]; then
     jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
   fi
 
@@ -458,7 +458,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_TG}" ]
+  if [ -n "${PERSISTENT_TG:-}" ]
   then
     GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
   else
@@ -521,7 +521,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_VPC}" ]
+  if [ -n "${PERSISTENT_VPC:-}" ]
   then
     VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_VPC}'")) | .id')
   else
@@ -735,8 +735,12 @@ POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep TGNAME)" ]; then
+  PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep VPCNAME)" ]; then
+  PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
 ARCH=$(yq-v4 eval '.ARCH' "${SHARED_DIR}/powervs-conf.yaml")
 BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervs-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervs-conf.yaml")
@@ -746,8 +750,8 @@ echo "BRANCH=${BRANCH}"
 echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
 echo "VPCREGION=${VPCREGION}"
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "PERSISTENT_TG=${PERSISTENT_TG}"
-echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
+echo "PERSISTENT_TG=${PERSISTENT_TG:-}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC:-}"
 
 # NOTE: If you want to test against a certain release, then do something like:
 # if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]

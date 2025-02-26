@@ -77,7 +77,7 @@ fi
 if [[ -n "$AKS_K8S_VERSION" ]]; then
     AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
 elif [[ "$USE_LATEST_K8S_VERSION" == "true" ]]; then
-    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[*].orchestratorVersion)')
+    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[?isPreview==`null`].orchestratorVersion)')
     AKS_CREATE_COMMAND+=(--kubernetes-version "$K8S_LATEST_VERSION")
 fi
 
