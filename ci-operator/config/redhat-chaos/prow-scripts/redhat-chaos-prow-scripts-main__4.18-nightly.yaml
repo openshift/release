@@ -11,6 +11,14 @@ base_images:
     name: krkn
     namespace: chaos
     tag: latest
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
   ocp-qe-perfscale-ci:
     name: ocp-qe-perfscale-ci
     namespace: ci
@@ -212,6 +220,39 @@ tests:
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: workers-scale
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-node-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
 - always_run: false
   as: krkn-hub-syn-flood
   steps:
