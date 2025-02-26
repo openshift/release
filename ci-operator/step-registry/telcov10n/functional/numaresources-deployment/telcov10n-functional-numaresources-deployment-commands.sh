@@ -23,7 +23,7 @@ T5CI_HCP_HOSTED_KUBECONFIG="${T5CI_HCP_HOSTED_KUBECONFIG:=${SHARED_DIR}/kubeconf
 source "${SHARED_DIR}"/main.env
 
 # Check if Inventory file exists
-if [[ -f "${SHARED_DIR}"/inventory ]]; then
+if ! [[ -f "${SHARED_DIR}"/inventory ]]; then
     echo "No inventory file found"
     exit 1;
 fi
