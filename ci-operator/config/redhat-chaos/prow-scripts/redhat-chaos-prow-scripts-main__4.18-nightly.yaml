@@ -91,7 +91,25 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: redhat-chaos-installer-aws
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+- as: krkn-hub-tests-13nodes
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.18
+      WORKER_REPLICA_COUNT: "13"
+      ITERATION_MULTIPLIER_ENV: "11"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: workers-scale
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-node-tests
   cron: 0 4 29 * *
