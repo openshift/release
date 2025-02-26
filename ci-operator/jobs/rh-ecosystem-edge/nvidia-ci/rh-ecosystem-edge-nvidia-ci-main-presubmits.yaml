@@ -198,7 +198,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.12-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.12-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -208,7 +208,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.12-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.12-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.12-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -225,7 +225,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.12-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.12-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -234,7 +234,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.12-stable
         command:
         - ci-operator
@@ -283,99 +283,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.12-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.12-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.12-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.12-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.12-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.12-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.12-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.12-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -468,6 +376,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.12-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.12-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.12-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.12-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.12-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.12-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.12-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -666,7 +666,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.14-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.14-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -676,7 +676,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.14-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.14-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.14-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -693,7 +693,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.14-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.14-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -702,7 +702,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.14-stable
         command:
         - ci-operator
@@ -751,99 +751,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.14-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.14-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.14-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.14-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.14-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.14-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -936,6 +844,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.14-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.14-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.14-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.14-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.14-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.14-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.14-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1134,7 +1134,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.15-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.15-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1144,7 +1144,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.15-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.15-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.15-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -1161,7 +1161,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.15-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.15-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -1170,7 +1170,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.15-stable
         command:
         - ci-operator
@@ -1219,99 +1219,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.15-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.15-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.15-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.15-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.15-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.15-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.15-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1404,6 +1312,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.15-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.15-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.15-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.15-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.15-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.15-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.15-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1602,7 +1602,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.16-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.16-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1612,7 +1612,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.16-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.16-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.16-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -1629,7 +1629,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.16-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.16-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -1638,7 +1638,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.16-stable
         command:
         - ci-operator
@@ -1687,99 +1687,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.16-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.16-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.16-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.16-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.16-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.16-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.16-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.16-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1872,6 +1780,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.16-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.16-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.16-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.16-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.16-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.16-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.16-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2070,7 +2070,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.17-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.17-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2080,7 +2080,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.17-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.17-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.17-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -2097,7 +2097,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.17-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.17-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -2106,7 +2106,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.17-stable
         command:
         - ci-operator
@@ -2155,99 +2155,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.17-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.17-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.17-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.17-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.17-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.17-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.17-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.17-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2340,6 +2248,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.17-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.17-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.17-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.17-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.17-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.17-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.17-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2538,7 +2538,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/4.18-stable-nvidia-gpu-operator-e2e-24-6-x
+    context: ci/prow/4.18-stable-nvidia-gpu-operator-e2e-last
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2548,7 +2548,7 @@ presubmits:
       ci-operator.openshift.io/variant: 4.18-stable
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.18-stable-nvidia-gpu-operator-e2e-24-6-x
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.18-stable-nvidia-gpu-operator-e2e-last
     reporter_config:
       slack:
         channel: '#wg-edge-nvidia-ci'
@@ -2565,7 +2565,7 @@ presubmits:
               The job was aborted, check for orphaned cloud resources.
             {{end}}
           {{end}}
-    rerun_command: /test 4.18-stable-nvidia-gpu-operator-e2e-24-6-x
+    rerun_command: /test 4.18-stable-nvidia-gpu-operator-e2e-last
     spec:
       containers:
       - args:
@@ -2574,7 +2574,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-6-x
+        - --target=nvidia-gpu-operator-e2e-last
         - --variant=4.18-stable
         command:
         - ci-operator
@@ -2623,99 +2623,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.18-stable-nvidia-gpu-operator-e2e-24-6-x,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
-    context: ci/prow/4.18-stable-nvidia-gpu-operator-e2e-24-9-x
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
-      ci-operator.openshift.io/variant: 4.18-stable
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.18-stable-nvidia-gpu-operator-e2e-24-9-x
-    reporter_config:
-      slack:
-        channel: '#wg-edge-nvidia-ci'
-        job_states_to_report:
-        - failure
-        - error
-        - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test 4.18-stable-nvidia-gpu-operator-e2e-24-9-x
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=nvidia-gpu-operator-e2e-24-9-x
-        - --variant=4.18-stable
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.18-stable-nvidia-gpu-operator-e2e-24-9-x,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.18-stable-nvidia-gpu-operator-e2e-last,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2808,6 +2716,98 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.18-stable-nvidia-gpu-operator-e2e-master,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.18-stable-nvidia-gpu-operator-e2e-previous
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-edge-infra
+      ci-operator.openshift.io/variant: 4.18-stable
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-4.18-stable-nvidia-gpu-operator-e2e-previous
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test 4.18-stable-nvidia-gpu-operator-e2e-previous
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nvidia-gpu-operator-e2e-previous
+        - --variant=4.18-stable
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.18-stable-nvidia-gpu-operator-e2e-previous,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
