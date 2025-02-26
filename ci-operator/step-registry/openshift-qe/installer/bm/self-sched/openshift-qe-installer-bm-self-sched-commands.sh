@@ -19,7 +19,7 @@ HOST=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true | jq 
 CLOUD=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self | jq -r .'cloud.name')
 
 # Create schedule
-curl -k -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{'cloud':$CLOUD, 'hostname': $HOST}" $QUADS_INSTANCE/api/v3/schedules | jq .'assignment_id' > ${SHARED_DIR}/assignment_id
+curl -k -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"cloud\": \"$CLOUD\", \"hostname\": \"$HOST\"}" $QUADS_INSTANCE/api/v3/schedules | jq .'assignment_id' > ${SHARED_DIR}/assignment_id
 
 # TODO: Wait for validation to be completed
 sleep 600
