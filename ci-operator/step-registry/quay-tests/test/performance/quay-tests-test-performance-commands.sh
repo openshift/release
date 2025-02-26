@@ -4,12 +4,20 @@ set -o nounset
 # part 1, Quay performance test
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
-ELK_SERVER='https://search-quay-performance-mdaaozleo7nnmgvrze3fduygra.us-east-2.es.amazonaws.com'
 
+ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
+ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
+ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
+ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
+echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
+
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
-export quay_perf_namespace="quay-perf"
+export quay_perf_namespace="quay-perf"//fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
+  
+export WORKLOAD="quay-load-test"
+export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 
 curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
     --header "Content-Type: application/json" \
@@ -19,10 +27,7 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
         "email": "testperf@testperf.com"
     }' -k
 
-#   refer to https://github.com/quay/quay-performance-scripts/README.md
-push_pull_numbers="5000"
-target_hit_size="100"
-concurrency="15"
+#   refer to https://github.com/quay/quay-performance-scripts
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
@@ -121,15 +126,15 @@ spec:
           - name: PUSH_PULL_ES_INDEX
             value: "quay-push-pull"
           - name: PUSH_PULL_NUMBERS
-            value:  "${push_pull_numbers}"
+            value:  "${PUSH_PULL_NUMBERS}"
           - name: TARGET_HIT_SIZE
-            value: "${target_hit_size}"
+            value: "${HITSIZE}"
           - name: CONCURRENCY
-            value: "${concurrency}"
+            value: "${CONCURRENCY}"
           - name: TEST_NAMESPACE
             value: "${quay_perf_namespace}"
           - name: TEST_PHASES
-            value: "LOAD,RUN"
+            value: "${TEST_PHASES}"
             # value: "LOAD,RUN,DELETE"
         resources:
           requests:
@@ -170,3 +175,7 @@ date
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 echo $end_time
+
+# fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
+echo "The Prow Job ID is: $PROW_JOB_ID"
+   
