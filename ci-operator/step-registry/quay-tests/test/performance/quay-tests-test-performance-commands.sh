@@ -2,7 +2,8 @@
 
 set -o nounset
 # part 1, Quay performance test
-QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)  #https://quayhostname
+QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
+QUAY_ROUTE=${QUAY_ROUTE#https://}         #remove "https://"
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
 ELK_SERVER='https://search-quay-performance-mdaaozleo7nnmgvrze3fduygra.us-east-2.es.amazonaws.com'
 
@@ -11,14 +12,13 @@ echo "QUAY_ROUTE: $QUAY_ROUTE"
 quay_perf_organization="perftest"
 quay_perf_namespace="quay-perf"
 
-curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
+curl --location --request POST "https://${QUAY_ROUTE}/api/v1/organization/" \
     --header "Content-Type: application/json" \
     --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
     --data-raw '{
         "name": "'"${quay_perf_organization}"'",
         "email": "testperf@testperf.com"
     }' -k
-
 
 #   refer to https://github.com/quay/quay-performance-scripts/README.md
 push_pull_numbers="5000"
@@ -27,7 +27,6 @@ concurrency="15"
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
-
 
 #Deploy Quay performance job to OCP namespace $quay_perf_namespace
 cat <<EOF | oc apply -f -
@@ -145,7 +144,29 @@ EOF
 echo "the Perf Job needs about 3~4 hours to complete"
 echo "check the OCP Quay Perf Job, if it complete, go to Kibana to generate index pattern and get Quay Perf metrics"
 
-#wait for the job to complete
-sleep 2h  
-oc wait --for=condition=complete --timeout=4h job/quay-perf-test-orchestrator -n "$quay_perf_namespace"
-     
+#wait until the quay perf testing job complete, and show the job status
+oc get job -n "$quay_perf_namespace"
+oc -n "$quay_perf_namespace" wait job/quay-perf-test-orchestrator --for=jsonpath='{.status.ready}'=0 --timeout=600s
+date
+start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+quayperf_pod_name=$(oc get pod -l job-name=quay-perf-test-orchestrator -n ${quay_perf_namespace} -o jsonpath='{.items[0].metadata.name}')
+echo "$quayperf_pod_name"
+
+if [[ -z "${quayperf_pod_name}" ]]; then
+    echo "No quay-perf-test-orchestrator pod started, please check"
+    exit 1
+fi
+
+sleep 120 #wait pod start
+
+oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p'>TEST_UUID
+echo "TEST_UUID: $(cat TEST_UUID)"
+echo $start_time
+
+oc wait --for=condition=complete --timeout=6h job/quay-perf-test-orchestrator -n "$quay_perf_namespace"
+date
+
+end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+echo $end_time
