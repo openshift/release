@@ -73,3 +73,4 @@ PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
 cat ./certified-plugins.yaml
+bash ./rhdh_certify.sh
