@@ -1,80 +1,25 @@
-presubmits:
+postsubmits:
   stolostron/console:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build11
-    context: ci/prow/check
+    - ^backplane-2\.9$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-console-release-2.13-check
-    rerun_command: /test check
+    max_concurrency: 1
+    name: branch-ci-stolostron-console-backplane-2.9-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=check
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )check,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build11
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-console-release-2.13-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -95,6 +40,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -106,32 +54,31 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build11
-    context: ci/prow/pr-image-mirror
+    - ^backplane-2\.9$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-console-release-2.13-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    max_concurrency: 1
+    name: branch-ci-stolostron-console-backplane-2.9-latest-image-mirror-mce
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-image-mirror
+        - --target=latest-image-mirror-mce
         command:
         - ci-operator
         image: ci-operator:latest
@@ -164,29 +111,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build11
-    context: ci/prow/pr-image-mirror-mce
+    - ^backplane-2\.9$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-console-release-2.13-pr-image-mirror-mce
-    rerun_command: /test pr-image-mirror-mce
+    max_concurrency: 1
+    name: branch-ci-stolostron-console-backplane-2.9-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-image-mirror-mce
+        - --target=publish
         command:
         - ci-operator
         image: ci-operator:latest
@@ -219,22 +162,18 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror-mce,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build11
-    context: ci/prow/unit-tests-sonarcloud
+    - ^backplane-2\.9$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-console-release-2.13-unit-tests-sonarcloud
-    rerun_command: /test unit-tests-sonarcloud
+    max_concurrency: 1
+    name: branch-ci-stolostron-console-backplane-2.9-sonar-post-submit
     spec:
       containers:
       - args:
@@ -242,7 +181,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/acm-sonarcloud-token
-        - --target=unit-tests-sonarcloud
+        - --target=sonar-post-submit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -281,4 +220,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-tests-sonarcloud,?($|\s.*)
