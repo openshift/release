@@ -332,12 +332,14 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: hosted-hypershift-insights-operator-e2e-tests
+  cron: 0 0 * * 6
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
+    - ref: wait
     - as: test
       cli: latest
       commands: |
@@ -365,8 +367,6 @@ tests:
         name: slack-webhook-url
         namespace: test-credentials
       env:
-      - default: +10 hours
-        name: TIMEOUT
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
       - default: /secret/aws/aws-bucket/aws-bucket
