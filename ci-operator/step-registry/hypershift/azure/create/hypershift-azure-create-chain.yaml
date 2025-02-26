@@ -39,6 +39,12 @@ chain:
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
       default: ""
       documentation: "The Azure Marketplace image publisher."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU
+      default: ""
+      documentation: "The Azure Marketplace image SKU."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
+      default: ""
+      documentation: "The Azure Marketplace image version."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -96,6 +102,12 @@ chain:
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra arguments to pass to the hypershift create cluster azure command."
+    - name: AZURE_OIDC_ISSUER_URL
+      default: ""
+      documentation: "OIDC Issuer URL to be used when creating azure cluster"
+    - name: AZURE_SA_TOKEN_ISSUER_KEY_PATH
+      default: ""
+      documentation: "The file location of the  private key for the service account token issuer"
     commands: |-
       set -exuo pipefail
 
@@ -107,7 +119,18 @@ chain:
       AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
         AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        AZURE_OIDC_ISSUER_URL_LOCATION="/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json"
+        AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private"
+            
+        while IFS= read -r line; do
+          if [[ $line == *"oidcIssuerURL"* ]]; then
+            AZURE_OIDC_ISSUER_URL=$(echo "$line" | awk -F'"' '{print $4}')
+            break
+          fi
+        done < "$AZURE_OIDC_ISSUER_URL_LOCATION"
+      
       fi
+      
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
       
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
@@ -168,8 +191,20 @@ chain:
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
+      if [[ $AZURE_OIDC_ISSUER_URL != "" ]]; then
+        COMMAND+=( --oidc-issuer-url $AZURE_OIDC_ISSUER_URL)
+      fi
+      
+      if [[ $AZURE_SA_TOKEN_ISSUER_KEY_PATH != "" ]]; then
+        COMMAND+=( --sa-token-issuer-private-key-path $AZURE_SA_TOKEN_ISSUER_KEY_PATH)
+      fi
+      
       if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
-        COMMAND+=(--managed-identities-file "${SHARED_DIR}"/hypershift_azure_mi_file.json)
+        if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+          COMMAND+=(--managed-identities-file "/etc/hypershift-ci-jobs-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json")
+        else
+          COMMAND+=(--managed-identities-file "${SHARED_DIR}/hypershift_azure_mi_file.json")
+        fi
       fi
       
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
@@ -188,8 +223,18 @@ chain:
       if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
         EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
         EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
-        EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}"/azure-marketplace-image-sku)"
-        EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}"/azure-marketplace-image-version)"
+
+        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
+          EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
+        else
+          EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
+        fi
+        
+        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
+          EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
+        else
+          EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+        fi
       fi
       
       if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
