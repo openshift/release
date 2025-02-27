@@ -19,6 +19,8 @@ fi
 
 # Login to get token
 set +x
+echo
+echo "Login to get token ..."
 TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq -r .'auth_token')
 
 # Get available hosts for self scheduling from a certain hardware model
