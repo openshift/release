@@ -1,26 +1,25 @@
-presubmits:
-  openshift-eng/baremetal-qe-infra:
+postsubmits:
+  openshift-eng/ocp-qe-perfscale-ci:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/images
+    - ^main$
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      capability/arm64: arm64
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-baremetal-qe-infra-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-eng-ocp-qe-perfscale-ci-main-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -41,6 +40,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -52,32 +54,37 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/shellcheck
+    - ^main$
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: metal-4.14-latest-x86
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-baremetal-qe-infra-master-shellcheck
-    rerun_command: /test shellcheck
+      job-release: "4.14"
+    max_concurrency: 1
+    name: branch-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.14-latest-x86-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=shellcheck
+        - --target=[images]
+        - --variant=metal-4.14-latest-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -96,6 +103,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -107,7 +117,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )shellcheck,?($|\s.*)
