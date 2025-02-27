@@ -4,7 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" != "true" ]]; then
+	return
+fi
+
+if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+    echo "Setting AWS credential with minimal permision for installer"
+    export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+else
+    export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+fi
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
@@ -190,8 +199,7 @@ Outputs:
 EOF
 
 # The above cloudformation template's max zones account is 3
-if [[ "${ZONES_COUNT}" -gt 3 ]]
-then
+if [[ "${ZONES_COUNT}" -gt 3 ]]; then
   ZONES_COUNT=3
 fi
 

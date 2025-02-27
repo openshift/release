@@ -60,7 +60,6 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -84,191 +83,191 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
 	PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
-	if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
+	if [[ ${ocp_major_version} -lt 4 || (${ocp_major_version} -eq 4 && ${ocp_minor_version} -lt 18) ]]; then
 		# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
 
-		cat <<EOF >"${PERMISION_LIST}"
-autoscaling:DescribeAutoScalingGroups
-ec2:AllocateAddress
-ec2:AssociateAddress
-ec2:AssociateDhcpOptions
-ec2:AssociateRouteTable
-ec2:AttachInternetGateway
-ec2:AttachNetworkInterface
-ec2:AuthorizeSecurityGroupEgress
-ec2:AuthorizeSecurityGroupIngress
-ec2:CopyImage
-ec2:CreateDhcpOptions
-ec2:CreateInternetGateway
-ec2:CreateNatGateway
-ec2:CreateNetworkInterface
-ec2:CreateRoute
-ec2:CreateRouteTable
-ec2:CreateSecurityGroup
-ec2:CreateSubnet
-ec2:CreateTags
-ec2:CreateVolume
-ec2:CreateVpc
-ec2:CreateVpcEndpoint
-ec2:DeleteDhcpOptions
-ec2:DeleteInternetGateway
-ec2:DeleteNatGateway
-ec2:DeleteNetworkInterface
-ec2:DeleteRoute
-ec2:DeleteRouteTable
-ec2:DeleteSecurityGroup
-ec2:DeleteSnapshot
-ec2:DeleteSubnet
-ec2:DeleteTags
-ec2:DeleteVolume
-ec2:DeleteVpc
-ec2:DeleteVpcEndpoints
-ec2:DeregisterImage
-ec2:DescribeAccountAttributes
-ec2:DescribeAddresses
-ec2:DescribeAvailabilityZones
-ec2:DescribeDhcpOptions
-ec2:DescribeImages
-ec2:DescribeInstanceAttribute
-ec2:DescribeInstanceCreditSpecifications
-ec2:DescribeInstances
-ec2:DescribeInstanceTypeOfferings
-ec2:DescribeInstanceTypes
-ec2:DescribeInternetGateways
-ec2:DescribeKeyPairs
-ec2:DescribeNatGateways
-ec2:DescribeNetworkAcls
-ec2:DescribeNetworkInterfaces
-ec2:DescribePrefixLists
-ec2:DescribeRegions
-ec2:DescribeRouteTables
-ec2:DescribeSecurityGroups
-ec2:DescribeSubnets
-ec2:DescribeTags
-ec2:DescribeVolumes
-ec2:DescribeVpcAttribute
-ec2:DescribeVpcClassicLink
-ec2:DescribeVpcClassicLinkDnsSupport
-ec2:DescribeVpcEndpoints
-ec2:DescribeVpcs
-ec2:DetachInternetGateway
-ec2:DisassociateRouteTable
-ec2:GetEbsDefaultKmsKeyId
-ec2:ModifyInstanceAttribute
-ec2:ModifyNetworkInterfaceAttribute
-ec2:ModifySubnetAttribute
-ec2:ModifyVpcAttribute
-ec2:ReleaseAddress
-ec2:ReplaceRouteTableAssociation
-ec2:RevokeSecurityGroupEgress
-ec2:RevokeSecurityGroupIngress
-ec2:RunInstances
-ec2:TerminateInstances
-elasticloadbalancing:AddTags
-elasticloadbalancing:ApplySecurityGroupsToLoadBalancer
-elasticloadbalancing:AttachLoadBalancerToSubnets
-elasticloadbalancing:ConfigureHealthCheck
-elasticloadbalancing:CreateListener
-elasticloadbalancing:CreateLoadBalancer
-elasticloadbalancing:CreateLoadBalancerListeners
-elasticloadbalancing:CreateTargetGroup
-elasticloadbalancing:DeleteLoadBalancer
-elasticloadbalancing:DeleteTargetGroup
-elasticloadbalancing:DeregisterInstancesFromLoadBalancer
-elasticloadbalancing:DeregisterTargets
-elasticloadbalancing:DescribeInstanceHealth
-elasticloadbalancing:DescribeListeners
-elasticloadbalancing:DescribeLoadBalancerAttributes
-elasticloadbalancing:DescribeLoadBalancers
-elasticloadbalancing:DescribeTags
-elasticloadbalancing:DescribeTargetGroupAttributes
-elasticloadbalancing:DescribeTargetGroups
-elasticloadbalancing:DescribeTargetHealth
-elasticloadbalancing:ModifyLoadBalancerAttributes
-elasticloadbalancing:ModifyTargetGroup
-elasticloadbalancing:ModifyTargetGroupAttributes
-elasticloadbalancing:RegisterInstancesWithLoadBalancer
-elasticloadbalancing:RegisterTargets
-elasticloadbalancing:SetLoadBalancerPoliciesOfListener
-iam:AddRoleToInstanceProfile
-iam:CreateInstanceProfile
-iam:CreateRole
-iam:DeleteAccessKey
-iam:DeleteInstanceProfile
-iam:DeleteRole
-iam:DeleteRolePolicy
-iam:DeleteUser
-iam:DeleteUserPolicy
-iam:GetInstanceProfile
-iam:GetRole
-iam:GetRolePolicy
-iam:GetUser
-iam:GetUserPolicy
-iam:ListAccessKeys
-iam:ListAttachedRolePolicies
-iam:ListInstanceProfiles
-iam:ListInstanceProfilesForRole
-iam:ListRolePolicies
-iam:ListRoles
-iam:ListUserPolicies
-iam:ListUsers
-iam:PassRole
-iam:PutRolePolicy
-iam:PutUserPolicy
-iam:RemoveRoleFromInstanceProfile
-iam:SimulatePrincipalPolicy
-iam:TagRole
-iam:TagUser
-iam:UntagRole
-route53:ChangeResourceRecordSets
-route53:ChangeTagsForResource
-route53:CreateHostedZone
-route53:DeleteHostedZone
-route53:GetChange
-route53:GetHostedZone
-route53:ListHostedZones
-route53:ListHostedZonesByName
-route53:ListResourceRecordSets
-route53:ListTagsForResource
-route53:UpdateHostedZoneComment
-s3:AbortMultipartUpload
-s3:CreateBucket
-s3:DeleteBucket
-s3:DeleteObject
-s3:GetAccelerateConfiguration
-s3:GetBucketAcl
-s3:GetBucketCors
-s3:GetBucketLocation
-s3:GetBucketLogging
-s3:GetBucketObjectLockConfiguration
-s3:GetBucketPublicAccessBlock
-s3:GetBucketReplication
-s3:GetBucketRequestPayment
-s3:GetBucketTagging
-s3:GetBucketVersioning
-s3:GetBucketWebsite
-s3:GetEncryptionConfiguration
-s3:GetLifecycleConfiguration
-s3:GetObject
-s3:GetObjectAcl
-s3:GetObjectTagging
-s3:GetObjectVersion
-s3:GetReplicationConfiguration
-s3:HeadBucket
-s3:ListBucket
-s3:ListBucketMultipartUploads
-s3:ListBucketVersions
-s3:PutBucketAcl
-s3:PutBucketPublicAccessBlock
-s3:PutBucketTagging
-s3:PutEncryptionConfiguration
-s3:PutLifecycleConfiguration
-s3:PutObject
-s3:PutObjectAcl
-s3:PutObjectTagging
-servicequotas:ListAWSDefaultServiceQuotas
-tag:GetResources
-EOF
+		cat <<-EOF > "${PERMISION_LIST}"
+			autoscaling:DescribeAutoScalingGroups
+			ec2:AllocateAddress
+			ec2:AssociateAddress
+			ec2:AssociateDhcpOptions
+			ec2:AssociateRouteTable
+			ec2:AttachInternetGateway
+			ec2:AttachNetworkInterface
+			ec2:AuthorizeSecurityGroupEgress
+			ec2:AuthorizeSecurityGroupIngress
+			ec2:CopyImage
+			ec2:CreateDhcpOptions
+			ec2:CreateInternetGateway
+			ec2:CreateNatGateway
+			ec2:CreateNetworkInterface
+			ec2:CreateRoute
+			ec2:CreateRouteTable
+			ec2:CreateSecurityGroup
+			ec2:CreateSubnet
+			ec2:CreateTags
+			ec2:CreateVolume
+			ec2:CreateVpc
+			ec2:CreateVpcEndpoint
+			ec2:DeleteDhcpOptions
+			ec2:DeleteInternetGateway
+			ec2:DeleteNatGateway
+			ec2:DeleteNetworkInterface
+			ec2:DeleteRoute
+			ec2:DeleteRouteTable
+			ec2:DeleteSecurityGroup
+			ec2:DeleteSnapshot
+			ec2:DeleteSubnet
+			ec2:DeleteTags
+			ec2:DeleteVolume
+			ec2:DeleteVpc
+			ec2:DeleteVpcEndpoints
+			ec2:DeregisterImage
+			ec2:DescribeAccountAttributes
+			ec2:DescribeAddresses
+			ec2:DescribeAvailabilityZones
+			ec2:DescribeDhcpOptions
+			ec2:DescribeImages
+			ec2:DescribeInstanceAttribute
+			ec2:DescribeInstanceCreditSpecifications
+			ec2:DescribeInstances
+			ec2:DescribeInstanceTypeOfferings
+			ec2:DescribeInstanceTypes
+			ec2:DescribeInternetGateways
+			ec2:DescribeKeyPairs
+			ec2:DescribeNatGateways
+			ec2:DescribeNetworkAcls
+			ec2:DescribeNetworkInterfaces
+			ec2:DescribePrefixLists
+			ec2:DescribeRegions
+			ec2:DescribeRouteTables
+			ec2:DescribeSecurityGroups
+			ec2:DescribeSubnets
+			ec2:DescribeTags
+			ec2:DescribeVolumes
+			ec2:DescribeVpcAttribute
+			ec2:DescribeVpcClassicLink
+			ec2:DescribeVpcClassicLinkDnsSupport
+			ec2:DescribeVpcEndpoints
+			ec2:DescribeVpcs
+			ec2:DetachInternetGateway
+			ec2:DisassociateRouteTable
+			ec2:GetEbsDefaultKmsKeyId
+			ec2:ModifyInstanceAttribute
+			ec2:ModifyNetworkInterfaceAttribute
+			ec2:ModifySubnetAttribute
+			ec2:ModifyVpcAttribute
+			ec2:ReleaseAddress
+			ec2:ReplaceRouteTableAssociation
+			ec2:RevokeSecurityGroupEgress
+			ec2:RevokeSecurityGroupIngress
+			ec2:RunInstances
+			ec2:TerminateInstances
+			elasticloadbalancing:AddTags
+			elasticloadbalancing:ApplySecurityGroupsToLoadBalancer
+			elasticloadbalancing:AttachLoadBalancerToSubnets
+			elasticloadbalancing:ConfigureHealthCheck
+			elasticloadbalancing:CreateListener
+			elasticloadbalancing:CreateLoadBalancer
+			elasticloadbalancing:CreateLoadBalancerListeners
+			elasticloadbalancing:CreateTargetGroup
+			elasticloadbalancing:DeleteLoadBalancer
+			elasticloadbalancing:DeleteTargetGroup
+			elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+			elasticloadbalancing:DeregisterTargets
+			elasticloadbalancing:DescribeInstanceHealth
+			elasticloadbalancing:DescribeListeners
+			elasticloadbalancing:DescribeLoadBalancerAttributes
+			elasticloadbalancing:DescribeLoadBalancers
+			elasticloadbalancing:DescribeTags
+			elasticloadbalancing:DescribeTargetGroupAttributes
+			elasticloadbalancing:DescribeTargetGroups
+			elasticloadbalancing:DescribeTargetHealth
+			elasticloadbalancing:ModifyLoadBalancerAttributes
+			elasticloadbalancing:ModifyTargetGroup
+			elasticloadbalancing:ModifyTargetGroupAttributes
+			elasticloadbalancing:RegisterInstancesWithLoadBalancer
+			elasticloadbalancing:RegisterTargets
+			elasticloadbalancing:SetLoadBalancerPoliciesOfListener
+			iam:AddRoleToInstanceProfile
+			iam:CreateInstanceProfile
+			iam:CreateRole
+			iam:DeleteAccessKey
+			iam:DeleteInstanceProfile
+			iam:DeleteRole
+			iam:DeleteRolePolicy
+			iam:DeleteUser
+			iam:DeleteUserPolicy
+			iam:GetInstanceProfile
+			iam:GetRole
+			iam:GetRolePolicy
+			iam:GetUser
+			iam:GetUserPolicy
+			iam:ListAccessKeys
+			iam:ListAttachedRolePolicies
+			iam:ListInstanceProfiles
+			iam:ListInstanceProfilesForRole
+			iam:ListRolePolicies
+			iam:ListRoles
+			iam:ListUserPolicies
+			iam:ListUsers
+			iam:PassRole
+			iam:PutRolePolicy
+			iam:PutUserPolicy
+			iam:RemoveRoleFromInstanceProfile
+			iam:SimulatePrincipalPolicy
+			iam:TagRole
+			iam:TagUser
+			iam:UntagRole
+			route53:ChangeResourceRecordSets
+			route53:ChangeTagsForResource
+			route53:CreateHostedZone
+			route53:DeleteHostedZone
+			route53:GetChange
+			route53:GetHostedZone
+			route53:ListHostedZones
+			route53:ListHostedZonesByName
+			route53:ListResourceRecordSets
+			route53:ListTagsForResource
+			route53:UpdateHostedZoneComment
+			s3:AbortMultipartUpload
+			s3:CreateBucket
+			s3:DeleteBucket
+			s3:DeleteObject
+			s3:GetAccelerateConfiguration
+			s3:GetBucketAcl
+			s3:GetBucketCors
+			s3:GetBucketLocation
+			s3:GetBucketLogging
+			s3:GetBucketObjectLockConfiguration
+			s3:GetBucketPublicAccessBlock
+			s3:GetBucketReplication
+			s3:GetBucketRequestPayment
+			s3:GetBucketTagging
+			s3:GetBucketVersioning
+			s3:GetBucketWebsite
+			s3:GetEncryptionConfiguration
+			s3:GetLifecycleConfiguration
+			s3:GetObject
+			s3:GetObjectAcl
+			s3:GetObjectTagging
+			s3:GetObjectVersion
+			s3:GetReplicationConfiguration
+			s3:HeadBucket
+			s3:ListBucket
+			s3:ListBucketMultipartUploads
+			s3:ListBucketVersions
+			s3:PutBucketAcl
+			s3:PutBucketPublicAccessBlock
+			s3:PutBucketTagging
+			s3:PutEncryptionConfiguration
+			s3:PutLifecycleConfiguration
+			s3:PutObject
+			s3:PutObjectAcl
+			s3:PutObjectTagging
+			servicequotas:ListAWSDefaultServiceQuotas
+			tag:GetResources
+		EOF
 
 		if [[ ${CREDENTIALS_MODE} == "Mint" ]] || [[ ${CREDENTIALS_MODE} == "" ]]; then
 			echo "iam:CreateAccessKey" >> "${PERMISION_LIST}"
@@ -278,40 +277,40 @@ EOF
 		# additional permisions for 4.11+
 		if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
 			# base
-			echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
-			echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
+			echo "ec2:DeletePlacementGroup" >> "${PERMISION_LIST}"
+			echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.14+
 		if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
 			# base
-			echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
+			echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.15+
 		if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
 			# base
-			echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
+			echo "iam:TagInstanceProfile" >> "${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.16+
 		if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
 			# base
-			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
-			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
+			echo "elasticloadbalancing:SetSecurityGroups" >> "${PERMISION_LIST}"
+			echo "s3:PutBucketPolicy" >> "${PERMISION_LIST}"
 		fi
 
 		# Shared-VPC (4.14+)
 		# https://issues.redhat.com/browse/OCPBUGS-17751
 		# platform.aws.hostedZoneRole
 		if grep -q "hostedZoneRole" "${CONFIG}"; then
-			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
+			echo "sts:AssumeRole" >> "${PERMISION_LIST}"
 		fi
 
 		# byo public ipv4 pool (4.16+)
 		# platform.aws.publicIpv4Pool
 		if grep -q "publicIpv4Pool" "${CONFIG}"; then
-			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+			echo "ec2:DisassociateAddress" >> "${PERMISION_LIST}"
 		fi
 
 		# byo IAM Profile (4.17+)
@@ -320,14 +319,14 @@ EOF
 		# compute[0].platform.aws.iamProfile
 		# controlPlane.platform.aws.iamProfile
 		if grep -q "iamProfile" "${CONFIG}"; then
-			echo "tag:UntagResources" >>"${PERMISION_LIST}"
-			echo "iam:UntagInstanceProfile" >>"${PERMISION_LIST}"
+			echo "tag:UntagResources" >> "${PERMISION_LIST}"
+			echo "iam:UntagInstanceProfile" >> "${PERMISION_LIST}"
 		fi
 
 		# Shared network
 		# platform.aws.subnets
 		if grep -q "subnets" "${CONFIG}"; then
-			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+			echo "tag:UntagResources" >> "${PERMISION_LIST}"
 		fi
 
 	else
@@ -355,9 +354,19 @@ EOF
 
 		rm -rf "${dir}"
 	fi
-
-	create_jsoner_py
 	
+	# Force all clusters when not configured
+	# explicitly to use public IP avoiding NAT
+	if [[ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" == "true" ]]; then
+		cat >> "${PERMISION_LIST}" <<-EOF
+			sqs:*
+			cloudformation:CreateStack
+			cloudformation:DescribeStacks
+		EOF
+	fi
+	
+	create_jsoner_py
+
 	# generate policy file and save it to shared dir so later steps have access to it.
 	cat "${PERMISION_LIST}" | sort | uniq | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 
@@ -369,60 +378,61 @@ else
 	echo "Custom AWS user with minimal permissions is disabled for installer. Using AWS user from cluster profile."
 fi
 
-
-
 if [[ "${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	USER_POLICY_FILENAME="aws-permissions-policy-creds-ccoctl.json"
 	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
 
 	PERMISION_LIST="${ARTIFACT_DIR}/permision_list_ccoctl.txt"
-	cat <<EOF > "${PERMISION_LIST}"
-cloudfront:ListCloudFrontOriginAccessIdentities
-cloudfront:ListDistributions
-cloudfront:ListTagsForResource
-iam:CreateOpenIDConnectProvider
-iam:CreateRole
-iam:DeleteOpenIDConnectProvider
-iam:DeleteRole
-iam:DeleteRolePolicy
-iam:GetOpenIDConnectProvider
-iam:GetRole
-iam:GetUser
-iam:ListOpenIDConnectProviders
-iam:ListRolePolicies
-iam:ListRoles
-iam:PutRolePolicy
-iam:TagOpenIDConnectProvider
-iam:TagRole
-s3:CreateBucket
-s3:DeleteBucket
-s3:DeleteObject
-s3:GetBucketAcl
-s3:GetBucketTagging
-s3:GetObject
-s3:GetObjectAcl
-s3:GetObjectTagging
-s3:ListBucket
-s3:PutBucketAcl
-s3:PutBucketPolicy
-s3:PutBucketPublicAccessBlock
-s3:PutBucketTagging
-s3:PutObject
-s3:PutObjectAcl
-s3:PutObjectTagging
-EOF
+	cat <<-EOF > "${PERMISION_LIST}"
+		cloudfront:ListCloudFrontOriginAccessIdentities
+		cloudfront:ListDistributions
+		cloudfront:ListTagsForResource
+		iam:CreateOpenIDConnectProvider
+		iam:CreateRole
+		iam:DeleteOpenIDConnectProvider
+		iam:DeleteRole
+		iam:DeleteRolePolicy
+		iam:GetOpenIDConnectProvider
+		iam:GetRole
+		iam:GetUser
+		iam:ListOpenIDConnectProviders
+		iam:ListRolePolicies
+		iam:ListRoles
+		iam:PutRolePolicy
+		iam:TagOpenIDConnectProvider
+		iam:TagRole
+		s3:CreateBucket
+		s3:DeleteBucket
+		s3:DeleteObject
+		s3:GetBucketAcl
+		s3:GetBucketTagging
+		s3:GetObject
+		s3:GetObjectAcl
+		s3:GetObjectTagging
+		s3:ListBucket
+		s3:PutBucketAcl
+		s3:PutBucketPolicy
+		s3:PutBucketPublicAccessBlock
+		s3:PutBucketTagging
+		s3:PutObject
+		s3:PutObjectAcl
+		s3:PutObjectTagging
+	EOF
+
 	if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
 		# enable option --create-private-s3-bucket
-		echo "cloudfront:CreateCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
-		echo "cloudfront:CreateDistribution" >> "${PERMISION_LIST}"
-		echo "cloudfront:DeleteCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
-		echo "cloudfront:DeleteDistribution" >> "${PERMISION_LIST}"
-		echo "cloudfront:GetCloudFrontOriginAccessIdentity" >> "${PERMISION_LIST}"
-		echo "cloudfront:GetCloudFrontOriginAccessIdentityConfig" >> "${PERMISION_LIST}"
-		echo "cloudfront:GetDistribution" >> "${PERMISION_LIST}"
-		echo "cloudfront:TagResource" >> "${PERMISION_LIST}"
-		echo "cloudfront:UpdateDistribution" >> "${PERMISION_LIST}"
+		cat <<-EOF > "${PERMISION_LIST}"
+			cloudfront:CreateCloudFrontOriginAccessIdentity
+			cloudfront:CreateDistribution
+			cloudfront:DeleteCloudFrontOriginAccessIdentity
+			cloudfront:DeleteDistribution
+			cloudfront:GetCloudFrontOriginAccessIdentity
+			cloudfront:GetCloudFrontOriginAccessIdentityConfig
+			cloudfront:GetDistribution
+			cloudfront:TagResource
+			cloudfront:UpdateDistributio
+		EOF
   	fi
 
 	create_jsoner_py
