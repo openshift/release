@@ -16,6 +16,8 @@ if [[ "${GCP_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
   echo "$(date -u --rfc-3339=seconds) - GCP_INSTALL_USE_MINIMAL_PERMISSIONS is no, nothing to do." && exit 0
 fi
 
+ret=0
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -23,6 +25,17 @@ if ! gcloud auth list | grep -E "\*\s+${sa_email}"
 then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
   gcloud config set project "${GOOGLE_PROJECT_ID}"
+fi
+
+# jiwei-debug
+role_name="installer_qe_minimal_permissions"
+if [[ "${GOOGLE_PROJECT_ID}" == openshift-gce-devel ]]; then
+  echo "$(date -u --rfc-3339=seconds) - in GCP DEVEL project, describing the custom role '${role_name}'..."
+  gcloud iam roles describe --project "${GOOGLE_PROJECT_ID}" "${role_name}" || echo "The custom role '${role_name}' does not exist."
+else
+  echo "$(date -u --rfc-3339=seconds) - not in GCP DEVEL project, describing the project..."
+  gcloud projects describe "${GOOGLE_PROJECT_ID}"
+  gcloud iam roles describe --project "${GOOGLE_PROJECT_ID}" "${role_name}" || echo "The custom role '${role_name}' does not exist."
 fi
 
 # See https://docs.openshift.com/container-platform/4.12/installing/installing_gcp/installing-gcp-account.html#minimum-required-permissions-ipi-gcp_installing-gcp-account
@@ -39,11 +52,15 @@ fi
 if [ -f "${CLUSTER_PROFILE_DIR}/${sa_filename}" ]; then
   echo "$(date -u --rfc-3339=seconds) - Use pre-configured key of the IAM service account for the minimum permissions testing on GCP."
   cp "${CLUSTER_PROFILE_DIR}/${sa_filename}" "${SHARED_DIR}/gcp_min_permissions.json"
+  iam_account=$(jq -r .client_email "${CLUSTER_PROFILE_DIR}/${sa_filename}")
 else
-  echo "$(date -u --rfc-3339=seconds) - Failed to find the pre-configured key file of the IAM service account for the minimum permissions testing on GCP, abort." && exit 1
+  echo "$(date -u --rfc-3339=seconds) - Failed to find the pre-configured key file of the IAM service account for the minimum permissions testing on GCP, abort." && ret=1
+  iam_account="ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
+  if [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
+    iam_account="ipi-min-perm-without-actAs-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
+  fi
 fi
 
-iam_account=$(jq -r .client_email "${CLUSTER_PROFILE_DIR}/${sa_filename}")
 email=$(gcloud iam service-accounts list --filter="email=${iam_account}" --format='value(email)')
 if [[ -z "${email}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Failed to find the IAM service account '${iam_account}' in GCP project '${GOOGLE_PROJECT_ID}', abort." && exit 1
@@ -67,3 +84,5 @@ for role in "${binding_roles[@]}"; do
   echo "Running Command: ${CMD}"
   eval "${CMD}"
 done
+
+return "${ret}"
