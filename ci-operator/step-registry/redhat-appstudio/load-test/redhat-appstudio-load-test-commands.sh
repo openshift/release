@@ -111,21 +111,34 @@ export INFRA_DEPLOYMENTS_BRANCH='update-ns-limits'
 
 # Clear existing resource quota limits
 (
+    echo "Deleting resource quota from namespace: $ns"
+
+    end_time=$(( $(date +%s) + 3600 ))
     while true; do
         # shellcheck disable=SC1090
         source "/usr/local/ci-secrets/redhat-appstudio-load-test/load-test-scenario.${SCENARIO:-concurrent}"
 
         # Delete resource quotas for all userprefix namespaces
         for ns in $(kubectl get ns --no-headers | awk -v prefix="$USER_PREFIX" '$1 ~ "^" prefix {print $1}'); do
-            echo "Deleting resource quota from namespace: $ns"
             kubectl -n "$ns" delete resourcequota --ignore-not-found=true compute-build compute-deploy storage || true
+            kubectl -n "$ns" delete ClusterResourceQuota --all  --ignore-not-found=true || true
         done
+
+
+        # Exit loop after 1 hour timeout
+        if [ "$(date +%s)" -ge "$end_time" ]; then
+            echo "Time limit reached. Exiting loop."
+            break
+        fi
 
         # Wait for 5 seconds before checking again
         sleep 5
     done
 ) &
-
+bg_pid=$!
+echo "Bg process: $bg_pid"
 
 # Execute load test
 ./tests/load-tests/ci-scripts/load-test.sh "$SCENARIO"
+
+wait
