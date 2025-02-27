@@ -61,6 +61,7 @@ fi
 
 # summarize test results
 echo "Summarizing test results..."
+sleep 3600
 if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
     echo "Artifact dir '${ARTIFACT_DIR}' not exist"
     exit 0

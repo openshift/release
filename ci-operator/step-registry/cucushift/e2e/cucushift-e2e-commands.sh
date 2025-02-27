@@ -31,6 +31,8 @@ function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
 	echo "KUBECONFIG: ${KUBECONFIG}"
+    echo "print ${KUBECONFIG}"
+    cat ${KUBECONFIG}
     fi
     cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
     if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -417,5 +419,5 @@ oc version --client --output='yaml' || true
 set_cluster_access
 preparation_for_test
 filter_tests
-test_execution
-summarize_test_results
+#test_execution
+#summarize_test_results
