@@ -11,6 +11,8 @@ cat << EOF > /tmp/config.yaml
 apiServer:
   subjectAltNames:
   - ${IP_ADDRESS}
+telemetry:
+  status: Disabled
 EOF
 
 configure_vm_args=""

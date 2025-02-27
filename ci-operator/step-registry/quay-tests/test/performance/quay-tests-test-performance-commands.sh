@@ -14,8 +14,7 @@ echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
-export quay_perf_namespace="quay-perf"//fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
-  
+export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
 export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 

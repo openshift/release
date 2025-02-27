@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build09
+    cluster: build06
     context: ci/prow/configmap-scale
     decorate: true
     labels:
@@ -78,7 +78,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-etcd-recovery
     decorate: true
     labels:
@@ -152,7 +152,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -225,7 +225,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -298,7 +298,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -371,7 +371,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build06
+    cluster: build09
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
@@ -445,7 +445,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build06
+    cluster: build09
     context: ci/prow/e2e-hypershift-conformance
     decorate: true
     labels:
@@ -519,7 +519,7 @@ presubmits:
     branches:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
-    cluster: build06
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -575,6 +575,82 @@ presubmits:
     - ^openshift-4\.20$
     - ^openshift-4\.20-
     cluster: build06
+    context: ci/prow/perfscale-payload-control-plane-6nodes
+    decorate: true
+    decoration_config:
+      timeout: 3h30m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-etcd-openshift-4.20-perfscale-payload-control-plane-6nodes
+    optional: true
+    path_alias: go.etcd.io/etcd
+    rerun_command: /test perfscale-payload-control-plane-6nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=perfscale-payload-control-plane-6nodes
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )perfscale-payload-control-plane-6nodes,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^openshift-4\.20$
+    - ^openshift-4\.20-
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     labels:
