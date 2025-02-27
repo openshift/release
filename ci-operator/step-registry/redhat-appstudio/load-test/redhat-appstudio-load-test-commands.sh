@@ -111,7 +111,7 @@ export INFRA_DEPLOYMENTS_BRANCH='update-ns-limits'
 
 # Clear existing resource quota limits
 (
-    echo "Deleting resource quota from namespace: $ns"
+    echo "Deleting resource quota from namespace"
 
     end_time=$(( $(date +%s) + 3600 ))
     while true; do
