@@ -8,7 +8,7 @@ set -x
 declare -A guest_to_job_aws=(
     [4.14]="periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-aws-critical"
     [4.15]="periodic-ci-openshift-hypershift-release-4.15-periodics-mce-e2e-aws-critical"
-    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-critical"
+    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-criticadddgl"
     [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-critical"
     [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-critical"
 )
@@ -20,11 +20,11 @@ declare -A mce_to_guest=(
     [2.8]="4.14 4.15 4.16 4.17 4.18"
 )
 declare -A hub_to_mce=(
-    [4.14]="2.4 2.5 2.6"
-    [4.15]="2.5 2.6 2.7"
-    [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8"
-    [4.18]="2.8"
+    [4.14]="2.6"
+    [4.15]="2.5"
+#    [4.16]="2.6 2.7 2.8"
+#    [4.17]="2.7 2.8"
+#    [4.18]="2.8"
 )
 
 function get_payload_list() {
@@ -77,25 +77,77 @@ function trigger_prow_job() {
     echo "Gangway API is still not available after $max_retries retries. Aborting." && return 0
 }
 
+function check_jobs() {
+    local GANGWAY_API='https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com'
+
+    local max_retries=2
+    local retry_interval=10
+
+    while IFS=, read -r HUB MCE HostedCluster PLATFORM JOB JOB_ID; do
+        JOB_ID=$(echo "$JOB_ID" | awk -F= '{print $2}' || true)
+
+        if [ -z "$JOB_ID" ]; then
+            job_status="TriggerFailed"
+        else
+            set +x
+            for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
+                response=$(curl -s -X GET -H "Authorization: Bearer $(cat /etc/mce-prow-gangway-credentials/token)" \
+                    "${GANGWAY_API}/v1/executions/${JOB_ID}" -w "%{http_code}")
+
+                json_body=$(echo "$response" | sed '$d')    # Extract JSON response body
+                http_status=$(echo "$response" | tail -n 1) # Extract HTTP status code
+
+                if [ "$http_status" -eq 200 ]; then
+                    job_status=$(jq -r '.job_status' <<< "$json_body")
+                    if [ "$job_status" == "null" ] || [ -z "$job_status" ]; then
+                        job_status="other"
+                    fi
+                    break
+                else
+                    echo "[$retry_count/$max_retries] Gangway API not available (HTTP $http_status). Retrying in $retry_interval sec..."
+                    sleep "$retry_interval"
+                fi
+            done
+            set -x
+            if [ "$http_status" -ne 200 ]; then
+                job_status="QueryNotFound"
+            fi
+        fi
+        echo "$HUB, $MCE, $HostedCluster, $PLATFORM, $JOB, JOB_ID=${JOB_ID}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
+    done < "/tmp/job_list"
+}
+
 function generate_junit_xml() {
     total_tests=$(awk 'END {print NR}' "${SHARED_DIR}/job_list")
-    failures=$(grep -c "JOB_ID=$" "${SHARED_DIR}/job_list" || true)
+    failures=$(grep -c "JOB_STATUS=FAILURE" "${SHARED_DIR}/job_list" || true)
+    skipped=$(( $(grep -c "JOB_STATUS=QueryNotFound" "${SHARED_DIR}/job_list" || true) + $(grep -c "JOB_STATUS=TriggerFailed" "${SHARED_DIR}/job_list" || true) ))
 
     cat << EOF > "${ARTIFACT_DIR}/junit-multi-version-result.xml"
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="mce multi version test on ${HOSTEDCLUSTER_PLATFORM}" tests="${total_tests}" skipped="0" failures="${failures}" time="0">
+<testsuite name="mce multi version test on ${HOSTEDCLUSTER_PLATFORM}" tests="${total_tests}" skipped="${skipped}" failures="${failures}" time="0">
     <link/>
     <script/>
 EOF
     while IFS= read -r line; do
-        job_id=$(echo "$line" | sed -n 's/.*JOB_ID=\(.*\)/\1/p')
-        if [[ -z "$job_id" ]]; then
-            echo "    <testcase name=\"$line\" time=\"0\">" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
-            echo "        <failure message=\"\">job trigger failed</failure>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+        testcase_name=$(echo "$line" | sed -n 's/^\([^,]*, [^,]*, [^,]*, [^,]*\).*/\1/p')
+        job_status=$(echo "$line" | sed -n 's/.*JOB_STATUS=\([^,]*\).*/\1/p')
+
+        if [[ -z "$job_status" ]]; then
+            echo "    <testcase name=\"$testcase_name\" time=\"0\">" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "        <failure message=\"\">Missing JOB_STATUS</failure>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "    </testcase>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+        elif [[ "$job_status" == "FAILURE" ]]; then
+            echo "    <testcase name=\"$testcase_name\" time=\"0\">" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "        <failure message=\"Job failed\">$line</failure>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "    </testcase>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+        elif [[ "$job_status" == "QueryNotFound" || "$job_status" == "TriggerFailed" ]]; then
+            echo "    <testcase name=\"$testcase_name\" time=\"0\">" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "        <skipped message=\"$job_status\">$line</skipped>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
             echo "    </testcase>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
         else
-            echo "    <testcase name=\"$line\" time=\"0\"/>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
+            echo "    <testcase name=\"$testcase_name\" time=\"0\"/>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
         fi
+
     done < "${SHARED_DIR}/job_list"
     echo "</testsuite>" >> "${ARTIFACT_DIR}/junit-multi-version-result.xml"
 }
@@ -128,7 +180,7 @@ for hub_version in "${!hub_to_mce[@]}"; do
                     ;;
             esac
             job_id=$(echo "$result" | grep "JOB_ID###" | cut -d'#' -f4 || true)
-            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${guest_to_job_aws[$guest_version]}, JOB_ID=${job_id}" >> "${SHARED_DIR}/job_list"
+            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${guest_to_job_aws[$guest_version]}, JOB_ID=${job_id}" >> "/tmp/job_list"
 
             ((job_count++))
 
@@ -146,4 +198,5 @@ if ((job_count > 1)); then
     sleep "${JOB_DURATION}"
 fi
 
+check_jobs
 generate_junit_xml
