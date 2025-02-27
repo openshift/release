@@ -1,20 +1,25 @@
 ref:
-  as: openshift-upgrade-azure
-  steps:
-    allow_best_effort_post_steps: true
-    pre:
-    - chain: upi-azure-pre-stableinitial
-    test:
-    - ref: openshift-e2e-test
-    post:
-    - chain: gather-network 
-    - chain: upi-azure-post
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
-    env:
-      TEST_TYPE: upgrade
-      TEST_SUITE: ""
-      TEST_UPGRADE_OPTIONS: ""
+  as: aro-e2e-classic-cluster-update
+  from_image:
+    namespace: ocp
+    name: "4.16"
+    tag: upi-installer
+  commands: aro-e2e-classic-cluster-update-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: AZURE_SUBSCRIPTION_ID
+    - name: AZURE_LOCATION
+    - name: RP_ENDPOINT
+      documentation: |-
+        Heads up, the endpoint is protected and IPs must be whitelisted!
+    - name: ARO_VERSION
+      documentation: |-
+        TODO: use test job release config and RELEASE_IMAGE_LATEST for overriding this default
+    - name: ARO_VERSION_INSTALLER_PULLSPEC
+      documentation: |-
+        TODO: use test job release config and RELEASE_IMAGE_LATEST for overriding this default
   documentation: |-
-    The ARO E2E Azure workflow executes the upgrade end-to-end test suite on ARO with a default cluster configuration and Loki as a log collector, exercising an upgrade during the process.
+    Update a cluster from latest installable version to a nightly. 
