@@ -12,9 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile.lightweight
   from: centos9
   to: topsail-light
-- dockerfile_path: build/Dockerfile
-  from: centos9
-  to: topsail
 resources:
   '*':
     limits:
@@ -36,7 +33,7 @@ tests:
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
         run jump_ci run unlock_cluster
       credentials:
-      - mount_path: /var/run/crc-mac-ai-secret-1
+      - mount_path: /var/run/crc-mac-ai-secret
         name: crc-mac-ai-secret
         namespace: test-credentials
       from: topsail-light
@@ -67,7 +64,7 @@ tests:
       - mount_path: /var/run/crc-mac-ai-secret
         name: crc-mac-ai-secret
         namespace: test-credentials
-      from: topsail
+      from: topsail-light
       resources:
         requests:
           cpu: 1000m
@@ -115,42 +112,6 @@ tests:
           cpu: 1000m
           memory: 500Mi
       timeout: 23h0m0s
-- always_run: false
-  as: ci
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    allow_skip_on_success: true
-    pre:
-    - as: prepare
-      commands: |
-        export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        run rhoai test prepare_ci
-      credentials:
-      - mount_path: /var/run/crc-mac-ai-secret
-        name: crc-mac-ai-secret
-        namespace: test-credentials
-      from: topsail
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    test:
-    - as: test
-      commands: |
-        export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        run rhoai test test_ci
-      credentials:
-      - mount_path: /var/run/crc-mac-ai-secret
-        name: crc-mac-ai-secret
-        namespace: test-credentials
-      from: topsail
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-psap

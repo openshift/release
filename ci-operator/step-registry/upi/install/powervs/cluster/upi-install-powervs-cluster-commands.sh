@@ -168,7 +168,7 @@ function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
+    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     do
         echo "Targetting power cloud instance"
         ibmcloud pi workspace target "${CRN}"

@@ -275,11 +275,6 @@ def _add_osd_rc_deployment(gendoc):
         # The main x86_64 release controller also monitors origin
         extra_rc_args.append('--publish-namespace=origin')
 
-    # Creating Cluster Groups for the AMD64 jobs...
-    if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build01,build02,build03,build05')
-        extra_rc_args.append('--cluster-group=vsphere')
-
     gendoc.append({
         'apiVersion': 'apps/v1',
         'kind': 'Deployment',
