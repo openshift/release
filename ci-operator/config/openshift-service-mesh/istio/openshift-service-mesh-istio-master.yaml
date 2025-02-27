@@ -108,6 +108,62 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
+- as: istio-telemetry-sail-controlplane
+  optional: true
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: telemetry-sail-cp-test-run
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export CONTROL_PLANE_SOURCE=sail &&\
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          telemetry"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-telemetry
   steps:
     cluster_profile: ossm-aws

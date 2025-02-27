@@ -81,4 +81,14 @@ spec:
           allowed:
             mode: filtered
 EOF
+
+CLUSTER_NETWORK="10.128.0.0/14"
+EGRESSIP_CIDR="192.169.100.0/24"
+
+iptables -t filter -I FORWARD -s ${CLUSTER_NETWORK} -i ostestbm -j ACCEPT
+iptables -t filter -I FORWARD -d ${CLUSTER_NETWORK} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -t filter -I FORWARD -s ${EGRESSIP_CIDR} -i ostestbm -j ACCEPT
+iptables -t filter -I FORWARD -d ${EGRESSIP_CIDR} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -t nat -I POSTROUTING -s ${CLUSTER_NETWORK} ! -d 192.168.111.1/24 -j MASQUERADE
+iptables -t nat -I POSTROUTING -s ${EGRESSIP_CIDR} ! -d 192.168.111.1/24 -j MASQUERADE
 EOFTOP
