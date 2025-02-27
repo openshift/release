@@ -331,11 +331,6 @@ function extract_rhcos_images {
   get_openshift_baremetal_install_tool
 
   openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
-  if [ -z "${RHCOS_IMG_ROOTFS_URL:-}" ]; then
-    rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
-  else
-    rootfs_url="${RHCOS_IMG_ROOTFS_URL}"
-  fi
   if [ -z "${RHCOS_ISO_URL:-}" ]; then
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
@@ -403,7 +398,6 @@ spec:
   osImages:
   - cpuArchitecture: x86_64
     openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-    rootFSUrl: ${rootfs_url}
     url: ${iso_url}
     version: ${openshift_release}
 EOF
@@ -419,7 +413,6 @@ EOF
       yq -o json >| /tmp/AgentServiceConfig-agent.spec.osImages.patch.json <<-EOF
 - cpuArchitecture: x86_64
   openshiftVersion: "${openshift_version}"
-  rootFSUrl: ${rootfs_url}
   url: ${iso_url}
   version: ${openshift_release}
 EOF
