@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
   stolostron_builder_go1.22-linux:
     name: builder
     namespace: stolostron
@@ -9,26 +13,17 @@ build_root:
     namespace: stolostron
     tag: go1.22-linux
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.prow
+  from: base
   inputs:
     stolostron_builder_go1.22-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.22-linux
-  to: observatorium-operator
+  to: kube-state-metrics
 promotion:
   to:
   - name: "2.14"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.16"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -38,38 +33,23 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
+- as: test
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow test-unit
+  container:
+    from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: observatorium-operator
+      SOURCE_IMAGE_REF: kube-state-metrics
     env:
-      IMAGE_REPO: observatorium-operator
+      IMAGE_REPO: kube-state-metrics
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: e2e-kind
-  steps:
-    env:
-      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
-      AWS_INSTANCE_TYPE: t3.small
-    post:
-    - ref: ocm-e2e-kind-destroy
-    pre:
-    - ref: ocm-ci-rbac
-    - ref: ocm-e2e-kind-create
-    test:
-    - as: test
-      commands: |
-        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
-        ./tests/e2e.sh test-kind-prow
-      dependencies:
-      - env: OPERATOR_IMAGE_NAME
-        name: observatorium-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-e2e-kind
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -89,13 +69,32 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kube-state-metrics
     env:
-      DESTINATION_BRANCH: release-2.14
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: kube-state-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="kube-state-metrics"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.14
   org: stolostron
-  repo: observatorium-operator
+  repo: kube-state-metrics
