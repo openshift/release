@@ -103,6 +103,8 @@ EOF
   # Wait for the app server deployment
   sleep 60
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
+  COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
+  run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
 
   # Create namespace and kubeconfig secret for load testing
   run_or_fail oc create namespace ols-load-test

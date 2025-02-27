@@ -1,0 +1,30 @@
+workflow:
+  as: openshift-e2e-vsphere-host-groups-csi
+  steps:
+    pre:
+    - chain: ipi-conf-vsphere
+    - chain: ipi-conf-vsphere-nested-host-groups
+    - chain: ipi-install-vsphere
+    - ref: storage-conf-csi-vsphere
+    - ref: storage-obj-save    
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:      
+      POOLS: "vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3"
+      NETWORK_TYPE: nested-multi-tenant
+      HOSTS: 2      
+      FEATURE_GATES: '["VSphereHostVMGroupZonal=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OPENSHIFT_REQUIRED_CORES: 48
+      OPENSHIFT_REQUIRED_MEMORY: 192
+      # for storage-conf-csi-vsphere and openshift-e2e-test
+      TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-vsphere.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    Deploys a nested vCenter 8 with 2 hosts, each of which are in their own host group and
+    run e2e csi testsuite.
