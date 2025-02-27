@@ -12,9 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile.lightweight
   from: centos9
   to: topsail-light
-- dockerfile_path: build/Dockerfile
-  from: centos9
-  to: topsail
 resources:
   '*':
     limits:
@@ -34,10 +31,9 @@ tests:
     - as: 006-unlock-cluster
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci run unlock_cluster
       credentials:
-      - mount_path: /var/run/crc-mac-ai-secret-1
+      - mount_path: /var/run/crc-mac-ai-secret
         name: crc-mac-ai-secret
         namespace: test-credentials
       from: topsail-light
@@ -49,7 +45,6 @@ tests:
     - as: 001-lock-cluster
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci run lock_cluster
       credentials:
       - mount_path: /var/run/crc-mac-ai-secret
@@ -64,7 +59,6 @@ tests:
     - as: 002-prepare-jump-ci
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci run prepare_jump_ci
       credentials:
       - mount_path: /var/run/crc-mac-ai-secret
@@ -79,7 +73,6 @@ tests:
     - as: 003-pre-cleanup
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci test pre_cleanup_ci
       credentials:
       - mount_path: /var/run/crc-mac-ai-secret
@@ -93,7 +86,6 @@ tests:
     - as: 004-prepare
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci test prepare_ci
       credentials:
       - mount_path: /var/run/crc-mac-ai-secret
@@ -109,7 +101,6 @@ tests:
     - as: 005-test
       commands: |
         export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
         run jump_ci test test_ci
       credentials:
       - mount_path: /var/run/crc-mac-ai-secret
@@ -121,43 +112,6 @@ tests:
           cpu: 1000m
           memory: 500Mi
       timeout: 23h0m0s
-- always_run: false
-  as: ci
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    allow_skip_on_success: true
-    pre:
-    - as: prepare
-      commands: |
-        export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
-        run rhoai test prepare_ci
-      credentials:
-      - mount_path: /var/run/crc-mac-ai-secret
-        name: crc-mac-ai-secret
-        namespace: test-credentials
-      from: topsail
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    test:
-    - as: test
-      commands: |
-        export CRC_MAC_AI_SECRET_PATH=/var/run/crc-mac-ai-secret
-        export PSAP_ODS_SECRET_PATH=$CRC_MAC_AI_SECRET_PATH
-        run rhoai test test_ci
-      credentials:
-      - mount_path: /var/run/crc-mac-ai-secret
-        name: crc-mac-ai-secret
-        namespace: test-credentials
-      from: topsail
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
 zz_generated_metadata:
   branch: main
   org: openshift-psap
