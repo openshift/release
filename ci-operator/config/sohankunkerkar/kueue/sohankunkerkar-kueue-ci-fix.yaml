@@ -1,0 +1,46 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- dockerfile_path: Dockerfile.ci
+  from: root
+  to: kueue-controller
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.19"
+  namespace: ocp
+tests:
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: e2e-kueue
+  commands: |
+    curl -O https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_kustomize.v5.6.0_linux_amd64
+    mv kustomize_kustomize.v5.6.0_linux_amd64 kustomize
+    chmod +x kustomize
+
+    curl -O https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+    mv yq_linux_amd64 yq
+    chmod +x yq
+
+    # Download ginkgo v2.22.2
+    curl -O https://github.com/onsi/ginkgo/releases/download/v2.22.2/ginkgo_linux_amd64
+    mv ginkgo_linux_amd64 ginkgo
+    chmod +x ginkgo
+
+    export PATH=`pwd`:$PATH
+    export IMAGE_TAG=stable:kueue-controller
+    make -f Makefile-test-ocp.mk test-e2e-ocp
+  container:
+    from: src
+zz_generated_metadata:
+  branch: ci-fix
+  org: sohankunkerkar
+  repo: kueue
