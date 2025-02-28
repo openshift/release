@@ -1,4 +1,7 @@
-name: Auto Merge dispatcher PRs from openshift-bot
+name: Auto Merge dispatcher PR
+
+permissions:
+  pull-requests: write
 
 on:
   pull_request:
@@ -9,9 +12,10 @@ jobs:
     if: ${{ startsWith(github.event.pull_request.title, 'Automate prow job dispatcher at') && github.event.pull_request.user.login == 'openshift-bot' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Merge PR Even if Checks Fail
+      - name: Merge PR
         uses: actions/github-script@v6
         with:
+          token: ${{ secrets.MERGE_TOKEN }}
           script: |
             const prNumber = context.payload.pull_request.number;
             console.log(`Attempting to merge PR #${prNumber}...`);
