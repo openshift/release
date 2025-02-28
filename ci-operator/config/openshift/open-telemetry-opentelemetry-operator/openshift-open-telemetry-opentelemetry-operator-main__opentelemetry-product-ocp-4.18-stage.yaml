@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.18"
     namespace: ocp
     tag: cli
 build_root:
@@ -18,7 +18,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -28,7 +28,9 @@ tests:
 - always_run: false
   as: opentelemetry-stage-tests
   steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
@@ -39,24 +41,16 @@ tests:
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927216
-      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
-        tests/e2e-instrumentation/instrumentation-nodejs* tests/e2e-instrumentation/instrumentation-nginx*
-        tests/e2e-instrumentation/instrumentation-dotnet* tests/e2e-instrumentation/instrumentation-apache*
-        tests/e2e-instrumentation/instrumentation-go tests/e2e-multi-instrumentation/instrumentation-single-instr-first-container
-        tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer tests/e2e-otel/oidcauthextension
-        tests/e2e-openshift/route tests/e2e/smoke-ip-families tests/e2e-openshift/export-to-cluster-logging-lokistack
-        tests/e2e-targetallocator/targetallocator-prometheuscr tests/e2e-otel/awscloudwatchlogsexporter
-        tests/e2e-otel/awsxrayexporter
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928197
+      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927217
+      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928198
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: distributed-tracing-install-ibm-p
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: opentelemetry-product-ocp-4.16-ibm-p-stage
+  variant: opentelemetry-product-ocp-4.18-stage
