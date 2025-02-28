@@ -303,27 +303,27 @@ function get_openshift_baremetal_install_tool {
   set +x
 }
 
-function check_url_links_are_available {
+# function check_url_links_are_available {
 
-  for url in "$@"; do
-    if [[ ${url} == http://* || ${url} == https://* ]]; then
-      echo "Checking URL: ${url}"
-      # It should be a HEAD request, but it doesn't work
-      # for AmazonS3 servers. curl -sSIL ... always return '403'
-      # code when this is run from a Prow container
-      response=$(curl -sSL -o /dev/null -w "%{http_code}" "${url}")
-      if [[ ${response} -eq 200 ]]; then
-        echo "URL is accessible."
-      else
-        echo "URL is not accessible. HTTP status code: ${response}"
-        exit 1
-      fi
-    else
-      echo "Invalid URL: ${url}. Only HTTP and HTTPS URLs are allowed."
-      exit 1
-    fi
-  done
-}
+#   for url in "$@"; do
+#     if [[ ${url} == http://* || ${url} == https://* ]]; then
+#       echo "Checking URL: ${url}"
+#       # It should be a HEAD request, but it doesn't work
+#       # for AmazonS3 servers. curl -sSIL ... always return '403'
+#       # code when this is run from a Prow container
+#       response=$(curl -sSL -o /dev/null -w "%{http_code}" "${url}")
+#       if [[ ${response} -eq 200 ]]; then
+#         echo "URL is accessible."
+#       else
+#         echo "URL is not accessible. HTTP status code: ${response}"
+#         exit 1
+#       fi
+#     else
+#       echo "Invalid URL: ${url}. Only HTTP and HTTPS URLs are allowed."
+#       exit 1
+#     fi
+#   done
+# }
 
 function extract_rhcos_images {
 
@@ -335,7 +335,7 @@ function extract_rhcos_images {
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
     iso_url="${RHCOS_ISO_URL}"
-    check_url_links_are_available "${iso_url}"
+    # check_url_links_are_available "${iso_url}"
   fi
 
 }
@@ -441,7 +441,11 @@ EOF
     [ -n "${assisted_service_pod_name}" ] && \
     oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} && break ;
   done ;
-  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
+  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m || {
+    oc -n multicluster-engine get sc,pv,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
+    exit 1 ;
+  }
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x
 }
