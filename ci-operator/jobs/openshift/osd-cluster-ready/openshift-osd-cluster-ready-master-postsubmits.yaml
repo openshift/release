@@ -4,12 +4,21 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build09
+    cluster: build01
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-openshift-osd-cluster-ready-master-post-leading-zero-check
+    reporter_config:
+      slack:
+        channel: '#hcm-sre-team-rocket'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "failure"}}:failed: Job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>{{else}}:success:
+          Job *{{.Spec.Job}}* completed successfully! {{end}}'
     spec:
       containers:
       - args:

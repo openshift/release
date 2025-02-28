@@ -15,7 +15,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: weekly-6nodes
+- as: daily-6nodes
   capabilities:
   - intranet
   cron: 0 0 * * 2
@@ -28,7 +28,7 @@ tests:
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: 4.18.0-rc.5
+      OCP_VERSION: candidate-4.18
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
@@ -37,7 +37,34 @@ tests:
     - chain: openshift-qe-cluster-health
     - chain: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-node-density
     - chain: openshift-qe-node-density-heavy
+  timeout: 8h0m0s
+- as: daily-virt-6nodes
+  cluster: build06
+  cron: 0 8 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_VERSION: candidate-4.18
+      PUBLIC_VLAN: "true"
+      VM: "true"
+      VMI_READY_THRESHOLD: "180"
+      VMS_PER_NODE: "200"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-virt-density
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
