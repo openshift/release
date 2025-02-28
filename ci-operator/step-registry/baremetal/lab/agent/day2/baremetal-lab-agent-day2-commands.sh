@@ -140,6 +140,7 @@ case "${BOOT_MODE}" in
   echo -e "\nCreate pxe files for day2 worker nodes..."
   /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
+  sleep 200
   echo -e "\nCopying the PXE files into the bastion host..."
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-vmlinuz* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}_2"
