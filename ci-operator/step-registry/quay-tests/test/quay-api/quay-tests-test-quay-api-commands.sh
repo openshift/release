@@ -21,5 +21,3 @@ mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
 cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_report.xml || true
 cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
 cp cypress/videos/* $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
-
-sleep 8h

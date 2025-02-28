@@ -66,3 +66,5 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     terraform init
     terraform destroy -auto-approve || true
 fi
+
+sleep 8h
