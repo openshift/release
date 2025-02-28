@@ -16,17 +16,12 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git config --global user.name "ocp-perfscale"
     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
     git switch ${PULL_NUMBER}
-    pushd workloads/kube-burner
-    ES_PASSWORD=$(cat "/secret/perfscale-prod/password")
-    ES_USERNAME=$(cat "/secret/perfscale-prod/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
-    export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}
+    pushd workloads/kube-burner-ocp-wrapper
+    export WORKLOAD=whereabouts
+
     current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-    export WORKLOAD=${WORKLOAD:=network-policy}
-    JOB_ITERATIONS=${current_worker_count}
-    echo $JOB_ITERATIONS is JOB_ITERATIONS
-    export JOB_ITERATIONS
-    ./run.sh
+
+    ES_SERVER="" ITERATIONS=${current_worker_count} ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
