@@ -35,7 +35,7 @@ echo $HOST
 echo
 echo "Create self scheduling assignment ..."
 CLOUD_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self)
-echo $CLOUD_OUTPUT
+echo $CLOUD_OUTPUT | jq .
 CLOUD=$(echo $CLOUD_OUTPUT | jq -r .'cloud.name')
 echo $CLOUD
 
@@ -43,12 +43,14 @@ echo $CLOUD
 echo
 echo "Create schedule ..."
 ASSIGNMENT_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"cloud\": \"$CLOUD\", \"hostname\": \"$HOST\"}" $QUADS_INSTANCE/api/v3/schedules)
-echo $ASSIGNMENT_OUTPUT
-echo $ASSIGNMENT_OUTPUT | jq .'assignment_id' > ${SHARED_DIR}/assignment_id
+echo $ASSIGNMENT_OUTPUT | jq .
+ASSIGNMENT_ID=$(echo $ASSIGNMENT_OUTPUT jq -r .'assignment_id')
+echo $ASSIGNMENT_ID
+echo $ASSIGNMENT_ID > ${SHARED_DIR}/assignment_id
 
 # Wait for validation to be completed
 set -x
-while [[ $(curl -sSk $QUADS_INSTANCE/api/v3/assignments/63 | jq -r .validated) != "true" ]]; do
+while [[ $(curl -sSk $QUADS_INSTANCE/api/v3/assignments/$ASSIGNMENT_ID | jq -r .validated) != "true" ]]; do
   echo "Waiting for validation ..."
   sleep 60s
 done
