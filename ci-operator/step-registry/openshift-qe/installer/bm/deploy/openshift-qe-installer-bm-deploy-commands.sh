@@ -24,7 +24,6 @@ worker_node_count: $NUM_WORKER_NODES
 sno_node_count: $NUM_SNO_NODES
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
-networktype: OVNKubernetes
 public_vlan: $PUBLIC_VLAN
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
