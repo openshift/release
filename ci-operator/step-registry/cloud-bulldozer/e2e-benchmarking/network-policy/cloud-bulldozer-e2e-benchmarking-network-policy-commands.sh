@@ -26,7 +26,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     JOB_ITERATIONS=${current_worker_count}
     echo $JOB_ITERATIONS is JOB_ITERATIONS
     export JOB_ITERATIONS
-    PPROF=false  ./run.sh
+    PPROF=false ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
