@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: quayio-pull-through-cache-us-east-1
+  name: qci-pull-through-cache-us-east-1
 data:
   config.yml: |-
     version: 0.1
@@ -33,11 +33,11 @@ data:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: quayio-pull-through-cache-us-east-1
+  name: qci-pull-through-cache-us-east-1
 spec:
   to:
     kind: Service
-    name: quayio-pull-through-cache-us-east-1
+    name: qci-pull-through-cache-us-east-1
   tls:
     termination: Edge
     insecureEdgeTerminationPolicy: Redirect
@@ -45,10 +45,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: quayio-pull-through-cache-us-east-1
+  name: qci-pull-through-cache-us-east-1
 spec:
   selector:
-    app: quayio-pull-through-cache-us-east-1
+    app: qci-pull-through-cache-us-east-1
   ports:
   - port: 5000
     targetPort: 5000
@@ -57,34 +57,34 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quayio-pull-through-cache-us-east-1
+  name: qci-pull-through-cache-us-east-1
   labels:
-    app: quayio-pull-through-cache-us-east-1
+    app: qci-pull-through-cache-us-east-1
 spec:
   selector:
     matchLabels:
-      app: quayio-pull-through-cache-us-east-1
+      app: qci-pull-through-cache-us-east-1
   template:
     metadata:
       labels:
-        app: quayio-pull-through-cache-us-east-1
+        app: qci-pull-through-cache-us-east-1
     spec:
       tolerations:
-      - key: "node-role.kubernetes.io/quayio-cache-worker"
+      - key: "node-role.kubernetes.io/qci-cache-worker"
         operator: "Equal"
-        value: "quayio-cache-worker"
+        value: "qci-cache-worker"
         effect: "NoSchedule"
       nodeSelector:
-        cache-workload: quayio-cache
+        cache-workload: qci-cache
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
-                app: quayio-pull-through-cache-us-east-1
+                app: qci-pull-through-cache-us-east-1
             topologyKey: "kubernetes.io/hostname"
       containers:
-      - name: quayio-cache
+      - name: qci-cache
         image: registry.ci.openshift.org/ci/docker-registry:tp-2.8.1
         command:
         - /tp-entrypoint.sh
@@ -122,7 +122,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: quayio-pull-through-cache-us-east-1
+          name: qci-pull-through-cache-us-east-1
       - name: quay-io-pull-credentials
         secret:
           secretName: quay-io-pull-credentials
