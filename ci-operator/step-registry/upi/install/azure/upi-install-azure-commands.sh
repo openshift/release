@@ -2,11 +2,15 @@
 set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"; cp -t "${SHARED_DIR}" "${ARTIFACT_DIR}/installer/metadata.json" "${ARTIFACT_DIR}/installer/auth/kubeconfig"' EXIT TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'prepare_next_steps' EXIT TERM INT
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
 export PATH=/tmp:${PATH}
+
+INSTALL_DIR=/tmp/installer
+mkdir ${INSTALL_DIR}
 
 function backoff() {
     local attempt=0
@@ -26,11 +30,59 @@ function backoff() {
     return $failed
 }
 
+function populate_artifact_dir()
+{
+  set +e
+  current_time=$(date +%s)
+
+  echo "Copying log bundle..."
+  cp "${INSTALL_DIR}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+
+  echo "Removing REDACTED info from log..."
+  sed '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${INSTALL_DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
+
+  # terraform may not exist now
+  if [ -f "${INSTALL_DIR}/terraform.txt" ]; then
+    sed -i '
+      s/password: .*/password: REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' "${INSTALL_DIR}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-${current_time}.tar.gz" --remove-files "${INSTALL_DIR}/terraform.txt"
+  fi
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${INSTALL_DIR}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${INSTALL_DIR}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
+  fi
+  set -e
+}
+
+function prepare_next_steps() {
+  set +e
+  populate_artifact_dir
+
+  echo "Copying required artifacts to shared dir"
+  cp \
+      -t "${SHARED_DIR}" \
+      "${INSTALL_DIR}/auth/kubeconfig" \
+      "${INSTALL_DIR}/auth/kubeadmin-password" \
+      "${INSTALL_DIR}/metadata.json"
+  set -e
+}
+
+
 GATHER_BOOTSTRAP_ARGS=
 
 function gather_bootstrap_and_fail() {
   if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    openshift-install --dir=${ARTIFACT_DIR}/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+    openshift-install --dir=${INSTALL_DIR} gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
   fi
 
   return 1
@@ -51,11 +103,10 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 export TEST_PROVIDER='azure'
 
 cp "$(command -v openshift-install)" /tmp
-mkdir ${ARTIFACT_DIR}/installer
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
-cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
+cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
@@ -68,12 +119,12 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-pushd ${ARTIFACT_DIR}/installer
+pushd ${INSTALL_DIR}
 
-CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
-BASE_DOMAIN=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'baseDomain')
-AZURE_REGION=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.azure.region')
-BASE_DOMAIN_RESOURCE_GROUP=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.azure.baseDomainResourceGroupName')
+CLUSTER_NAME=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'metadata.name')
+BASE_DOMAIN=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'baseDomain')
+AZURE_REGION=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'platform.azure.region')
+BASE_DOMAIN_RESOURCE_GROUP=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'platform.azure.baseDomainResourceGroupName')
 
 
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
@@ -91,9 +142,13 @@ if [ -f "${provisioned_vnet_file}" ]; then
     [ -z "${vnet_basename}" ] && echo "Did not get vnet basename" && exit 1
 fi
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo "Creating manifests"
-openshift-install --dir=${ARTIFACT_DIR}/installer create manifests
+openshift-install --dir=${INSTALL_DIR} create manifests
 
 echo "Editing manifests"
 sed -i '/^  channel:/d' manifests/cvo-overrides.yaml
@@ -114,10 +169,10 @@ popd
 
 echo "Creating ignition configs"
 
-openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs &
+openshift-install --dir=${INSTALL_DIR} create ignition-configs &
 wait "$!"
 
-cp ${ARTIFACT_DIR}/installer/bootstrap.ign ${SHARED_DIR}
+cp ${INSTALL_DIR}/bootstrap.ign ${SHARED_DIR}
 BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
 export BOOTSTRAP_URI
 # begin bootstrapping
@@ -143,7 +198,7 @@ echo ${AZURE_AUTH_CLIENT_ID} >> ${SHARED_DIR}/AZURE_AUTH_CLIENT_ID
 echo ${AZURE_AUTH_CLIENT_SECRET} >> ${SHARED_DIR}/AZURE_AUTH_CLIENT_SECRET
 echo ${AZURE_AUTH_TENANT_ID} >> ${SHARED_DIR}/AZURE_AUTH_TENANT_ID
 
-INFRA_ID="$(jq -r .infraID ${ARTIFACT_DIR}/installer/metadata.json)"
+INFRA_ID="$(jq -r .infraID ${INSTALL_DIR}/metadata.json)"
 RESOURCE_GROUP="${INFRA_ID}-rg"
 echo "Infra ID: ${INFRA_ID}"
 
@@ -203,7 +258,7 @@ fi
 
 echo "Uploading bootstrap.ign"
 az storage container create --name files --account-name $ACCOUNT_NAME
-az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "${ARTIFACT_DIR}/installer/bootstrap.ign" -n "bootstrap.ign"
+az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "${INSTALL_DIR}/bootstrap.ign" -n "bootstrap.ign"
 
 echo "Creating private DNS zone"
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
@@ -268,7 +323,7 @@ echo "Deploying 04_bootstrap"
 BOOTSTRAP_URL_EXPIRY=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
 BOOTSTRAP_URL=$(az storage blob generate-sas -c 'files' -n 'bootstrap.ign' --https-only --full-uri --permissions r --expiry ${BOOTSTRAP_URL_EXPIRY} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} -o tsv)
 #BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
-IGNITION_VERSION=$(jq -r .ignition.version ${ARTIFACT_DIR}/installer/bootstrap.ign)
+IGNITION_VERSION=$(jq -r .ignition.version ${INSTALL_DIR}/bootstrap.ign)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "${IGNITION_VERSION}" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
 # shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
@@ -281,7 +336,7 @@ BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?na
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
 
 echo "Deploying 05_masters"
-MASTER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/master.ign | base64 -w0)
+MASTER_IGNITION=$(cat ${INSTALL_DIR}/master.ign | base64 -w0)
 # shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
   --template-file "05_masters.json" $([ -n "${CONTROL_PLANE_NODE_TYPE}" ] && echo "--parameters masterVMSize=${CONTROL_PLANE_NODE_TYPE}") \
@@ -299,7 +354,7 @@ MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
 echo "Deploying 06_workers"
-WORKER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/worker.ign | base64 -w0)
+WORKER_IGNITION=$(cat ${INSTALL_DIR}/worker.ign | base64 -w0)
 export WORKER_IGNITION
 # shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
@@ -310,7 +365,7 @@ az deployment group create -g $RESOURCE_GROUP \
 
 popd
 echo "Waiting for bootstrap to complete"
-openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
+openshift-install --dir=${INSTALL_DIR} wait-for bootstrap-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!" || gather_bootstrap_and_fail
 
 echo "Bootstrap complete, destroying bootstrap resources"
@@ -326,7 +381,7 @@ az network nic delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-nic
 az storage blob delete --account-key $ACCOUNT_KEY --account-name $ACCOUNT_NAME --container-name files --name bootstrap.ign
 az network public-ip delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-ssh-pip
 
-export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
+export KUBECONFIG=${INSTALL_DIR}/auth/kubeconfig
 
 echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
 function approve_csrs() {
@@ -360,10 +415,8 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 
 set +x
 echo "Completing UPI setup"
-openshift-install --dir=${ARTIFACT_DIR}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
+openshift-install --dir=${INSTALL_DIR} wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
-# Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
 touch /tmp/install-complete
