@@ -16,7 +16,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git config --global user.name "ocp-perfscale"
     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
     git switch ${PULL_NUMBER}
-    pushd workloads/kube-burner
+    pushd workloads/kube-burner-ocp-wrapper
     ES_PASSWORD=$(cat "/secret/perfscale-prod/password")
     ES_USERNAME=$(cat "/secret/perfscale-prod/username")
     export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
@@ -26,7 +26,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     JOB_ITERATIONS=${current_worker_count}
     echo $JOB_ITERATIONS is JOB_ITERATIONS
     export JOB_ITERATIONS
-    ./run.sh
+    PPROF=false ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
