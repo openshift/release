@@ -4,6 +4,8 @@ set -e
 set -u
 set -o pipefail
 
+sleep 3600
+
 prow_api_token=$(cat "/var/run/vault/release-tests-token/prow_api_token")
 export APITOKEN=$prow_api_token
 
