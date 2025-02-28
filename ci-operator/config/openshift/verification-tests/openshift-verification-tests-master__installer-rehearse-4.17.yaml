@@ -40,22 +40,15 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe-c3-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    cluster_profile: aws-qe
     env:
-      COMPUTE_DISK_TYPE: hyperdisk-balanced
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: c3-highcpu-192-metal
-      CONFIDENTIAL_COMPUTE: Disabled
-      CONTROL_PLANE_NODE_TYPE: n2-standard-4
-      ON_HOST_MAINTENANCE: Terminate
-      SLEEP_DURATION: 30m
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 120m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
+    - chain: cucushift-installer-rehearse-aws-ipi-provision
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:

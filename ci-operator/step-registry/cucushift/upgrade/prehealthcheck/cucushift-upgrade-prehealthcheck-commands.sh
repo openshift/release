@@ -174,7 +174,7 @@ function check_mcp() {
 function wait_mcp_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
     num=$(oc get node --no-headers | wc -l)
-    max_retries=$(expr $num \* 5 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
     local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
@@ -205,7 +205,6 @@ function wait_mcp_continous_success() {
         echo >&2 "Some mcp does not get ready or not stable"
         echo "Debug: current mcp output is:"
         oc get machineconfigpools
-	sleep 7200
         return 1
     else
         echo "All mcp status check PASSED"
