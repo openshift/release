@@ -37,6 +37,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      RT_ENABLED: "true"
+      SLEEP_DURATION: 5m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-provision
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
