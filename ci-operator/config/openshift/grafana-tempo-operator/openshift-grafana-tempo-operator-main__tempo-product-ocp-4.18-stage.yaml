@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.18"
     namespace: ocp
     tag: cli
 build_root:
@@ -18,7 +18,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -27,17 +27,10 @@ resources:
 tests:
 - always_run: false
   as: tempo-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
   steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -46,17 +39,17 @@ tests:
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927219
-      SKIP_TESTS: tests/e2e-openshift-object-stores/*
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928197
+      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927217
+      SKIP_TESTS: tests/e2e-openshift-ossm/*
+      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928198
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: tempo-product-ocp-4.15-stage
+  variant: tempo-product-ocp-4.18-stage
