@@ -340,6 +340,38 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-73352
+function check_upgrade_recommend_when_upgrade_inprogress() {
+    if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] || [[ "${TARGET_MINOR_VERSION}" -eq "19" ]] ; then
+        # So far, this is a TP feature in OCP 4.18 and OCP 4.19, so need to enable the gate 
+        export OC_ENABLE_CMD_UPGRADE_RECOMMEND=true
+    fi
+    
+    local out 
+    local info="info: An update is in progress.  You may wish to let this update complete before requesting a new update."
+    local no_update="No updates available. You may still upgrade to a specific release image with --to-image or wait for new updates to be available."
+    local error="error: no updates available, so cannot display context for the requested release 4.999.999"
+
+    echo "OCP-73352: Checking \"oc adm upgrade recommend\" command"
+    out="$(oc adm upgrade recommend)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${no_update}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend\" should output \"${info}\" and \"${no_update}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    out="$(oc adm upgrade recommend --show-outdated-releases)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${no_update}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend --show-outdated-releases\" should output \"${info}\" and \"${no_update}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    out="$(oc adm upgrade recommend --version 4.999.999 2>&1)"
+    if [[ "${out}" != *"${info}"* ]] || [[ "${out}" != *"${error}"* ]]; then
+        echo "OCP-73352: Command \"oc adm upgrade recommend --version 4.999.999\" should output \"${info}\" and \"${error}\", but actualy not: \"${out}\""
+        return 1
+    fi
+    echo "OCP-73352: \"oc adm upgrade recommend\" command works normal"
+    return 0
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
@@ -377,6 +409,14 @@ function check_upgrade_status() {
             end_time=$(date "+%s")
             echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
+        fi
+        if [ "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" ] &&  check_ota_case_enabled "OCP-73352"; then
+            # "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" is used to make sure run check_upgrade_recommend_when_upgrade_inprogress once
+            # and "TIMEOUT - 10" is used to make sure upgrade is started
+            if ! check_upgrade_recommend_when_upgrade_inprogress; then
+                echo "OCP-73352: failed"
+                return 1
+            fi
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
             UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"

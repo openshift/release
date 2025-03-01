@@ -66,9 +66,9 @@ podman pull quay.io/quads/badfish:latest
 USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].pm_addr")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -76,27 +76,34 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
   echo "Resetting IDRACs ..."
   for i in $HOSTS; do
     echo "Resetting IDRAC of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --racreset
+    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --racreset
   done
   for i in $HOSTS; do
-    if ! podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --power-state; then
+    if ! podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
       echo "$i iDRAC is still rebooting"
       continue
     fi
+  done
+fi
+if [[ "$PRE_PXE_LOADER" == "true" ]]; then
+  echo "Modifying PXE loaders ..."
+  for i in $HOSTS; do
+    echo "Modifying PXE loader of server $i ..."
+    hammer -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
   echo "Clearing job queue ..."
   for i in $HOSTS; do
     echo "Clear job queue of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD --clear-jobs --force
+    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --clear-jobs --force
   done
 fi
 if [[ "$PRE_BOOT_ORDER" == "true" ]]; then
   echo "Cheking boot order ..."
   for i in $HOSTS; do
     # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
-    command_output=$(podman run quay.io/quads/badfish:latest -H $i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+    command_output=$(podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
     desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
     echo "Cheking boot order of server $i ..."
     echo $command_output
@@ -114,8 +121,8 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   echo "Cheking UEFI setup ..."
   for i in $HOSTS; do
     echo "Cheking UEFI setup of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H $i -u $USER -p $PWD -H $i --set-bios-attribute --attribute BootMode --value Uefi
-    if [[ $(podman run quay.io/quads/badfish -H $i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
+    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --set-bios-attribute --attribute BootMode --value Uefi
+    if [[ $(podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
       echo "$i not in Uefi mode"
       sleep 10s
       continue
@@ -128,7 +135,7 @@ if [[ $LAB == "performancelab" ]]; then
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
@@ -167,7 +174,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/prereqs-updated.sh
+   source /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE

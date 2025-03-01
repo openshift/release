@@ -41,11 +41,31 @@ function create_disconnected_network() {
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
         if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
-            run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+	    if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+	        run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+	    else
+                run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+           fi
         fi
     done
     return 0
 }
+
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP Version: $ocp_version"
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -98,17 +118,6 @@ run_command "az group show --name $RESOURCE_GROUP"; ret=$?
 if [ X"$ret" != X"0" ]; then
     echo "The $RESOURCE_GROUP resrouce group does not exit"
     exit 1
-fi
-
-# Assigne proper permissions to resource group where vnet will be created
-if [[ -n "${AZURE_PERMISSION_FOR_VNET_RG}" ]]; then
-    cluster_sp_id=${AZURE_AUTH_CLIENT_ID}
-    if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
-        cluster_sp_id=$(< "${SHARED_DIR}/azure_sp_id")
-    fi
-    resource_group_id=$(az group show -g "${RESOURCE_GROUP}" --query id -otsv)
-    echo "Assigin role '${AZURE_PERMISSION_FOR_VNET_RG}' to resource group ${RESOURCE_GROUP}"
-    run_command "az role assignment create --assignee ${cluster_sp_id} --role '${AZURE_PERMISSION_FOR_VNET_RG}' --scope ${resource_group_id} -o jsonc"
 fi
 
 VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"

@@ -63,6 +63,8 @@ spec:
                       function envoy_on_request(request_handle) \n\
                           request_handle:headers():add("x-endpoint-api-consumer-type", "PROJECT") \n\
                           request_handle:headers():add("x-endpoint-api-consumer-number", "1") \n\
+                          local headers = request_handle:headers() \n\
+                          local user = request_handle:headers():get("x-forwarded-user") \n\
                           local path = request_handle:headers():get(":path") \n\
                           request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "path", path) \n\
                           local job_name = string.match(path, "/v1/executions/([^/]+)$") \n\
@@ -71,7 +73,8 @@ spec:
                           local bodyTable = json.decode(jsonString) \n\
                           local podSpecOptions = bodyTable.pod_spec_options or {} \n\
                           podSpecOptions.annotations = podSpecOptions.annotations or {} \n\
-                          podSpecOptions.annotations.executor = "gangway" \n\
+                          podSpecOptions.annotations["ci.openshift.io/executor"] = "gangway" \n\
+                          podSpecOptions.annotations["ci.openshift.io/user"] = user \n\
                           bodyTable.pod_spec_options = podSpecOptions \n\
                           if job_name then \n\
                             request_handle:headers():replace(":path", "/v1/executions") \n\

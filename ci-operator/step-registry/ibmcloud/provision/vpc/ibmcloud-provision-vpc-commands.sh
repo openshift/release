@@ -101,12 +101,12 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" rg="$3" num_subnets_pair_per_zone="${4:-1}"
+    local preName="$1" vpcName="$2" rgID="$3" num_subnets_pair_per_zone="${4:-1}"
     local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
-    echo "Creating vpc $vpcName under $rg ..."
+    echo "Creating vpc $vpcName under $rgID ..."
     # create vpc
-    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName}  --resource-group-id "${rgID}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
@@ -219,11 +219,20 @@ rg_id=$("${IBMCLOUD_CLI}" resource group $resource_group --id)
 ## Create the VPC
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
-declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+
+readarray -t ZONES  < <(${IBMCLOUD_CLI} is zones -q | grep ${region} | awk '{print $1}')
+max_zones="${#ZONES[@]}"
+if [ ${ZONES_COUNT} -gt ${max_zones} ]; then
+  echo "based on the availability zones: ${ZONES[*]} adjust the ZONES_COUNT!"
+  ZONES_COUNT=${max_zones}
+fi
+
+ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+echo "Adjusted zones to ${ZONES[*]} based on ZONES_COUNT: ${ZONES_COUNT}."
 
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
-create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
+create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${rg_id}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}"

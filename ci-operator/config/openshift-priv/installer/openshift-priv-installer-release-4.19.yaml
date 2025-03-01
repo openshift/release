@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -30,7 +30,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.59.0
+    tag: v1.63.4
   nested-environment-builder:
     name: nested-environment-builder
     namespace: ci
@@ -91,14 +91,14 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: installer-terraform-providers
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -130,9 +130,6 @@ images:
     ocp_4.19_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.19:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
@@ -148,9 +145,9 @@ images:
     ocp_4.17_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.17:hyperkube
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   inputs:
@@ -169,9 +166,9 @@ images:
     ocp_4.17_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
@@ -190,9 +187,9 @@ images:
     ocp_4.17_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
@@ -214,9 +211,6 @@ images:
     ocp_4.19_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.19:hyperkube
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
@@ -560,9 +554,9 @@ tests:
     post:
     - chain: ipi-azure-post
     pre:
-    - ref: azure-provision-service-principal-minimal-permission
     - ref: ipi-conf
     - ref: ipi-conf-azure-default
+    - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
   timeout: 6h0m0s
 - as: e2e-azure-ovn
@@ -570,7 +564,6 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -642,6 +635,7 @@ tests:
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
 - as: e2e-azure-ovn-upi
+  optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: azure4
@@ -826,6 +820,12 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
+- as: e2e-vsphere-externallb-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-externallb
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview
   optional: true
   run_if_changed: vsphere
@@ -863,6 +863,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-disk
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
@@ -1149,7 +1160,6 @@ tests:
     cluster_profile: azure4
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      ENABLE_MIN_PERMISSION_FOR_MARKETPLACE: "true"
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
       OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
@@ -1159,10 +1169,10 @@ tests:
     - chain: ipi-deprovision
     - ref: azure-deprovision-sp-and-custom-role
     pre:
-    - ref: azure-provision-service-principal-minimal-permission
     - chain: ipi-conf-azure
     - ref: ipi-conf-azure-osimage
     - ref: ovn-conf
+    - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
     - ref: ipi-azure-rbac
   timeout: 6h0m0s

@@ -4,12 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
-
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
 
 JSONER_PY="/tmp/jsoner.py"
 GET_ACTIONS_PY="/tmp/get_actions.py"
+CONFIG=${SHARED_DIR}/install-config.yaml
 
 function create_jsoner_py()
 {
@@ -272,29 +277,59 @@ EOF
 
 		# additional permisions for 4.11+
 		if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
+			# base
 			echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
 			echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.14+
 		if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
+			# base
 			echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
-
-			# sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
-			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.15+
 		if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
+			# base
 			echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.16+
 		if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
-			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+			# base
 			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
 			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
 		fi
+
+		# Shared-VPC (4.14+)
+		# https://issues.redhat.com/browse/OCPBUGS-17751
+		# platform.aws.hostedZoneRole
+		if grep -q "hostedZoneRole" "${CONFIG}"; then
+			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
+		fi
+
+		# byo public ipv4 pool (4.16+)
+		# platform.aws.publicIpv4Pool
+		if grep -q "publicIpv4Pool" "${CONFIG}"; then
+			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+		fi
+
+		# byo IAM Profile (4.17+)
+		# https://issues.redhat.com/browse/OCPBUGS-44848
+		# platform.aws.defaultMachinePlatform.iamProfile
+		# compute[0].platform.aws.iamProfile
+		# controlPlane.platform.aws.iamProfile
+		if grep -q "iamProfile" "${CONFIG}"; then
+			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+			echo "iam:UntagInstanceProfile" >>"${PERMISION_LIST}"
+		fi
+
+		# Shared network
+		# platform.aws.subnets
+		if grep -q "subnets" "${CONFIG}"; then
+			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+		fi
+
 	else
 		dir=/tmp/min_perms/
 
@@ -320,7 +355,7 @@ EOF
 	create_jsoner_py
 	
 	# generate policy file and save it to shared dir so later steps have access to it.
-	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+	cat "${PERMISION_LIST}" | sort | uniq | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 
 	# Save policy as a step artifact
 	cp ${USER_POLICY_FILE} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}
@@ -388,7 +423,7 @@ EOF
 
 	create_jsoner_py
 	# generate policy file
-	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+	cat "${PERMISION_LIST}" | sort | uniq | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 	echo "Created policy profile ${USER_POLICY_FILE}"
 else
 	echo "Custom AWS user with minimal permissions is disabled for ccoctl tool. Using AWS user from cluster profile."

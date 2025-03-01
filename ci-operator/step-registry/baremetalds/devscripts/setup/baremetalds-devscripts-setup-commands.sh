@@ -177,12 +177,13 @@ if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   done
 fi
 
-# Copy additional dev-script configuration provided by the the job, if present
-if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
-then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
-fi
+# We always want to collect an installer log bundle for bootstrap,
+# even on success
+cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
+export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+EOF
 
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
 
 

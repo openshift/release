@@ -117,6 +117,12 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   fi
 fi
 
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+  fi
+fi
+
 echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 openshift-install --dir /tmp/installer destroy cluster &

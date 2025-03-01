@@ -128,7 +128,7 @@ EOF
 
 create_catalog_sources() {
 	local node_name
-	echo "creating catalogsource: $CATALOG_SOURCE"
+	echo "creating catalogsource: $CATALOG_SOURCE using index image: $COO_INDEX_IMAGE"
 
 	cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1

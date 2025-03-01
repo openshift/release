@@ -391,32 +391,6 @@ function check_resources() {
   fi
 }
 
-function delete_network() {
-  NETWORK_NAME=$1
-  echo "delete_network(${NETWORK_NAME})"
-
-  (
-    while read UUID
-    do
-      echo ibmcloud pi subnet delete ${UUID}
-      ibmcloud pi subnet delete ${UUID}
-    done
-  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
-
-  for (( TRIES=0; TRIES<20; TRIES++ ))
-  do
-    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
-    echo "LINES=${LINES}"
-    if (( LINES == 0 ))
-    then
-      return 0
-    fi
-    sleep 15s
-  done
-
-  return 1
-}
-
 function destroy_resources() {
   #
   # Create a fake cluster metadata file
@@ -427,7 +401,7 @@ function destroy_resources() {
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
-  if [ -n "${PERSISTENT_TG}" ]; then
+  if [ -n "${PERSISTENT_TG:-}" ]; then
     jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
   fi
 
@@ -484,7 +458,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_TG}" ]
+  if [ -n "${PERSISTENT_TG:-}" ]
   then
     GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
   else
@@ -547,7 +521,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_VPC}" ]
+  if [ -n "${PERSISTENT_VPC:-}" ]
   then
     VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_VPC}'")) | .id')
   else
@@ -761,12 +735,26 @@ POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep TGNAME)" ]; then
+  PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep VPCNAME)" ]; then
+  PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+ARCH=$(yq-v4 eval '.ARCH' "${SHARED_DIR}/powervs-conf.yaml")
+BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervs-conf.yaml")
+LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervs-conf.yaml")
 
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+echo "VPCREGION=${VPCREGION}"
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "PERSISTENT_TG=${PERSISTENT_TG}"
-echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
+echo "PERSISTENT_TG=${PERSISTENT_TG:-}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC:-}"
+
+# NOTE: If you want to test against a certain release, then do something like:
+# if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -779,6 +767,15 @@ export CLUSTER_NAME
 
 echo "tgName in ${SHARED_DIR}/install-config.yaml"
 grep tgName "${SHARED_DIR}/install-config.yaml" || true
+
+# Remove this if test when https://issues.redhat.com/browse/OCPBUGS-50576 has been closed.
+if echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($2 == 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
+then
+    echo "***************************************************************************************************"
+    echo "4.19 hack OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE in use!"
+    echo "***************************************************************************************************"
+    export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-418-94-202410090804-0-ppc64le-powervs.ova.gz"
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"

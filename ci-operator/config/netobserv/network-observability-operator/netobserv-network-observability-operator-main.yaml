@@ -85,7 +85,8 @@ tests:
           cpu: 100m
     - as: noo-e2e-flowcollector
       cli: latest
-      commands: |
+      commands: |2
+
         export PATH=$PATH:$HOME
 
         if ! which kubectl; then
@@ -94,22 +95,45 @@ tests:
 
         export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
         make set-release-kind-downstream
-        PORT_FWD=false NAMESPACE=netobserv make deploy-loki
+        export NAMESPACE=netobserv
+        PORT_FWD=false make deploy-loki
         oc apply -f /go/src/github.com/netobserv/network-observability-operator/config/samples/flows_v1beta2_flowcollector.yaml
 
-        echo "====> Waiting for netobserv-privileged pod to be ready"
-        while : ; do oc get ds netobserv-ebpf-agent -n netobserv-privileged && break; sleep 1; done
+        sleep 30
+        echo "====> Waiting for flowlogs-pipeline daemonset to be created"
+        while :; do
+          oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
+          sleep 1
+        done
 
-        oc wait pods --timeout=120s --for=condition=ready -l app=netobserv-ebpf-agent -n netobserv-privileged
+        echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
+        while :; do
+          oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
+          sleep 1
+        done
 
-        echo "====> Waiting for flowlogs-pipeline pod to be ready"
-        oc wait pods --timeout=120s --for=condition=ready -l app=flowlogs-pipeline -n netobserv
+        echo "====> Waiting for console-plugin deployment to be created"
+        while :; do
+          oc get deployment netobserv-plugin -n ${NAMESPACE} && break
+          sleep 1
+        done
 
-        echo "====> Waiting for console-plugin pod to be ready"
-        oc wait -n netobserv --timeout=60s --for condition=Available=True deployment netobserv-plugin
-
-        echo "====> Waiting for flowcollector pod to be ready"
-        oc wait flowcollector/cluster --timeout=120s --for=condition=ready
+        echo "====> Waiting for flowcollector to be ready"
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].type}' -n netobserv)
+          if [[ $status == "Ready" ]]; then
+            rc=0
+            break
+          fi
+          sleep 30
+          timeout=$((timeout+30))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "flowcollector did not become Ready after 180 secs!!!"
+          return 1
+        fi
 
         echo "====> Deleting flowcollector"
         oc delete flowcollector/cluster

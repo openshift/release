@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 # Used for downstream testing.
 # Set the Go path and Go cache environment variables
 export GOPATH=/tmp/go
@@ -16,7 +22,7 @@ mkdir -p /tmp/go/bin $GOCACHE \
 
 git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout rhosdt-3-3-interop
+git checkout rhosdt-3-4-downstream
 make build
 
 #Enable user workload monitoring.
@@ -57,7 +63,9 @@ chainsaw test \
 --test-dir \
 tests/e2e \
 tests/e2e-openshift \
-tests/e2e-openshift-serverless || any_errors=true
+tests/e2e-openshift-serverless \
+tests/e2e-long-running \
+tests/operator-metrics || any_errors=true
 
 # Get the platform type
 dt_platform_type=$(oc get infrastructures cluster -o=jsonpath='{.status.platformStatus.type}')

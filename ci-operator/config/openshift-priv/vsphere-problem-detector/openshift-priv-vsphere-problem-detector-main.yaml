@@ -1,4 +1,8 @@
 base_images:
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -63,6 +67,14 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-host-groups
 - as: unit
   commands: make test-unit
   container:

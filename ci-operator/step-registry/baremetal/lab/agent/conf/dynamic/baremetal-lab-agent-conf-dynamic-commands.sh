@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 QUERY=".[0].ip"
-if [ "${ipv6_enabled:-}" == "true" ]; then
+if [ "${ipv6_enabled:-}" == "true" ] && [ "${ipv4_enabled:-}" == "false" ]; then
  QUERY=".[0].ipv6"
 fi
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 "${QUERY}" "${SHARED_DIR}/hosts.yaml")"
