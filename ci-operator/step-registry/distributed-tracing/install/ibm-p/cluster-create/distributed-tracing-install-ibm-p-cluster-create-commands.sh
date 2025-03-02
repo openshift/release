@@ -11,7 +11,7 @@ curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stabl
 chmod +x kubectl
 
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
-PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
+PRIVATE_KEY_FILE="${SECRET_DIR}/IPI_SSH_KEY"
 
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
