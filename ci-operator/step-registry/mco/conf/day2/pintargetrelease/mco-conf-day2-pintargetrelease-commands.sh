@@ -163,7 +163,7 @@ metadata:
   name: 99-${MACHINE_CONFIG_POOL}-pinned-release
 spec:
   pinnedImages:
-$(oc adm release info "${TARGET}" -a "${CLUSTER_PROFILE_DIR}"/pull-secret -o pullspec | awk '{print "   - name: " $1}')
+$(oc adm release info "${TARGET}" -a "${CLUSTER_PROFILE_DIR}"/pull-secret -o pullspec | awk '{print "   - name: " $1}'| sort | uniq)
 EOF
 
     # Add the release image itself as well
