@@ -29,7 +29,6 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
 export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
-export ITERATIONS=$ITERATION_MULTIPLIER_ENV
 export GC=false
 echo ${SHARED_DIR}
 
@@ -37,7 +36,7 @@ echo ${SHARED_DIR}
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
