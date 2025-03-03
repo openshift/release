@@ -18,7 +18,11 @@ KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
-SSH_CMD="manage-cluster.sh acquire -v ${OCP_CLUSTER_VERSION} --fips"
+if [[ $FIPS_ENABLED == true ]]; then
+    SSH_CMD="manage-cluster.sh acquire -v ${OCP_CLUSTER_VERSION} --fips"
+else
+    SSH_CMD="manage-cluster.sh acquire -v ${OCP_CLUSTER_VERSION}"
+fi
 
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
