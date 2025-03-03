@@ -5,7 +5,7 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # Development Assumptions:
-# - jq, yq, openshift-install are installed
+# - jq, yq-v4, openshift-install are installed
 
 ##### Constants
 IBMCLOUD_HOME=/tmp/ibmcloud
@@ -61,13 +61,13 @@ function download_automation_code() {
 
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
-    mkdir -p ${IBMCLOUD_HOME_FOLDER}
+    mkdir -p "${IBMCLOUD_HOME_FOLDER}/ocp-install-dir"
     echo "Attempting to install terraform using gzip"
     curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME}"/ocp-install-dir/terraform
     echo "Terraform installed. expect to see version"
-    terraform version -no-color
+    "${IBMCLOUD_HOME}/ocp-install-dir/terraform" version -no-color
 }
 
 # Cleans up the failed prior jobs
@@ -78,7 +78,7 @@ function cleanup_prior() {
     do
         VPC_CONN="${WORKSPACE_NAME}-vpc"
         VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
-        if [ ! -z "${VPC_CONN_ID}" ]
+        if [ -n "${VPC_CONN_ID}" ]
         then
             echo "deleting VPC connection"
             ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
@@ -113,8 +113,9 @@ function cleanup_prior() {
             sleep 60
         done
 
+        # Dev Note: avoid deleting the stream9 image
         echo "Deleting the Images"
-        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
+        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | .name? | select(. = "CentOS-Stream-9").imageID')
         do
             echo "Deleting Images ${IMAGE_ID}"
             ibmcloud pi image delete "${IMAGE_ID}"
@@ -150,7 +151,7 @@ function configure_automation() {
 
     export INSTALL_CONFIG_FILE=${SHARED_DIR}/install-config.yaml
     # Resource Group:
-    RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
+    RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
 
     # create workspace for powervs from cli
@@ -162,9 +163,11 @@ function configure_automation() {
 
     # Use existing pvs workspace.
     # Process the CRN into a variable
-    CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
-      export CRN
-      echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
+    CRN=$(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-x-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
+    export CRN
+    echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
+    POWERVS_SERVICE_INSTANCE_ID="${CRN}"
+    export POWERVS_SERVICE_INSTANCE_ID
     # This CRN is useful when manually destroying.
     echo "PowerVS Service CRN: ${CRN}"
 
@@ -180,13 +183,20 @@ function configure_automation() {
     
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+    RHEL_IMAGE_NAME="CentOS-Stream-9"
+    export RHEL_IMAGE_NAME
+
+    echo "Target the PowerVS Workspace"
+    ibmcloud pi workspace target "${CRN}"
+
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
     cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud/ocp4-upi-compute-powervs "${ADDITIONAL_WORKERS}" "p-px"
     cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
     #Create the VPC to fixed transit gateway Connection for the TG
+    RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
     for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
     do
         for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
@@ -206,26 +216,27 @@ function setup_powervs_image() {
     echo "PowerVS Target CRN is: ${CRN}"
     ibmcloud pi workspace target "${CRN}"
 
-    COUNT=$(ibmcloud pi image ls --json | jq -r '.images[] | [.name? | select(. = "CentOS-Stream-9")] | length')
-    if [ ${COUNT} -ne 1 ]
+    COUNT=$(ibmcloud pi image ls --json | jq -r '[.images[] | select(.name? == "CentOS-Stream-9").name] | length')
+    if [[ "${COUNT}" == "0" ]]
     then
         echo "Creating the Centos Stream Image"
         ibmcloud pi image ls
         ibmcloud pi image create CentOS-Stream-9 --json
         echo "Import image status is: $?"
+    else
+        echo "Skipping import, CentOS-Stream exists"
     fi
 }
 
 # run_automation executes the terraform based on automation
 function run_automation() {
-    cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
-        && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
-        && "${IBMCLOUD_HOME_FOLDER}"/terraform plan -var-file=data/var.tfvars -no-color \
-        && "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
-        || cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
-
-    echo "Shared Directory: copy the terraform.tfstate"
-    cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+    echo "Running init"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ init -upgrade -no-color
+    echo "Running plan"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ plan -var-file=data/var.tfvars -no-color
+    echo "Running apply"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ apply -var-file=data/var.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    echo "Finished Running"
 }
 
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
@@ -259,6 +270,58 @@ function wait_for_additional_nodes_readiness() {
     done
 }
 
+# waits for the worker machines to be available
+function wait_for_worker_machines() {
+    INTERVAL=10
+    CNT=180
+
+    while [ $((CNT)) -gt 0 ]; do
+        READY=false
+        while read -r i
+        do
+            name=$(echo "${i}" | awk '{print $1}')
+            status=$(echo "${i}" | awk '{print $2}')
+            if [[ "${status}" == "Ready" ]]; then
+                echo "Worker ${name} is ready"
+                READY=true
+            else
+                echo "Waiting for the worker to be ready"
+            fi
+        done <<< "$(oc get node --no-headers -l node-role.kubernetes.io/worker | grep -v master)"
+
+        if [[ ${READY} == "true" ]]; then
+            echo "Worker is ready"
+            return 0
+        else
+            sleep "${INTERVAL}"
+            CNT=$((CNT))-1
+        fi
+
+        if [[ $((CNT)) -eq 0 ]]; then
+            echo "Timed out waiting for worker to be ready"
+            oc get node
+            return 1
+        fi
+    done
+}
+
+# Scales up the intel workers
+function scale_up_intel_workers {
+    echo "Scaling the MachineSet for 2 of the workers/zones"
+    for WORKER_MACHINESET in $(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}' | head -n 2)
+    do
+        echo "[Worker MachineSet]: Scaling up worker to 1 for '${WORKER_MACHINESET}'"
+        oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
+    done
+
+    echo "Start waiting for Workers to be ready"
+    wait_for_worker_machines
+
+    echo "Disable mastersSchedulable since we now have a dedicated worker node"
+	oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+	sleep 10
+}
+
 ## Main Execution Path
 if [ "${ADDITIONAL_WORKERS}" == "0" ]
 then
@@ -278,14 +341,16 @@ then
     exit 64
 fi
 
+scale_up_intel_workers
+
 setup_ibmcloud_cli
 login_ibmcloud
 download_terraform_binary
 download_automation_code
+#cleanup_prior
 configure_automation
-cleanup_prior
 setup_powervs_image
 run_automation
-wait_for_additional_nodes_readiness ${ADDITIONAL_WORKERS}
+wait_for_additional_nodes_readiness "$((2+${ADDITIONAL_WORKERS}))"
 
 exit 0
