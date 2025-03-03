@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 8h
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
     #Copy GCP auth.json from mounted secret to current directory
@@ -66,5 +67,3 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     terraform init
     terraform destroy -auto-approve || true
 fi
-
-sleep 8h
