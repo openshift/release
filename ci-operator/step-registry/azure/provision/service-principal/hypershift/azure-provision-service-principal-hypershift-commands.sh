@@ -27,13 +27,13 @@ declare -A component_to_cert_name
 for component in $COMPONENTS; do
     name="${SP_NAME_PREFIX}-${component}"
     scopes="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
-    role="Contributor"
+    role="b24988ac-6180-42a0-ab88-20f7382dd24c"
 
     if [[ $component == ingress ]]; then
-          role="Azure Red Hat OpenShift Cluster Ingress Operator Role"
+          role="0336e1d3-7a87-462b-b6db-342b63f7802c"
           scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == cloud-provider ]]; then
-        role="Azure Red Hat OpenShift Cloud Controller Manager Role"
+        role="a1f96423-95ce-4224-ab27-4e3dc72facd4"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
     elif [[ $component == cpo ]]; then
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
@@ -42,15 +42,15 @@ for component in $COMPONENTS; do
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == azure-file ]]; then
-        role="Azure Red Hat OpenShift Azure Files Storage Operator Role"
+        role="0d7aedc0-15fd-4a67-a412-efad370c947e"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == azure-disk ]]; then
-        role="Azure Red Hat OpenShift Storage Operator Role"
+        role="5b7237c5-45e1-49d6-bc18-a1f62f400748"
     elif [[ $component == cncc ]]; then
-        role="Azure Red Hat OpenShift Network Operator Role"
+        role="be7a6435-15ae-4171-8f30-4a343eff9e8f"
     elif [[ $component == ciro ]]; then
-        role="Azure Red Hat OpenShift Image Registry Operator Role"
+        role="8b32b316-c2f5-4ddf-b05b-83dacd2d08b5"
     fi
 
     client_id="$(eval "az ad sp create-for-rbac --name $name --role \"$role\" --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"

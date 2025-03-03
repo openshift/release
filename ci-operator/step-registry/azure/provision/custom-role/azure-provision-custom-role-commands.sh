@@ -298,6 +298,23 @@ ${required_permissions}
 """
     fi
 
+    #optional permissions for creating a private storage endpoint for internal image registry
+    registry_conf="${SHARED_DIR}/manifest_image_registry-config.yml"
+    if [[ -f "${registry_conf}" ]]; then
+        registry_type=$(yq-go r "${registry_conf}" 'spec.storage.azure.networkAccess.type')
+        if [[ "${registry_type}" == "Internal" ]]; then
+            required_permissions="""
+\"Microsoft.Network/privateEndpoints/write\",
+\"Microsoft.Network/privateEndpoints/read\",
+\"Microsoft.Network/privateEndpoints/privateDnsZoneGroups/write\",
+\"Microsoft.Network/privateEndpoints/privateDnsZoneGroups/read\",
+\"Microsoft.Network/privateDnsZones/join/action\",
+\"Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action\",
+${required_permissions}
+"""
+        fi
+    fi
+
     # optional permissions when installing cluster in existing vnet
     if [[ -n ${install_config_vnet} ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
         required_permissions="""
