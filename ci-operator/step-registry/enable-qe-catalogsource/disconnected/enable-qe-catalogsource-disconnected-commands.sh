@@ -532,7 +532,13 @@ set_CA_for_nodes
 #ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 kube_major=$(oc version -o json |jq -r '.serverVersion.major')
 kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
-origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+
+if [[ $OO_INDEX == "" ]];then
+    origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+else
+    origin_index_image="$OO_INDEX"
+fi
+
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 echo "origin_index_image: ${origin_index_image}"
 echo "mirror_index_image: ${mirror_index_image}"

@@ -117,8 +117,6 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
-tar -czf "${SHARED_DIR}/.openshift_install_state.json.tgz" ".openshift_install_state.json"
-
 export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 

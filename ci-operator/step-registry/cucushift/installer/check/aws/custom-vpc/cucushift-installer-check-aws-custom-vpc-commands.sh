@@ -49,15 +49,24 @@ aws --region ${REGION} ec2 describe-subnets --subnet-ids ${ic_subnets} > $out
 # tag: kubernetes.io/cluster/$INFRA_ID: shared
 expect_k="kubernetes.io/cluster/$INFRA_ID"
 expect_v="shared"
+kv_str="[$expect_k:$expect_v]"
 
-cnt=$(jq --arg k $expect_k -r '.Subnets[].Tags[] | select(.Key == $k) | .Value' $out | grep -E "^${expect_v}$" | wc -l)
+echo "--------------------------------"
+echo "Subnets in install-config:"
+yq-go r ${CONFIG} platform.aws.subnets
+echo "--------------------------------"
+echo "Subnets contains tag $kv_str:"
+jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Key == $k and .Value == $v)) | {subnet: .SubnetId, tags: .Tags}]' $out
+echo "--------------------------------"
+
+cnt=$(jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Key == $k and .Value == $v))] | length' $out)
 expect_cnt=$(yq-go r ${CONFIG} --length platform.aws.subnets)
-
 if [[ "${cnt}" != "${expect_cnt}" ]]; then
-  echo "FAIL: subnet tag: ${expect_k}:${expect_v}, found ${cnt}, but expect ${expect_cnt}, please check logs for details."
+  echo "FAIL: check tag $kv_str, found ${cnt}, but expect ${expect_cnt}, please check following subents:"
+  jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Key == $k and .Value == $v) | not) | {subnet: .SubnetId, tags: .Tags}]' $out
   ret=$((ret+1))
 else
-  echo "PASS: subnet tag: ${expect_k}:${expect_v}"
+  echo "PASS: check tag $kv_str"
 fi
 
 exit $ret
