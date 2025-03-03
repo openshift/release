@@ -99,10 +99,44 @@ data:
       [[registry.mirror]]
         location = "brew.registry.redhat.io/multicluster-engine"
         insecure = false
+         
+    [[registry]]
+      location = "registry.redhat.io/multicluster-engine"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+    [[registry]]
+      location = "registry.redhat.io/rhacm2"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+    [[registry]]
+      location = "registry.access.redhat.com/openshift4/ose-oauth-proxy"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "registry.redhat.io/openshift4/ose-oauth-proxy"
+        insecure = false
 EOF
 
 # Creating AgentServiceConfig
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+# CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2) # This will calculate the compute nodes version based on the management cluster version, in case of multi-version testing this logic does not hold good
+CLUSTER_VERSION=$(echo $JOB_SPEC | jq -r '.extra_refs[].base_ref' | cut -d '-' -f 2) # Calculating the compute nodes version based on the hcp version
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
 cat <<EOF | oc apply -f -
