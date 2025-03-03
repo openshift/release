@@ -198,11 +198,13 @@ setup(){
         export job_run_id=${AIRFLOW_CTX_DAG_RUN_ID}
         export ci="AIRFLOW"
         # Get Airflow URL
-        export airflow_base_url="http://$(kubectl get route/airflow -n airflow -o jsonpath='{.spec.host}')"
+        airflow_base_url="http://$(kubectl get route/airflow -n airflow -o jsonpath='{.spec.host}')"
+        export ${airflow_base_url}
         # Setup Kubeconfig
         export KUBECONFIG=/home/airflow/auth/config
         curl -sS https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar xz oc
-        export PATH=$PATH:/home/airflow/.local/bin:$(pwd)
+        PATH=$PATH:/home/airflow/.local/bin:$(pwd)
+        export $PATH
         if echo "$job_run_id" | grep -qi "scheduled"; then
             job_type="scheduled"
         elif echo "$job_run_id" | grep -qi "backfill"; then
