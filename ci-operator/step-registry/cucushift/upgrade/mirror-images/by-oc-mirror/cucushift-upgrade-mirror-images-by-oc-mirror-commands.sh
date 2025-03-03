@@ -5,13 +5,6 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-# save the exit code for junit xml file generated in step gather-must-gather
-# pre configuration steps before running installation, exit code 100 if failed,
-# save to install-pre-config-status.txt
-# post check steps after cluster installation, exit code 101 if failed,
-# save to install-post-check-status.txt
-EXIT_CODE=100
-trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
@@ -78,14 +71,6 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 
-#Because user does not have permission to update subgid and subuid file, so use another workaround.
-ocp_version=$(oc adm release info ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
-if ((ocp_minor_version > 17)); then
-    echo "export TEST_E2E=true to workaournd OCPBUGS-43986"
-    export TEST_E2E=true
-fi
-
 oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
@@ -130,7 +115,6 @@ if [ -s "${itms_file}" ]; then
 fi
 
 if [[ "${MIRROR_GRAPH_DATA}" == "true" ]]; then
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
     us_file="${result_folder}/cluster-resources/updateService.yaml"
     if [ ! -s "${us_file}" ]; then
         echo "${us_file} not found, exit..."
@@ -153,6 +137,7 @@ if [[ "${MIRROR_GRAPH_DATA}" == "true" ]]; then
             exit 1
         fi
         run_command "ls '${sig_folder}'"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
         oc apply -f "${sig_folder}"
     fi
 fi
