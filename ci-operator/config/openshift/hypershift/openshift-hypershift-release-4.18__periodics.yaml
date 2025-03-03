@@ -52,6 +52,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
+  previous-minor:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -82,6 +87,17 @@ tests:
   cron: 0 */6 * * *
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-metrics
+- as: e2e-aws-ovn-upgrade
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest
+      OCP_IMAGE_PREVIOUS: release:previous-minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
