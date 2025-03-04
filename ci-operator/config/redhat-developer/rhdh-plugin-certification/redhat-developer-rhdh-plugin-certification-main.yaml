@@ -1,19 +1,22 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
-  use_build_cache: true
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      RUN yum -y install make wget gcc git httpd-tools
 images:
 - context_dir: .ibm/images
   dockerfile_path: Dockerfile
   to: showcase-e2e-runner
 releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
   latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.15"
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
 resources:
   '*':
     limits:
