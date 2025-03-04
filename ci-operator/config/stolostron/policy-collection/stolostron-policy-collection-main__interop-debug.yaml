@@ -1,0 +1,73 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  observability-core-automation:
+    name: "2.12"
+    namespace: acm-qe
+    tag: observability-core-automation
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git python39
+  from: cli
+  optional: true
+  to: cli-with-git
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ftan-debug-slack
+  cron: 0 0 1,15 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "opp-tests", "priority": 1}},
+              {"step": "acm-mch", "failure_type": "all", "classification": "MCH install", "group": {"name": "opp-tests", "priority": 2}},
+              {"step": "acm-policies-openshift-plus-setup", "failure_type": "all", "classification": "Policies setup failure", "jira_project": "OCPQE", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 3}, "jira_epic": "OCPQE-19467", "jira_additional_labels": ["CI", "OPP", "QE-ACM"], "jira_assignee": "gparvin@redhat.com"},
+              {"step": "acm-policies-openshift-plus", "failure_type": "all", "classification": "Policies testcase failure", "jira_project": "OCPQE", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 3}, "jira_epic": "OCPQE-19467", "jira_additional_labels": ["CI", "OPP", "QE-ACM"], "jira_assignee": "gparvin@redhat.com"},
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["PICS"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["OPPQE"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: OCPQE
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.12", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - ref: firewatch-report-issues
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: policy-collection
+  variant: interop-debug
