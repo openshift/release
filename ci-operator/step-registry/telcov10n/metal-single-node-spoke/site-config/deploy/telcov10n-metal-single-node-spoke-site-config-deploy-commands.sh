@@ -33,7 +33,7 @@ function run_script_in_the_hub_cluster {
   if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
     oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
       oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
+        --image=${helper_img} --restart=Never -- sleep infinity || echo ; \
       oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
     }
     oc -n ${ns} exec -i ${pod_name} -- \
@@ -303,27 +303,86 @@ function get_openshift_baremetal_install_tool {
   set +x
 }
 
-# function check_url_links_are_available {
+function upload_iso_url_to_http_hub_pod {
 
-#   for url in "$@"; do
-#     if [[ ${url} == http://* || ${url} == https://* ]]; then
-#       echo "Checking URL: ${url}"
-#       # It should be a HEAD request, but it doesn't work
-#       # for AmazonS3 servers. curl -sSIL ... always return '403'
-#       # code when this is run from a Prow container
-#       response=$(curl -sSL -o /dev/null -w "%{http_code}" "${url}")
-#       if [[ ${response} -eq 200 ]]; then
-#         echo "URL is accessible."
-#       else
-#         echo "URL is not accessible. HTTP status code: ${response}"
-#         exit 1
-#       fi
-#     else
-#       echo "Invalid URL: ${url}. Only HTTP and HTTPS URLs are allowed."
-#       exit 1
-#     fi
-#   done
-# }
+  echo "************ ISO image cache ************"
+
+  src_iso_url="${1}"
+  http_listen_port="8080"
+  run_script=$(mktemp --dry-run)
+
+  cat <<EOF > ${run_script}
+set -o nounset
+set -o errexit
+set -o pipefail
+
+iso_path=/tmp/live-iso/$(basename ${src_iso_url})
+
+set -x
+if [ -d \$(dirname \${iso_path}) ]; then
+  echo "Waiting for the server to start up..."
+  for ((attempts = 0 ; attempts < 10 ; attempts++)); do
+    response=\$(curl -sSkL -w "%{http_code}" -o /dev/null http://localhost:${http_listen_port}/$(basename ${src_iso_url}) || echo)
+    [[ \${response} -eq 200 ]] && exit 0
+    sleep 30s
+  done
+  exit 1
+fi
+
+mkdir -pv \$(dirname \${iso_path})
+curl -sSkL -o \${iso_path} ${src_iso_url}
+
+cat <<EOP > /tmp/server.py
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+import os
+
+FILE_PATH = "\${iso_path}"
+HOST = "0.0.0.0"
+PORT = ${http_listen_port}
+
+class CustomHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/$(basename ${src_iso_url})":
+            if os.path.exists(FILE_PATH):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", f"attachment; filename={os.path.basename(FILE_PATH)}")
+                self.send_header("Content-Length", str(os.path.getsize(FILE_PATH)))
+                self.end_headers()
+
+                with open(FILE_PATH, "rb") as file:
+                    self.wfile.write(file.read())
+            else:
+                self.send_error(404, "File Not Found")
+        else:
+            self.send_error(404, "Not Found")
+
+if __name__ == "__main__":
+    server = HTTPServer((HOST, PORT), CustomHandler)
+    print(f"Serving {FILE_PATH} on http://{HOST}:{PORT}/$(basename ${src_iso_url})")
+    server.serve_forever()
+EOP
+
+  cat << EOP >| /tmp/run.py
+import subprocess
+
+process = subprocess.Popen(["python3", "/tmp/server.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+print(f"Server started in the background with PID {process.pid}")
+EOP
+
+  exec python3 /tmp/run.py
+EOF
+
+  gitea_project="${GITEA_NAMESPACE}"
+  pod_name="$(basename ${src_iso_url} | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project} ${pod_name}
+
+  pod_ip=$(oc -n ${gitea_project} get po ${pod_name} -ojsonpath='{.status.podIP}')
+  iso_url="http://${pod_ip}:${http_listen_port}/$(basename ${src_iso_url})"
+  echo
+  echo "The ISO is served on '${iso_url}' inside the Hub cluster"
+  echo
+}
 
 function extract_rhcos_images {
 
@@ -334,10 +393,9 @@ function extract_rhcos_images {
   if [ -z "${RHCOS_ISO_URL:-}" ]; then
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
-    iso_url="${RHCOS_ISO_URL}"
-    # check_url_links_are_available "${iso_url}"
+    iso_url=""
+    upload_iso_url_to_http_hub_pod "${RHCOS_ISO_URL}"
   fi
-
 }
 
 function generate_agent_service_config {

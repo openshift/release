@@ -28,7 +28,7 @@ function run_script_in_the_spoke_cluster {
   if [[ "${pod_name:="--rm spoke-script"}" != "--rm spoke-script" ]]; then
     oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
       oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
+        --image=${helper_img} --restart=Never -- sleep infinity || echo ; \
       oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
     }
     oc -n ${ns} exec -i ${pod_name} -- \
