@@ -28,7 +28,7 @@ echo
 echo "Fail if there are not enough hosts ..."
 NUM_AVAILABLE=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL | jq .[] | wc -l)
 if [ "$NUM_SERVERS" -gt "$NUM_AVAILABLE" ]; then
-  exit -1
+  exit 1
 else
   echo "Get available hosts for self scheduling from a certain hardware model ..."
   HOSTS=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL | jq .[0:$NUM_SERVERS] | jq -r .[])
