@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.21-linux:
+  stolostron_builder_go1.20-linux:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.20-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -16,13 +16,14 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.20-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-  to: search-v2-operator
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: insights-metrics
 promotion:
   to:
-  - name: "2.14"
+  - disabled: true
+    name: "2.14"
     namespace: stolostron
 resources:
   '*':
@@ -33,23 +34,12 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-v2-operator
+      SOURCE_IMAGE_REF: insights-metrics
     env:
-      IMAGE_REPO: search-v2-operator
+      IMAGE_REPO: insights-metrics
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: git-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.14
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
-- as: unit-test
+- as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
@@ -74,7 +64,31 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-metrics
+    env:
+      IMAGE_REPO: insights-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.14
   org: stolostron
-  repo: search-v2-operator
+  repo: insights-metrics
