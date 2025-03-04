@@ -542,7 +542,7 @@ echo "The Prow Job ID is: $PROW_JOB_ID"
 export ES_SERVER="${ELK_SERVER}"
 export BUILD_ID="${BUILD_ID}"
 export UUID="${TEST_UUID}"
-export BUILD_URL="${PROW_JOB_URL}"
+# export BUILD_URL="${PROW_JOB_URL}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
@@ -554,6 +554,7 @@ export PUSH_PULL_NUMBERS="${PUSH_PULL_NUMBERS}"
 export TEST_PHASES="${TEST_PHASES}"
 
 echo "es server is: $ES_SERVER"
+source ../utility/e2e-benchmarking.sh
 
 
 # setup
