@@ -25,11 +25,15 @@ TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Con
 
 # Get available hosts for self scheduling from a certain hardware model
 echo
-echo "Get available hosts for self scheduling from a certain hardware model ..."
-HOST_OUTPUT=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL)
-echo $HOST_OUTPUT
-HOST=$(echo $HOST_OUTPUT | jq -r '.[0]')
-echo $HOST
+echo "Fail if there are not enough hosts ..."
+NUM_AVAILABLE=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL | jq .[] | wc -l)
+if [ "$NUM_SERVERS" -gt "$NUM_AVAILABLE" ]; then
+  exit -1
+else
+  echo "Get available hosts for self scheduling from a certain hardware model ..."
+  HOSTS=$(curl -sSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL | jq .[0:$NUM_SERVERS] | jq -r .[])
+  echo $HOSTS
+fi
 
 # Create self scheduling assignment
 echo
@@ -42,8 +46,12 @@ echo $CLOUD
 # Create schedule
 echo
 echo "Create schedule ..."
-ASSIGNMENT_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"cloud\": \"$CLOUD\", \"hostname\": \"$HOST\"}" $QUADS_INSTANCE/api/v3/schedules)
-echo $ASSIGNMENT_OUTPUT | jq .
+
+for i in $HOSTS; do
+  echo "Requesting allocation of host $i ..."
+  ASSIGNMENT_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"cloud\": \"$CLOUD\", \"hostname\": \"$i\"}" $QUADS_INSTANCE/api/v3/schedules)
+  echo $ASSIGNMENT_OUTPUT | jq .
+done
 ASSIGNMENT_ID=$(echo $ASSIGNMENT_OUTPUT jq -r .'assignment_id')
 echo $ASSIGNMENT_ID
 echo $ASSIGNMENT_ID > ${SHARED_DIR}/assignment_id
