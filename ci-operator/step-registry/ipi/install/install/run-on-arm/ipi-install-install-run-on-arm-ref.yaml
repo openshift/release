@@ -1,0 +1,69 @@
+ref:
+  as: ipi-install-install-run-on-arm
+  from: installer
+  grace_period: 10m
+  commands: ipi-install-install-run-on-arm-commands.sh
+  cli: latest
+  node_architecture: arm64
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: loki-prod-collector-test-secret
+    mount_path: /var/run/loki-secret
+  - namespace: test-credentials
+    name: ci-ibmcloud8
+    mount_path: /var/run/vsphere8-secrets
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-ci 
+    mount_path: /var/run/vsphere-ibmcloud-ci
+  - namespace: test-credentials
+    name: devqe-secrets
+    mount_path: /var/run/devqe-secrets
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK
+    default: "false"
+    documentation: Using experimental Azure dual-stack support
+  - name: OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+    default: ""
+    documentation: "Keep bootstrap resources after install. Warning: this should only be used for debugging purposes, and poses a risk to cluster stability."
+  - name: OPENSHIFT_INSTALL_GATHER_BOOTSTRAP
+    default: "true"
+    documentation: "Collect bootstrap log bundle, even on success."
+  - name: OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP
+    default: ""
+    documentation: "Send bootstrap logs to Loki. Warning: this should only be used for debugging purposes."
+  - name: FIPS_ENABLED
+    default: "false"
+    documentation: "Indicates a FIPS-enabled cluster, to disable FIPS host checks in the installer."
+  - name: TF_LOG
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform components."
+  - name: TF_LOG_CORE
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform core library."
+  - name: TF_LOG_PROVIDER
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform provider libraries."
+  - name: SPOT_INSTANCES
+    default: "false"
+    documentation:  "Use AWS Spot Instances for *worker* nodes.  Set to 'true' to opt into spot instances.  Explicitly set to 'false' to opt out.  Leave unset for the default, which may change."
+  - name: SPOT_MASTERS
+    default: "false"
+    documentation:  "Use AWS Spot Instances for *master* nodes. Set to 'true' to opt into spot instances. Explicitly set to 'false' to opt out. Leave unset for the default, which may change. Note that spot masters are only supported when installing with a) CAPI; or b) newer installer versions (see https://github.com/openshift/installer/pull/8349). A preflight check will fail if this variable is set to 'true' for an unsupported configuration."
+  - name: OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY
+    default: ""
+    documentation: "Whether to use only public subnets for AWS. Implies no NAT Gateways. Requires a VPC to be configured prior to install."
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR so that this step can pull in the manifests. Files with name manifest_(manifest_name).yml|yaml end up in $INSTALL_DIR/manifests, while files with name tls_(tls_asset_name).key|pub end up in $INSTALL_DIR/tls.
+
