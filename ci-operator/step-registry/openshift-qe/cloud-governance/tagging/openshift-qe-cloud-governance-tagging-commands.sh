@@ -7,7 +7,8 @@ es_port="$(cat /secret/es_port)"
 export es_port
 perf_services_url="$(cat /secret/perf_services_url)"
 export perf_services_url
-
+account_group="$(cat /secret/${account_group})"
+IFS=","
 
 function run_policy(){
     regions=("us-east-1" "us-east-2" "us-west-1" "us-west-2" "ap-south-1" "eu-north-1" "eu-west-3" "eu-west-2"
@@ -17,15 +18,14 @@ function run_policy(){
         AWS_DEFAULT_REGION="${region}"
         export AWS_DEFAULT_REGION
         export s3_bucket
-        policy_output="s3://${s3_bucket}/${LOGS}/${region}"
+        policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
         export policy_output
         python3 /usr/local/cloud_governance/main.py
     done
 }
 
 function run_accounts(){
-  account_names=("industry-partners" "certification-pipeline" "ecoengverticals-qe")
-  for account_name in "${account_names[@]}";do
+  for account_name in ${account_group};do
 
     # Load credentials
     cat "/secret/${account_name}" > /tmp/creds.sh
