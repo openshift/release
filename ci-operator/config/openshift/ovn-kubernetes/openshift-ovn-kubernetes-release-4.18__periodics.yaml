@@ -1,4 +1,8 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.17_base-rhel9:
     name: "4.18"
     namespace: ocp
@@ -55,6 +59,22 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
     workflow: openshift-e2e-aws-ovn-virt
+- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview-periodic
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-dualstack
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

@@ -90,36 +90,6 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build10
-  cron: 30 7 * * 1-5
-  decorate: true
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-build10-upgrade
-  reporter_config:
-    slack:
-      channel: '#ops-testplatform'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
-        `build10` has not been completed over 24 hours. Please check if anything blocks
-        the process.
-  spec:
-    containers:
-    - args:
-      - adm
-      - upgrade
-      - --to-latest
-      command:
-      - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-    serviceAccountName: upgrader
-- agent: kubernetes
   cluster: hosted-mgmt
   cron: 30 7 * * 1-5
   decorate: true
@@ -2628,7 +2598,7 @@ periodics:
   cron: 0 1 * * 5
   decorate: true
   extra_refs:
-  - base_ref: master
+  - base_ref: main
     org: openshift
     repo: origin
   labels:
@@ -2687,6 +2657,7 @@ periodics:
         -github-token-path=/etc/github/oauth \
         -organization=openshift \
         -repo=origin \
+        -branch=main \
         -git-message="Updated synthetic tests" \
         -pr-message "$(cat /var/tmp/pr_message.md)" \
         -pr-title="NO-ISSUE: Automated - Update synthetic test data" \

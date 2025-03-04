@@ -1,0 +1,48 @@
+chain:
+  as: openshift-e2e-test-clusterinfra-qe-regression
+  env:
+  - name: E2E_RUN_TAGS
+    default: ""
+    documentation: |
+      It is used to filter the cucushift cases.
+      '@ccm' - to run only ccm cases
+      '@mapi' - to run only mapi cases
+      '@cas' - to run only autoscaler cases
+  - name: TEST_FILTERS
+    default: NonHyperShiftHOST
+    documentation: |
+      It is used to filter the openshift-test-private cases.
+  - name: TEST_FILTERS_CLUSTERINFRASTRUCTURE
+    default: "!qe-only"
+    documentation: |
+      It is used to filter the cluster-api-actuator-pkg cases.
+      "ccm" - to run only ccm cases
+      "mapi" - to run only mapi cases
+      "autoscaler" - to run only autoscaler cases
+      "capi" - to run only capi cases
+      "machine-approver" - to run only machine-approver cases
+      "cpms" - to run only CPMS cases
+      "!qe-only&&ccm" - to run only ccm cases excluding qe-only cases
+  - name: TEST_SCENARIOS
+    default: Cluster_Infrastructure
+    documentation: |-
+      It is used to select the openshift-test-private cases. It's a RE pattern and is passed to the 'grep -E'
+      Cluster_Infrastructure CCM - to run only ccm cases
+      Cluster_Infrastructure MAPI - to run only mapi cases
+      Cluster_Infrastructure CAS - to run only autoscaler cases
+      Cluster_Infrastructure CAPI - to run only capi cases
+      Cluster_Infrastructure CMA - to run only machine-approver cases
+      Cluster_Infrastructure CPMS - to run only CPMS cases
+  - name: TEST_TIMEOUT
+    default: "35"
+    documentation: Time-out duration for each openshift-test-private test case execution in minutes.
+  steps:
+  - chain: cucushift-installer-check-cluster-health
+  - ref: idp-htpasswd
+  - ref: cucushift-pre
+  - ref: openshift-extended-test
+  - ref: cucushift-e2e
+  - ref: openshift-e2e-test-clusterinfra-qe
+  - ref: openshift-e2e-test-qe-report
+  documentation: |-
+    Execute presubmit regression testing for cluster_infrastructure team, the testing include cucushift, openshift-test-private, cluster-api-actuator-pkg.

@@ -41,7 +41,9 @@ if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
     sp_ids=$(< "${SHARED_DIR}/azure_sp_id")
     for sp_id in ${sp_ids}; do
         cmd="az ad app delete --id ${sp_id}"
-        run_command "${cmd}"
+        # app registration / service principal starting with ci-op- or ci-ln- will be pruned by DPP
+        # continue custom role deprovision once {cmd} here failed
+        run_command "${cmd}" || true
     done
 fi
 

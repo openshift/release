@@ -35,6 +35,8 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+          oc get pod -n local-cluster-${CLUSTER_NAME}
           oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
           oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
@@ -76,6 +78,10 @@ chain:
           echo "extract secret/pull-secret"
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+        fi
+        
+        if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+          HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
         fi
         
         CRED_COMMAND=""
