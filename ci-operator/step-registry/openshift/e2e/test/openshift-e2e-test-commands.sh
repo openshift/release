@@ -79,11 +79,12 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
     oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
 fi
 
-# if this test requires an SSH bastion and one is not installed, configure it
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+    # if this test requires an SSH bastion and one is not installed, configure it
+    KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+    KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+    export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
+
     export SSH_BASTION_NAMESPACE=test-ssh-bastion
     echo "Setting up ssh bastion"
 

@@ -4,10 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -18,7 +14,6 @@ export KRKN_KUBE_CONFIG=$KUBECONFIG
 mkdir -p $HOME/.aws
 cat "/secret/telemetry/.awscred" > $HOME/.aws/config
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
-ls -al /secret/telemetry/
 
 ES_PASSWORD=$(cat "/secret/es/password" || "")
 ES_USERNAME=$(cat "/secret/es/username" || "")

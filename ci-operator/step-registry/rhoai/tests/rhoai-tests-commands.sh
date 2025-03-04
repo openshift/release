@@ -5,25 +5,46 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-OCM_ENV=$API_HOST
-SET_ENVIRONMENT="1"
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+export CONSOLE_URL
+export API_URL
+export KUBECONFIG=$SHARED_DIR/kubeconfig
+
+# login for interop testings
+OCP_CRED_USR="kubeadmin"
+export OCP_CRED_USR
+OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+export OCP_CRED_PSW
+oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+
 OC_HOST=$(oc whoami --show-server)
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
-OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-ROBOT_EXTRA_ARGS="-i $TEST_MARKER -e AutomationBug -e Resources-GPU -e Resources-2GPUS"
-RUN_SCRIPT_ARGS="--skip-oclogin true --set-urls-variables true --test-artifact-dir ${ARTIFACT_DIR}/results"
-
-export OCM_ENV
-export SET_ENVIRONMENT
+OCP_CONSOLE=$(oc whoami --show-console)
+RHODS_DASHBOARD="https://$(oc get route rhods-dashboard -n redhat-ods-applications -o jsonpath='{.spec.host}{"\n"}')"
 export OC_HOST
-export CLUSTER_NAME
-export OCM_TOKEN
-export ROBOT_EXTRA_ARGS
-export RUN_SCRIPT_ARGS
-export CLUSTER_ID
+export OCP_CONSOLE
+export RHODS_DASHBOARD
 
-mkdir "$ARTIFACT_DIR/results"
+BUCKET_INFO="/tmp/secrets/ci"
+ENDPOINT_1="$(cat ${BUCKET_INFO}/ENDPOINT_1)"
+ENDPOINT_2="$(cat ${BUCKET_INFO}/ENDPOINT_2)"
+REGION_1="$(cat ${BUCKET_INFO}/REGION_1)"
+REGION_2="$(cat ${BUCKET_INFO}/REGION_2)"
+NAME_1="$(cat ${BUCKET_INFO}/NAME_1)"
+NAME_2="$(cat ${BUCKET_INFO}/NAME_2)"
+NAME_3="$(cat ${BUCKET_INFO}/NAME_3)"
+NAME_4="$(cat ${BUCKET_INFO}/NAME_4)"
+NAME_5="$(cat ${BUCKET_INFO}/NAME_5)"
 
-# running RHOAI testsuite
-./ods_ci/build/run.sh
+export ENDPOINT_1
+export ENDPOINT_2
+export REGION_1
+export REGION_2
+export NAME_1
+export NAME_2
+export NAME_3
+export NAME_4
+export NAME_5
+
+# running RHOAI tests
+./run_interop.sh

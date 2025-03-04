@@ -16,16 +16,10 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
-function mirror_test_images() {
-        echo "### Mirroring test images"
-
-        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
-
-        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
-        scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
-
+function run_mirror_test_images_ssh_commands() {
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+set -o errexit
 oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
 # "registry.k8s.io/pause:3.8" is excluded from the output of the "openshift-tests images" command as some of the layers arn't compressed and this isn't supported by quay.io
 # So we need to mirror it from source bypassing quay.io
@@ -38,9 +32,49 @@ oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
 # new image coming in k8s 1.31
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
-# new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too
+# new image coming in k8s 1.32
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+# new image coming in k8s 1.29.11. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F
+# new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
 EOF
+}
+
+function mirror_test_images() {
+        echo "### Mirroring test images"
+
+        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
+
+        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+        scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
+
+        MIRROR_RESULT=$(run_mirror_test_images_ssh_commands || echo "fail")
+
+        JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring.xml"
+
+        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring" tests="1" failures="1">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully">
+        <failure message="Image mirroring failed"></failure>
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+            exit 1
+        else
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring" tests="1" failures="0">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully">
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+        fi
+
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
 
@@ -64,12 +98,10 @@ function set_test_provider() {
     fi
 }
 
-function mirror_release_image_for_disconnected_upgrade() {
-    # All IPv6 clusters are disconnected and
-    # release image should be mirrored for upgrades.
-    if [[ "${DS_IP_STACK}" == "v6" ]]; then
-      # shellcheck disable=SC2087
+function run_mirror_release_image_for_disconnected_upgrade_ssh_commands() {
+  # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+set -o errexit
 MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
 RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
@@ -103,6 +135,39 @@ echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
 oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
 
 EOF
+}
+
+function mirror_release_image_for_disconnected_upgrade() {
+    # All IPv6 clusters are disconnected and
+    # release image should be mirrored for upgrades.
+    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+      echo "### Mirroring release image for disconnected upgrade ###"
+
+      MIRROR_RESULT=$(run_mirror_release_image_for_disconnected_upgrade_ssh_commands || echo "fail")
+
+      JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring-disconnected-upgrade.xml"
+
+        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring for Disconnected Upgrade" tests="1" failures="1">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully for disconnected upgrade">
+        <failure message="Image mirroring for Disconnected Upgrade failed"></failure>
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+            exit 1
+        else
+            cat > "$JUNIT_IMAGE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Image Mirroring for Disconnected Upgrade" tests="1" failures="0">
+    <testcase name="[sig-metal] release payload images should be mirrored successfully for disconnected upgrade">
+    </testcase>
+</testsuite>
+EOF
+            echo "JUnit result written to $JUNIT_IMAGE_FILE"
+        fi
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
     fi

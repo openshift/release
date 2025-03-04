@@ -26,8 +26,9 @@ tests:
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      HUNTER_ANALYZE: "true"
       ITERATION_MULTIPLIER_ENV: "15"
-      JUNIT: "true"
+      OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
       VERSION: "4.17"
       ZONES_COUNT: "3"
@@ -49,7 +50,7 @@ tests:
       PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       USER_TAGS: |
-        TicketId 382
+        TicketId 532
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
@@ -118,6 +119,20 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-ipsec-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - ref: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 5h0m0s
 - always_run: false
   as: payload-node-density-heavy-6nodes

@@ -4,6 +4,13 @@ set -Eeuo pipefail
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
+# If this file is present, we want to run the tests against an Hypershift HostedCluster
+# and therefore we want to load the KUBECONFIG from a specific path.
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+	export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+fi
+
 function wait_for_network() {
     # Wait up to 2 minutes for the network to be ready
     for _ in $(seq 1 12); do

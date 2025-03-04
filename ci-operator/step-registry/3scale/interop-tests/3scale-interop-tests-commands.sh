@@ -7,6 +7,10 @@ set -o pipefail
 export NAMESPACE=$DEPL_PROJECT_NAME
 status=0
 
+echo "Deploying Tools"
+oc new-project tools --skip-config-write=true
+make tools
+
 echo "Running 3scale interop tests"
 make smoke || status="$?" || :
 

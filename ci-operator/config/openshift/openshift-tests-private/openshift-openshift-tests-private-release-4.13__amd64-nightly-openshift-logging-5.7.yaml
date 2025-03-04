@@ -51,14 +51,17 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      CLO_SUB_CHANNEL: stable-5.7
       COMPUTE_NODE_TYPE: e2-standard-4
       E2E_RUN_TAGS: '@logging5.7'
-      EO_SUB_CHANNEL: stable-5.7
       FILTERS_ADDITIONAL: ""
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-5.7
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.7
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.7", "install_namespace": "openshift-logging","target_namespaces": "openshift-logging", "operator_group": "openshift-logging"}
+        ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
       TEST_IMPORTANCE: ""
@@ -68,9 +71,7 @@ tests:
       TEST_TIMEOUT: "15"
     test:
     - ref: enable-qe-catalogsource-logging
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-cluster-logging-operator
-    - ref: operatorhub-subscribe-loki-operator
+    - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 zz_generated_metadata:

@@ -53,6 +53,9 @@ echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
 echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
 echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
 
+WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
+export WORKSPACE_NAME
+
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
 
@@ -165,7 +168,7 @@ function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
+    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     do
         echo "Targetting power cloud instance"
         ibmcloud pi workspace target "${CRN}"
@@ -197,8 +200,7 @@ function cleanup_prior() {
 
     # VPC Instances
     # VPC LBs 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    VPC_NAME="${WORKSPACE_NAME}"
     echo "Target region - ${VPC_REGION}"
     ibmcloud target -r "${VPC_REGION}" -g "${RESOURCE_GROUP}"
 
@@ -238,11 +240,8 @@ function cleanup_prior() {
 
 # creates the var file
 function configure_terraform() {
-
-    OCP_STREAM="ocp"
-    export OCP_STREAM
-
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IBMCLOUD_API_KEY
 
     echo "IC: Resource Group is ${RESOURCE_GROUP}"
     echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
@@ -264,11 +263,10 @@ function configure_terraform() {
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
+    VPC_NAME="${WORKSPACE_NAME}"
     echo "IC workspace :  ${WORKSPACE_NAME}"
     echo "IC VPC workspace :  ${VPC_NAME}"
-    echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
 
     # Select the workspace ID 
     POWERVS_SERVICE_INSTANCE_ID=$(ibmcloud pi workspace ls --json | jq --arg wn "${WORKSPACE_NAME}" -r '.Payload.workspaces[] | select(.name | contains($wn)).id')
@@ -285,6 +283,12 @@ function configure_terraform() {
     export TARGET_VERSION
     echo "${TARGET_VERSION}"
 
+    # Dev note: should we switch between ocp-dev-preview and ocp
+    OCP_STREAM="ocp"
+    export OCP_STREAM
+    OCP_TARGET="latest"
+    export OCP_TARGET
+
 cat << EOF >${IBMCLOUD_HOME}/ocp-install-dir/var-multi-arch-upi.tfvars
 ibmcloud_api_key    = "${IBMCLOUD_API_KEY}"
 ibmcloud_zone       = "${POWERVS_ZONE}"
@@ -294,27 +298,29 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_image_name                = "${COREOS_NAME}"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
-rhcos_import_image_storage_type = "tier5k"
-system_type         = "e980"
+rhcos_import_image_storage_type = "tier0"
+system_type         = "s1022"
 cluster_domain      = "${CLUSTER_DOMAIN}"
-cluster_id_prefix   = "p2"
+cluster_id_prefix   = "p-px"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
-openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-install-linux.tar.gz"
-openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/latest/ppc64le/openshift-client-linux.tar.gz"
+openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
+openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
 release_image_override    = "${TARGET_VERSION}"
 
-use_zone_info_for_names   = true
-use_ibm_cloud_services    = true
-ibm_cloud_vpc_name        = "${VPC_NAME}"
-private_network_mtu       = 9000
+use_zone_info_for_names    = true
+use_ibm_cloud_services     = true
+ibm_cloud_vpc_name         = "${VPC_NAME}"
+private_network_mtu        = 9000
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
-ibm_cloud_cis_crn = "${IBMCLOUD_CIS_CRN}"
+ibm_cloud_cis_crn          = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+
+dns_forwarders = "161.26.0.10; 161.26.0.11"
 
 override_bastion_storage_pool = "General-Flash-7"
 EOF
@@ -328,7 +334,7 @@ function build_upi_cluster() {
     OUTPUT="yes"
     echo "Applying terraform to build PowerVS UPI cluster"
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color && \
+        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color -upgrade && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
             -var-file "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars \
             -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \

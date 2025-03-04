@@ -155,6 +155,13 @@ end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
 NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 
+# We expect this to have the correct number of addresses.  If we are short, we need to exit here with meaningful message.
+if jq -e --argjson IPS "$((end_worker_num + 1))" '.spec.ipAddresses | length < $IPS' "${NETWORK_CONFIG}"; then
+  echo "SUBNETS.JSON does not contain enough addresses. This workflow is expected to be a single-tenant lease. Please check lease / network type."
+  cat "${SUBNETS_CONFIG}"
+  exit 1
+fi
+
 dns_server=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
 gateway=${dns_server}
 netmask=$(jq -r '.spec.netmask' "${NETWORK_CONFIG}")
@@ -393,7 +400,12 @@ if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
     fi
     if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
       echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-      cat ${PULL_THROUGH_CACHE_CONFIG} >>${install_config}
+      if [ "${Z_VERSION}" -lt 14 ]; then
+        echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
+        cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${install_config}
+      else
+        cat ${PULL_THROUGH_CACHE_CONFIG} >>${install_config}
+      fi
     else
       echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
     fi

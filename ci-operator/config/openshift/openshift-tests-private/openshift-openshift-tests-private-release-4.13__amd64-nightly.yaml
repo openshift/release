@@ -155,17 +155,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-network-mtu-edge-zone
-- as: aws-ipi-disc-priv-f60-longduration-cloud
-  cron: 46 1 9 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sdn-rhcos-rhel8-f60
   cron: 59 21 7 2,4,6,8,10,12 *
   steps:
@@ -796,17 +785,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-mag-ipi
-- as: azure-mag-ipi-fullyprivate-f60-longduration-cloud
-  cron: 16 4 13 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: azuremag-qe
-    env:
-      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-mag-ipi-fullyprivate-fips-f60
   cron: 4 14 29 2,4,6,8,10,12 *
   steps:
@@ -895,16 +873,56 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
-      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "40"
     test:
     - ref: etcd-encryption
     - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-compliance-destructive
+  cron: 3 14 14 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-file-integrity
+  cron: 6 22 1 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-security-profiles
+  cron: 2 17 25 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
+    - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetalds-ipi-ovn-ipv4-fips-f60
@@ -1291,16 +1309,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-private-f60-longduration-cloud
-  cron: 14 5 27 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: gcp-ipi-proxy-etcd-encryption-f60
   cron: 34 4 17 1,3,5,7,9,11 *
   steps:
@@ -1650,18 +1658,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: nutanix-ipi-proxy-fips-f60-longduration-cloud
-  cluster: build01
-  cron: 23 21 20 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: nutanix-qe-dis
-    env:
-      FIPS_ENABLED: "true"
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-agent-compact-fips-f60
   cron: 31 4 16 2,4,6,8,10,12 *
   steps:
@@ -1809,20 +1805,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-proxy-fips-f60-longduration-cloud
-  cron: 31 21 9 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: vsphere-dis-2
-    env:
-      FIPS_ENABLED: "true"
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    leases:
-    - env: VSPHERE_BASTION_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
-    test:
-    - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f60
   cron: 5 9 10 2,4,6,8,10,12 *
   steps:
@@ -1932,10 +1914,20 @@ tests:
 - as: vsphere-upi-zones-f60
   cron: 27 19 24 1,3,5,7,9,11 *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
+- as: openstack-ipi-disasterrecovery-f60
+  cron: 30 3 7 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      USE_RAMFS: "false"
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

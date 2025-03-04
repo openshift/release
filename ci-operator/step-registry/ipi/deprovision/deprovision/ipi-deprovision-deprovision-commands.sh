@@ -13,7 +13,6 @@ fi
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
-    cp /tmp/installer/metadata.json "${ARTIFACT_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -57,8 +56,13 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
-    # all vcenter certificates are in the file below
-    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+    cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
+    if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
+      echo "additional CA bundle found, appending it to the bundle from vault"
+      echo -n $'\n' >> /tmp/ca-bundle.pem
+      cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
+    fi
+    export SSL_CERT_FILE=/tmp/ca-bundle.pem
 fi
 
 echo ${SHARED_DIR}/metadata.json
@@ -109,6 +113,12 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     echo "Private cluster setting proxy"
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+  fi
+fi
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
   fi
 fi
 

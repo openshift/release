@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -35,18 +35,18 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_builder_rhel-8-golang-1.22-builder-multi-openshift-4.18:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-builder-multi-openshift-4.18
-  ocp_builder_rhel-9-enterprise-base-multi-openshift-4.18:
+    tag: rhel-8-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.18
-  ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
   ocp_os:
     name: "4.19"
     namespace: ocp
@@ -56,15 +56,15 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_builder_rhel-8-golang-1.22-builder-multi-openshift-4.18:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-builder-multi-openshift-4.18
-    ocp_builder_rhel-9-enterprise-base-multi-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-enterprise-base-multi-openshift-4.18
-    ocp_builder_rhel-9-golang-1.22-builder-multi-openshift-4.18:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-builder-multi-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -78,11 +78,15 @@ images:
         ostree container commit
   from: ocp_os
   to: custom-os-image
+- dockerfile_literal: |
+    FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
+  to: zacks-toolbox
 promotion:
   to:
   - disabled: true
     excluded_images:
     - custom-os-image
+    - zacks-toolbox
     name: "4.19"
     namespace: ocp
 releases:
@@ -226,6 +230,23 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
   timeout: 5h0m0s
+- as: e2e-gcp-op-ocl
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-ocl
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-gcp
 - as: e2e-gcp-op-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -454,7 +475,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
@@ -468,6 +488,102 @@ tests:
     env:
       PROJECT_NAME: machine-config-operator
     workflow: openshift-ci-security
+- always_run: false
+  as: e2e-aws-ovn-upgrade-ocb-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: get-prelayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: enable-layering
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        onclustertesting version
+        onclustertesting setup ci --inject-yum-repos --containerfile-path <(curl -L https://raw.githubusercontent.com/openshift/machine-config-operator/refs/heads/master/test/e2e-ocl/Containerfile.cowsay)
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: get-postlayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    - as: get-posttest-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-upgrade-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-ocb-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: get-prelayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: enable-layering
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        onclustertesting version
+        onclustertesting setup ci --inject-yum-repos --containerfile-path <(curl -L https://raw.githubusercontent.com/openshift/machine-config-operator/refs/heads/master/test/e2e-ocl/Containerfile.cowsay)
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: get-postlayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    - as: get-posttest-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

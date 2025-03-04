@@ -12,6 +12,7 @@ BRANCH=$(cluster_version_to_branch)
 MAIN_BRANCH="release-4.19"
 
 ADDITIONAL_NFTABLES_RULES_FILE_PATH="${SHARED_DIR}/additional-nftables-rules"
+SUITE=${SUITE:-"all"}
 
 echo "# Allow host level services dynamic port range
 tcp dport 9000-9999 accept
@@ -38,5 +39,6 @@ git clone https://github.com/openshift-kni/commatrix ${SHARED_DIR}/commatrix
 pushd ${SHARED_DIR}/commatrix || exit
 git checkout ${BRANCH}
 go mod vendor
-EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" make e2e-test
+EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
+OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE}" OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT}" make e2e-test
 popd || exit

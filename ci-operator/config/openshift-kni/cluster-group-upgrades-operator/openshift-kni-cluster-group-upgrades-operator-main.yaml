@@ -25,17 +25,17 @@ operator:
     with: pipeline:cluster-group-upgrades-operator
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.19"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -48,10 +48,15 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: integration
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-telco
     env:

@@ -1,0 +1,40 @@
+ref:
+  as: quay-tests-test-quay-upgrade
+  cli: latest
+  # from: quay-test-operator
+  from_image:
+    name: quay-test-operator
+    namespace: ci
+    tag: latest
+  commands: quay-tests-test-quay-upgrade-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 10h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  - namespace: test-credentials  
+    name: quay-qe-brew-secret
+    mount_path: /var/run/quay-qe-brew-secret
+  documentation: |-
+    Deploy Quay Operator and execute Quay upgrade test
+  env:
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.13"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAYREGISTRY_QUAY_VERSION
+    documentation: Target Quay version upgrade to
+    default: "3.13"
+  - name: QUAY_INDEX_IMAGE_BUILD
+    documentation: Index image to test
+    default: "brew.registry.redhat.io/rh-osbs/iib:856636"
+  - name: QUAY_UPGRADE_TESTCASE
+    documentation: TestCase to run:Quay-Upgrade-High|Quay-Upgrade-Medium
+    default: "Quay-Upgrade-High|Quay-Upgrade-Medium"    

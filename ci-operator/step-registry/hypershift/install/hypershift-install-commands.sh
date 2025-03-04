@@ -47,6 +47,10 @@ if [ "${AUTH_THROUGH_CERTS}" == "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --aro-hcp-key-vault-users-client-id ${KEYVAULT_CLIENT_ID}"
 fi
 
+if [ "${ENABLE_SIZE_TAGGING}" == "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-size-tagging"
+fi
+
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \

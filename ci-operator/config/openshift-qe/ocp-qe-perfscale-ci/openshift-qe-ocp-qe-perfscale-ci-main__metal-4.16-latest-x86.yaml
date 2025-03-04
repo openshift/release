@@ -16,7 +16,8 @@ resources:
       memory: 200Mi
 tests:
 - as: weekly-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 0 * * 0
   restrict_network_access: false
   steps:
@@ -28,19 +29,20 @@ tests:
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
     - chain: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-installer-bm-day2-sriov
     - chain: openshift-qe-data-path-tests
-    - chain: openshift-qe-web-burner
     - chain: openshift-qe-node-density-heavy
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -48,13 +50,15 @@ tests:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: deploy-sno
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -62,6 +66,7 @@ tests:
       CRUCIBLE: "false"
       LAB_CLOUD: cloud31
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -69,7 +74,8 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -79,6 +85,7 @@ tests:
       KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -87,7 +94,8 @@ tests:
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -98,6 +106,7 @@ tests:
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_VERSION: latest-4.16
+      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
@@ -108,7 +117,8 @@ tests:
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -126,7 +136,8 @@ tests:
     - chain: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
-  cluster: build05
+  capabilities:
+  - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt

@@ -20,10 +20,6 @@ function create_dc_and_xpaas_pod()
   "SpringBootCxfJaxrsS2ITest"
   )
 
-  oc create -n jboss-fuse-interop serviceaccount jboss-fuse-sa || true
-  oc adm policy add-scc-to-user privileged -z jboss-fuse-sa -n jboss-fuse-interop
-  oc adm policy add-role-to-user cluster-admin -z jboss-fuse-sa -n jboss-fuse-interop
-
   NGINX_ROUTE=$(oc get routes nginx -n jboss-fuse-interop --no-headers=true | awk '{print $2}')
 
   for i in "${!interopTestList[@]}"; do

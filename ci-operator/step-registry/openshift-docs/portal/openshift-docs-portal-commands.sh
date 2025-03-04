@@ -6,13 +6,15 @@ set -o pipefail
 set -o verbose
 
 curl https://raw.githubusercontent.com/openshift/openshift-docs/main/scripts/get-updated-distros.sh > scripts/get-updated-distros.sh
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/build_for_portal.py > build_for_portal.py
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/makeBuild.py > makeBuild.py
 
 IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
 for DISTRO in "${DISTROS[@]}"; do
 
     case "${DISTRO}" in
-        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde"|"openshift-lightspeed")
+        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde"|"openshift-lightspeed"|"openshift-ove")
             TOPICMAP="_topic_maps/_topic_map.yml"
             ;;
         "openshift-rosa")

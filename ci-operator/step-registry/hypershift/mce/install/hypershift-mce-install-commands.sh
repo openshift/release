@@ -1,15 +1,54 @@
 #!/bin/bash
 
 set -ex
+env
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-MCE_VERSION=${MCE_VERSION:-"2.2"}
-if [[ $MCE_QE_CATALOG != "true" ]]; then
-  _REPO="quay.io/acm-d/mce-custom-registry"
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
+    MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
+fi
 
+echo "$MCE_VERSION"
+
+_REPO="quay.io/acm-d/mce-custom-registry"
+if [[ "$DISCONNECTED" == "true" ]]; then
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  # Setup disconnected quay mirror container repo
+  oc apply -f - <<EOF
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: rhacm-repo
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: quay.io/acm-d
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.redhat.io/rhacm2
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.redhat.io/multicluster-engine
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
+    source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+EOF
+  oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: rhacm-repo
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: quay.io/acm-d
+EOF
+else
   # Setup quay mirror container repo
   cat << EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
@@ -37,15 +76,14 @@ EOF
   mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
   rm /tmp/global-pull-secret.json
-  sleep 60
-  oc wait mcp master worker --for condition=updated --timeout=20m
+fi
 
-  VER=`oc version | grep "Client Version:"`
-  echo "* oc CLI ${VER}"
+sleep 60
+oc wait mcp master worker --for condition=updated --timeout=20m
 
-  echo "Install MCE custom catalog source"
-  IMG="${_REPO}:${MCE_VERSION}-latest"
-  oc apply -f - <<EOF
+echo "Install MCE custom catalog source"
+IMG="${_REPO}:${MCE_VERSION}-latest"
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -60,7 +98,7 @@ spec:
     registryPoll:
       interval: 10m
 EOF
-fi
+oc wait CatalogSource --timeout=20m --for=jsonpath='{.status.connectionState.lastObservedState}'=READY -n openshift-marketplace multiclusterengine-catalog
 
 oc apply -f - <<EOF
 apiVersion: v1
@@ -80,8 +118,7 @@ spec:
     - "multicluster-engine"
 EOF
 
-CATALOG=$([[ $MCE_QE_CATALOG == "true" ]] && echo -n "qe-app-registry" || echo -n "multiclusterengine-catalog")
-echo "* Applying SUBSCRIPTION_CHANNEL $MCE_VERSION, SUBSCRIPTION_SOURCE $CATALOG to multiclusterengine-operator subscription"
+echo "* Applying SUBSCRIPTION_CHANNEL $MCE_VERSION, SUBSCRIPTION_SOURCE multiclusterengine-catalog to multiclusterengine-operator subscription"
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -92,7 +129,7 @@ spec:
   channel: stable-${MCE_VERSION}
   installPlanApproval: Automatic
   name: multicluster-engine
-  source: ${CATALOG}
+  source: multiclusterengine-catalog
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -107,12 +144,12 @@ for ((i=1; i<=60; i++)); do
   if [ "$CSVName" != "" ]; then
     break
   fi
-  sleep 10
+  sleep 20
 done
 
 _apiReady=0
 echo "* Using CSV: ${CSVName}"
-for ((i=1; i<=20; i++)); do
+for ((i=1; i<=40; i++)); do
   sleep 30
   output=$(oc get csv -n multicluster-engine $CSVName -o jsonpath='{.status.phase}' >> /dev/null && echo "exists" || echo "not found")
   if [ "$output" != "exists" ]; then
@@ -233,10 +270,11 @@ metadata:
 data:
   hypershift-operator: ${OVERRIDE_HO_IMAGE}
 EOF
-  while ! [ "$(oc get deployment operator -n hypershift -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}')" == NewReplicaSetAvailable ]; do
+  while ! [[ "$(oc get deployment operator -n hypershift -o jsonpath='{.spec.template.spec.containers[*].image}')" == "$OVERRIDE_HO_IMAGE" ]]; do
       echo "wait override hypershift operator IMAGE..."
       sleep 10
   done
+  oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
 fi
 
 # display HyperShift cli version
@@ -249,3 +287,8 @@ if [ "$arch" == "x86_64" ]; then
   cd -
 fi
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+
+# display HyperShift Operator Version and MCE version
+oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
+oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperatorImage.txt" >/dev/null; echo > "$ARTIFACT_DIR/hypershiftoperator-image"
+oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"

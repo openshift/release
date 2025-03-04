@@ -2,11 +2,11 @@
 
 set -exuo pipefail
 
-if [ ! -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
-    exit 1
+# Ensure that oc commands run against the management cluster by default
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
 fi
-echo "switch kubeconfig"
-export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 echo "$(date) Creating additional NodePool for HyperShift cluster ${CLUSTER_NAME}"

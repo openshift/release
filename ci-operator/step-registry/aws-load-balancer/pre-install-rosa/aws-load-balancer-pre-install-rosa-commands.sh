@@ -22,8 +22,8 @@ E2E_INPUT_WAFV2_WEBACL="wafv2-webacl"
 E2E_INPUT_WAF_WEBACL="waf-webacl"
 E2E_INPUT_OPERATOR_ROLE_ARN="operator-role-arn"
 E2E_INPUT_CONTROLLER_ROLE_ARN="controller-role-arn"
-E2E_WAFV2_WEB_ACL_NAME="echoserver-acl"
-E2E_WAF_WEB_ACL_NAME="echoserverclassicacl"
+E2E_WAFV2_WEB_ACL_NAME="echoserver-acl-${UNIQUE_HASH}"
+E2E_WAF_WEB_ACL_NAME="echoserverclassicacl${UNIQUE_HASH}"
 
 if [ -f "${AWSCRED}" ]; then
     echo "=> configuring aws"

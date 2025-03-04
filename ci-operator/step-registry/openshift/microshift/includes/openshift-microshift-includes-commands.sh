@@ -143,7 +143,7 @@ function download_microshift_scripts() {
 
 function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 22 )); then
+    if (( go_version < 23 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
         mkdir -p /tmp/prow

@@ -31,6 +31,16 @@ chain:
           documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
+        
+        trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
+        
+        debug() {
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+          oc get pod -n local-cluster-${CLUSTER_NAME}
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
+          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+          oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+        }
 
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
@@ -70,6 +80,10 @@ chain:
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
         
+        if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+          HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+        fi
+        
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           echo "MCE version is less than 2.6, use --aws-creds command"
@@ -96,7 +110,7 @@ chain:
         --region ${HYPERSHIFT_AWS_REGION} \
         --pull-secret ${PULL_SECRET_PATH} \
         --namespace local-cluster \
-        --release-image ${RELEASE_IMAGE_LATEST}
+        --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}
         
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4"
@@ -142,6 +156,7 @@ chain:
         echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
         sleep 10s
         done
+        echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
         name: "4.12"
@@ -161,6 +176,6 @@ chain:
           namespace: test-credentials
       dependencies:
         - name: "release:latest"
-          env: RELEASE_IMAGE_LATEST
+          env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
         - name: hypershift-operator
           env: HYPERSHIFT_RELEASE_LATEST

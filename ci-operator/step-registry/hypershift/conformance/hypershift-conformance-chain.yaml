@@ -54,28 +54,42 @@ chain:
         TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
 
       }
-      
-      export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-      export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-      export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
-      [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-      
+
+      if [[ -z "${HOSTED_CP:-}" ]]; then
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      else
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+      fi
+
+      # In order for openshift-tests to pull external binary images from the
+      # payload, we need access enabled to the images on the build farm. In
+      # order to do that, we need to unset the KUBECONFIG so we talk to the
+      # build farm, not the cluster under test.
+      echo "Granting access for image pulling from the build farm..."
+      KUBECONFIG_BAK=$KUBECONFIG
+      unset KUBECONFIG
+      oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+      export KUBECONFIG=$KUBECONFIG_BAK
+
       if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
       fi
-      
-      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
       if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
         source "${SHARED_DIR}/ds-vars.conf"
-      fi  
+      fi
       if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
         source "${SHARED_DIR}/packet-conf.sh"
-      fi  
+      fi
 
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
@@ -149,15 +163,27 @@ chain:
       if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
         export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       fi
-      
+
+      if [[ -n "${TEST_INCLUDES}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep "${TEST_INCLUDES}" >/tmp/test_includes
+      fi
+
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          if [[ -n "${TEST_INCLUDES}" ]]; then
+            TEST_SKIPS_SPECIFIC=$(echo "$TEST_SKIPS" | sed 's/\\\[Suite:openshift\/conformance\/parallel\\\]$//')
+            TEST_SKIPS_SPECIFIC="${TEST_SKIPS_SPECIFIC%\\|}"
+            cat /tmp/test_includes | grep -v "${TEST_SKIPS_SPECIFIC:-placeholder_no_match}" >>/tmp/tests
+          fi
+
           echo "Skipping tests:"
-          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          echo "${TESTS}" | grep -vxFf /tmp/tests || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
+      RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -183,6 +209,9 @@ chain:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       name: hypershift-ci-jobs-azurecreds
       namespace: test-credentials
+    dependencies:
+    - name: "release:latest"
+      env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
     timeout: 14400s
     grace_period: 30m0s
     env:
@@ -201,6 +230,11 @@ chain:
         It is suggested to test the regex to make sure that it matches with the available tests.
         Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
         that are printed in Prow won't exactly match the list returned by openshift-tests.
+    - name: TEST_INCLUDES
+      default: ""
+      documentation: |
+        Regular expression (POSIX basic regular expression) of tests to include,
+        even if these tests were matched in the TEST_SKIPS expression.
     - name: SKIP_MONITOR_TEST
       default: ""
       documentation: |-
@@ -221,6 +255,9 @@ chain:
         Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
         program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
         details. The file must be present in ${SHARED_DIR}.
+    - name: HOSTED_CP
+      default: ""
+      documentation: Execute against a ROSA hosted control plane
     resources:
       requests:
         cpu: "3"

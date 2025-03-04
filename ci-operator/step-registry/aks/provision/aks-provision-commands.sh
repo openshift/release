@@ -11,6 +11,15 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
 
+MI_ARGS=""
+if [[ "${AKS_USE_HYPERSHIFT_MI}" == "true" ]]; then
+    HYPERSHIFT_MI_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-mi-info.json"
+    ASSIGN_IDENTITY="$(<"${HYPERSHIFT_MI_LOCATION}" jq -r .assignIdentity)"
+    KUBELET_ASSIGN_IDENTITY="$(<"${HYPERSHIFT_MI_LOCATION}" jq -r .kubeletAssignIdentity)"
+
+    MI_ARGS="--assign-identity ${ASSIGN_IDENTITY} --assign-kubelet-identity ${KUBELET_ASSIGN_IDENTITY}"
+fi
+
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
@@ -56,6 +65,7 @@ AKS_CREATE_COMMAND=(
     --os-sku "$AKS_OS_SKU"
     "${CLUSTER_AUTOSCALER_ARGS:-}"
     "${CERT_ROTATION_ARGS:-}"
+    "${MI_ARGS:-}"
     --location "$AZURE_LOCATION"
 )
 
@@ -67,7 +77,7 @@ fi
 if [[ -n "$AKS_K8S_VERSION" ]]; then
     AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
 elif [[ "$USE_LATEST_K8S_VERSION" == "true" ]]; then
-    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[*].orchestratorVersion)')
+    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[?isPreview==`null`].orchestratorVersion)')
     AKS_CREATE_COMMAND+=(--kubernetes-version "$K8S_LATEST_VERSION")
 fi
 

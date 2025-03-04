@@ -54,12 +54,16 @@ if [[ -z "${RESOURCE_GROUP}" ]]; then
     RESOURCE_GROUP="${INFRA_ID}-rg"
 fi
 
-no_critical_check_result=0
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
+no_critical_check_result=0
 echo "Checking if storage account is publicly accessible in ${RESOURCE_GROUP}"
 
 sa_access_output=$(mktemp)
-az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
+az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess,allowCrossTenantReplication]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
 if [[ ${no_critical_check_result=} == 1 ]]; then
     echo "ERROR: fail to list storage account on cluster ${INFRA_ID}!"
     [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
@@ -70,11 +74,22 @@ cat "${sa_access_output}" | while read line || [[ -n $line ]];
 do
     name=$(echo $line | awk -F' ' '{print $1}')
     access=$(echo $line | awk -F' ' '{print $2}')
+    echo "Checking storage account ${name} ......"
     if [[ "${access}" == "False" ]]; then
-        echo "storage account ${name} property allowBlobPublicAccess is False, which is expected!"
+        echo "INFO: property allowBlobPublicAccess is False, expected!"
     else
-        echo "storage account ${name} property allowBlobPublicAccess is ${access}, which is not expected!"
+        echo "ERROR: property allowBlobPublicAccess is ${access}, expected value should be False!"
         no_critical_check_result=1
+    fi
+
+    if (( ocp_minor_version > 15 )); then
+        cross_tenant_replication=$(echo $line | awk -F' ' '{print $3}')
+        if [[ "${cross_tenant_replication}" == "False" ]]; then
+            echo "INFO: property allowCrossTenantReplication is False, expected!"
+        else
+            echo "ERROR: property allowCrossTenantReplication is ${cross_tenant_replication}, expected value should be False!"
+            no_critical_check_result=1
+        fi
     fi
 done
 

@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -25,14 +25,6 @@ base_images:
     tag: dev-scripts
   tests:
     name: "4.18"
-    namespace: ocp
-    tag: tests
-  tests-4.12:
-    name: "4.12"
-    namespace: ocp
-    tag: tests
-  tests-4.13:
-    name: "4.13"
     namespace: ocp
     tag: tests
   tests-4.14:
@@ -55,6 +47,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -67,7 +63,7 @@ images:
   to: assisted-test-infra-internal
 promotion:
   to:
-  - name: ocm-2.13
+  - name: ocm-2.14
     namespace: edge-infrastructure
 releases:
   latest:
@@ -101,6 +97,26 @@ tests:
         OPENSHIFT_VERSION=4.18
       PACKET_PLAN: m3.small.x86
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-ha-kube-api-4-18
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        ISO_IMAGE_TYPE=minimal-iso
+        IPv4=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.18
+      PACKET_PLAN: c3.medium.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-sno-live-iso
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-sno
+    workflow: baremetalds-sno
 - always_run: false
   as: e2e-metal-assisted-onprem-4-18
   optional: true
@@ -112,7 +128,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-onprem-4-18-periodic
-  cron: 30 00 * * 0-5
+  cron: 30 03 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -122,7 +138,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-18-periodic
-  cron: 30 01 * * 0-5
+  cron: 30 03 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -153,28 +169,6 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-4-12
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.12
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-13
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.13
-    workflow: assisted-baremetal
-- always_run: false
   as: e2e-metal-assisted-4-14
   optional: true
   steps:
@@ -184,28 +178,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-12-periodic
-  cron: 30 09 * * 2
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.12
-      TEST_TYPE: none
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-13-periodic
-  cron: 30 03 * * 2
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.13
-      TEST_TYPE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-14-periodic
   cron: 30 04 * * 2
@@ -332,7 +304,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm-4-18-periodic
-  cron: 30 07 * * 0-5
+  cron: 30 03 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -384,53 +356,55 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-osc-4-17
+  as: e2e-metal-assisted-osc-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
+      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
         NUM_MASTERS=3
         NUM_WORKERS=2
-        MASTER_MEMORY=10240
-        MASTER_CPU=6
+        MASTER_MEMORY=18432
+        MASTER_CPU=5
         WORKER_MEMORY=10240
-        WORKER_CPU=6
-        OPENSHIFT_VERSION=4.17
+        WORKER_CPU=3
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-osc-sno-4-17
+  as: e2e-metal-assisted-osc-sno-4-18
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
+      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
         NUM_MASTERS=1
         NUM_WORKERS=0
-        MASTER_MEMORY=20480
-        MASTER_CPU=12
-        OPENSHIFT_VERSION=4.17
+        MASTER_MEMORY=18432
+        MASTER_CPU=10
+        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-metallb-4-18
+  as: e2e-metal-assisted-nmstate-4-17
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=metallb
-        METALLB_API_IP=10.0.0.1
-        METALLB_INGRESS_IP=10.0.0.2
-        OPENSHIFT_VERSION=4.18
+        OLM_OPERATORS=nmstate
+        NUM_MASTERS=3
+        NUM_WORKERS=1
+        OPENSHIFT_VERSION=4.17
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-4-17-periodic
-  cron: 30 02 * * 0-5
+  cron: 30 03 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -443,7 +417,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce-4-18-periodic
-  cron: 30 09 * * 0-5
+  cron: 30 03 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -454,7 +428,6 @@ tests:
       TEST_TYPE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-4-18
-  optional: true
   run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -464,7 +437,6 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-sno-4-18
-  optional: true
   run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -488,7 +460,7 @@ tests:
       TEST_TYPE: minimal
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-4-18-periodic
-  cron: 30 11 * * 0-5
+  cron: 30 03 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -497,25 +469,27 @@ tests:
         OPENSHIFT_VERSION=4.18
       TEST_TYPE: minimal
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
-        export MASTER_CPU=5
-        export MASTER_MEMORY=18432
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
         OPENSHIFT_VERSION=4.18
       PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-sno-4-18-periodic
-  cron: 00 10 * * 0-5
+  cron: 30 03 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -552,9 +526,9 @@ tests:
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv6-4-18
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -564,7 +538,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6-4-18-periodic
-  cron: 30 12 * * 0-5
+  cron: 30 01 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -573,9 +547,9 @@ tests:
         IPv4=no
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv4v6-4-18
+- always_run: false
+  as: e2e-metal-assisted-ipv4v6-4-18
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -585,7 +559,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6-4-18-periodic
-  cron: 30 13 * * 0-5
+  cron: 30 01 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -595,9 +569,9 @@ tests:
         OPENSHIFT_VERSION=4.18
       TEST_TYPE: extensive
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-none-4-18
+- always_run: false
+  as: e2e-metal-assisted-none-4-18
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -606,7 +580,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-none-4-18-periodic
-  cron: 30 14 * * 0-5
+  cron: 30 01 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -625,20 +599,8 @@ tests:
         PLATFORM=external
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-external-4-16
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        PLATFORM=external
-        OPENSHIFT_VERSION=4.16
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-external-4-18-periodic
-  cron: 30 15 * * 0-5
+  cron: 30 01 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -658,7 +620,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-sno-4-18-periodic
-  cron: 30 16 * * 0-5
+  cron: 30 01 * * 1,3,5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -667,8 +629,9 @@ tests:
         OPENSHIFT_VERSION=4.18
       TEST_TYPE: extensive
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-net-suite-4-18
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-metal-assisted-kube-api-net-suite-4-18
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -684,7 +647,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-4-18-periodic
-  cron: 30 17 * * 0-5
+  cron: 30 01 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -699,36 +662,6 @@ tests:
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.18
       TEST_TYPE: extensive
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ha-kube-api-4-18
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.18
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ha-kube-api-ipv4-4-18
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        IPv4=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-18
@@ -745,9 +678,9 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-static-ip-suite-4-18
+- always_run: false
+  as: e2e-metal-assisted-static-ip-suite-4-18
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -756,9 +689,9 @@ tests:
         OPENSHIFT_VERSION=4.18
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-bond-4-18
+- always_run: false
+  as: e2e-metal-assisted-bond-4-18
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -767,7 +700,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-4-18-periodic
-  cron: 30 18 * * 0-5
+  cron: 30 03 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -777,7 +710,7 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-4-18-periodic
-  cron: 30 0 * * 0-5
+  cron: 30 03 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -816,6 +749,7 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-static-ip-suite-4-14
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -829,6 +763,7 @@ tests:
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-bond-4-14
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -840,11 +775,6 @@ tests:
         OPENSHIFT_VERSION=4.14
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-sno-live-iso
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
 - as: e2e-metal-sno-with-worker-live-iso
   run_if_changed: .*bootstrap_in_place.*
   steps:
@@ -866,7 +796,7 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-4-18-periodic
-  cron: 30 22 * * 0-5
+  cron: 30 01 * * 0,2,4
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -874,48 +804,6 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         OPENSHIFT_VERSION=4.18
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-14
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-15
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.15
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- always_run: false
-  as: e2e-vsphere-assisted-4-16
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.16
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
@@ -990,7 +878,7 @@ tests:
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipxe-4-18-periodic
-  cron: 30 23 * * 0-5
+  cron: 30 01 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1049,57 +937,6 @@ tests:
         OPENSHIFT_VERSION=4.18
       PLATFORM: nutanix
     workflow: assisted-nutanix
-- always_run: false
-  as: e2e-nutanix-assisted-4-14
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.14
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
-- always_run: false
-  as: e2e-nutanix-assisted-4-15
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.15
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
-- always_run: false
-  as: e2e-nutanix-assisted-4-16
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.16
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-4-18-periodic
   cluster: build01
   interval: 24h
@@ -1143,7 +980,7 @@ tests:
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
         DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.18-multi
     workflow: assisted-equinix
 - as: e2e-metal-assisted-day2-arm-workers-4-18-periodic
   cron: 30 01 * * 1,4
@@ -1157,7 +994,7 @@ tests:
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
         DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.18-multi
     workflow: assisted-equinix
 - always_run: false
   as: e2e-oci-assisted-4-18
@@ -1168,54 +1005,37 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
     workflow: assisted-oci
-- always_run: false
-  as: opct-oci-assisted-4-18
-  optional: true
+- as: e2e-oci-assisted-4-18-periodic
+  cron: 30 01 * * 0,2,4
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_WORKERS=3
-        WORKER_DISK=100000000000
-        WORKER_MEMORY=16384
         OPENSHIFT_VERSION=4.18
-    workflow: assisted-oci-opct
-  timeout: 7h0m0s
-- as: opct-oci-assisted-4-18-periodic
-  cron: 00 20 * * 2
-  steps:
-    cluster_profile: oci-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=3
-        WORKER_DISK=100000000000
-        WORKER_MEMORY=16384
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-oci-opct
-  timeout: 7h0m0s
-- always_run: false
-  as: e2e-oci-assisted-4-16
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.16
     workflow: assisted-oci
 - always_run: false
-  as: e2e-oci-assisted-iscsi-4-18
+  as: e2e-oci-assisted-bm-iscsi-4-18
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OCI_BOOT_VOLUME_TYPE="ISCSI"
         OPENSHIFT_VERSION=4.18
+        OCI_COMPUTE_SHAPE="BM.Standard3.64"
+        OCI_CONTROL_PLANE_SHAPE="BM.Standard3.64"
+    workflow: assisted-oci
+- as: e2e-oci-assisted-bm-iscsi-4-18-periodic
+  cron: 30 01 * * 1
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.18
+        OCI_COMPUTE_SHAPE="BM.Standard3.64"
+        OCI_CONTROL_PLANE_SHAPE="BM.Standard3.64"
     workflow: assisted-oci
 - as: e2e-metal-assisted-4-control-planes-4-18-periodic
-  cron: 30 20 * * 0-5
+  cron: 30 01 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1224,6 +1044,52 @@ tests:
         NUM_WORKERS=1
         OPENSHIFT_VERSION=4.18
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-umlb-4-18
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        LOAD_BALANCER_TYPE=user-managed
+        OPENSHIFT_VERSION=4.18
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-umlb-4-18-periodic
+  cron: 30 01 * * 3
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        LOAD_BALANCER_TYPE=user-managed
+        OPENSHIFT_VERSION=4.18
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-umlb-4-18
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        ENABLE_KUBE_API=true
+        LOAD_BALANCER_TYPE=user-managed
+        IPv4=true
+        OPENSHIFT_VERSION=4.18
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-vsphere-assisted-umlb-4-18
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.18
+        LOAD_BALANCER_TYPE=user-managed
+      PLATFORM: vsphere
+    workflow: assisted-vsphere-external-lb
 zz_generated_metadata:
   branch: master
   org: openshift

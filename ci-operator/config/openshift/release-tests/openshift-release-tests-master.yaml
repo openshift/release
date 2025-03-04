@@ -1,27 +1,10 @@
-base_images:
-  tools:
-    name: "4.14"
-    namespace: ocp
-    tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN dnf install -y python3-devel && \
-      dnf install -y python3-pip && \
-      pip3 install --upgrade pip && \
-      pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
-  from: root
-  to: oar-python3
-- dockerfile_path: prow/Dockerfile
-  from: tools
-  to: job-python3
 - dockerfile_path: Dockerfile
-  from: oar-python3
   to: oar
 - dockerfile_path: prow/Dockerfile
   to: jobctl-python3
@@ -45,6 +28,8 @@ resources:
 test_binary_build_commands: job --help
 tests:
 - as: oar-check
+  capabilities:
+  - arm64
   commands: |
     oar --help
     oarctl --help
@@ -52,10 +37,12 @@ tests:
     from: oar
   optional: true
 - as: qe-release-gate-test
+  capabilities:
+  - arm64
   cron: 15 * * * *
   steps:
     env:
-      OCP_RELEASES: 4.12 4.13 4.14 4.15 4.16
+      OCP_RELEASES: 4.12 4.13 4.14 4.15 4.16 4.17 4.18 4.19
     test:
     - ref: release-qe-tests
 zz_generated_metadata:

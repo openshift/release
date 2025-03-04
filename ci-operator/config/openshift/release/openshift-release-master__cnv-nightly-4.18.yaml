@@ -18,12 +18,23 @@ base_images:
 releases:
   initial:
     candidate:
-      architecture: multi
       product: ocp
       relative: 1
       stream: nightly
       version: "4.18"
   latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.18"
+  multi-latest:
     candidate:
       architecture: multi
       product: ocp
@@ -38,9 +49,11 @@ tests:
 - as: e2e-aws-arm64-deploy-cnv
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+      BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: c8g.metal-24xl
       KUBEVIRT_RELEASE: v0.55.0
       KUBEVIRT_STORAGECLASS_NAME: gp3-csi
@@ -57,9 +70,11 @@ tests:
 - as: e2e-aws-arm64-upgrade-cnv
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+      BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: c8g.metal-24xl
       KUBEVIRT_RELEASE: v0.55.0
       KUBEVIRT_STORAGECLASS_NAME: gp3-csi
@@ -74,8 +89,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: cnv-e2e
     workflow: ipi-aws
-- as: e2e-azure-deploy-cnv
-  interval: 168h
+- as: deploy-azure-kubevirt-ovn
+  interval: 24h
   steps:
     cluster_profile: azure-2
     env:
@@ -101,7 +116,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
+      - default: v1.4.0
         name: KUBEVIRT_RELEASE
       - default: "4.18"
         name: OCP_VERSION
@@ -109,7 +124,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "false"
+      - default: "true"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src
       resources:
@@ -117,7 +132,7 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-azure-upgrade-cnv
+- as: upgrade-azure-kubevirt-ovn
   interval: 168h
   steps:
     cluster_profile: azure-2
@@ -143,7 +158,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
+      - default: v1.4.0
         name: KUBEVIRT_RELEASE
       - default: "4.18"
         name: OCP_VERSION
@@ -151,7 +166,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "false"
+      - default: "true"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src-upgrade
       resources:

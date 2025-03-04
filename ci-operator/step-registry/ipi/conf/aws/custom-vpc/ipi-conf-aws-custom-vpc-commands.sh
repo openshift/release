@@ -7,7 +7,13 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-subnet_ids_file="${SHARED_DIR}/subnet_ids"
+
+if [ -n "${PUBLISH}" ] && [ X"${PUBLISH}" == X"Internal" ]; then
+  subnet_ids_file="${SHARED_DIR}/private_subnet_ids"	
+  echo "This is a private cluster so use only private subnets from the VPC"
+else
+  subnet_ids_file="${SHARED_DIR}/subnet_ids"
+fi
 az_file="${SHARED_DIR}/availability_zones"
 
 if [ ! -f "${subnet_ids_file}" ] || [ ! -f "${az_file}" ]; then

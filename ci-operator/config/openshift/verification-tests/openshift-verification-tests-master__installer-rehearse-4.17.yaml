@@ -61,8 +61,11 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_MANAGED_IDENTITY_TYPE: user-defined
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork-public-to-private
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-managed-identity
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
@@ -80,10 +83,8 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
-      SLEEP_DURATION: 2m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
+      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private

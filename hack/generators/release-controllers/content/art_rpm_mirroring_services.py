@@ -14,7 +14,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
         # will actually hit the upstream repos.
         repo_config = configparser.ConfigParser()
         repo_config.read(repo_file, encoding='utf-8')
-        first_section_id = repo_config.sections()[0]
+        # first_section_id = repo_config.sections()[0]
 
         # Unfortunately, there is a legacy mapping from .repo file to service name.
         # Perform that mapping now.
@@ -120,15 +120,15 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                 },
                             },
                             'workingDir': '/tmp/repos',
-                            'livenessProbe': {
-                                'httpGet': {
-                                    # All repos have repomd.xml, so we should be able to read it.
-                                    'path': f'/{first_section_id}/repodata/repomd.xml',
-                                    'port': 8080,
-                                },
-                                'initialDelaySeconds': 120,
-                                'periodSeconds': 120,
-                            }
+                            # 'livenessProbe': {
+                            #     'httpGet': {
+                            #         # All repos have repomd.xml, so we should be able to read it.
+                            #         'path': f'/{first_section_id}/repodata/repomd.xml',
+                            #         'port': 8080,
+                            #     },
+                            #     'initialDelaySeconds': 120,
+                            #     'periodSeconds': 120,
+                            # }
                         }],
                         'nodeSelector': {
                             'kubernetes.io/os': 'linux',

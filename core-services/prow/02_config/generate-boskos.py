@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 4,
+        'us-east-1': 7,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -86,6 +86,12 @@ CONFIG = {
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
+    },
+    'metal-perfscale-selfsched-quota-slice': {
+        'metal-perfscale-selfsched': 3,
+    },
+    'metal-perfscale-telco-quota-slice': {
+        'metal-perfscale-telco-rdu2': 1,
     },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
@@ -158,6 +164,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azurestack-dev-quota-slice': {
+        'mtcazs': 4
+    },
     'azurestack-qe-quota-slice': {
         'mtcazs': 4
     },
@@ -182,7 +191,7 @@ CONFIG = {
         'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
-        'eastus2': 4
+        'eastus2': 7
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
@@ -216,7 +225,7 @@ CONFIG = {
         'us-central1': 4,
     },
     'gcp-autorelease-qe-quota-slice': {
-        'us-central1': 4,
+        'us-central1': 7,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -241,6 +250,9 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    'libvirt-s390x-vpn-quota-slice': {
+        'libvirt-s390x-0-1': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -260,22 +272,23 @@ CONFIG = {
         'default': 2,
     },
     'openstack-hwoffload-quota-slice': {
-        'default': 5,
+        'default': 3,
     },
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
-    'rhoso-giant28-quota-slice': {
-        'default': 1,
-    },    
+    'openstack-rhoso-quota-slice': {
+        '10.46.4.7': 1, # titan03.lab.eng.tlv2.redhat.com
+        '10.46.4.12': 1, # titan08.lab.eng.tlv2.redhat.com
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -375,6 +388,9 @@ CONFIG = {
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
+    },
+    'oci-agent-qe-quota-slice': {
+        'default': 50,
     },
     'oci-edge-quota-slice': {
         'default': 50,
@@ -476,6 +492,9 @@ CONFIG = {
     'aws-managed-osd-rhoai-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
+    },
+    'ibmcloud-rhoai-qe-quota-slice': {
+        'us-east': 40,
     }
 }
 

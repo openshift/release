@@ -77,11 +77,12 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-byo-iam-profile-arm-f60
-  cron: 25 4 14 1,3,5,7,9,11 *
+- as: aws-ipi-byo-iam-profile-mini-perm-arm-f60
+  cron: 6 9 7 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
@@ -328,13 +329,14 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
 - as: azure-ipi-fullyprivate-internal-registry-arm-f60
   cron: 52 13 17 2,4,6,8,10,12 *
   steps:
@@ -400,13 +402,15 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: azure-ipi-ovn-etcd-encryption-compact-arm-f60
   cron: 0 20 23 2,4,6,8,10,12 *
   steps:
@@ -506,6 +510,7 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
@@ -514,25 +519,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
-- as: baremetal-compact-agent-ipv4-dhcp-day2-amd-mixarch-f60
-  cluster: build05
-  cron: 49 20 28 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKERS: "1"
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-dynamic-day2
 - as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f60
   cluster: build05
   cron: 36 16 16 2,4,6,8,10,12 *
