@@ -38,7 +38,7 @@ if [ ${TELCO} == "true" ]; then
       for label in $(echo "${LABEL}" | tr ',' '\n' | sed 's/^ *//;s/ *$//'); do
         if [ -n "$label" ]; then
           echo "Applying label: $label to node: $node"
-          oc label node "$node" "$label"="" --overwrite
+          oc label node "$node" "$label=" --overwrite
         fi
       done
     done
