@@ -41,7 +41,7 @@ echo "Create self scheduling assignment ..."
 CLOUD_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self)
 echo $CLOUD_OUTPUT | jq .
 CLOUD=$(echo $CLOUD_OUTPUT | jq -r .'cloud.name')
-echo $CLOUD
+echo "The cloud name is: $CLOUD"
 
 # Create schedule
 echo
@@ -52,8 +52,8 @@ for i in $HOSTS; do
   ASSIGNMENT_OUTPUT=$(curl -sSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"cloud\": \"$CLOUD\", \"hostname\": \"$i\"}" $QUADS_INSTANCE/api/v3/schedules)
   echo $ASSIGNMENT_OUTPUT | jq .
 done
-ASSIGNMENT_ID=$(echo $ASSIGNMENT_OUTPUT jq -r .'assignment_id')
-echo $ASSIGNMENT_ID
+ASSIGNMENT_ID=$(echo $ASSIGNMENT_OUTPUT | jq -r .'assignment_id')
+echo "The assignment_id is: $ASSIGNMENT_ID"
 echo $ASSIGNMENT_ID > ${SHARED_DIR}/assignment_id
 
 # Wait for validation to be completed
