@@ -33,10 +33,14 @@ fi
 
 if [ ${TELCO} == "true" ]; then
 # Label the nodes
-  if [ ${LABEL} ]; then
-    for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")
-    do
-      oc label node $node ${LABEL}="" --overwrite
+  if [ -n "${LABEL}" ]; then
+    for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*"); do
+      for label in $(echo "${LABEL}" | tr ',' '\n' | sed 's/^ *//;s/ *$//'); do
+        if [ -n "$label" ]; then
+          echo "Applying label: $label to node: $node"
+          oc label node "$node" "$label"="" --overwrite
+        fi
+      done
     done
   fi
 fi

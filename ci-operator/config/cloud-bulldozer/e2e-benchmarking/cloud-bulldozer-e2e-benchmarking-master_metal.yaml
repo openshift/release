@@ -1,0 +1,56 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-rds-core-single-node
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      BASTION_CP_INTERFACE: ens7f1
+      CRUCIBLE: "false"
+      ISOLATED_CORES: 2-39,42-79
+      LAB_CLOUD: cloud19
+      LAB_INTERFACE: eno3
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+      RESERVED_CORES: 0,40,1,41
+      SRIOV_NUM_VFS: "64"
+      SRIOV_PF_NAME: ens7f0
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
+    - chain: openshift-qe-installer-bm-day2-metallb
+    - chain: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: cloud-bulldozer-e2e-benchmarking-rds-core
+zz_generated_metadata:
+  branch: master_metal
+  org: cloud-bulldozer
+  repo: e2e-benchmarking
