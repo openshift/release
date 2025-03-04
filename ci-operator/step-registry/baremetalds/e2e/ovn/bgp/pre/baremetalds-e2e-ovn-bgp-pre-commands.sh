@@ -8,7 +8,6 @@ source "${SHARED_DIR}/packet-conf.sh"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOFTOP'
 FRR_K8S_VERSION=v0.0.14
 FRR_TMP_DIR=$(mktemp -d -u)
-
 clone_frr() {
   [ -d "$FRR_TMP_DIR" ] || {
     mkdir -p "$FRR_TMP_DIR" && trap 'rm -rf $FRR_TMP_DIR' EXIT
@@ -18,22 +17,77 @@ clone_frr() {
   }
 }
 
+generate_frr_config() {
+    set -x
+    local NODE="$1"  # Get NODE argument
+    local OUTPUT_FILE="$2"  # Get output file path argument
+    local IFS=' '
+    read -ra ips <<< "$NODE"
+    local ipv4_list=()
+    local ipv6_list=()
+    
+    # First filter out IPv4 addresses
+    for ip in "${ips[@]}"; do
+        if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            ipv4_list+=("$ip")
+        else
+            ipv6_list+=("$ip")
+        fi
+    done
+
+    # Write to file using heredoc
+    cat > "$OUTPUT_FILE" << EOF
+router bgp 64512
+ no bgp default ipv4-unicast
+ no bgp network import-check
+
+EOF
+
+    # Generate neighbor remote-as section
+    for ip in "${ipv4_list[@]}"; do
+        echo " neighbor $ip remote-as 64512" >> "$OUTPUT_FILE"
+    done
+    echo "" >> "$OUTPUT_FILE"
+
+    for ip in "${ipv6_list[@]}"; do
+        echo " neighbor $ip remote-as 64512" >> "$OUTPUT_FILE"
+    done
+    echo "" >> "$OUTPUT_FILE"
+
+    echo " address-family ipv4 unicast" >> "$OUTPUT_FILE"
+    for ip in "${ipv4_list[@]}"; do
+        echo "  neighbor $ip activate" >> "$OUTPUT_FILE"
+        echo "  neighbor $ip next-hop-self" >> "$OUTPUT_FILE"
+        echo "  neighbor $ip route-reflector-client" >> "$OUTPUT_FILE"
+    done
+    echo " exit-address-family" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+
+    echo " address-family ipv6 unicast" >> "$OUTPUT_FILE"
+    for ip in "${ipv6_list[@]}"; do
+        echo "  neighbor $ip activate" >> "$OUTPUT_FILE"
+        echo "  neighbor $ip next-hop-self" >> "$OUTPUT_FILE"
+        echo "  neighbor $ip route-reflector-client" >> "$OUTPUT_FILE"
+    done
+    echo " exit-address-family" >> "$OUTPUT_FILE"
+}
+
 deploy_frr_external_container() {
   echo "Deploying FRR external container ..."
   clone_frr
- 
-  # apply the demo which will deploy an external FRR container that the cluster
-  # can peer with acting as BGP (reflector) external gateway
-  pushd "${FRR_TMP_DIR}"/frr-k8s/hack/demo || exit 1
-  # modify config template to configure neighbors as route reflector clients
-  sed -i '/remote-as 64512/a \ neighbor {{ . }} route-reflector-client' frr/frr.conf.tmpl
   # create the frr container with host network
-  sed -i 's/kind/host/' demo.sh
-  ./demo.sh
-  popd || exit 1
+  NODES=$(kubectl get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
+  echo $NODES
+  FRR_CONFIG=$(mktemp -d -t frr-XXXXXXXXXX)
+  generate_frr_config "$NODES" $FRR_CONFIG/frr.conf
+  cp "${FRR_TMP_DIR}"/frr-k8s/hack/demo/frr/daemons $FRR_CONFIG
+  chmod a+rw $FRR_CONFIG/*
+
+  podman rm -f frr
+  podman run -d --privileged --network host --rm --ulimit core=-1 --name frr --volume "$FRR_CONFIG":/etc/frr quay.io/frrouting/frr:9.1.0
 }
 
-sudo dnf install -y podman-docker golang
+sudo dnf install -y golang
 
 # deploy a frr instance
 deploy_frr_external_container
@@ -63,7 +117,7 @@ spec:
   advertisements:
     - "PodNetwork"
 EOF
-
+# set up BGP peering with the FRR instance running at hypervisor for both v4 and v6
 oc apply -f - <<EOF
 apiVersion: frrk8s.metallb.io/v1beta1
 kind: FRRConfiguration
@@ -76,6 +130,11 @@ spec:
     - asn: 64512
       neighbors:
       - address: 192.168.111.1
+        asn: 64512
+        toReceive:
+          allowed:
+            mode: filtered
+      - address: fd2e:6f44:5dd8:c956::1
         asn: 64512
         toReceive:
           allowed:
