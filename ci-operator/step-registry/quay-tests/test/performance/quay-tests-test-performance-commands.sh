@@ -4,6 +4,7 @@ set -o nounset
 
 pwd
 ls -al
+ls ./utility -al || true
 echo "current directory is: $(pwd)"
 
 # 1, Setup Quay performance test environment
@@ -187,7 +188,7 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-echo "job end $end_time"
+echo "job end $end_time and status $JOB_STATUS"
 
 # fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 echo "The Prow Job ID is: $PROW_JOB_ID"
