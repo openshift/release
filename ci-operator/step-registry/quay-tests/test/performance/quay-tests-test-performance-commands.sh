@@ -554,8 +554,8 @@ export CONCURRENCY="${CONCURRENCY}"
 export PUSH_PULL_NUMBERS="${PUSH_PULL_NUMBERS}"
 export TEST_PHASES="${TEST_PHASES}"
 
-echo "es server is: $ES_SERVER"
 source ../utility/e2e-benchmarking.sh
+echo "es server is: $ES_SERVER"
 
 
 # setup
