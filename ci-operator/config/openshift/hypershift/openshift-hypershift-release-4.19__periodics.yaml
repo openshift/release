@@ -39,6 +39,11 @@ releases:
       product: ocp
       stream: ci
       version: "4.19"
+  latest-4-18:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   multi-initial:
     candidate:
       architecture: multi
@@ -103,6 +108,17 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
+- as: e2e-aws-upgrade
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_PREVIOUS: release:latest-4-18
+    env:
+      CI_TESTS_RUN: ^TestUpgradeControlPlane.*
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
