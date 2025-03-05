@@ -297,7 +297,7 @@ all:
                 # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv4}"
                 # dual_api_ip: "${HUB_CLUSTER_API_IPv6}"
                 # ingress_ip: "${HUB_CLUSTER_INGRESS_IPv6}"
-                apps: ${HUB_CLUSTER_OPERATORS}
+                # apps: ${HUB_CLUSTER_OPERATORS}
                 ignore_hosts: true
                 vmrules:
                 - ${HUB_CLUSTER_NAME}-bootstrap:
@@ -408,6 +408,7 @@ all:
                   # address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv6}
                   #
                   # OCP SPOKE cluster API
+                  # TODO: These below lines should be added later during Spoke deployments, so that more than one Spoke can be installed at the same time:
                   #
                   # OCP SPOKE cluster
                   address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
