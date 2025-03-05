@@ -41,7 +41,10 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- from: ubi9-minimal
+- build_args:
+  - name: USE_FAST
+    value: "true"
+  from: ubi9-minimal
   inputs:
     base:
       as:
@@ -53,6 +56,14 @@ images:
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
   to: cluster-logging-operator-registry
+- build_args:
+  - name: RELATED_IMAGE_VECTOR
+    value: pipeline:cluster-logging-operator
+  dockerfile_literal: |
+    FROM scratch
+    ARG RELATED_IMAGE_VECTOR=""
+    RUN echo "--$RELATED_IMAGE_VECTOR--"
+  to: cluster-logging-operator-bundle
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
     FROM loki-operator-src AS lo-src
@@ -82,8 +93,9 @@ images:
   to: cluster-logging-operator-e2e
 operator:
   bundles:
-  - as: cluster-logging-operator-bundle
+  - as: cluster-logging-operator-bundle-test
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator:latest
     with: pipeline:cluster-logging-operator
