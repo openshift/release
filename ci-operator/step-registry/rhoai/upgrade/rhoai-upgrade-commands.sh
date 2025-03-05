@@ -23,6 +23,9 @@ export RHODS_DASHBOARD
 TEST_SUITE="PostUpgrade"
 export TEST_SUITE
 
+mkdir -p ${ARTIFACT_DIR}/PostUpgrade
+mkdir -p ${ARTIFACT_DIR}/Smoke
+
 # Update subscription to use the custome catalog source
 oc patch subscription rhods-operator -n redhat-ods-operator \
 --type='merge' -p '{"spec":{"source":"rhoai-catalog-dev"}}'
