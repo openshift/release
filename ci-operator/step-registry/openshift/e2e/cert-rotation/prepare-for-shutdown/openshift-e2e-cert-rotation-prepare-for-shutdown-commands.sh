@@ -14,7 +14,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 # This file has commonly used functions for cert rotation steps
 cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
@@ -39,11 +39,11 @@ function run-on-all-nodes {
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
 
 function run-on-first-master-long {
-  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo bash -eEuo pipefail ${1}
 }
 
 function run-on-first-master-silent {
