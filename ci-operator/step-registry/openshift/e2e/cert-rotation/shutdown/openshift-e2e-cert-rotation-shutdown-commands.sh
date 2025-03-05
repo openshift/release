@@ -60,11 +60,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null
 done
 
 # Set date for host
@@ -83,11 +81,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Starting ${vm} VM" --null
 done
 set -x
 
