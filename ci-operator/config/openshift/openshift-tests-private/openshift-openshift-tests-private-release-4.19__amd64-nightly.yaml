@@ -2102,6 +2102,74 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetal-ipi-ovn-lvms-f14-compliance
+  cron: 1 14 13,27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      FILTERS_ADDITIONAL: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetal-ipi-ovn-lvms-f14-compliance-destructive
+  cron: 9 21 14,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetal-ipi-ovn-lvms-f14-file-integrity
+  cron: 25 15 8,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetal-ipi-ovn-lvms-f14-security-profiles
+  cron: 34 14 14,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      E2E_RUN_TAGS: '@spo'
+      FILTERS_ADDITIONAL: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-mco-p1-f14
   cluster: build05
   cron: 26 17 6,20 * *
@@ -2695,35 +2763,6 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-ovn-winc-f28-compliance
-  cron: 30 23 9 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@complianceoperator'
-      FILTERS_ADDITIONAL: ""
-      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
-      TEST_PARALLEL: "1"
-      TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "40"
-    test:
-    - ref: etcd-encryption
-    - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
-  cron: 5 20 23 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~HyperShiftMGMT
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
-      TEST_TIMEOUT: "20"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-secureboot-confidential-computing-f14
   cron: 8 17 13,29 * *
   steps:
