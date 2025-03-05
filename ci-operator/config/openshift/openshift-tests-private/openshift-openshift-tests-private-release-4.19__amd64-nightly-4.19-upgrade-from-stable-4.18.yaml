@@ -295,11 +295,12 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-cco-manual-security-token-service
-- as: aws-ipi-workers-marketplace-f28
+- as: aws-ipi-workers-marketplace-mini-perm-f28
   cron: 12 6 26 * *
   steps:
     cluster_profile: aws-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - chain: openshift-upgrade-qe-test
@@ -443,6 +444,21 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-disc-oidc-oc-mirror-f28-ota
+  cron: 5 19 1 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
+      MIRROR_GRAPH_DATA: "true"
+    test:
+    - ref: cucushift-upgrade-mirror-images-by-oc-mirror
+    - ref: cucushift-upgrade-prehealthcheck
+    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-upgrade-healthcheck
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-ipi-marketplace-mini-perm-f28
   cron: 26 6 3 * *

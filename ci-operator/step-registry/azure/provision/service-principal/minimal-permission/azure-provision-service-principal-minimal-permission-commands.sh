@@ -87,7 +87,7 @@ fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
-AZURE_AUTH_SUBSCRIPTOIN_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]] || [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -97,7 +97,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account set --subscription ${AZURE_AUTH_SUBSCRIPTOIN_ID}
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -121,7 +121,7 @@ for sp_type in ${sp_list}; do
     fi
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
-    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sp_output}"    
+    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
     sp_id=$(jq -r .appId "${sp_output}")
     sp_password=$(jq -r .password "${sp_output}")
     sp_tenant=$(jq -r .tenant "${sp_output}")
@@ -136,7 +136,7 @@ for sp_type in ${sp_list}; do
         os_sp_file_name="azure_minimal_permission_${sp_type}"
     fi
     cat <<EOF > "${SHARED_DIR}/${os_sp_file_name}"
-{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
+{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTION_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
 EOF
 
     # for destroy
